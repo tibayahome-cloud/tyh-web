@@ -1,0 +1,28 @@
+# Server Configurations
+nginx.conf
+
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Tech-specific
+.env
+.env.*
+!.env.example
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+
+# Documentation
+docs/
+site/
+
+# Tests
+tests/
+test-results/

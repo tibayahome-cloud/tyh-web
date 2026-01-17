@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "Tiba Ya Home"
+  },
+  "nav": {
+    "signOut": "Sign out"
+  },
+  "auth": {
+    "loginTitle": "Sign in to continue",
+    "adminLoginTitle": "Admin access",
+    "emailOrPhone": "Email or phone",
+    "email": "Email",
+    "phone": "Phone",
+    "fullName": "Full name",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "rememberMe": "Remember me",
+    "submit": "Sign in",
+    "switchUser": "Back to user sign in",
+    "forgotPassword": "Forgot your password?",
+    "signUp": "Create a new account",
+    "adminRedirectNotice": "We detected admin privileges on your account. Please sign in using the admin portal below.",
+    "signUpTitle": "Create your Tiba Ya Home account",
+    "signUpCta": "Create account",
+    "signUpSuccess": "Account created successfully. Check your inbox to verify and then sign in.",
+    "signUpError": "We could not complete your registration. Please try again.",
+    "haveAccount": "Already have an account?",
+    "passwordResetTitle": "Reset your password",
+    "passwordResetDescription": "Enter the email you used to sign up and we will send you a password reset link.",
+    "passwordResetCta": "Send reset link",
+    "passwordResetSuccess": "We have sent reset instructions if that email exists in our records.",
+    "passwordResetError": "We could not start the reset flow. Please try again.",
+    "backToLogin": "Back to sign in",
+    "resetPasswordTitle": "Choose a new password",
+    "resetPasswordDescription": "Enter your new password below. For security, this link will expire shortly.",
+    "resetPasswordCta": "Update password",
+    "resetPasswordSuccess": "Your password has been updated. Redirecting you to sign in\u2026",
+    "resetPasswordError": "We could not update your password. Please request a new reset link.",
+    "resetPasswordMissingToken": "Reset token missing or invalid. Request a new password reset link.",
+    "resetPasswordMissingTokenHelp": "Need a new link? ",
+    "success": "Welcome back, {{name}}",
+    "signingIn": "Signing you in\u2026",
+    "redirecting": "Redirecting to your workspace\u2026",
+    "verifyingCode": "Verifying code\u2026",
+    "twoFactorTitle": "Enter verification code",
+    "twoFactorDescription": "Enter the code from {{method}} to continue.",
+    "twoFactorCode": "Verification code",
+    "twoFactorSubmit": "Verify code",
+    "twoFactorMethod": {
+      "totp": "your authenticator app",
+      "sms": "SMS",
+      "email": "email",
+      "default": "your trusted device"
+    },
+    "twoFactorError": "We could not verify the code. Try again.",
+    "cancel": "Cancel"
+  },
+  "home": {
+    "client": "You are signed in as a client",
+    "provider": "You are signed in as a provider",
+    "admin": "Administrator dashboard"
+  }
+}

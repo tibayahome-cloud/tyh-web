@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "Tiba Ya Home"
+  },
+  "nav": {
+    "signOut": "Ondoka"
+  },
+  "auth": {
+    "loginTitle": "Ingia ili uendelee",
+    "adminLoginTitle": "Huduma ya msimamizi",
+    "emailOrPhone": "Barua pepe au simu",
+    "email": "Barua pepe",
+    "phone": "Simu",
+    "fullName": "Jina kamili",
+    "password": "Nenosiri",
+    "confirmPassword": "Thibitisha nenosiri",
+    "rememberMe": "Nikumbuke",
+    "submit": "Ingia",
+    "switchUser": "Rudi kwenye kuingia kwa mtumiaji",
+    "forgotPassword": "Umesahau nenosiri?",
+    "signUp": "Fungua akaunti mpya",
+    "adminRedirectNotice": "Tulichanganua kuwa una ruhusa ya msimamizi. Tafadhali ingia kupitia ukurasa wa wasimamizi hapa chini.",
+    "signUpTitle": "Fungua akaunti yako ya Tiba Ya Home",
+    "signUpCta": "Sajili akaunti",
+    "signUpSuccess": "Akaunti imeundwa. Tafadhali angalia barua pepe yako kuthibitisha kisha uingie.",
+    "signUpError": "Usajili haujakamilika. Jaribu tena.",
+    "haveAccount": "Tayari una akaunti?",
+    "passwordResetTitle": "Weka upya nenosiri",
+    "passwordResetDescription": "Ingiza barua pepe uliyotumia kujisajili na tutakutumia kiungo cha kuweka upya.",
+    "passwordResetCta": "Tuma kiungo",
+    "passwordResetSuccess": "Tumehifadhi maagizo kama barua pepe hiyo ipo kwenye kumbukumbu zetu.",
+    "passwordResetError": "Hatukuweza kuanza mchakato. Jaribu tena.",
+    "backToLogin": "Rudi kwenye kuingia",
+    "resetPasswordTitle": "Chagua nenosiri jipya",
+    "resetPasswordDescription": "Weka nenosiri lako jipya hapa chini. Kiungo hiki kutaisha muda mfupi ujao.",
+    "resetPasswordCta": "Sasisha nenosiri",
+    "resetPasswordSuccess": "Nenosiri limebadilishwa. Unahamishwa kwenda kwenye ukurasa wa kuingia…",
+    "resetPasswordError": "Hatukuweza kusasisha nenosiri. Jaribu kuomba kiungo kipya.",
+    "resetPasswordMissingToken": "Tokeni ya kuweka upya haipo au si sahihi. Omba kiungo kipya.",
+    "resetPasswordMissingTokenHelp": "Unahitaji kiungo kipya? ",
+    "success": "Karibu tena, {{name}}",
+    "signingIn": "Tunakukagua...",
+    "redirecting": "Tunakupeleka kwenye ukurasa wako...",
+    "verifyingCode": "Tunathibitisha msimbo…",
+    "twoFactorTitle": "Ingiza msimbo wa uthibitisho",
+    "twoFactorDescription": "Ingiza msimbo kutoka {{method}} ili kuendelea.",
+    "twoFactorCode": "Msimbo wa uthibitisho",
+    "twoFactorSubmit": "Thibitisha msimbo",
+    "twoFactorMethod": {
+      "totp": "programu yako ya uthibitishaji",
+      "sms": "SMS",
+      "email": "barua pepe",
+      "default": "kifaa chako cha kuaminika"
+    },
+    "twoFactorError": "Hatukuweza kuthibitisha msimbo. Jaribu tena.",
+    "cancel": "Ghairi"
+  },
+  "home": {
+    "client": "Umeingia kama mteja",
+    "provider": "Umeingia kama mtoa huduma",
+    "admin": "Dashibodi ya msimamizi"
+  }
+}
