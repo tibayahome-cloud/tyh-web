@@ -26,7 +26,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
-import { ConversationsPanel } from "../pages/ConversationsPage";
+import { ConversationsPanel } from "../components/ConversationsPanel";
 import { AppHeader } from "../../../shared/components/AppHeader";
 
 type NavItem = {

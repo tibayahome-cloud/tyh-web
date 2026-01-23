@@ -1,0 +1,1 @@
+const m=(t,s)=>`${t.toFixed(4)}, ${s.toFixed(4)}`,a=t=>t*Math.PI/180,p=(t,s,n,i)=>{const e=a(t),M=a(n),o=a(n-t),c=a(i-s),h=Math.sin(o/2)*Math.sin(o/2)+Math.cos(e)*Math.cos(M)*Math.sin(c/2)*Math.sin(c/2);return 6371e3*(2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h)))};export{p as d,m as f};

@@ -19,6 +19,7 @@ const TwoFactorPage = lazy(() => import("../auth/TwoFactorPage"));
 const ForgotPasswordPage = lazy(() => import("../auth/ForgotPassword"));
 const SignUpPage = lazy(() => import("../auth/SignUp"));
 const ResetPasswordPage = lazy(() => import("../auth/ResetPassword"));
+const LandingPage = lazy(() => import("../domains/landing/pages/Landing"));
 
 const SuspenseWrapper = ({ children }: { children: JSX.Element }) => (
   <Suspense fallback={<Loading fullHeight />}>{children}</Suspense>
@@ -36,68 +37,79 @@ export const router = createBrowserRouter(
   [
     {
       path: "/",
-      element: (
-        <SuspenseWrapper>
-          <PublicLayout />
-        </SuspenseWrapper>
-      ),
       children: [
-        { index: true, element: <Navigate to="/login" replace /> },
         {
-          path: "login",
+          index: true,
           element: (
             <SuspenseWrapper>
-              <ClientLoginPage />
+              <LandingPage />
             </SuspenseWrapper>
           )
         },
         {
-          path: "two-factor",
           element: (
             <SuspenseWrapper>
-              <TwoFactorPage />
+              <PublicLayout />
             </SuspenseWrapper>
-          )
-        },
-        {
-          path: "admin/login",
-          element: (
-            <SuspenseWrapper>
-              <AdminLoginPage />
-            </SuspenseWrapper>
-          )
-        },
-        {
-          path: "session-expired",
-          element: (
-            <SuspenseWrapper>
-              <SessionExpiredPage />
-            </SuspenseWrapper>
-          )
-        },
-        {
-          path: "forgot-password",
-          element: (
-            <SuspenseWrapper>
-              <ForgotPasswordPage />
-            </SuspenseWrapper>
-          )
-        },
-        {
-          path: "signup",
-          element: (
-            <SuspenseWrapper>
-              <SignUpPage />
-            </SuspenseWrapper>
-          )
-        },
-        {
-          path: "reset-password",
-          element: (
-            <SuspenseWrapper>
-              <ResetPasswordPage />
-            </SuspenseWrapper>
-          )
+          ),
+          children: [
+            {
+              path: "login",
+              element: (
+                <SuspenseWrapper>
+                  <ClientLoginPage />
+                </SuspenseWrapper>
+              )
+            },
+            {
+              path: "two-factor",
+              element: (
+                <SuspenseWrapper>
+                  <TwoFactorPage />
+                </SuspenseWrapper>
+              )
+            },
+            {
+              path: "admin/login",
+              element: (
+                <SuspenseWrapper>
+                  <AdminLoginPage />
+                </SuspenseWrapper>
+              )
+            },
+            {
+              path: "session-expired",
+              element: (
+                <SuspenseWrapper>
+                  <SessionExpiredPage />
+                </SuspenseWrapper>
+              )
+            },
+            {
+              path: "forgot-password",
+              element: (
+                <SuspenseWrapper>
+                  <ForgotPasswordPage />
+                </SuspenseWrapper>
+              )
+            },
+            {
+              path: "signup",
+              element: (
+                <SuspenseWrapper>
+                  <SignUpPage />
+                </SuspenseWrapper>
+              )
+            },
+            {
+              path: "reset-password",
+              element: (
+                <SuspenseWrapper>
+                  <ResetPasswordPage />
+                </SuspenseWrapper>
+              )
+            }
+          ]
         }
       ]
     },
@@ -141,7 +153,6 @@ export const router = createBrowserRouter(
   ],
   {
     future: {
-      v7_startTransition: true,
       v7_relativeSplatPath: true
     }
   }

@@ -1075,7 +1075,7 @@ const ProviderDetailPage = () => {
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Telemetry</p>
               <p className="mt-0.5 text-[10px] font-medium text-slate-500">
-                {provider.currentLat && provider.currentLng 
+                {provider.currentLat && provider.currentLng
                   ? `${provider.currentLat.toFixed(4)}, ${provider.currentLng.toFixed(4)}`
                   : "No tracking data"}
               </p>
@@ -1127,7 +1127,7 @@ const ProviderDetailPage = () => {
           </form>
         </Card>
 
-        </Card>
+
 
         <Card title="Intelligence insights" description="AI-driven feedback and sentiment analysis.">
           <div className="space-y-4">
@@ -1138,7 +1138,7 @@ const ProviderDetailPage = () => {
               </p>
               "This provider maintains a high reliability score with particular strength in pediatric care. Sentiment analysis indicates high client satisfaction regarding turnaround time."
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
                 <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Positive Sentiment</p>
