@@ -3,6 +3,22 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Activity,
+  MapPin,
+  Clock,
+  CheckCircle2,
+  ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
+  Stethoscope,
+  Heart,
+  Baby,
+  Activity as VitalsIcon,
+  Search,
+  Crosshair
+} from "lucide-react";
 
 import { Modal } from "../../../shared/components/Modal";
 import { Button } from "../../../shared/components/Button";
@@ -17,6 +33,7 @@ import { LocationPickerMap } from "../../../shared/components/LocationPickerMap"
 import { loadRecentLocations, saveRecentLocation, type StoredLocation } from "../../../shared/utils/recentLocations";
 import { Stepper } from "../../../shared/components/Stepper";
 import { formatDecimalLocation } from "../../../shared/utils/location";
+import { SlideToBook } from "../../../shared/components/SlideToBook";
 
 type BookingRequestDialogProps = {
   open: boolean;
@@ -48,15 +65,19 @@ const LOCATION_SOURCE_LABEL: Record<LocationSource, string> = {
 const BOOKING_STEPS = [
   {
     title: "Service",
-    description: "Choose the care you need"
+    description: "What do you need?"
   },
   {
     title: "Location",
-    description: "Pin your address & notes"
+    description: "Where are you?"
+  },
+  {
+    title: "Timing",
+    description: "Now or later?"
   },
   {
     title: "Confirm",
-    description: "Review duration & submit"
+    description: "Review & book"
   }
 ];
 
@@ -175,10 +196,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     }
     return 2;
   }, [selectedService, locationComplete]);
-  const [currentStep, setCurrentStep] = useState(derivedStep);
-  useEffect(() => {
-    setCurrentStep(derivedStep);
-  }, [derivedStep]);
+  const [currentStep, setCurrentStep] = useState(0);
   const derivedEstimateMinutes = useMemo(() => {
     if (estimateField && estimateField.trim().length) {
       const value = Number(estimateField);
@@ -476,336 +494,370 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     <Modal
       open={open}
       onClose={closeAndReset}
-      title="New booking request"
-      description="Tell us what you need and drop your location—we'll take care of matching."
+      title="Create Booking"
+      description="Tell us what you need and we'll match you with a provider."
       maxWidth="md"
     >
       {loadingServices ? (
-        <div className="py-6">
-          <Loading label="Loading services..." />
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loading label="Fetching care services..." />
         </div>
       ) : (
-        <form className="py-1" onSubmit={onSubmit} noValidate>
-          <div className="space-y-4">
+        <form className="relative overflow-hidden" onSubmit={onSubmit} noValidate>
+          <div className="mb-6">
             <Stepper steps={BOOKING_STEPS} current={currentStep} />
+          </div>
 
-            <section className="space-y-3 rounded-2xl border border-white/70 bg-white/90 p-3 shadow-card sm:rounded-3xl sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-500 sm:text-xs sm:tracking-[0.3em]">Step 1 · Service</p>
-                  <p className="text-xs text-neutral-500 sm:text-sm">Pick the care type you need.</p>
-                </div>
-              </div>
-              <FormField
-                control={control}
-                name="serviceId"
-                render={({ field, fieldState }) => (
-                  <label className="flex w-full flex-col gap-2 text-sm font-semibold text-neutral-700">
-                    <span>Service</span>
-                    <select
-                      {...field}
-                      className="w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 shadow-inner transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                    >
-                      <option value="">Select a service</option>
-                      {(services ?? []).map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {service.name}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldState.error && <span className="text-xs text-danger-600">{fieldState.error.message}</span>}
-                  </label>
-                )}
-              />
-              {selectedService && (
-                <div className="rounded-2xl border border-white/60 bg-brand-50/60 p-4 text-sm text-neutral-600">
-                  <p className="text-base font-semibold text-neutral-900">{selectedService.name}</p>
-                  <p className="text-xs text-neutral-500">
-                    {selectedService.description ?? "No additional description available."}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-3 text-[11px] uppercase tracking-wide text-brand-600">
-                    <span>{formatCurrency(selectedService.base_price_cents)}</span>
-                    <span>{selectedService.default_estimate_minutes} mins</span>
-                    {selectedService.is_emergency_capable && (
-                      <span className="text-emerald-600">Emergency ready</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </section>
-
-            <section className="space-y-3 rounded-2xl border border-white/70 bg-white/90 p-3 shadow-card sm:space-y-4 sm:rounded-3xl sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-500 sm:text-xs sm:tracking-[0.3em]">Step 2 · Location</p>
-                  <p className="text-xs text-neutral-500 sm:text-sm">
-                    Drop pin and add directions.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={handleUseCurrentLocation} loading={geoLoading}>
-                    Current location
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={handleClearLocation} disabled={!mapLocation}>
-                    Clear
-                  </Button>
-                </div>
-              </div>
-              <FormField
-                control={control}
-                name="addressText"
-                render={({ field, fieldState }) => (
-                  <label className="flex w-full flex-col gap-2 text-sm font-semibold text-neutral-700">
-                    <span>Directions & notes</span>
-                    <textarea
-                      {...field}
-                      rows={3}
-                      className="w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 shadow-inner transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                      placeholder="Estate, apartment, gate code, preferred contact..."
-                    />
-                    {fieldState.error && <span className="text-xs text-danger-600">{fieldState.error.message}</span>}
-                  </label>
-                )}
-              />
-              <div className="grid gap-4 md:grid-cols-3">
-                <FormField
-                  control={control}
-                  name="homeAddress"
-                  render={({ field, fieldState }) => (
-                    <Input
-                      {...field}
-                      label="Home or estate address"
-                      placeholder="E.g. Riverside Estate, Block A"
-                      error={fieldState.error?.message}
-                    />
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="houseNumber"
-                  render={({ field, fieldState }) => (
-                    <Input
-                      {...field}
-                      label="House number"
-                      placeholder="e.g. 12B"
-                      error={fieldState.error?.message}
-                    />
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="apartment"
-                  render={({ field, fieldState }) => (
-                    <Input
-                      {...field}
-                      label="House/Apartment"
-                      placeholder="Apartment name, floor, etc."
-                      error={fieldState.error?.message}
-                    />
-                  )}
-                />
-              </div>
-              <LocationPickerMap value={mapLocation ?? undefined} onChange={handleMapSelect} onAddressChange={handleAddressResolved} />
-              <div className="text-xs text-neutral-500">
-                Source: <span className="font-semibold text-neutral-800">{LOCATION_SOURCE_LABEL[locationSource]}</span>
-              </div>
-              {recentLocations.length > 0 && (
-                <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Recent locations</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {recentLocations.map((loc) => (
+          <div className="min-h-[400px]">
+            <AnimatePresence mode="wait">
+              {/* STEP 1: SERVICE SELECTION */}
+              {currentStep === 0 && (
+                <motion.div
+                  key="step0"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-6"
+                >
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {(services ?? []).map((service) => (
                       <button
-                        key={loc.id}
+                        key={service.id}
                         type="button"
-                        onClick={() => handleApplyRecent(loc)}
-                        className="flex min-w-[160px] flex-col rounded-xl border border-white/80 bg-white px-3 py-2 text-left text-xs text-neutral-600 transition hover:border-brand-200"
+                        onClick={() => {
+                          setValue("serviceId", service.id);
+                          setCurrentStep(1);
+                        }}
+                        className={classNames(
+                          "group relative flex flex-col rounded-3xl border-2 p-5 text-left transition-all duration-300",
+                          selectedServiceId === service.id
+                            ? "border-brand-500 bg-brand-50/40 shadow-lg shadow-brand-500/10"
+                            : "border-neutral-100 bg-white hover:border-brand-200 hover:shadow-md"
+                        )}
                       >
-                        <span className="font-semibold text-neutral-900">{loc.label}</span>
-                        <span className="text-[11px] text-neutral-500">
-                          {loc.lat.toFixed(3)}, {loc.lng.toFixed(3)}
-                        </span>
+                        <div className={classNames(
+                          "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-300",
+                          selectedServiceId === service.id ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-600 group-hover:bg-brand-100"
+                        )}>
+                          {service.name.toLowerCase().includes("nurse") ? <Stethoscope /> :
+                            service.name.toLowerCase().includes("baby") ? <Baby /> :
+                              service.name.toLowerCase().includes("heart") ? <Heart /> : <Activity />}
+                        </div>
+                        <h3 className="text-lg font-bold text-neutral-900">{service.name}</h3>
+                        <p className="mt-1 text-xs text-neutral-500 line-clamp-2">
+                          {service.description ?? "Reliable professional healthcare at your doorstep."}
+                        </p>
+                        <div className="mt-4 flex items-center justify-between">
+                          <span className="text-sm font-black text-brand-600">{formatCurrency(service.base_price_cents)}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{service.default_estimate_minutes} MINS</span>
+                        </div>
                       </button>
                     ))}
                   </div>
-                </div>
+                </motion.div>
               )}
-            </section>
 
-            <section className="space-y-4 rounded-3xl border border-white/70 bg-white/90 p-5 shadow-card">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={control}
-                  name="lat"
-                  render={({ field, fieldState }) => (
-                    <Input
-                      {...field}
-                      label="Latitude"
-                      placeholder="-1.2854"
-                      error={fieldState.error?.message}
-                      inputMode="decimal"
-                      onChange={(event) => {
-                        setLocationSource("manual");
-                        field.onChange(event);
-                      }}
+              {/* STEP 2: LOCATION */}
+              {currentStep === 1 && (
+                <motion.div
+                  key="step1"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-6"
+                >
+                  <div className="relative overflow-hidden rounded-[32px] border border-neutral-100 shadow-xl">
+                    <LocationPickerMap
+                      value={mapLocation ?? undefined}
+                      onChange={handleMapSelect}
+                      onAddressChange={handleAddressResolved}
                     />
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="lng"
-                  render={({ field, fieldState }) => (
-                    <Input
-                      {...field}
-                      label="Longitude"
-                      placeholder="36.8219"
-                      error={fieldState.error?.message}
-                      inputMode="decimal"
-                      onChange={(event) => {
-                        setLocationSource("manual");
-                        field.onChange(event);
-                      }}
-                    />
-                  )}
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={control}
-                  name="estimateDurationMinutes"
-                  render={({ field, fieldState }) => (
-                    <Input
-                      {...field}
-                      label="Estimated duration (minutes)"
-                      placeholder={selectedService?.default_estimate_minutes?.toString() ?? "e.g. 60"}
-                      inputMode="numeric"
-                      error={fieldState.error?.message}
-                    />
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="emergency"
-                  render={({ field }) => (
-                    <label className="flex h-full items-center gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
-                        checked={Boolean(field.value)}
-                        onChange={(event) => field.onChange(event.target.checked)}
-                      />
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-neutral-900">Emergency-capable only</span>
-                        <span className="text-xs text-neutral-500">
-                          We'll prioritize teams flagged for rapid response.
-                        </span>
+
+                    <div className="absolute top-4 left-4 right-4 z-10 flex gap-2">
+                      <div className="flex-1 rounded-2xl bg-white/90 p-1 shadow-2xl backdrop-blur-md ring-1 ring-black/5">
+                        <div className="flex items-center px-3">
+                          <Search className="h-4 w-4 text-neutral-400" />
+                          <input
+                            type="text"
+                            className="w-full border-none bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-0"
+                            placeholder="Find your location..."
+                            {...control.register("addressText")}
+                          />
+                        </div>
                       </div>
-                    </label>
-                  )}
-                />
-              </div>
+                      <button
+                        type="button"
+                        onClick={handleUseCurrentLocation}
+                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg active:scale-95 transition-transform"
+                      >
+                        {geoLoading ? <Loading /> : <Crosshair className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Scheduling Section */}
-              <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 space-y-3">
-                <FormField
-                  control={control}
-                  name="scheduleForLater"
-                  render={({ field }) => (
-                    <label className="flex items-center gap-3 text-sm text-neutral-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-neutral-300 text-violet-600 focus:ring-violet-500"
-                        checked={Boolean(field.value)}
-                        onChange={(event) => field.onChange(event.target.checked)}
-                      />
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-neutral-900">Schedule for later</span>
-                        <span className="text-xs text-neutral-500">
-                          Book in advance instead of requesting a provider now.
-                        </span>
-                      </div>
-                    </label>
-                  )}
-                />
-
-                {watch("scheduleForLater") && (
-                  <FormField
-                    control={control}
-                    name="scheduledAt"
-                    render={({ field, fieldState }) => (
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-semibold text-neutral-700">
-                          When do you need the service?
-                        </label>
-                        <input
-                          type="datetime-local"
-                          name={field.name}
-                          value={typeof field.value === 'string' ? field.value : ''}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          ref={field.ref}
-                          min={new Date().toISOString().slice(0, 16)}
-                          className="w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 shadow-inner transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={control}
+                      name="homeAddress"
+                      render={({ field, fieldState }) => (
+                        <Input
+                          {...field}
+                          label="Address Line"
+                          placeholder="Estate, Street name"
+                          error={fieldState.error?.message}
+                          className="rounded-2xl"
                         />
-                        {fieldState.error && (
-                          <span className="text-xs text-danger-600">{fieldState.error.message}</span>
-                        )}
+                      )}
+                    />
+                    <FormField
+                      control={control}
+                      name="apartment"
+                      render={({ field, fieldState }) => (
+                        <Input
+                          {...field}
+                          label="House / Unit"
+                          placeholder="Apt 4B, Floor 2"
+                          error={fieldState.error?.message}
+                          className="rounded-2xl"
+                        />
+                      )}
+                    />
+                  </div>
+
+                  {recentLocations.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Recents</p>
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                        {recentLocations.slice(0, 3).map((loc) => (
+                          <button
+                            key={loc.id}
+                            type="button"
+                            onClick={() => handleApplyRecent(loc)}
+                            className="flex shrink-0 items-center gap-3 rounded-2xl border border-neutral-100 bg-white p-3 text-left transition hover:border-brand-200"
+                          >
+                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
+                              <MapPin className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-neutral-900">{loc.label}</p>
+                              <p className="text-[10px] text-neutral-400">{loc.lat.toFixed(2)}, {loc.lng.toFixed(2)}</p>
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  />
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-card">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-500">Review</p>
-                  <p className="text-sm text-neutral-500">Double-check the summary before sending.</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-pill bg-brand-50 px-3 py-1 text-brand-600">
-                    {selectedService?.name ?? "Select service"}
-                  </span>
-                  {derivedEstimateMinutes && (
-                    <span className="rounded-pill bg-neutral-100 px-3 py-1 text-neutral-600">
-                      ~{derivedEstimateMinutes} mins
-                    </span>
+                    </div>
                   )}
-                </div>
-              </div>
-              <div className="mt-4 grid gap-4 text-sm text-neutral-600 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-neutral-400">Estimated total</p>
-                  <p className="text-base font-semibold text-neutral-900">
-                    {derivedPriceCents ? formatCurrency(derivedPriceCents) : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-neutral-400">Location</p>
-                  <p className="font-semibold text-neutral-900 line-clamp-2">{locationSummaryLabel}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-neutral-400">Status</p>
-                  <p className="font-semibold text-neutral-900">
-                    {locationComplete ? "Ready to submit" : "Add location details"}
-                  </p>
-                </div>
-              </div>
-            </section>
 
-            {(submitError || errors.root?.message) && (
-              <p className="text-sm text-danger-600">{submitError ?? errors.root?.message}</p>
-            )}
+                  <div className="flex items-center justify-between">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(0)} className="rounded-2xl">
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                    </Button>
+                    <Button
+                      variant="primary"
+                      type="button"
+                      disabled={!locationComplete}
+                      onClick={() => setCurrentStep(2)}
+                      className="rounded-2xl px-8 shadow-lg shadow-brand-100"
+                    >
+                      Next Step <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <Button type="button" variant="ghost" onClick={closeAndReset} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" loading={isSubmitting || createBooking.isPending}>
-                Send booking request
-              </Button>
-            </div>
+              {/* STEP 3: TIMING */}
+              {currentStep === 2 && (
+                <motion.div
+                  key="step2"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8 py-4"
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setValue("scheduleForLater", false)}
+                      className={classNames(
+                        "flex flex-col items-center justify-center rounded-[32px] border-2 p-8 text-center transition-all duration-300",
+                        !watch("scheduleForLater")
+                          ? "border-brand-500 bg-brand-50/40 shadow-lg shadow-brand-500/10"
+                          : "border-neutral-100 bg-white hover:border-brand-200"
+                      )}
+                    >
+                      <div className={classNames(
+                        "mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] shadow-sm transition-colors",
+                        !watch("scheduleForLater") ? "bg-brand-600 text-white" : "bg-slate-50 text-slate-400"
+                      )}>
+                        <VitalsIcon className="h-8 w-8" />
+                      </div>
+                      <h3 className="text-xl font-black text-neutral-900">Request Now</h3>
+                      <p className="mt-2 text-xs font-medium text-neutral-500">Immediate response from the nearest available provider.</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setValue("scheduleForLater", true)}
+                      className={classNames(
+                        "flex flex-col items-center justify-center rounded-[32px] border-2 p-8 text-center transition-all duration-300",
+                        watch("scheduleForLater")
+                          ? "border-violet-500 bg-violet-50/40 shadow-lg shadow-violet-500/10"
+                          : "border-neutral-100 bg-white hover:border-violet-200"
+                      )}
+                    >
+                      <div className={classNames(
+                        "mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] shadow-sm transition-colors",
+                        watch("scheduleForLater") ? "bg-violet-600 text-white" : "bg-slate-50 text-slate-400"
+                      )}>
+                        <Clock className="h-8 w-8" />
+                      </div>
+                      <h3 className="text-xl font-black text-neutral-900">Schedule</h3>
+                      <p className="mt-2 text-xs font-medium text-neutral-500">Pick a specific time that works best for your routine.</p>
+                    </button>
+                  </div>
+
+                  {watch("scheduleForLater") && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-[32px] bg-violet-50 p-6"
+                    >
+                      <FormField
+                        control={control}
+                        name="scheduledAt"
+                        render={({ field, fieldState }) => (
+                          <div className="flex flex-col gap-3">
+                            <label className="text-sm font-black uppercase tracking-widest text-violet-700">Appointment Date & Time</label>
+                            <input
+                              type="datetime-local"
+                              {...field}
+                              min={new Date().toISOString().slice(0, 16)}
+                              className="w-full rounded-2xl border-none bg-white px-4 py-3 text-sm text-neutral-900 shadow-sm ring-1 ring-black/5 focus:ring-2 focus:ring-violet-500"
+                            />
+                            {fieldState.error && (
+                              <span className="text-xs font-bold text-danger-600">{fieldState.error.message}</span>
+                            )}
+                          </div>
+                        )}
+                      />
+                    </motion.div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-2xl">
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                    </Button>
+                    <Button
+                      variant="primary"
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="rounded-2xl px-12 shadow-lg shadow-brand-100"
+                    >
+                      Continue <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 4: CONFIRMATION */}
+              {currentStep === 3 && (
+                <motion.div
+                  key="step3"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="space-y-8"
+                >
+                  <div className="relative overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5">
+                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-brand-500/10 blur-3xl" />
+                    <div className="relative">
+                      <div className="mb-8 flex items-center justify-between">
+                        <div>
+                          <h2 className="text-2xl font-black text-slate-900 leading-none">Confirm Booking</h2>
+                          <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Review Summary</p>
+                        </div>
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-linear text-white shadow-lg shadow-brand-100">
+                          <CheckCircle2 className="h-7 w-7" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-brand-600">
+                            <ShieldCheck className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Service</p>
+                            <p className="text-sm font-bold text-slate-900">{selectedService?.name}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-indigo-600">
+                            <MapPin className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Location</p>
+                            <p className="text-sm font-bold text-slate-900 line-clamp-1">{locationSummaryLabel}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-violet-600">
+                            <Clock className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Timing</p>
+                            <p className="text-sm font-bold text-slate-900">
+                              {watch("scheduleForLater") ? `Scheduled: ${new Date(watch("scheduledAt")!).toLocaleString()}` : "Ready for ASAP Dispatch"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-10 border-t border-dashed border-slate-200 pt-6">
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Base Estimate</p>
+                            <p className="text-3xl font-black text-brand-600 leading-none">{formatCurrency(derivedPriceCents ?? 0)}</p>
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-400 italic mb-1">*Excl. extra consumables</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <SlideToBook
+                      onConfirm={onSubmit}
+                      isLoading={isSubmitting || createBooking.isPending}
+                      label="Slide to Book Now"
+                    />
+
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      fullWidth
+                      className="rounded-2xl h-12"
+                      onClick={() => setCurrentStep(2)}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Change timing
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+
+          {submitError && (
+            <motion.p
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 text-center text-sm font-bold text-danger-600"
+            >
+              {submitError}
+            </motion.p>
+          )}
         </form>
       )}
     </Modal>

@@ -27,16 +27,12 @@ const DESKTOP_NAV: NavItem[] = [
   { label: "Inbox", to: "/app/inbox", icon: <ForumIcon fontSize="small" /> }
 ];
 
-// Mobile nav: 4 items with FAB in center
-const MOBILE_NAV_LEFT: NavItem[] = [
+const MOBILE_NAV: NavItem[] = [
   { label: "Home", to: "/app/home", icon: <HomeIcon fontSize="small" /> },
   { label: "Services", to: "/app/services", icon: <MedicalServicesIcon fontSize="small" /> },
-  { label: "Care", to: "/app/selfcare", icon: <FavoriteBorderIcon fontSize="small" /> }
-];
-
-const MOBILE_NAV_RIGHT: NavItem[] = [
-  { label: "Inbox", to: "/app/inbox", icon: <ForumIcon fontSize="small" /> },
-  { label: "Bookings", to: "/app/bookings", icon: <CalendarMonthIcon fontSize="small" /> }
+  { label: "Bookings", to: "/app/bookings", icon: <CalendarMonthIcon fontSize="small" /> },
+  { label: "Care", to: "/app/selfcare", icon: <FavoriteBorderIcon fontSize="small" /> },
+  { label: "Inbox", to: "/app/inbox", icon: <ForumIcon fontSize="small" /> }
 ];
 
 export const ClientShell = () => {
@@ -106,7 +102,7 @@ export const ClientShell = () => {
             </p>
           </div>
           <nav className="space-y-2">
-            {DESKTOP_NAV.map((item) => {
+            {MOBILE_NAV.map((item) => {
               const badgeCount = navBadge(item.to);
               return (
                 <NavLink
@@ -162,45 +158,11 @@ export const ClientShell = () => {
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation with FAB */}
+      {/* Mobile Bottom Navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-30 lg:hidden">
-        {/* FAB Button - positioned above nav */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-7 z-40">
-          <button
-            type="button"
-            onClick={() => setBookingDialogOpen(true)}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-500/40 transition-transform hover:scale-105 active:scale-95"
-          >
-            <AddIcon className="h-7 w-7" />
-          </button>
-        </div>
-
-        {/* Nav Bar */}
         <div className="border-t border-white/60 bg-white/95 shadow-2xl backdrop-blur-sm">
-          <div className="grid grid-cols-6">
-            {/* Left Nav Items */}
-            {MOBILE_NAV_LEFT.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  classNames(
-                    "flex flex-col items-center gap-0.5 py-2 font-semibold",
-                    isActive ? "text-brand-600" : "text-neutral-500"
-                  )
-                }
-              >
-                {({ isActive }) => renderNavItem(item, isActive)}
-              </NavLink>
-            ))}
-
-            {/* Center spacer for FAB */}
-            <div className="flex items-center justify-center">
-              <span className="text-[10px] text-neutral-400">Book</span>
-            </div>
-
-            {/* Right Nav Items */}
-            {MOBILE_NAV_RIGHT.map((item) => (
+          <div className="grid grid-cols-5">
+            {MOBILE_NAV.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

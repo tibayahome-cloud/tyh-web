@@ -66,6 +66,7 @@ export const svcCard: FieldPreset = {
     "id",
     "key",
     "name",
+    "description",
     "base_price_cents",
     "default_estimate_minutes",
     "is_emergency_capable",
@@ -74,6 +75,25 @@ export const svcCard: FieldPreset = {
   includes: {
     category: {
       fields: ["id", "name"]
+    }
+  }
+};
+
+export const servicePublic: FieldPreset = {
+  resource: "services",
+  fields: [
+    "id",
+    "key",
+    "name",
+    "description",
+    "base_price_cents",
+    "default_estimate_minutes",
+    "is_emergency_capable",
+    "active"
+  ],
+  includes: {
+    category: {
+      fields: ["id", "name", "key"]
     }
   }
 };

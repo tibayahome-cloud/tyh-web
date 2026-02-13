@@ -15,6 +15,14 @@ const PAGE_SIZE = 20;
 const AdminNotificationsPage = () => {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | "unread" | "delivered">("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<"all" | "unread" | "delivered">("all");
+  const [draftSearch, setDraftSearch] = useState("");
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const isMobileFilters = useMediaQuery("(max-width: 640px)");
+
   const { notifications, meta, isLoading, isFetching, markAllAsRead } = useNotifications({
     page,
     pageSize: PAGE_SIZE
@@ -44,14 +52,7 @@ const AdminNotificationsPage = () => {
       document.removeEventListener("mousedown", handleClickAway);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [filtersOpen]);
-  const [statusFilter, setStatusFilter] = useState<"all" | "unread" | "delivered">("all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [draftStatus, setDraftStatus] = useState<"all" | "unread" | "delivered">("all");
-  const [draftSearch, setDraftSearch] = useState("");
-  const filterMenuRef = useRef<HTMLDivElement | null>(null);
-  const isMobileFilters = useMediaQuery("(max-width: 640px)");
+  }, [filtersOpen, isMobileFilters]);
 
   const columns = useMemo<GridColDef[]>(
     () => [
@@ -65,7 +66,7 @@ const AdminNotificationsPage = () => {
 
   const filteredNotifications = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return notifications.filter((item) => {
+    return notifications.filter((item: any) => {
       if (statusFilter === "unread" && item.readAt) {
         return false;
       }
@@ -80,7 +81,7 @@ const AdminNotificationsPage = () => {
     });
   }, [notifications, statusFilter, searchTerm]);
 
-  const rows = filteredNotifications.map((item) => ({
+  const rows = filteredNotifications.map((item: any) => ({
     id: item.id,
     title: item.title || "Notification",
     event: item.eventName || item.eventKey || "—",
@@ -246,7 +247,7 @@ const AdminNotificationsPage = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {preferences.map((pref) => (
+            {preferences.map((pref: any) => (
               <div
                 key={pref.id || pref.event?.key}
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-primary-200 hover:bg-white"
@@ -266,7 +267,7 @@ const AdminNotificationsPage = () => {
                 <p className="mt-3 text-xs text-slate-500">
                   Default channels:{" "}
                   {(pref.event?.default_channels || pref.event?.supported_channels || [])
-                    .map((channel) => channel.toUpperCase())
+                    .map((channel: any) => channel.toUpperCase())
                     .join(", ") || "None"}
                 </p>
               </div>

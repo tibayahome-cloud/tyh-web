@@ -29,7 +29,21 @@ import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/util
 import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
 import { useWalletAccount } from "../../../shared/hooks/useWallet";
+import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { useNotificationBadge } from "../../../shared/hooks/useNotificationBadge";
+import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
+import {
+  Plus,
+  ArrowRight,
+  Activity as VitalsIcon,
+  Heart,
+  Zap,
+  ChevronRight,
+  TrendingDown,
+  TrendingUp,
+  Clock as RecentIcon,
+  CalendarDays
+} from "lucide-react";
 
 const ACTIVE_STATUSES = [
   "accepted",
@@ -131,6 +145,7 @@ const ClientHome = () => {
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [completionError, setCompletionError] = useState<string | null>(null);
+  const [showMpesaManual, setShowMpesaManual] = useState(false);
   const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -142,6 +157,8 @@ const ClientHome = () => {
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const notificationBadge = useNotificationBadge();
+  const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
+  const latestCheckin = checkinsQuery.data?.[0];
 
   const { data: activeList } = useBookingList(
     {
@@ -191,7 +208,7 @@ const ClientHome = () => {
       setCompletionPrompt({ bookingId: activeBooking.id });
       setCompletionError(null);
     }
-  }, [activeBooking?.id, activeBooking?.status]);
+  }, [activeBooking]);
 
   const { data: historyList } = useBookingList(
     {
@@ -207,18 +224,13 @@ const ClientHome = () => {
   const historyCount = Number(historyList?.bookings?.length ?? 0);
 
   const walletBalance = walletQuery.data ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}` : "—";
-  const unreadAlerts = notificationBadge.unread > 0 ? String(notificationBadge.unread) : "0";
 
-  const statsChips = [
-    { label: "Wallet", value: walletBalance, highlight: true },
-    { label: "Upcoming", value: String(upcomingCount) },
-    { label: "Alerts", value: unreadAlerts, alert: notificationBadge.unread > 0 }
-  ];
-  const mapContainerHeight = viewportHeight;
-  const collapsedSheetHeight = Math.max(viewportHeight * 0.12, 120);
-  const expandedSheetHeight = Math.max(viewportHeight * 0.45, 300);
-  const sheetHeight = sheetExpanded ? expandedSheetHeight : collapsedSheetHeight;
-  const sheetTranslate = sheetExpanded ? expandedSheetHeight - collapsedSheetHeight : 0;
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -245,9 +257,8 @@ const ClientHome = () => {
   };
 
   const closeCompletionPrompt = () => {
-    setCompletionPrompt(null);
-    setDeclineReason("");
     setCompletionError(null);
+    setShowMpesaManual(false);
   };
 
   const closeCancelPrompt = () => {
@@ -271,8 +282,8 @@ const ClientHome = () => {
         description: "Please complete the STK push to finalize your booking.",
         variant: "success"
       });
-      closeCompletionPrompt();
-      setSheetExpanded(false);
+      setShowMpesaManual(true);
+      setCompletionError(null);
     } catch (error) {
       setCompletionError(error instanceof Error ? error.message : "Unable to confirm completion. Try again.");
     }
@@ -368,7 +379,6 @@ const ClientHome = () => {
     };
   }, [socket, toast, user?.id, activeBooking?.id]);
 
-  const hasActiveBooking = Boolean(activeBooking);
   const firstName = user?.fullName?.split(" ")[0] || "there";
 
   return (
@@ -381,21 +391,7 @@ const ClientHome = () => {
         />
       )}
 
-      <div
-        className={classNames(
-          "flex flex-col",
-          hasActiveBooking ? "gap-0 overflow-hidden pb-0" : "gap-4 sm:gap-8 pb-20"
-        )}
-        style={{ minHeight: hasActiveBooking ? "calc(100vh - 60px)" : undefined }}
-      >
-        {!hasActiveBooking && (
-          <div className="px-4 pt-6 pb-2">
-            <h1 className="text-2xl font-bold text-slate-900">
-              Hello, <span className="text-brand-600">{firstName}</span>
-            </h1>
-            <p className="text-sm text-slate-500 font-medium">How can we help you today?</p>
-          </div>
-        )}
+      <div className="flex flex-col gap-4 sm:gap-8 pb-20">
         <LocationPermissionBanner
           status={locationAccess.status}
           error={locationAccess.error}
@@ -412,408 +408,327 @@ const ClientHome = () => {
           </div>
         )}
 
-        {activeBooking ? (
-          <section className="fixed inset-0 z-0 h-[100dvh] w-screen">
-            <div
-              className="relative h-full w-full"
-            >
-              {TRACKING_STATUSES.includes(activeBooking.status) ? (
-                <>
+        <div className="flex flex-col gap-8 pb-10">
+          {/* IMMERSIVE HERO */}
+          <section className="relative -mx-4 -mt-12 overflow-hidden px-4 pb-12 pt-16 sm:-mx-8 sm:px-8">
+            <div className="absolute inset-0 bg-brand-linear opacity-90" />
+            <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+            <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-2xl" />
+
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-black uppercase tracking-widest text-white/60">{greeting}</p>
+                  <h1 className="text-3xl font-black text-white">
+                    Hello, <span className="text-white/80">{firstName}</span>
+                  </h1>
+                </div>
+                <button
+                  onClick={() => navigate("/app/inbox")}
+                  className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur-xl ring-1 ring-white/20 transition-all active:scale-95"
+                >
+                  <ChatIcon />
+                  {notificationBadge.unread > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-lg">
+                      {notificationBadge.unread}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+                <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-white backdrop-blur-xl ring-1 ring-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Wallet</p>
+                  <p className="text-base font-black">{walletBalance}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-white backdrop-blur-xl ring-1 ring-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Upcoming</p>
+                  <p className="text-base font-black">{upcomingCount}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* BENTO ACTION HUB */}
+          <section className="grid grid-cols-2 gap-4">
+            {activeBooking ? (
+              /* LIVE TRACKER CARD */
+              <button
+                onClick={() => setIsTracking(true)}
+                className="group relative col-span-2 flex items-center justify-between overflow-hidden rounded-[32px] bg-slate-900 p-8 text-left text-white shadow-2xl transition-all active:scale-[0.98]"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)]" />
+                <div className="relative z-10 max-w-[65%]">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live Booking</p>
+                  </div>
+                  <h2 className="mt-2 text-2xl font-black leading-tight">
+                    {activeBooking.provider?.fullName?.split(" ")[0] || "Matching"} is {formatBookingStatus(activeBooking.status).toLowerCase()}
+                  </h2>
+                  <div className="mt-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-xl text-white">
+                      <MapPinIcon className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm font-bold opacity-80">Tap to track arrival</p>
+                  </div>
+                </div>
+                <div className="relative z-10 hidden sm:flex h-32 w-32 items-center justify-center rounded-[40px] bg-white/5 backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden">
                   <BookingLiveMapCard
                     bookingId={activeBooking.id}
                     role="client"
                     variant="immersive"
                     mapOnly
                     hideOverlays
-                    className="h-full w-full"
-                    onOpenChat={() => navigate("/app/inbox")}
+                    className="h-full w-full opacity-50 grayscale contrast-125"
                   />
-                  {/* Floating Info Button */}
-                  <div className="absolute top-4 right-4 z-10">
-                    <button
-                      onClick={() => setSheetExpanded(true)}
-                      className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-900 shadow-xl ring-1 ring-black/5 transition-transform active:scale-95 hover:bg-slate-50"
-                    >
-                      <InfoIcon className="h-6 w-6" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-slate-900/5 backdrop-blur-sm">
-                  <div className="text-center p-6">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-4">
-                      <CheckCircleIcon className="h-8 w-8" />
-                    </div>
-                    <p className="text-lg font-bold text-slate-900">Service Finished</p>
-                    <p className="text-sm text-slate-500">Please confirm completion below</p>
-                    <Button onClick={() => setCompletionPrompt({ bookingId: activeBooking.id })} className="mt-4">
-                      Confirm
-                    </Button>
-                  </div>
                 </div>
-              )}
-
-              {/* Side Pane (Drawer) */}
-              <Drawer
-                anchor="right"
-                open={sheetExpanded}
-                onClose={() => setSheetExpanded(false)}
-                PaperProps={{
-                  sx: { width: "100%", maxWidth: "400px", padding: 0 }
-                }}
+              </button>
+            ) : (
+              /* BOOK CARE - LARGE SPAN */
+              <button
+                onClick={() => openBookingDialog()}
+                className="group relative col-span-2 flex items-center justify-between overflow-hidden rounded-[32px] bg-brand-linear p-8 text-left text-white shadow-2xl transition-all active:scale-[0.98]"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 p-4 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-                  <h2 className="text-lg font-bold text-slate-900">Current Booking</h2>
-                  <button onClick={() => setSheetExpanded(false)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600">
-                    <span className="sr-only">Close</span>
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-
-                <div className="p-4 space-y-6">
-                  {/* Status Progress Stepper */}
-                  <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-4 border border-slate-100">
-                    {STATUS_STEPS.map((step, index) => {
-                      const currentIndex = getStepIndex(activeBooking.status);
-                      const isCompleted = index < currentIndex;
-                      const isCurrent = index === currentIndex;
-                      const isPending = index > currentIndex;
-                      return (
-                        <div key={step.key} className="flex flex-1 flex-col items-center gap-1.5">
-                          <div
-                            className={classNames(
-                              "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-300",
-                              {
-                                "bg-slate-900 text-white shadow-lg scale-110": isCurrent,
-                                "bg-emerald-500 text-white": isCompleted,
-                                "bg-slate-200/50 text-slate-400": isPending
-                              }
-                            )}
-                          >
-                            {isCompleted ? <CheckCircleIcon className="h-4 w-4" /> : index + 1}
-                          </div>
-                          <span
-                            className={classNames("text-[9px] font-bold uppercase tracking-wider", {
-                              "text-slate-900": isCurrent,
-                              "text-emerald-600": isCompleted,
-                              "text-slate-400": isPending
-                            })}
-                          >
-                            {step.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Provider Card */}
-                  <div className="flex items-center gap-4 p-4 rounded-3xl border border-slate-100 bg-white shadow-sm">
-                    <div className="relative">
-                      <div className="h-16 w-16 overflow-hidden rounded-2xl bg-slate-100 ring-2 ring-white shadow-md">
-                        {activeBooking.provider?.avatarUrl ? (
-                          <img
-                            src={activeBooking.provider.avatarUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-brand-linear text-xl font-bold text-white uppercase">
-                            {(activeBooking.provider?.fullName ?? "P").charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
-                        <CheckCircleIcon className="h-3.5 w-3.5 text-white" />
-                      </div>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold text-slate-900 truncate">
-                          {activeBooking.provider?.fullName ?? "Matching..."}
-                        </p>
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-100">
-                          PRO
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1 text-sm text-slate-500">
-                        <StarIcon className="h-4 w-4 fill-amber-400 text-amber-400" />
-                        <span className="font-medium text-slate-900">4.9</span>
-                        <span className="text-slate-300">•</span>
-                        <span>500+ jobs</span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/app/inbox`)}
-                        className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors"
-                      >
-                        <ChatIcon className="h-6 w-6" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Location Info */}
-                  <div className="rounded-3xl bg-slate-50 p-5 space-y-4">
-                    <div className="flex gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-100">
-                        <MapPinIcon className="h-4 w-4 text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Destination</p>
-                        <p className="font-semibold text-slate-900 mt-0.5">{getDestinationLabel(activeBooking)}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Info Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white p-4 border border-slate-100 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">ETA</p>
-                      <p className="text-xl font-bold text-slate-900">{getEtaLabel(activeBooking)}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white p-4 border border-slate-100 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status</p>
-                      <p className="text-sm font-bold text-slate-900 truncate px-1">
-                        {formatBookingStatus(activeBooking.status)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Main Action */}
-                  <div className="pt-2">
-                    <Button
-                      variant="primary"
-                      className="w-full h-14 rounded-2xl text-base font-bold shadow-xl shadow-slate-200"
-                      onClick={() => navigate(`/app/bookings/${activeBooking.id}`)}
-                    >
-                      Management Dashboard
-                    </Button>
+                <div className="relative z-10 max-w-[60%]">
+                  <h2 className="text-2xl font-black leading-tight">Request Care Now</h2>
+                  <p className="mt-2 text-sm font-medium text-white/80">Connect with expert providers instantly.</p>
+                  <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-full bg-white text-brand-600 shadow-xl transition-transform group-hover:translate-x-2">
+                    <ArrowRight className="h-5 w-5" />
                   </div>
                 </div>
-              </Drawer>
+                <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-[32px] bg-white/10 backdrop-blur-2xl ring-1 ring-white/20">
+                  <Heart className="h-12 w-12 text-white animate-pulse" />
+                </div>
+                <div className="absolute -bottom-8 -right-8 h-48 w-48 rounded-full bg-white/5" />
+              </button>
+            )}
+
+            {/* HEALTH PULSE */}
+            <div
+              onClick={() => navigate("/app/selfcare")}
+              className="group flex flex-col justify-between rounded-[32px] bg-white p-6 shadow-card ring-1 ring-black/5 active:scale-95 transition-transform cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <VitalsIcon className="h-5 w-5" />
+                </div>
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Health Pulse</p>
+                <h3 className="mt-1 text-xl font-black text-slate-900">
+                  {latestCheckin?.vitals?.bpSystolic ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}` : "Norm"}
+                  <span className="ml-1 text-[10px] text-slate-400">mmHg</span>
+                </h3>
+              </div>
+            </div>
+
+            {/* DAILY CHECKIN */}
+            <div
+              onClick={() => navigate("/app/selfcare/checkin")}
+              className="group flex flex-col justify-between rounded-[32px] bg-slate-900 p-6 text-white shadow-card active:scale-95 transition-transform cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-brand-400">
+                  <Zap className="h-5 w-5 fill-current" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Self Care</p>
+                <h3 className="mt-1 text-xl font-black">Daily Check-in</h3>
+              </div>
             </div>
           </section>
-        ) : (
-          <section className="flex flex-1 flex-col gap-4 sm:gap-8 px-0 sm:px-1">
-            {/* Hero Stats */}
-            <div className="grid grid-cols-3 gap-2 px-4 sm:px-0">
-              {statsChips.map((chip, idx) => (
-                <div key={chip.label} className={classNames(
-                  "relative overflow-hidden rounded-2xl p-3 sm:p-4 transition-all duration-300 hover:scale-[1.02]",
-                  idx === 0 ? "bg-slate-900 text-white shadow-lg" : "bg-white text-slate-900 shadow-sm border border-slate-100"
-                )}>
-                  <p className={classNames("text-[9px] sm:text-[10px] font-bold uppercase tracking-widest", idx === 0 ? "text-slate-400" : "text-slate-500")}>
-                    {chip.label}
-                  </p>
-                  <p className="mt-1 text-sm sm:text-xl font-bold tracking-tight truncate">{chip.value}</p>
-                  {(chip as any).alert && (
-                    <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-                  )}
+
+          {/* LISTS SECTION */}
+          <div className="space-y-10">
+            {/* UPCOMING */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-indigo-500" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Upcoming Care</h3>
                 </div>
-              ))}
-            </div>
-
-
-            {/* Quick Request */}
-            <div className="px-4 sm:px-0">
-              <div className="relative group">
-                <div className="absolute -inset-0.5 rounded-[32px] bg-brand-linear opacity-10 blur group-hover:opacity-20 transition-opacity" />
-                <Card className="relative flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-none bg-white p-6 text-center sm:p-12 shadow-md ring-1 ring-slate-100">
-                  <div className="relative">
-                    <div className="absolute inset-0 animate-ping rounded-full bg-brand-500/10" />
-                    <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-brand-linear text-white shadow-inner">
-                      <PlusIcon className="h-6 w-6" />
-                    </div>
-                  </div>
-
-                  <div className="max-w-md">
-                    <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">Ready for a service?</h2>
-                    <p className="mt-2 text-xs sm:text-sm text-slate-500 leading-relaxed font-medium">
-                      Instantly connect with the best rated home service providers in your neighborhood.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-row justify-center gap-2 w-full sm:w-auto mt-2">
-                    <Button
-                      className="flex-1 sm:flex-none sm:px-10 h-12 rounded-xl text-xs sm:text-base font-bold shadow-lg shadow-brand-100"
-                      onClick={() => openBookingDialog()}
-                    >
-                      Request Provider
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 sm:flex-none sm:px-10 h-12 rounded-xl text-xs sm:text-base font-bold border-slate-200 text-slate-600 hover:bg-slate-50"
-                      onClick={() => navigate("/app/services")}
-                    >
-                      Services
-                    </Button>
-                  </div>
-                </Card>
+                <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-700">View Schedule</button>
               </div>
-            </div>
-
-            {/* Lists */}
-            <div className="grid gap-6 lg:grid-cols-2 px-4 sm:px-0">
-              {/* Upcoming */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Upcoming</h3>
-                  <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-bold text-brand-600 uppercase tracking-widest hover:underline">
-                    View All
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
-                    upcomingList.bookings.map((b) => (
-                      <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
-                      No upcoming bookings scheduled
+              <div className="space-y-4">
+                {upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
+                  upcomingList.bookings.map((b) => (
+                    <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-100 p-10 text-center">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-50 text-slate-300">
+                      <RecentIcon className="h-8 w-8" />
                     </div>
-                  )}
-                </div>
+                    <p className="text-sm font-bold text-slate-400">Your calendar is currently clear</p>
+                  </div>
+                )}
               </div>
+            </section>
 
-              {/* History */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">History</h3>
-                  <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-bold text-brand-600 uppercase tracking-widest hover:underline">
-                    Past orders
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {historyList?.bookings && historyList.bookings.length > 0 ? (
-                    historyList.bookings.map((b) => (
-                      <BookingCompactCard
-                        key={b.id}
-                        booking={b}
-                        onClick={() => navigate(`/app/bookings/${b.id}`)}
-                        onRate={() => b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed" ? setFeedbackPrompt({ bookingId: b.id, providerName: b.provider?.fullName || "the provider" }) : undefined}
-                      />
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
-                      No past bookings found
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
+            {/* ARTIFICIAL INTELLIGENCE */}
             <AIRecommendationsCard />
-          </section>
-        )
-        }
 
-        {/* Dialogs ... */}
-        <Dialog
-          open={Boolean(completionPrompt)}
-          onClose={confirmCompletion.isPending ? undefined : closeCompletionPrompt}
-          PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
-          maxWidth="xs"
-          fullWidth
-        >
-          <DialogTitle className="text-xl font-bold text-slate-900">Confirm Service</DialogTitle>
-          <DialogContent>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              Your provider marked the booking as complete. Please confirm if everything was handled to your satisfaction.
-            </p>
-            <div className="mt-6 space-y-4">
-              <label className="block">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason for decline (Optional)</span>
-                <textarea
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
-                  rows={3}
-                  value={declineReason}
-                  onChange={(event) => setDeclineReason(event.target.value)}
-                  placeholder="Tell us what went wrong..."
-                  disabled={confirmCompletion.isPending}
+            {/* RECENT HISTORY */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RecentIcon className="h-5 w-5 text-slate-400" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Recent History</h3>
+                </div>
+                <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-black uppercase tracking-widest text-slate-500">Full History</button>
+              </div>
+              <div className="space-y-3">
+                {historyList?.bookings && historyList.bookings.length > 0 ? (
+                  historyList.bookings.map((b) => (
+                    <BookingCompactCard
+                      key={b.id}
+                      booking={b}
+                      onClick={() => navigate(`/app/bookings/${b.id}`)}
+                      onRate={() => b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed" ? setFeedbackPrompt({ bookingId: b.id, providerName: b.provider?.fullName || "the provider" }) : undefined}
+                    />
+                  ))
+                ) : (
+                  <p className="text-center py-4 text-xs font-bold text-slate-300 italic uppercase tracking-widest">No past bookings yet</p>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      {/* Dialogs ... */}
+      <Dialog
+        open={Boolean(completionPrompt)}
+        onClose={confirmCompletion.isPending ? undefined : closeCompletionPrompt}
+        PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle className="text-xl font-bold text-slate-900">Confirm Service</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            Your provider marked the booking as complete. Please confirm if everything was handled to your satisfaction.
+          </p>
+          <div className="mt-6 space-y-4">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason for decline (Optional)</span>
+              <textarea
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
+                rows={3}
+                value={declineReason}
+                onChange={(event) => setDeclineReason(event.target.value)}
+                placeholder="Tell us what went wrong..."
+                disabled={confirmCompletion.isPending}
+              />
+            </label>
+          </div>
+          {completionError && <p className="mt-3 text-xs font-semibold text-rose-500 px-1">{completionError}</p>}
+        </DialogContent>
+        <DialogActions className="p-4 flex-col">
+          <div className="w-full">
+            {showMpesaManual ? (
+              <div className="space-y-4">
+                <p className="text-xs font-medium text-slate-500 text-center animate-pulse">
+                  Waiting for STK Push... If it doesn't appear, use manual payment:
+                </p>
+                <MpesaPaymentInstructions
+                  amountCents={activeBooking?.priceCents ?? 0}
+                  accountNumber={activeBooking?.id.slice(0, 8).toUpperCase() ?? "BOOKING"}
                 />
-              </label>
-            </div>
-            {completionError && <p className="mt-3 text-xs font-semibold text-rose-500 px-1">{completionError}</p>}
-          </DialogContent>
-          <DialogActions className="p-4 gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1 rounded-xl h-12"
-              onClick={handleDeclineCompletion}
-              loading={confirmCompletion.isPending}
-            >
-              Decline
-            </Button>
-            <Button
-              className="flex-1 rounded-xl h-12 shadow-lg shadow-brand-100"
-              onClick={handleConfirmCompletion}
-              loading={confirmCompletion.isPending}
-            >
-              Confirm & Pay
-            </Button>
-          </DialogActions>
-        </Dialog>
+                <Button
+                  variant="ghost"
+                  className="w-full text-xs font-bold text-slate-400"
+                  onClick={() => setShowMpesaManual(false)}
+                >
+                  Back to confirmation
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1 rounded-xl h-12"
+                  onClick={handleDeclineCompletion}
+                  loading={confirmCompletion.isPending}
+                >
+                  Decline
+                </Button>
+                <Button
+                  className="flex-1 rounded-xl h-12 shadow-lg shadow-brand-100"
+                  onClick={handleConfirmCompletion}
+                  loading={confirmCompletion.isPending}
+                >
+                  Confirm & Pay
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogActions>
+      </Dialog>
 
-        <Dialog
-          open={Boolean(cancelPrompt)}
-          onClose={cancelBookingMutation.isPending ? undefined : closeCancelPrompt}
-          PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
-          maxWidth="xs"
-          fullWidth
-        >
-          <DialogTitle className="text-xl font-bold text-rose-600">Cancel Booking?</DialogTitle>
-          <DialogContent>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              This will stop the current search. Are you sure you want to stop finding a provider?
-            </p>
-            <div className="mt-6">
-              <label className="block">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason (Optional)</span>
-                <textarea
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
-                  rows={3}
-                  value={cancelReason}
-                  onChange={(event) => setCancelReason(event.target.value)}
-                  placeholder="Why are you cancelling?"
-                  disabled={cancelBookingMutation.isPending}
-                />
-              </label>
-            </div>
-            {cancelError && <p className="mt-3 text-xs font-semibold text-rose-500 px-1">{cancelError}</p>}
-          </DialogContent>
-          <DialogActions className="p-4 gap-2">
-            <Button variant="ghost" className="flex-1 rounded-xl h-12" onClick={closeCancelPrompt} disabled={cancelBookingMutation.isPending}>
-              Keep it
-            </Button>
-            <Button
-              variant="secondary"
-              className="flex-1 rounded-xl h-12 bg-rose-50 text-rose-600 border-none hover:bg-rose-100"
-              onClick={handleCancelBooking}
-              loading={cancelBookingMutation.isPending}
-            >
-              Stop Search
-            </Button>
-          </DialogActions>
-        </Dialog>
+      <Dialog
+        open={Boolean(cancelPrompt)}
+        onClose={cancelBookingMutation.isPending ? undefined : closeCancelPrompt}
+        PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle className="text-xl font-bold text-rose-600">Cancel Booking?</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            This will stop the current search. Are you sure you want to stop finding a provider?
+          </p>
+          <div className="mt-6">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason (Optional)</span>
+              <textarea
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
+                rows={3}
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="Why are you cancelling?"
+                disabled={cancelBookingMutation.isPending}
+              />
+            </label>
+          </div>
+          {cancelError && <p className="mt-3 text-xs font-semibold text-rose-500 px-1">{cancelError}</p>}
+        </DialogContent>
+        <DialogActions className="p-4 gap-2">
+          <Button variant="ghost" className="flex-1 rounded-xl h-12" onClick={closeCancelPrompt} disabled={cancelBookingMutation.isPending}>
+            Keep it
+          </Button>
+          <Button
+            variant="secondary"
+            className="flex-1 rounded-xl h-12 bg-rose-50 text-rose-600 border-none hover:bg-rose-100"
+            onClick={handleCancelBooking}
+            loading={cancelBookingMutation.isPending}
+          >
+            Stop Search
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        <BookingRequestDialog
-          open={bookingDialogOpen}
-          serviceId={bookingServiceId ?? undefined}
-          onClose={() => setBookingDialogOpen(false)}
-          onCreated={handleBookingCreated}
-        />
+      <BookingRequestDialog
+        open={bookingDialogOpen}
+        serviceId={bookingServiceId ?? undefined}
+        onClose={() => setBookingDialogOpen(false)}
+        onCreated={handleBookingCreated}
+      />
 
-        <BookingFeedbackDialog
-          open={Boolean(feedbackPrompt)}
-          bookingId={feedbackPrompt?.bookingId || null}
-          targetName={feedbackPrompt?.providerName || ""}
-          onClose={() => setFeedbackPrompt(null)}
-        />
-      </div >
-    </AppLayout >
+      <BookingFeedbackDialog
+        open={Boolean(feedbackPrompt)}
+        bookingId={feedbackPrompt?.bookingId || null}
+        targetName={feedbackPrompt?.providerName || ""}
+        onClose={() => setFeedbackPrompt(null)}
+      />
+    </AppLayout>
   );
 };
 
@@ -879,22 +794,7 @@ const BookingCompactCard = ({
       )}
     </div>
   );
-}
-
-const InfoChip = ({ label, value }: { label: string; value: string | null }) => (
-  <div className="rounded-xl border border-slate-100 bg-white/60 p-2 text-center shadow-sm">
-    <p className="text-[10px] uppercase tracking-wider text-slate-400">{label}</p>
-    <p className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-slate-900">
-      {value || "—"}
-    </p>
-  </div>
-);
-
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
+};
 
 const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>

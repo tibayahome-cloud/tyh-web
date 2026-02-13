@@ -19,7 +19,6 @@ const TwoFactorPage = lazy(() => import("../auth/TwoFactorPage"));
 const ForgotPasswordPage = lazy(() => import("../auth/ForgotPassword"));
 const SignUpPage = lazy(() => import("../auth/SignUp"));
 const ResetPasswordPage = lazy(() => import("../auth/ResetPassword"));
-const LandingPage = lazy(() => import("../domains/landing/pages/Landing"));
 
 const SuspenseWrapper = ({ children }: { children: JSX.Element }) => (
   <Suspense fallback={<Loading fullHeight />}>{children}</Suspense>
@@ -33,83 +32,75 @@ const PublicLayout = () => (
   </div>
 );
 
+import { websiteRoutes } from "../domains/website/routes";
+
+// ... existing imports
+
 export const router = createBrowserRouter(
   [
+    ...websiteRoutes,
     {
-      path: "/",
+      element: (
+        <SuspenseWrapper>
+          <PublicLayout />
+        </SuspenseWrapper>
+      ),
       children: [
         {
-          index: true,
+          path: "login",
           element: (
             <SuspenseWrapper>
-              <LandingPage />
+              <ClientLoginPage />
             </SuspenseWrapper>
           )
         },
         {
+          path: "two-factor",
           element: (
             <SuspenseWrapper>
-              <PublicLayout />
+              <TwoFactorPage />
             </SuspenseWrapper>
-          ),
-          children: [
-            {
-              path: "login",
-              element: (
-                <SuspenseWrapper>
-                  <ClientLoginPage />
-                </SuspenseWrapper>
-              )
-            },
-            {
-              path: "two-factor",
-              element: (
-                <SuspenseWrapper>
-                  <TwoFactorPage />
-                </SuspenseWrapper>
-              )
-            },
-            {
-              path: "admin/login",
-              element: (
-                <SuspenseWrapper>
-                  <AdminLoginPage />
-                </SuspenseWrapper>
-              )
-            },
-            {
-              path: "session-expired",
-              element: (
-                <SuspenseWrapper>
-                  <SessionExpiredPage />
-                </SuspenseWrapper>
-              )
-            },
-            {
-              path: "forgot-password",
-              element: (
-                <SuspenseWrapper>
-                  <ForgotPasswordPage />
-                </SuspenseWrapper>
-              )
-            },
-            {
-              path: "signup",
-              element: (
-                <SuspenseWrapper>
-                  <SignUpPage />
-                </SuspenseWrapper>
-              )
-            },
-            {
-              path: "reset-password",
-              element: (
-                <SuspenseWrapper>
-                  <ResetPasswordPage />
-                </SuspenseWrapper>
-              )
-            }
-          ]
+          )
+        },
+        {
+          path: "admin/login",
+          element: (
+            <SuspenseWrapper>
+              <AdminLoginPage />
+            </SuspenseWrapper>
+          )
+        },
+        {
+          path: "session-expired",
+          element: (
+            <SuspenseWrapper>
+              <SessionExpiredPage />
+            </SuspenseWrapper>
+          )
+        },
+        {
+          path: "forgot-password",
+          element: (
+            <SuspenseWrapper>
+              <ForgotPasswordPage />
+            </SuspenseWrapper>
+          )
+        },
+        {
+          path: "signup",
+          element: (
+            <SuspenseWrapper>
+              <SignUpPage />
+            </SuspenseWrapper>
+          )
+        },
+        {
+          path: "reset-password",
+          element: (
+            <SuspenseWrapper>
+              <ResetPasswordPage />
+            </SuspenseWrapper>
+          )
         }
       ]
     },

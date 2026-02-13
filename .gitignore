@@ -12,6 +12,8 @@ dist-ssr/
 .env.*
 !.env.example
 
+deploy.sh
+
 # IDEs/Editors
 .vscode/
 .idea/

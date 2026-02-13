@@ -2,14 +2,27 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import classNames from "classnames";
 import { Link, useNavigate } from "react-router-dom";
-import { Sparkles, ShieldCheck, Timer, Zap } from "lucide-react";
+import {
+  Sparkles,
+  ShieldCheck,
+  Timer,
+  Zap,
+  Search,
+  SlidersHorizontal,
+  X,
+  ChevronRight,
+  Heart,
+  ArrowRight,
+  CalendarDays
+} from "lucide-react";
+import Drawer from "@mui/material/Drawer";
 
 import { Button } from "../../../shared/components/Button";
-import { Card } from "../../../shared/components/Card";
 import { Loading } from "../../../shared/components/Loading";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin, svcCard } from "../../../shared/libs/fieldInclude";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
+import { AppLayout } from "../../../shared/components/AppLayout";
 
 type ServiceCategory = {
   id: string;
@@ -76,6 +89,7 @@ const ServicesPage = () => {
   const [maxPrice, setMaxPrice] = useState<number | "">("");
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const { data: categories, isLoading: loadingCategories } = useCategories();
   const { data: services, isLoading: loadingServices, isFetching } = useServices({
@@ -84,7 +98,7 @@ const ServicesPage = () => {
   });
 
   const categoryOptions = useMemo(() => {
-    const base = [{ id: "all", name: "All" }, ...(categories ?? [])];
+    const base = [{ id: "all", name: "All Services" }, ...(categories ?? [])];
     return base;
   }, [categories]);
 
@@ -109,9 +123,10 @@ const ServicesPage = () => {
     return <Loading fullHeight />;
   }
 
-  const resetPriceFilters = () => {
+  const resetFilters = () => {
     setMinPrice("");
     setMaxPrice("");
+    setEmergencyOnly(false);
   };
 
   const openBookingDialog = (serviceId: string) => {
@@ -124,171 +139,281 @@ const ServicesPage = () => {
     navigate(`/app/bookings/${bookingId}`);
   };
 
-  return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-white/70 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-sm ring-1 ring-black/5 sm:rounded-[32px] sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Services</p>
-            <h1 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl lg:text-2xl">
-              Professional Care at your Doorstep
-            </h1>
-            <p className="mt-1 text-[11px] text-slate-500 font-medium">
-              Browse and book specialized services instantly without the back-and-forth.
-            </p>
-          </div>
-          <div className="hidden gap-3 rounded-2xl border border-white/80 bg-white/50 p-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 shadow-inner sm:flex lg:w-auto">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Smart Match</span>
-            </div>
-            <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
-              <Timer className="h-3.5 w-3.5 text-indigo-500" />
-              <span>Live ETA</span>
-            </div>
-            <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
-              <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
-              <span>Verified</span>
-            </div>
-          </div>
-        </div>
-      </section>
+  const activeFiltersCount = [emergencyOnly, minPrice !== "", maxPrice !== ""].filter(Boolean).length;
 
-      <section className="rounded-2xl border border-slate-100 bg-white p-3 shadow-card sm:rounded-[32px] sm:p-4 lg:p-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex-1 space-y-4">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="service-search">
-              Search services
-            </label>
-            <input
-              id="service-search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Try nursing, physiotherapy..."
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
-            />
-            <div className="flex flex-wrap gap-2">
-              {categoryOptions.map((item) => (
+  return (
+    <AppLayout fullWidth showHeader={false} disablePadding>
+      <div className="flex flex-col gap-4 sm:gap-8 pb-20">
+        {/* IMMERSIVE HERO */}
+        <section className="relative -mx-4 -mt-12 overflow-hidden px-4 pb-12 pt-16 sm:-mx-8 sm:px-8">
+          <div className="absolute inset-0 bg-brand-linear opacity-90" />
+          <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-2xl" />
+
+          <div className="relative z-10">
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50">Service Marketplace</p>
+              <h1 className="text-4xl font-black text-white leading-tight">
+                Professional Care <br />
+                <span className="text-white/70">At Your Fingerprints</span>
+              </h1>
+              <p className="mt-2 max-w-sm text-sm font-medium text-white/60 leading-relaxed">
+                Choose from verified medical professionals and book instantly.
+              </p>
+            </div>
+
+            {/* SEARCH & QUICK FILTERS */}
+            <div className="mt-10 flex flex-col gap-4">
+              <div className="relative flex items-center">
+                <Search className="absolute left-5 h-5 w-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search for services (e.g. Nursing)"
+                  className="w-full h-16 rounded-3xl bg-white/10 pl-14 pr-16 text-white placeholder-white/40 backdrop-blur-2xl ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-white/40 transition-all shadow-2xl"
+                />
                 <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setCategory(item.id)}
-                  className={classNames(
-                    "rounded-full px-4 py-1.5 text-sm font-semibold transition",
-                    category === item.id
-                      ? "bg-primary-600 text-white shadow-lg"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  )}
+                  onClick={() => setFilterDrawerOpen(true)}
+                  className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-600 shadow-xl transition-all active:scale-90"
                 >
-                  {item.name}
+                  <SlidersHorizontal className="h-5 w-5" />
+                  {activeFiltersCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
+                      {activeFiltersCount}
+                    </span>
+                  )}
                 </button>
-              ))}
+              </div>
+
+              {/* QUICK CATEGORIES */}
+              <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                {categoryOptions.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setCategory(item.id)}
+                    className={classNames(
+                      "shrink-0 rounded-2xl px-6 py-3 text-xs font-black uppercase tracking-widest transition-all backdrop-blur-md",
+                      category === item.id
+                        ? "bg-white text-brand-600 shadow-xl"
+                        : "bg-white/10 text-white hover:bg-white/20 ring-1 ring-white/10"
+                    )}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600 lg:w-80">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Filters</p>
-            <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                checked={emergencyOnly}
-                onChange={(event) => setEmergencyOnly(event.target.checked)}
-              />
-              Emergency capable only
-            </label>
-            <div className="mt-4 grid gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Price (KES)</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  value={minPrice}
-                  onChange={(event) => setMinPrice(event.target.value ? Number(event.target.value) : "")}
-                />
-                <span>—</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  value={maxPrice}
-                  onChange={(event) => setMaxPrice(event.target.value ? Number(event.target.value) : "")}
-                />
+        </section>
+      </div>
+
+      {/* SERVICE GRID */}
+      <section className="px-4 sm:px-0">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-black text-slate-900">Available Services</h2>
+          {isFetching && (
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-600">
+              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-600" />
+              Refreshing...
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredServices.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
+                <Search size={40} />
               </div>
-              <Button variant="ghost" size="sm" onClick={resetPriceFilters} className="justify-start text-slate-600">
-                Reset price range
+              <h3 className="text-lg font-bold text-slate-900">No services found</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Try adjusting filters or searching for something else.
+              </p>
+              <Button variant="ghost" className="mt-4" onClick={resetFilters}>
+                Clear all filters
               </Button>
             </div>
-          </div>
-        </div>
-        {isFetching && <p className="mt-4 text-xs text-slate-500">Refreshing services…</p>}
-      </section>
-
-      <section className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredServices.length === 0 ? (
-            <Card title="No services found">
-              <p className="text-sm text-slate-600">
-                Try adjusting filters or clearing the search to see more options.
-              </p>
-            </Card>
           ) : (
             filteredServices.map((service) => (
               <article
                 key={service.id}
-                className="flex flex-col gap-4 rounded-[28px] border border-slate-100 bg-white p-5 shadow-card transition hover:-translate-y-1 hover:shadow-elevated"
+                className="group relative flex flex-col overflow-hidden rounded-[40px] border border-slate-100 bg-white p-2 shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      {service.category?.name ?? "General care"}
-                    </p>
-                    <h2 className="text-lg font-semibold text-slate-900">{service.name}</h2>
+                <div className="relative h-48 overflow-hidden rounded-[32px] bg-slate-50">
+                  <div className="absolute inset-0 bg-brand-linear opacity-0 transition-opacity group-hover:opacity-10" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-16 w-16 rounded-2xl bg-white shadow-xl flex items-center justify-center text-brand-600">
+                      {service.category?.name?.toLowerCase().includes("nurse") ? <ShieldCheck size={32} /> : <Heart size={32} />}
+                    </div>
                   </div>
+
                   {service.is_emergency_capable && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-                      <Zap className="h-3.5 w-3.5" />
+                    <div className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white shadow-lg">
+                      <Zap size={12} fill="currentColor" />
                       Emergency
-                    </span>
+                    </div>
                   )}
                 </div>
-                {service.description && (
-                  <p className="text-sm text-slate-600 line-clamp-3">{service.description}</p>
-                )}
-                <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Starting at</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatCurrency(service.base_price_cents)}</p>
+
+                <div className="flex flex-1 flex-col p-6">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      {service.category?.name ?? "General"}
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                      <Timer size={12} />
+                      {service.default_estimate_minutes}m
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Session length</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {service.default_estimate_minutes} mins
+
+                  <h3 className="text-xl font-black text-slate-900 group-hover:text-brand-600 transition-colors">
+                    {service.name}
+                  </h3>
+
+                  {service.description && (
+                    <p className="mt-2 text-sm font-medium text-slate-500 line-clamp-2">
+                      {service.description}
                     </p>
+                  )}
+
+                  <div className="mt-auto pt-4">
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fixed Rate</p>
+                        <p className="text-lg font-black text-brand-600">{formatCurrency(service.base_price_cents)}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Link to={`/app/services/${service.id}`}>
+                          <button className="h-12 w-12 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 flex items-center justify-center transition-all hover:bg-slate-100 hover:text-brand-600 active:scale-95">
+                            <ChevronRight size={20} />
+                          </button>
+                        </Link>
+                        <button
+                          onClick={() => openBookingDialog(service.id)}
+                          className="h-12 rounded-2xl bg-slate-900 px-6 text-[11px] font-black uppercase tracking-widest text-white shadow-xl transition-all hover:bg-brand-600 active:scale-95"
+                        >
+                          Book Now
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Link to={`/app/services/${service.id}`} className="inline-flex">
-                    <Button variant="ghost" className="w-full justify-center">
-                      View details
-                    </Button>
-                  </Link>
-                  <Button className="w-full justify-center" onClick={() => openBookingDialog(service.id)}>
-                    Book now
-                  </Button>
                 </div>
               </article>
             ))
           )}
         </div>
       </section>
+
+      {/* FILTER DRAWER */}
+      <Drawer
+        anchor="right"
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        PaperProps={{
+          sx: { width: { xs: "100%", sm: 400 }, borderRadius: { xs: 0, sm: "40px 0 0 40px" } }
+        }}
+      >
+        <div className="flex h-full flex-col p-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black text-slate-900">Filters</h2>
+            <button
+              onClick={() => setFilterDrawerOpen(false)}
+              className="h-10 w-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-all"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="mt-10 flex-1 space-y-8">
+            {/* EMERGENCY TOGGLE */}
+            <div className="space-y-4">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Urgency</p>
+              <button
+                onClick={() => setEmergencyOnly(!emergencyOnly)}
+                className={classNames(
+                  "flex w-full items-center justify-between rounded-3xl border p-5 transition-all",
+                  emergencyOnly
+                    ? "border-rose-500 bg-rose-50/50 shadow-lg ring-1 ring-rose-500"
+                    : "border-slate-100 bg-slate-50/50 grayscale hover:grayscale-0"
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={classNames(
+                    "flex h-12 w-12 items-center justify-center rounded-2xl shadow-inner",
+                    emergencyOnly ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-400"
+                  )}>
+                    <Zap size={24} fill={emergencyOnly ? "currentColor" : "none"} />
+                  </div>
+                  <div className="text-left">
+                    <p className={classNames("font-black", emergencyOnly ? "text-rose-900" : "text-slate-900")}>Emergency Only</p>
+                    <p className="text-[10px] font-bold text-slate-500">Show only instant response services</p>
+                  </div>
+                </div>
+                <div className={classNames(
+                  "h-6 w-10 rounded-full transition-all flex items-center px-1",
+                  emergencyOnly ? "bg-rose-500" : "bg-slate-200"
+                )}>
+                  <div className={classNames(
+                    "h-4 w-4 rounded-full bg-white shadow-sm transition-all",
+                    emergencyOnly ? "translate-x-4" : "translate-x-0"
+                  )} />
+                </div>
+              </button>
+            </div>
+
+            {/* PRICE RANGE */}
+            <div className="space-y-4">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Budget (KES)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 pl-1">Min Price</label>
+                  <input
+                    type="number"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="0"
+                    className="w-full h-14 rounded-2xl bg-slate-50 border-slate-100 px-5 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 transition-all border shadow-inner"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 pl-1">Max Price</label>
+                  <input
+                    type="number"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="Any"
+                    className="w-full h-14 rounded-2xl bg-slate-50 border-slate-100 px-5 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 transition-all border shadow-inner"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 flex gap-4 pt-8 border-t border-slate-100">
+            <button
+              onClick={resetFilters}
+              className="h-14 flex-1 rounded-2xl bg-slate-50 text-[11px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-100 active:scale-95"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => setFilterDrawerOpen(false)}
+              className="h-14 flex-[2] rounded-2xl bg-slate-900 text-[11px] font-black uppercase tracking-widest text-white shadow-xl transition-all hover:bg-brand-600 active:scale-95"
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+      </Drawer>
+
       <BookingRequestDialog
         open={bookingDialogOpen}
         serviceId={selectedServiceId}
         onClose={() => setBookingDialogOpen(false)}
         onCreated={handleBookingCreated}
       />
-    </div>
+    </AppLayout>
   );
 };
 

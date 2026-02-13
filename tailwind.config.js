@@ -10,6 +10,10 @@ export default {
         display: ["\"Space Grotesk\"", ...defaultTheme.fontFamily.sans]
       },
       colors: {
+        tiba: {
+          blue: "#1d4699",
+          gold: "#c5a044"
+        },
         brand: {
           25: "#f8f9ff",
           50: "#f3f5ff",
