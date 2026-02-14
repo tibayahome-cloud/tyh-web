@@ -1,20 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  MessageSquare,
-  Send,
-  Plus,
-  ChevronLeft,
-  User,
-  ShieldCheck,
-  Clock,
-  Search,
-  MoreVertical,
-  Activity,
-  Zap,
-  CheckCircle2
-} from "lucide-react";
+import classNames from "classnames";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Plus, Search, MessageSquare } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useSocket } from "../../../shared/hooks/useSocket";
@@ -24,72 +13,60 @@ import {
   useSendMessage,
   useCreateThread,
   messagingKeys,
-  useSupportContacts
 } from "../../../shared/hooks/useMessaging";
-import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "../../../shared/components/Modal";
-import { Input } from "../../../shared/components/Input";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useBookingList } from "../../../shared/hooks/useBookings";
-import type { Thread } from "../../../shared/schemas/messaging";
-import classNames from "classnames";
-
-const formatTimestamp = (iso?: string | null) => {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-
-  if (isToday) {
-    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-};
-
-const getThreadDisplayName = (thread: Thread, currentUserId?: string | null) => {
-  if (thread.title) return thread.title;
-  const otherParticipants = thread.participants.filter(p => p.userId !== currentUserId);
-  const names = otherParticipants.map(p => p.user?.fullName || "Analyst").filter(Boolean);
-  if (names.length === 0) return "Intelligence Link";
-  if (names.length > 2) return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
-  return names.join(", ");
-};
+import { AppLayout } from "../../../shared/components/AppLayout";
+import { ProviderPageHeader } from "../components/ProviderPageHeader";
+import { ConversationList, type Conversation } from "../../../shared/components/messaging/ConversationList";
+import { MessageThread, type Message } from "../../../shared/components/messaging/MessageThread";
 
 const ProviderInbox = () => {
+  const { threadId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
-  const threadsQuery = useThreads();
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const messagesQuery = useThreadMessages(selectedThreadId);
+  const queryClient = useQueryClient();
+  const socket = useSocket();
+
+  const {
+    data: threadsData,
+    isLoading: threadsLoading,
+    fetchNextPage: fetchNextThreads,
+    hasNextPage: hasNextThreads,
+  } = useThreads();
+
+  const {
+    data: messagesData,
+    isLoading: messagesLoading,
+    fetchNextPage: fetchNextMessages,
+    hasNextPage: hasNextMessages,
+    isFetchingNextPage: isFetchingMessages,
+  } = useThreadMessages(threadId || null);
+
   const sendMutation = useSendMessage();
   const createThreadMutation = useCreateThread();
-  const [messageBody, setMessageBody] = useState("");
-  const socket = useSocket();
-  const queryClient = useQueryClient();
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+
   const [composerOpen, setComposerOpen] = useState(false);
   const [conversationType, setConversationType] = useState<"client" | "support">("client");
   const [selectedBookingId, setSelectedBookingId] = useState("");
   const [supportSubject, setSupportSubject] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "detail">("list");
-  const { data: supportContacts } = useSupportContacts("provider_support");
 
-  const { data: providerBookings, isFetching: loadingClients } = useBookingList(
+  const { data: providerBookings } = useBookingList(
     { providerId: user?.id ?? undefined, pageSize: 50, preset: "card" },
     { enabled: Boolean(user?.id) }
   );
 
   const clientOptions = useMemo(() => {
     const seen = new Map<string, any>();
-    (providerBookings?.bookings ?? []).forEach(booking => {
+    (providerBookings?.bookings ?? []).forEach((booking: any) => {
       const client = booking.client;
       if (!client?.id || !booking.id) return;
       if (seen.has(client.id)) return;
       seen.set(client.id, {
         clientId: client.id,
-        name: client.fullName || "Field Agent",
+        name: client.fullName || client.email || "Client",
         bookingId: booking.id,
         status: booking.status
       });
@@ -98,371 +75,247 @@ const ProviderInbox = () => {
   }, [providerBookings?.bookings]);
 
   useEffect(() => {
-    if (threadsQuery.data?.length && !selectedThreadId) {
-      setSelectedThreadId(threadsQuery.data[0].id);
-    }
-  }, [threadsQuery.data, selectedThreadId]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesQuery.data]);
-
-  useEffect(() => {
-    if (!socket || !selectedThreadId) return;
-    const room = `thread:${selectedThreadId}`;
+    if (!socket || !threadId) return;
+    const room = `thread:${threadId}`;
     socket.emit?.("join_room", { room });
-    const handleNewMessage = (payload: { thread_id?: string }) => {
-      if (payload?.thread_id === selectedThreadId) {
-        queryClient.invalidateQueries({ queryKey: messagingKeys.messages(selectedThreadId) }).catch(() => undefined);
+    const handleMessageEvent = (payload: { thread_id?: string }) => {
+      if (payload?.thread_id === threadId) {
+        queryClient.invalidateQueries({ queryKey: messagingKeys.messages(threadId) }).catch(() => undefined);
       }
       queryClient.invalidateQueries({ queryKey: messagingKeys.threads() }).catch(() => undefined);
     };
-    socket.on("message.created", handleNewMessage);
+    socket.on("message.created", handleMessageEvent);
     return () => {
       socket.emit?.("leave_room", { room });
-      socket.off("message.created", handleNewMessage);
+      socket.off("message.created", handleMessageEvent);
     };
-  }, [socket, selectedThreadId, queryClient]);
+  }, [socket, threadId, queryClient]);
 
-  const handleSend = () => {
-    if (!selectedThreadId || !messageBody.trim()) return;
-    sendMutation.mutate({ threadId: selectedThreadId, body: messageBody.trim() }, {
-      onSuccess: () => setMessageBody("")
+  const threads: Conversation[] = useMemo(() => {
+    return (threadsData?.pages.flatMap((page: any) => page.data) ?? []).map((t: any) => {
+      const other = t.participants.find((p: any) => p.userId !== user?.id);
+      return {
+        id: t.id,
+        title: t.title || other?.user?.fullName || other?.user?.email || "Conversation",
+        lastMessage: t.messages[0] ? {
+          body: t.messages[0].body || "",
+          created_at: t.messages[0].createdAt || t.lastMessageAt || "",
+          sender_id: t.messages[0].senderUserId || "",
+          delivery_status: t.messages[0].deliveryStatus
+        } : undefined,
+        unreadCount: (t as any).unreadCount || 0,
+        avatarUrl: other?.user?.avatarUrl
+      };
+    });
+  }, [threadsData, user?.id]);
+
+  const messages: Message[] = useMemo(() => {
+    const raw = messagesData?.pages.flatMap((page: any) => page.data) ?? [];
+    return [...raw].reverse().map((m: any) => ({
+      id: m.id,
+      body: m.body || "",
+      created_at: m.createdAt || "",
+      isMe: m.senderUserId === user?.id,
+      senderName: m.sender?.fullName || undefined,
+      delivery_status: m.deliveryStatus as any
+    }));
+  }, [messagesData, user?.id]);
+
+  const handleSendMessage = (body: string) => {
+    if (!threadId) return;
+    sendMutation.mutate({ threadId, body });
+  };
+
+  const selectedThread = threads.find(t => t.id === threadId);
+
+  const handleCreateConversation = () => {
+    const scope = conversationType === "client" ? "booking" : "provider_support";
+    createThreadMutation.mutateAsync({
+      scope,
+      bookingId: scope === "booking" ? selectedBookingId : undefined,
+      title: scope === "provider_support" ? supportSubject : undefined
+    }).then((t: any) => {
+      setComposerOpen(false);
+      navigate(`/admin/inbox/${t.id}`); // Wait, provider inbox is under /admin? No, let's check routes.
+      // Retrying with correct route for provider
+      navigate(`/provider/inbox/${t.id}`); // Correcting route prefix
+    }).catch((e: any) => {
+      toast.showToast({ title: "Error", description: e.message, variant: "error" });
     });
   };
 
-  const handleCreateThread = () => {
-    const isSupport = conversationType === "support";
-    createThreadMutation.mutate({
-      scope: isSupport ? "provider_support" : "booking",
-      bookingId: isSupport ? undefined : selectedBookingId,
-      title: isSupport ? supportSubject.trim() || "Operational Support" : undefined
-    }, {
-      onSuccess: (thread) => {
-        if (thread?.id) setSelectedThreadId(thread.id);
-        toast.showToast({ title: "Link Established", variant: "success" });
-        setComposerOpen(false);
-        setViewMode("detail");
-      }
-    });
-  };
-
-  const threads = threadsQuery.data ?? [];
-  const messages = messagesQuery.data ?? [];
-  const selectedThread = threads.find(t => t.id === selectedThreadId);
-
-  if (threadsQuery.isLoading && !threads.length) return <Loading fullHeight />;
+  // Wait, I need to check the exact route prefix for provider in app/routes.tsx or ProviderRoutes.tsx
+  // ProviderRoutes.tsx lists path: "inbox/:threadId?"
+  // In app/routes.tsx, probably /app/... ? 
+  // Let's check app/routes.tsx.
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-6 overflow-hidden pb-10">
-      {/* Fleet Comms Sidebar */}
-      <aside className={classNames(
-        "flex flex-col gap-6 lg:flex lg:w-[380px]",
-        viewMode === "detail" ? "hidden" : "w-full"
-      )}>
-        <div className="flex flex-col gap-6 rounded-[40px] border border-white/80 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 h-full">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-xl">
-                <Activity className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold uppercase tracking-widest text-slate-900">Fleet Comms</h1>
-                <p className="text-[10px] font-bold uppercase text-brand-600">Active Intelligence</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setComposerOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-linear text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              placeholder="Search frequencies..."
-              className="w-full rounded-2xl border-none bg-slate-900/5 py-3 pl-11 pr-4 text-xs font-bold ring-1 ring-black/5 focus:ring-brand-500/20"
-            />
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
-            {threads.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-                <MessageSquare className="h-10 w-10 mb-4" />
-                <p className="text-xs font-bold uppercase tracking-widest">No Active Links</p>
-              </div>
-            ) : (
-              threads.map((thread) => {
-                const isActive = thread.id === selectedThreadId;
-                const lastMsg = thread.messages.at(-1);
-                return (
-                  <button
-                    key={thread.id}
-                    onClick={() => {
-                      setSelectedThreadId(thread.id);
-                      setViewMode("detail");
-                    }}
-                    className={classNames(
-                      "group relative flex w-full items-start gap-4 rounded-3xl p-4 transition-all duration-300",
-                      isActive
-                        ? "bg-white shadow-xl ring-1 ring-black/5"
-                        : "hover:bg-white/60"
-                    )}
-                  >
-                    <div className="relative shrink-0">
-                      <div className={classNames(
-                        "flex h-12 w-12 items-center justify-center rounded-2xl font-black text-white shadow-lg",
-                        thread.scope === "provider_support" ? "bg-slate-900" : "bg-brand-linear"
-                      )}>
-                        {getThreadDisplayName(thread, user?.id).charAt(0)}
-                      </div>
-                      {(thread as any).unreadCount > 0 && (
-                        <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-rose-500 ring-2 ring-white" />
-                      )}
-                    </div>
-                    <div className="flex-1 overflow-hidden text-left">
-                      <div className="flex items-center justify-between">
-                        <span className="truncate text-sm font-bold text-slate-900">
-                          {getThreadDisplayName(thread, user?.id)}
-                        </span>
-                        <span className="shrink-0 text-[10px] font-bold text-slate-400">
-                          {formatTimestamp(lastMsg?.createdAt || thread.lastMessageAt)}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-xs font-bold text-slate-500">
-                        {lastMsg?.body || "Awaiting intelligence..."}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+    <AppLayout fullWidth showHeader={false} disablePadding>
+      <div className="flex flex-col h-screen max-h-screen overflow-hidden">
+        <div className="shrink-0 bg-white border-b border-slate-100">
+          <ProviderPageHeader
+            title="Operational Comms"
+            subtitle="Secure messaging with clients and support staff."
+            overline="Inbox"
+          />
         </div>
-      </aside>
 
-      {/* Intelligence Feed */}
-      <main className={classNames(
-        "flex-1 flex flex-col lg:flex",
-        viewMode === "list" ? "hidden" : "flex"
-      )}>
-        <div className="flex flex-col rounded-[48px] border border-white/80 bg-white/40 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 h-full overflow-hidden">
-          {/* Active Link Header */}
-          <header className="flex shrink-0 items-center justify-between bg-white/40 px-8 py-6 backdrop-blur-md border-b border-white/80">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setViewMode("list")}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg ring-1 ring-black/5 lg:hidden"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-linear text-white shadow-xl font-black">
-                {selectedThread ? getThreadDisplayName(selectedThread, user?.id).charAt(0) : "?"}
+        <div className="flex-1 flex overflow-hidden lg:px-8 lg:py-8 bg-slate-50/50">
+          <div className="w-full h-full flex rounded-[2.5rem] bg-white shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+            {/* List Pane */}
+            <div className={classNames(
+              "w-full lg:w-[400px] border-r border-slate-50 flex flex-col shrink-0",
+              threadId && "hidden lg:flex"
+            )}>
+              <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Messages</h2>
+                <button
+                  onClick={() => setComposerOpen(true)}
+                  className="h-10 w-10 rounded-xl bg-iba-blue text-white flex items-center justify-center shadow-lg shadow-tiba-blue/20 hover:scale-105 active:scale-95 transition-all"
+                >
+                  <Plus size={20} />
+                </button>
               </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  {selectedThread ? getThreadDisplayName(selectedThread, user?.id) : "Establishing Link..."}
-                </h2>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Secure Channel</span>
+              <div className="p-4 bg-slate-50/50">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                  <input
+                    placeholder="Search conversations..."
+                    className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-100 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-tiba-blue/10 transition-all shadow-sm"
+                  />
                 </div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button className="h-10 w-10 rounded-xl bg-white shadow-lg ring-1 ring-black/5 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
-                <MoreVertical className="h-5 w-5" />
-              </button>
-            </div>
-          </header>
-
-          {/* Terminal Feed */}
-          <div className="flex-1 overflow-y-auto px-8 py-10 custom-scrollbar space-y-8 bg-slate-50/20">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
-                <Zap className="h-12 w-12 mb-4" />
-                <p className="text-sm font-bold uppercase tracking-widest">Encrypted Stream Empty</p>
+              <div className="flex-1 overflow-hidden">
+                {threadsLoading && !threads.length ? (
+                  <div className="p-12 text-center"><Loading /></div>
+                ) : (
+                  <ConversationList
+                    conversations={threads}
+                    activeId={threadId}
+                    onSelect={(id) => navigate(`/provider/inbox/${id}`)}
+                  />
+                )}
+                {hasNextThreads && (
+                  <button
+                    onClick={() => fetchNextThreads()}
+                    className="w-full py-4 text-xs font-bold text-slate-400 hover:text-tiba-blue transition-colors"
+                  >
+                    Load More
+                  </button>
+                )}
               </div>
-            ) : (
-              messages.map((message, i) => {
-                const isMine = message.senderUserId === user?.id;
-                const nextMessage = messages[i + 1];
-                const isContinued = nextMessage?.senderUserId === message.senderUserId;
-
-                return (
-                  <div key={message.id} className={classNames(
-                    "flex w-full",
-                    isMine ? "justify-end" : "justify-start"
-                  )}>
-                    <div className={classNames(
-                      "flex max-w-[70%] flex-col",
-                      isMine ? "items-end" : "items-start"
-                    )}>
-                      {!isMine && !isContinued && (
-                        <span className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-4">
-                          {`${message.sender?.fullName || "Field Unit"}`}
-                        </span>
-                      )}
-                      <div className={classNames(
-                        "relative px-6 py-4 text-sm font-medium shadow-2xl",
-                        isMine
-                          ? "rounded-[28px] rounded-tr-none bg-slate-900 text-white shadow-slate-900/10"
-                          : "rounded-[28px] rounded-tl-none bg-white text-slate-900 ring-1 ring-black/5"
-                      )}>
-                        <p className="leading-relaxed">{message.body}</p>
-                        <div className={classNames(
-                          "mt-2 flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest",
-                          isMine ? "text-white/40" : "text-slate-400"
-                        )}>
-                          {formatTimestamp(message.createdAt)}
-                          {isMine && <CheckCircle2 className="h-3 w-3 text-brand-400" />}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Comms Input */}
-          <footer className="shrink-0 p-8 pt-0 bg-slate-50/20 backdrop-blur-sm">
-            <div className="relative group">
-              <textarea
-                placeholder="Transmit intelligence..."
-                rows={1}
-                value={messageBody}
-                onChange={(e) => setMessageBody(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                className="w-full rounded-[32px] border-none bg-white p-6 pr-20 text-sm font-bold shadow-2xl ring-1 ring-black/5 transition-all focus:ring-brand-500/20"
-              />
-              <button
-                onClick={handleSend}
-                disabled={!messageBody.trim() || sendMutation.isPending}
-                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-brand-linear text-white shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
-              >
-                <Send className={classNames("h-6 w-6", sendMutation.isPending && "animate-pulse")} />
-              </button>
             </div>
-          </footer>
-        </div>
-      </main>
 
-      {/* Composer Intelligence Modal */}
+            {/* Thread Pane */}
+            <div className={classNames(
+              "flex-1 flex flex-col min-w-0 bg-[#f8f9fa]",
+              !threadId && "hidden lg:flex"
+            )}>
+              {threadId ? (
+                <MessageThread
+                  title={selectedThread?.title || "Secure Line"}
+                  messages={messages}
+                  onSendMessage={handleSendMessage}
+                  onLoadMore={() => fetchNextMessages()}
+                  hasMore={hasNextMessages}
+                  isLoading={isFetchingMessages || messagesLoading}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+                  <div className="h-24 w-24 rounded-[40px] bg-slate-50 flex items-center justify-center text-slate-200 mb-8 border border-slate-100 shadow-inner">
+                    <MessageSquare size={48} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Feed</h3>
+                  <p className="mt-2 text-slate-500 max-w-xs text-sm leading-relaxed">
+                    Select a mission link to begin transmitting tactical updates or coordinate with command.
+                  </p>
+                  <button
+                    onClick={() => setComposerOpen(true)}
+                    className="mt-8 px-8 h-12 rounded-2xl bg-slate-900 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
+                  >
+                    Establish Link
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <Modal
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
-        title="Establish Intelligence Link"
-        maxWidth="sm"
+        title="Establish Link"
+        description="Initiate communication with client or HQ."
       >
-        <div className="space-y-8 p-6">
-          <div className="flex gap-4 p-1 rounded-3xl bg-slate-900/5 ring-1 ring-black/5">
+        <div className="space-y-6 pt-4">
+          <div className="flex p-1 bg-slate-100 rounded-2xl">
             <button
               onClick={() => setConversationType("client")}
               className={classNames(
-                "flex-1 rounded-2xl py-4 text-xs font-bold uppercase tracking-widest transition-all",
-                conversationType === "client"
-                  ? "bg-white text-slate-900 shadow-xl"
-                  : "text-slate-400 hover:text-slate-600"
+                "flex-1 h-10 rounded-xl text-xs font-bold transition-all",
+                conversationType === "client" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               )}
             >
-              Field Unit
+              Client
             </button>
             <button
               onClick={() => setConversationType("support")}
               className={classNames(
-                "flex-1 rounded-2xl py-4 text-xs font-bold uppercase tracking-widest transition-all",
-                conversationType === "support"
-                  ? "bg-white text-slate-900 shadow-xl"
-                  : "text-slate-400 hover:text-slate-600"
+                "flex-1 h-10 rounded-xl text-xs font-bold transition-all",
+                conversationType === "support" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               )}
             >
-              Command Unit
+              HQ Support
             </button>
           </div>
 
           {conversationType === "client" ? (
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Active Operational Links</p>
-              <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {clientOptions.length === 0 ? (
-                  <p className="text-sm font-bold text-slate-500 text-center py-10 italic">No recent field units detected.</p>
-                ) : (
-                  clientOptions.map((client) => (
-                    <button
-                      key={client.bookingId}
-                      onClick={() => setSelectedBookingId(client.bookingId)}
-                      className={classNames(
-                        "flex items-center justify-between rounded-3xl p-5 text-left transition-all border",
-                        selectedBookingId === client.bookingId
-                          ? "bg-brand-500/5 border-brand-500/50 shadow-lg"
-                          : "bg-white border-transparent hover:border-slate-200"
-                      )}
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">{client.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Mission #{client.bookingId.slice(0, 8)}</p>
-                      </div>
-                      <div className={classNames(
-                        "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                        selectedBookingId === client.bookingId ? "border-brand-500 bg-brand-500" : "border-slate-100"
-                      )}>
-                        {selectedBookingId === client.bookingId && <CheckCircle2 className="h-4 w-4 text-white" />}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
+            <div className="space-y-3">
+              {clientOptions.length > 0 ? clientOptions.map(opt => (
+                <button
+                  key={opt.bookingId}
+                  onClick={() => setSelectedBookingId(opt.bookingId)}
+                  className={classNames(
+                    "w-full p-4 rounded-2xl border transition-all text-left flex items-center justify-between",
+                    selectedBookingId === opt.bookingId ? "border-tiba-blue bg-tiba-blue/5 ring-1 ring-tiba-blue" : "border-slate-100 hover:bg-slate-50"
+                  )}
+                >
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{opt.name}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Mission: #{opt.bookingId.slice(0, 8)}</p>
+                  </div>
+                  {selectedBookingId === opt.bookingId && <div className="h-4 w-4 rounded-full bg-tiba-blue" />}
+                </button>
+              )) : (
+                <div className="py-8 text-center text-slate-400 text-xs">No active clients found.</div>
+              )}
             </div>
           ) : (
-            <div className="space-y-6">
-              <Input
-                label="Operational Objective"
-                placeholder="Briefly state the support requirement..."
+            <div className="space-y-4">
+              <p className="text-xs font-medium text-slate-500 px-1">Nature of inquiry:</p>
+              <input
                 value={supportSubject}
-                onChange={(e) => setSupportSubject(e.target.value)}
-                className="bg-white/60"
+                onChange={e => setSupportSubject(e.target.value)}
+                placeholder="e.g. System access, Payment issue..."
+                className="w-full h-12 px-4 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-tiba-blue/10"
               />
-              <div className="rounded-3xl bg-slate-900 p-6 text-white/80 shadow-3xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <ShieldCheck className="h-5 w-5 text-brand-400" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Protocol Intelligence</span>
-                </div>
-                <p className="text-xs font-bold leading-relaxed">
-                  Support requests are prioritized by Fleet Intelligence. An analyst will verify your channel within the next 5-10 minutes.
-                </p>
-              </div>
             </div>
           )}
 
-          <div className="flex gap-4">
-            <Button
-              variant="secondary"
-              className="flex-1 rounded-2xl h-14 font-bold uppercase tracking-widest"
-              onClick={() => setComposerOpen(false)}
+          <div className="flex gap-4 pt-4">
+            <button onClick={() => setComposerOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all">Abort</button>
+            <button
+              onClick={handleCreateConversation}
+              disabled={createThreadMutation.isPending || (conversationType === 'client' && !selectedBookingId)}
+              className="flex-1 h-12 rounded-xl bg-slate-900 text-white text-sm font-bold shadow-lg disabled:opacity-50"
             >
-              Abort
-            </Button>
-            <Button
-              className="flex-2 rounded-2xl h-14 font-bold uppercase tracking-widest bg-brand-linear shadow-xl"
-              onClick={handleCreateThread}
-              disabled={createThreadMutation.isPending || (conversationType === "client" && !selectedBookingId)}
-              loading={createThreadMutation.isPending}
-            >
-              Establish Link
-            </Button>
+              {createThreadMutation.isPending ? "Linking..." : "Establish Link"}
+            </button>
           </div>
         </div>
       </Modal>
-    </div>
+    </AppLayout>
   );
 };
 
