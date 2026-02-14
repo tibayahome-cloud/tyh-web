@@ -362,7 +362,7 @@ const ProviderHome = () => {
 
             <Card className="border border-white/80 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5">
               <div className="flex items-center gap-3 mb-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-linear text-white shadow-xl">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-xl">
                   <ExternalLink className="h-5 w-5" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Quick Links</h3>
@@ -420,7 +420,7 @@ const ProviderHome = () => {
                       </div>
                       <div className="flex gap-3">
                         <Button
-                          className="flex-1 h-11 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-brand-100"
+                          className="flex-1 h-11 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-tiba-blue/20"
                           onClick={() => handleAcceptInvite(offer.booking.id)}
                           loading={acceptBookingMutation.isPending}
                         >

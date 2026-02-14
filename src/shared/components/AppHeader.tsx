@@ -3,6 +3,7 @@ import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import PaymentIcon from "@mui/icons-material/PaymentOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import logoImage from "../../assets/images/logo.jpeg";
 
 import type { AuthUser } from "../schemas/user";
 import { NotificationCenter } from "./NotificationCenter";
@@ -57,11 +58,14 @@ export const AppHeader = ({
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/90 backdrop-blur-xl shadow-sm">
       <div className={`mx-auto flex w-full ${containerMaxWidth} items-center justify-between px-4 py-3 sm:px-6 sm:py-4`}>
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
-            T
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 h-10 w-10">
+            <img src={logoImage} alt="Tiba Ya Home" className="h-full w-full object-cover" />
           </div>
-          <span className="hidden text-lg font-semibold text-neutral-900 sm:block">Tiba Ya Home</span>
+          <div className="hidden sm:block">
+            <span className="block text-lg font-black text-tiba-blue leading-none">Tiba Ya Home</span>
+            <span className="block text-[10px] font-bold text-tiba-gold uppercase tracking-widest mt-0.5">Divine Care @ Home</span>
+          </div>
         </div>
         {user ? (
           <div className="flex items-center gap-2 sm:gap-3">
@@ -79,7 +83,7 @@ export const AppHeader = ({
                     className="h-8 w-8 rounded-full object-cover"
                   />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-xs font-semibold text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-tiba-blue text-xs font-semibold text-white">
                     {initials}
                   </span>
                 )}
@@ -134,7 +138,7 @@ export const AppHeader = ({
             </div>
           </div>
         ) : (
-          <div className="text-sm font-semibold text-neutral-500">TYH Care</div>
+          <div className="text-xs font-black text-tiba-gold uppercase tracking-widest">Divine Care</div>
         )}
       </div>
     </header>

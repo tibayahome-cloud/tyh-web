@@ -26,10 +26,10 @@ export const Card = ({
   const paddingClass = padding === "none" ? "p-0" : "p-6";
   const toneClass =
     tone === "brand"
-      ? "bg-brand-linear text-white border-transparent shadow-elevated"
+      ? "bg-tiba-blue text-white border-transparent shadow-elevated"
       : tone === "muted"
-        ? "bg-neutral-50 text-neutral-900 border border-neutral-100 shadow-card"
-        : "bg-white text-neutral-900 border border-neutral-100 shadow-card";
+        ? "bg-slate-50 text-slate-900 border border-slate-100 shadow-card"
+        : "bg-white text-slate-900 border border-slate-100 shadow-card";
 
   return (
     <div className={clsx("rounded-3xl transition duration-200 hover:-translate-y-0.5", toneClass, paddingClass, className)}>
@@ -45,8 +45,8 @@ export const Card = ({
             {badge && (
               <span
                 className={clsx(
-                  "whitespace-nowrap rounded-pill px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-                  tone === "brand" ? "bg-white/20 text-white" : "bg-brand-50 text-brand-700"
+                  "whitespace-nowrap rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest",
+                  tone === "brand" ? "bg-white/20 text-white" : "bg-tiba-gold-soft text-tiba-gold ring-1 ring-tiba-gold/20"
                 )}
               >
                 {badge}

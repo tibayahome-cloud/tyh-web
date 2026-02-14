@@ -409,9 +409,9 @@ const ClientHome = () => {
         )}
 
         <div className="flex flex-col gap-8 pb-10">
-          {/* IMMERSIVE HERO */}
           <section className="relative -mx-4 -mt-12 overflow-hidden px-4 pb-12 pt-16 sm:-mx-8 sm:px-8">
-            <div className="absolute inset-0 bg-brand-linear opacity-90" />
+            <div className="absolute inset-0 bg-tiba-blue" />
+            <div className="absolute inset-0 bg-gradient-to-br from-tiba-blue via-tiba-blue/95 to-blue-900" />
             <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
             <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-2xl" />
 
@@ -488,15 +488,14 @@ const ClientHome = () => {
                 </div>
               </button>
             ) : (
-              /* BOOK CARE - LARGE SPAN */
               <button
                 onClick={() => openBookingDialog()}
-                className="group relative col-span-2 flex items-center justify-between overflow-hidden rounded-[32px] bg-brand-linear p-8 text-left text-white shadow-2xl transition-all active:scale-[0.98]"
+                className="group relative col-span-2 flex items-center justify-between overflow-hidden rounded-[32px] bg-tiba-blue p-8 text-left text-white shadow-2xl transition-all active:scale-[0.98]"
               >
                 <div className="relative z-10 max-w-[60%]">
                   <h2 className="text-2xl font-black leading-tight">Request Care Now</h2>
                   <p className="mt-2 text-sm font-medium text-white/80">Connect with expert providers instantly.</p>
-                  <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-full bg-white text-brand-600 shadow-xl transition-transform group-hover:translate-x-2">
+                  <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-full bg-tiba-gold text-white shadow-xl transition-transform group-hover:translate-x-2">
                     <ArrowRight className="h-5 w-5" />
                   </div>
                 </div>
@@ -521,7 +520,9 @@ const ClientHome = () => {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Health Pulse</p>
                 <h3 className="mt-1 text-xl font-black text-slate-900">
-                  {latestCheckin?.vitals?.bpSystolic ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}` : "Norm"}
+                  {latestCheckin?.vitals && (latestCheckin.vitals.bpSystolic || latestCheckin.vitals.bpDiastolic)
+                    ? `${latestCheckin.vitals.bpSystolic || '--'}/${latestCheckin.vitals.bpDiastolic || '--'}`
+                    : "Norm"}
                   <span className="ml-1 text-[10px] text-slate-400">mmHg</span>
                 </h3>
               </div>
@@ -533,7 +534,7 @@ const ClientHome = () => {
               className="group flex flex-col justify-between rounded-[32px] bg-slate-900 p-6 text-white shadow-card active:scale-95 transition-transform cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-brand-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-tiba-gold">
                   <Zap className="h-5 w-5 fill-current" />
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-600" />
@@ -551,10 +552,10 @@ const ClientHome = () => {
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-indigo-500" />
+                  <CalendarDays className="h-5 w-5 text-tiba-blue" />
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Upcoming Care</h3>
                 </div>
-                <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-700">View Schedule</button>
+                <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-black uppercase tracking-widest text-tiba-blue hover:text-tiba-gold">View Schedule</button>
               </div>
               <div className="space-y-4">
                 {upcomingList?.bookings && upcomingList.bookings.length > 0 ? (

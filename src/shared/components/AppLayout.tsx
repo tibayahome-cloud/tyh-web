@@ -47,8 +47,8 @@ export const AppLayout = ({
     basePath === "/admin" ? "/admin/finance/payments" : basePath === "/pro" ? "/pro/payments" : "/app/settings";
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="absolute inset-x-0 top-0 h-72 bg-brand-radial" aria-hidden />
+    <div className="min-h-screen bg-slate-50">
+      <div className="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-tiba-blue/5 to-transparent" aria-hidden />
       {showHeader && (
         <AppHeader
           containerMaxWidth={containerMaxWidth}

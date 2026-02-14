@@ -70,13 +70,13 @@ export const AIRecommendationsCard = () => {
     return (
         <div className="px-4 sm:px-0">
             <Card className="relative overflow-hidden border-none bg-white p-6 shadow-md ring-1 ring-slate-100">
-                <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-brand-500/5 blur-3xl opacity-50" />
+                <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-tiba-blue/5 blur-3xl opacity-50" />
 
                 <div className="flex flex-col gap-5">
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-linear text-white shadow-lg shadow-brand-100">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-lg shadow-tiba-blue/10">
                                 <ShieldCheck className="h-5 w-5" />
                             </div>
                             <div className="flex flex-col">
@@ -94,7 +94,7 @@ export const AIRecommendationsCard = () => {
 
                     {/* Summary */}
                     <div className="relative">
-                        <div className="absolute -left-3 top-0 bottom-0 w-1 rounded-full bg-brand-200/50" />
+                        <div className="absolute -left-3 top-0 bottom-0 w-1 rounded-full bg-tiba-gold/30" />
                         <p className="text-sm font-bold text-slate-800 leading-snug">
                             {recommendation.summary}
                         </p>
@@ -104,7 +104,7 @@ export const AIRecommendationsCard = () => {
                     <div className="space-y-2">
                         {recommendation.steps.slice(0, 2).map((step, idx) => (
                             <div key={idx} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 transition-colors hover:bg-slate-100/80">
-                                <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-white">
+                                <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-tiba-gold text-[10px] font-bold text-white">
                                     {idx + 1}
                                 </div>
                                 <div>
@@ -119,7 +119,7 @@ export const AIRecommendationsCard = () => {
                     <button
                         type="button"
                         onClick={() => navigate("/app/selfcare")}
-                        className="group flex items-center justify-between rounded-2xl bg-slate-900 p-4 text-white shadow-lg shadow-slate-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                        className="group flex items-center justify-between rounded-2xl bg-tiba-blue p-4 text-white shadow-lg shadow-tiba-blue/10 transition-all hover:scale-[1.01] active:scale-[0.99]"
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 group-hover:bg-white/20 transition-colors">

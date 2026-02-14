@@ -13,11 +13,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-gradient-to-r from-brand-650 via-brand-600 to-accent-500 text-white shadow-elevated hover:shadow-lg hover:shadow-brand-900/20 focus-visible:shadow-focus",
+    "bg-tiba-blue text-white shadow-elevated hover:bg-blue-800 focus-visible:ring-tiba-blue/40",
   secondary:
-    "bg-white text-brand-700 border border-neutral-200 shadow-card hover:-translate-y-0.5 hover:shadow-elevated",
-  ghost: "bg-transparent text-brand-600 hover:bg-brand-50/70",
-  outline: "border border-brand-200 text-brand-700 hover:bg-brand-50/60"
+    "bg-tiba-gold text-white shadow-card hover:opacity-90 active:scale-[0.98]",
+  ghost: "bg-transparent text-tiba-blue hover:bg-slate-50",
+  outline: "border-2 border-slate-200 text-slate-700 hover:border-tiba-blue hover:text-tiba-blue"
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -28,9 +28,9 @@ const sizeStyles: Record<ButtonSize, string> = {
 
 const spinnerColorByVariant: Record<ButtonVariant, string> = {
   primary: "border-white",
-  secondary: "border-brand-600",
-  ghost: "border-brand-600",
-  outline: "border-brand-600"
+  secondary: "border-white",
+  ghost: "border-tiba-blue",
+  outline: "border-tiba-blue"
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -40,7 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={clsx(
-          "inline-flex items-center justify-center gap-2 rounded-pill font-semibold transition duration-200 ease-emphasized focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+          "inline-flex items-center justify-center gap-2 rounded-xl font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95",
           variantStyles[variant],
           sizeStyles[size],
           className

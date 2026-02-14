@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import classNames from "classnames";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -531,13 +532,13 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                         className={classNames(
                           "group relative flex flex-col rounded-3xl border-2 p-5 text-left transition-all duration-300",
                           selectedServiceId === service.id
-                            ? "border-brand-500 bg-brand-50/40 shadow-lg shadow-brand-500/10"
-                            : "border-neutral-100 bg-white hover:border-brand-200 hover:shadow-md"
+                            ? "border-tiba-blue bg-blue-50/40 shadow-lg shadow-tiba-blue/10"
+                            : "border-neutral-100 bg-white hover:border-tiba-blue/20 hover:shadow-md"
                         )}
                       >
                         <div className={classNames(
                           "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-300",
-                          selectedServiceId === service.id ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-600 group-hover:bg-brand-100"
+                          selectedServiceId === service.id ? "bg-tiba-blue text-white" : "bg-blue-50 text-tiba-blue group-hover:bg-blue-100"
                         )}>
                           {service.name.toLowerCase().includes("nurse") ? <Stethoscope /> :
                             service.name.toLowerCase().includes("baby") ? <Baby /> :
@@ -548,7 +549,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                           {service.description ?? "Reliable professional healthcare at your doorstep."}
                         </p>
                         <div className="mt-4 flex items-center justify-between">
-                          <span className="text-sm font-black text-brand-600">{formatCurrency(service.base_price_cents)}</span>
+                          <span className="text-sm font-black text-tiba-blue">{formatCurrency(service.base_price_cents)}</span>
                           <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{service.default_estimate_minutes} MINS</span>
                         </div>
                       </button>
@@ -588,7 +589,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       <button
                         type="button"
                         onClick={handleUseCurrentLocation}
-                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg active:scale-95 transition-transform"
+                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-lg active:scale-95 transition-transform"
                       >
                         {geoLoading ? <Loading /> : <Crosshair className="h-5 w-5" />}
                       </button>
@@ -649,7 +650,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   )}
 
                   <div className="flex items-center justify-between">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(0)} className="rounded-2xl">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-2xl">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                     <Button
@@ -657,7 +658,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       type="button"
                       disabled={!locationComplete}
                       onClick={() => setCurrentStep(2)}
-                      className="rounded-2xl px-8 shadow-lg shadow-brand-100"
+                      className="rounded-2xl px-8"
                     >
                       Next Step <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -681,13 +682,13 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       className={classNames(
                         "flex flex-col items-center justify-center rounded-[32px] border-2 p-8 text-center transition-all duration-300",
                         !watch("scheduleForLater")
-                          ? "border-brand-500 bg-brand-50/40 shadow-lg shadow-brand-500/10"
-                          : "border-neutral-100 bg-white hover:border-brand-200"
+                          ? "border-tiba-blue bg-blue-50/40 shadow-lg shadow-tiba-blue/10"
+                          : "border-neutral-100 bg-white hover:border-tiba-blue/20"
                       )}
                     >
                       <div className={classNames(
                         "mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] shadow-sm transition-colors",
-                        !watch("scheduleForLater") ? "bg-brand-600 text-white" : "bg-slate-50 text-slate-400"
+                        !watch("scheduleForLater") ? "bg-tiba-blue text-white" : "bg-slate-50 text-slate-400"
                       )}>
                         <VitalsIcon className="h-8 w-8" />
                       </div>
@@ -751,7 +752,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       variant="primary"
                       type="button"
                       onClick={() => setCurrentStep(3)}
-                      className="rounded-2xl px-12 shadow-lg shadow-brand-100"
+                      className="rounded-2xl px-12"
                     >
                       Continue <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -769,21 +770,21 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   className="space-y-8"
                 >
                   <div className="relative overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5">
-                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-brand-500/10 blur-3xl" />
+                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-tiba-blue/5 blur-3xl" />
                     <div className="relative">
                       <div className="mb-8 flex items-center justify-between">
                         <div>
                           <h2 className="text-2xl font-black text-slate-900 leading-none">Confirm Booking</h2>
                           <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Review Summary</p>
                         </div>
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-linear text-white shadow-lg shadow-brand-100">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-lg shadow-tiba-blue/10">
                           <CheckCircle2 className="h-7 w-7" />
                         </div>
                       </div>
 
                       <div className="space-y-6">
                         <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-brand-600">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-tiba-blue">
                             <ShieldCheck className="h-6 w-6" />
                           </div>
                           <div>

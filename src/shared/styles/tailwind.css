@@ -8,6 +8,13 @@
   :root {
     color-scheme: light;
     font-family: "Inter", "Inter var", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    
+    /* Brand Colors */
+    --tiba-blue: #1d4699;
+    --tiba-gold: #c5a044;
+    --tiba-gold-soft: rgba(197, 160, 68, 0.1);
+    --tiba-blue-soft: rgba(29, 70, 153, 0.05);
+
     background-color: #f8fafc;
     color: #0f172a;
     scroll-behavior: smooth;
@@ -29,10 +36,15 @@
   h4,
   h5,
   h6 {
+    @apply text-tiba-blue;
     font-family: "Space Grotesk", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
+
+  h1 { @apply text-4xl md:text-5xl lg:text-6xl leading-tight; }
+  h2 { @apply text-3xl md:text-4xl leading-snug; }
+  h3 { @apply text-xl md:text-2xl; }
 
   button,
   input,
@@ -44,6 +56,18 @@
 @layer utilities {
   .slide-in-right {
     animation: slide-in-right 0.3s ease-out;
+  }
+
+  .btn-primary {
+    @apply bg-tiba-blue text-white rounded-xl font-bold hover:bg-blue-800 transition-all shadow-lg flex items-center justify-center gap-2 px-8 py-3;
+  }
+
+  .btn-secondary {
+    @apply bg-tiba-gold text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2 px-8 py-3;
+  }
+
+  .btn-outline {
+    @apply border-2 border-slate-200 bg-white text-slate-700 rounded-xl font-bold hover:border-tiba-blue hover:text-tiba-blue transition-all flex items-center justify-center gap-2 px-8 py-3;
   }
 
   @keyframes slide-in-right {

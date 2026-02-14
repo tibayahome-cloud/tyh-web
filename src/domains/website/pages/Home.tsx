@@ -32,7 +32,7 @@ import diagnosticsImage from "../../../assets/images/service-nurse.png";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
-        <h2 className="text-3xl md:text-4xl font-bold text-tiba-blue mb-4">{title}</h2>
+        <h2 className="mb-4">{title}</h2>
         {subtitle && <p className="text-slate-600 max-w-2xl mx-auto">{subtitle}</p>}
     </div>
 );
@@ -72,7 +72,7 @@ export const Home = () => {
                             transition={{ duration: 0.6 }}
                             className="flex-1 max-w-2xl"
                         >
-                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-tiba-blue leading-tight mb-6">
+                            <h1 className="leading-tight mb-6">
                                 Care That Comes to You
                             </h1>
                             <p className="text-lg md:text-xl text-slate-700 mb-10 leading-relaxed">
@@ -82,13 +82,13 @@ export const Home = () => {
                             <div className="flex flex-wrap gap-4 mb-10">
                                 <button
                                     onClick={handleServiceClick}
-                                    className="px-8 py-4 bg-tiba-blue text-white rounded-xl font-bold hover:bg-blue-800 transition-all shadow-lg flex items-center gap-2"
+                                    className="btn-primary"
                                 >
                                     Book Home Care
                                 </button>
                                 <button
                                     onClick={handleServiceClick}
-                                    className="px-8 py-4 bg-tiba-gold text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg flex items-center gap-2"
+                                    className="btn-secondary"
                                 >
                                     Get Ambulance
                                 </button>
@@ -175,8 +175,8 @@ export const Home = () => {
                             <div className="mb-4 inline-block px-4 py-1.5 rounded-full bg-tiba-gold/10 text-tiba-gold font-bold text-sm">
                                 COMING SOON
                             </div>
-                            <h2 className="text-3xl md:text-4xl font-bold text-tiba-blue mb-2">The Tiba Ya Home App</h2>
-                            <h3 className="text-xl md:text-2xl text-slate-800 font-bold mb-8">Care at Your Fingertips</h3>
+                            <h2 className="mb-2">The Tiba Ya Home App</h2>
+                            <h3 className="text-slate-800 mb-8">Care at Your Fingertips</h3>
 
                             <ul className="space-y-4 mb-10">
                                 {[
@@ -197,7 +197,7 @@ export const Home = () => {
 
                             <button
                                 onClick={handleServiceClick}
-                                className="px-8 py-4 bg-tiba-gold text-white rounded-xl font-bold hover:bg-opacity-90 transition-all shadow-lg inline-flex items-center gap-2"
+                                className="btn-secondary"
                             >
                                 Request an Ambulance
                             </button>
@@ -233,7 +233,7 @@ export const Home = () => {
                                     <div className="absolute inset-0 bg-tiba-blue/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                                 <div className="p-4 text-center">
-                                    <h3 className="text-sm md:text-base font-bold text-tiba-blue group-hover:text-tiba-gold transition-colors">
+                                    <h3 className="text-sm md:text-base font-bold transition-colors">
                                         {service.name}
                                     </h3>
                                 </div>
@@ -252,7 +252,7 @@ export const Home = () => {
                 <div className="container mx-auto px-4 md:px-6 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center gap-16">
                         <div className="flex-1">
-                            <h2 className="text-3xl md:text-5xl font-bold mb-4">Ambulance & Emergency Services</h2>
+                            <h2 className="text-white mb-4">Ambulance & Emergency Services</h2>
                             <p className="text-xl text-blue-100 mb-8 font-medium">Fast, Reliable, and Tracked.</p>
 
                             <ul className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 mb-10">
@@ -274,7 +274,7 @@ export const Home = () => {
 
                             <button
                                 onClick={handleServiceClick}
-                                className="px-8 py-4 bg-tiba-gold text-white rounded-xl font-bold hover:bg-opacity-90 transition-all shadow-lg inline-block"
+                                className="btn-secondary"
                             >
                                 Get Ambulance
                             </button>
@@ -308,7 +308,7 @@ export const Home = () => {
                                 className={`flex flex-col rounded-2xl overflow-hidden shadow-sm border border-slate-100 transition-transform hover:-translate-y-1 text-left`}
                             >
                                 <div className={`p-6 text-center h-24 flex items-center justify-center bg-white`}>
-                                    <h3 className="font-bold text-lg text-tiba-blue leading-tight">{pkg.name}</h3>
+                                    <h3 className="leading-tight">{pkg.name}</h3>
                                 </div>
                                 <div className={`p-4 text-center ${pkg.color === 'blue' ? 'bg-tiba-blue text-white' : 'bg-tiba-gold text-white'}`}>
                                     <span className="text-sm font-bold uppercase tracking-wider">{pkg.price}</span>
