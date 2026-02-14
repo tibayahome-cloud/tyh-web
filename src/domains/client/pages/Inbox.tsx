@@ -111,8 +111,7 @@ const ClientInbox = () => {
 
   const messages: Message[] = useMemo(() => {
     const raw = messagesData?.pages.flatMap((page: any) => page.data) ?? [];
-    // API returns DESC (newest first) for infinite scroll up, so reverse for chronological display
-    return [...raw].reverse().map((m: any) => ({
+    return raw.map((m: any) => ({
       id: m.id,
       body: m.body || "",
       created_at: m.createdAt || "",
@@ -149,7 +148,7 @@ const ClientInbox = () => {
       <div className="flex flex-col h-screen max-h-screen overflow-hidden">
         <div className="shrink-0 bg-white border-b border-slate-100">
           <ClientPageHeader
-            title="Message Hub"
+            title="Inbox"
             subtitle="Coordinate your care privately and securely."
             overline="Inbox"
           />
@@ -163,7 +162,7 @@ const ClientInbox = () => {
               threadId && "hidden lg:flex"
             )}>
               <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Chats</h2>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Messages</h2>
                 <button
                   onClick={() => setComposerOpen(true)}
                   className="h-10 w-10 rounded-xl bg-tiba-blue text-white flex items-center justify-center shadow-lg shadow-tiba-blue/20 hover:scale-105 active:scale-95 transition-all"
@@ -208,7 +207,7 @@ const ClientInbox = () => {
             )}>
               {threadId ? (
                 <MessageThread
-                  title={selectedThread?.title || "Care Chat"}
+                  title={selectedThread?.title || "Inbox"}
                   messages={messages}
                   onSendMessage={handleSendMessage}
                   onLoadMore={() => fetchNextMessages()}
@@ -220,7 +219,7 @@ const ClientInbox = () => {
                   <div className="h-24 w-24 rounded-[40px] bg-slate-50 flex items-center justify-center text-slate-200 mb-8 border border-slate-100 shadow-inner">
                     <MessageSquare size={48} />
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Select a Chat</h3>
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Inbox</h3>
                   <p className="mt-2 text-slate-500 max-w-xs text-sm leading-relaxed">
                     Choose a conversation from the list to start coordinating your care.
                   </p>
@@ -228,7 +227,7 @@ const ClientInbox = () => {
                     onClick={() => setComposerOpen(true)}
                     className="mt-8 px-8 h-12 rounded-2xl bg-slate-900 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
                   >
-                    New Conversation
+                    Start Conversation
                   </button>
                 </div>
               )}
@@ -303,7 +302,7 @@ const ClientInbox = () => {
               disabled={createThreadMutation.isPending}
               className="flex-1 h-12 rounded-xl bg-slate-900 text-white text-sm font-bold shadow-lg disabled:opacity-50"
             >
-              {createThreadMutation.isPending ? "Connecting..." : "Start Chat"}
+              {createThreadMutation.isPending ? "Starting..." : "Start Conversation"}
             </button>
           </div>
         </div>

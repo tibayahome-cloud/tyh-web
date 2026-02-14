@@ -111,7 +111,7 @@ const ProviderInbox = () => {
 
   const messages: Message[] = useMemo(() => {
     const raw = messagesData?.pages.flatMap((page: any) => page.data) ?? [];
-    return [...raw].reverse().map((m: any) => ({
+    return raw.map((m: any) => ({
       id: m.id,
       body: m.body || "",
       created_at: m.createdAt || "",
@@ -152,7 +152,7 @@ const ProviderInbox = () => {
       <div className="flex flex-col h-screen max-h-screen overflow-hidden">
         <div className="shrink-0 bg-white border-b border-slate-100">
           <ProviderPageHeader
-            title="Operational Comms"
+            title="Inbox"
             subtitle="Secure messaging with clients and support staff."
             overline="Inbox"
           />
@@ -166,7 +166,7 @@ const ProviderInbox = () => {
               threadId && "hidden lg:flex"
             )}>
               <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Messages</h2>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Inbox</h2>
                 <button
                   onClick={() => setComposerOpen(true)}
                   className="h-10 w-10 rounded-xl bg-iba-blue text-white flex items-center justify-center shadow-lg shadow-tiba-blue/20 hover:scale-105 active:scale-95 transition-all"
@@ -211,7 +211,7 @@ const ProviderInbox = () => {
             )}>
               {threadId ? (
                 <MessageThread
-                  title={selectedThread?.title || "Secure Line"}
+                  title={selectedThread?.title || "Inbox"}
                   messages={messages}
                   onSendMessage={handleSendMessage}
                   onLoadMore={() => fetchNextMessages()}
@@ -223,15 +223,15 @@ const ProviderInbox = () => {
                   <div className="h-24 w-24 rounded-[40px] bg-slate-50 flex items-center justify-center text-slate-200 mb-8 border border-slate-100 shadow-inner">
                     <MessageSquare size={48} />
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Feed</h3>
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Inbox</h3>
                   <p className="mt-2 text-slate-500 max-w-xs text-sm leading-relaxed">
-                    Select a mission link to begin transmitting tactical updates or coordinate with command.
+                    Select a conversation to start messaging.
                   </p>
                   <button
                     onClick={() => setComposerOpen(true)}
                     className="mt-8 px-8 h-12 rounded-2xl bg-slate-900 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
                   >
-                    Establish Link
+                    Start Conversation
                   </button>
                 </div>
               )}
@@ -243,7 +243,7 @@ const ProviderInbox = () => {
       <Modal
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
-        title="Establish Link"
+        title="Start Conversation"
         description="Initiate communication with client or HQ."
       >
         <div className="space-y-6 pt-4">
@@ -281,7 +281,7 @@ const ProviderInbox = () => {
                 >
                   <div>
                     <p className="text-sm font-bold text-slate-900">{opt.name}</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Mission: #{opt.bookingId.slice(0, 8)}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Booking: #{opt.bookingId.slice(0, 8)}</p>
                   </div>
                   {selectedBookingId === opt.bookingId && <div className="h-4 w-4 rounded-full bg-tiba-blue" />}
                 </button>
@@ -302,13 +302,13 @@ const ProviderInbox = () => {
           )}
 
           <div className="flex gap-4 pt-4">
-            <button onClick={() => setComposerOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all">Abort</button>
+            <button onClick={() => setComposerOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all">Cancel</button>
             <button
               onClick={handleCreateConversation}
               disabled={createThreadMutation.isPending || (conversationType === 'client' && !selectedBookingId)}
               className="flex-1 h-12 rounded-xl bg-slate-900 text-white text-sm font-bold shadow-lg disabled:opacity-50"
             >
-              {createThreadMutation.isPending ? "Linking..." : "Establish Link"}
+              {createThreadMutation.isPending ? "Starting..." : "Start Conversation"}
             </button>
           </div>
         </div>

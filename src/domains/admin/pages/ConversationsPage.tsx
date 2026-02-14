@@ -81,7 +81,7 @@ const AdminConversationsPage = () => {
 
   const messages: Message[] = useMemo(() => {
     const raw = messagesData?.pages.flatMap((page: any) => page.data) ?? [];
-    return [...raw].reverse().map((m: any) => ({
+    return raw.map((m: any) => ({
       id: m.id,
       body: m.body || "",
       created_at: m.createdAt || "",
@@ -110,7 +110,7 @@ const AdminConversationsPage = () => {
             <div className="p-6 border-b border-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Shield size={20} className="text-tiba-blue" />
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Admin Support</h2>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Inbox</h2>
               </div>
             </div>
             <div className="p-4 bg-slate-50/50">
@@ -150,7 +150,7 @@ const AdminConversationsPage = () => {
           )}>
             {threadId ? (
               <MessageThread
-                title={selectedThread?.title || "Support Thread"}
+                title={selectedThread?.title || "Inbox"}
                 messages={messages}
                 onSendMessage={handleSendMessage}
                 onLoadMore={() => fetchNextMessages()}
@@ -162,9 +162,9 @@ const AdminConversationsPage = () => {
                 <div className="h-24 w-24 rounded-[40px] bg-slate-50 flex items-center justify-center text-slate-200 mb-8 border border-slate-100 shadow-inner">
                   <MessageSquare size={48} />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Support Dashboard</h3>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Inbox</h3>
                 <p className="mt-2 text-slate-500 max-w-xs text-sm leading-relaxed">
-                  Select an active support thread to view messages and respond to users.
+                  Select an active conversation to view messages and respond to users.
                 </p>
               </div>
             )}
