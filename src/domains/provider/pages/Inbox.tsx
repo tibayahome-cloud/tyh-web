@@ -136,9 +136,7 @@ const ProviderInbox = () => {
       title: scope === "provider_support" ? supportSubject : undefined
     }).then((t: any) => {
       setComposerOpen(false);
-      navigate(`/admin/inbox/${t.id}`); // Wait, provider inbox is under /admin? No, let's check routes.
-      // Retrying with correct route for provider
-      navigate(`/provider/inbox/${t.id}`); // Correcting route prefix
+      navigate(`/pro/inbox/${t.id}`);
     }).catch((e: any) => {
       toast.showToast({ title: "Error", description: e.message, variant: "error" });
     });
@@ -192,7 +190,7 @@ const ProviderInbox = () => {
                   <ConversationList
                     conversations={threads}
                     activeId={threadId}
-                    onSelect={(id) => navigate(`/provider/inbox/${id}`)}
+                    onSelect={(id) => navigate(`/pro/inbox/${id}`)}
                   />
                 )}
                 {hasNextThreads && (
