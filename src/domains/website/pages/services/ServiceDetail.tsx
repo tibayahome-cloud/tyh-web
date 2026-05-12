@@ -1,7 +1,10 @@
 
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Check, ArrowRight, HelpCircle, Phone, Calendar, Stethoscope, UserCheck } from "lucide-react";
 
+import { COMPANY_PHONE } from "../../../../shared/constants/contact";
+import { GuestBookingDialog } from "../../components/GuestBookingDialog";
 import doctorImage from "../../../assets/images/service-doctor.png";
 import nurseImage from "../../../assets/images/service-nurse.png";
 import therapyImage from "../../../assets/images/service-therapy.png";
@@ -13,6 +16,7 @@ const serviceData: Record<string, any> = {
         title: "Doctor Visit at Home",
         subtitle: "Get professional assessment, diagnosis and treatment without leaving home.",
         heroImage: doctorImage,
+        serviceKey: "doctor-visit",
         whoFor: [
             "Fever, infections, pain, chronic illness reviews",
             "Elderly patients and patients with limited mobility",
@@ -179,8 +183,11 @@ const defaultService = {
 export const ServiceDetail = () => {
     const { slug } = useParams();
     const service = serviceData[slug || ""] || defaultService;
+    const [showGuestBooking, setShowGuestBooking] = useState(false);
 
     if (!service.title) return <div>Service not found</div>;
+
+    const serviceKey = slug || "";
 
     const steps = [
         { title: "Book", desc: "Select service & time." },
@@ -200,9 +207,17 @@ export const ServiceDetail = () => {
                 <div className="container mx-auto px-4 relative z-10 text-center max-w-4xl">
                     <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 font-display">{service.title}</h1>
                     <p className="text-xl text-blue-200 mb-10 font-medium">{service.subtitle}</p>
-                    <Link to="/login" className="px-8 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/30">
-                        Book Now
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button
+                            onClick={() => setShowGuestBooking(true)}
+                            className="px-8 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/30"
+                        >
+                            Book Now
+                        </button>
+                        <Link to="/login" className="px-8 py-4 bg-white/10 text-white rounded-xl font-bold hover:bg-white/20 transition-all border border-white/20">
+                            Sign In to Book
+                        </Link>
+                    </div>
                 </div>
             </section>
 
@@ -296,13 +311,19 @@ export const ServiceDetail = () => {
                                 </div>
                             </div>
 
-                            <Link to="/login" className="block w-full py-4 bg-blue-900 text-white text-center rounded-xl font-bold hover:bg-blue-800 transition-colors mb-4">
-                                Book This Service
+                            <button
+                                onClick={() => setShowGuestBooking(true)}
+                                className="block w-full py-4 bg-blue-900 text-white text-center rounded-xl font-bold hover:bg-blue-800 transition-colors mb-2"
+                            >
+                                Book Now (No Account)
+                            </button>
+                            <Link to="/login" className="block w-full py-3 bg-slate-100 text-slate-700 text-center rounded-xl font-medium hover:bg-slate-200 transition-colors mb-4">
+                                Sign In to Book
                             </Link>
 
                             <div className="text-center">
                                 <p className="text-sm text-slate-500 mb-2">Need help booking?</p>
-                                <a href="tel:+254700000000" className="inline-flex items-center gap-2 text-blue-600 font-bold">
+                                <a href={`tel:${COMPANY_PHONE}`} className="inline-flex items-center gap-2 text-blue-600 font-bold">
                                     <Phone className="w-4 h-4" /> Call Advisor
                                 </a>
                             </div>
@@ -310,6 +331,13 @@ export const ServiceDetail = () => {
                     </div>
                 </div>
             </div>
+
+            <GuestBookingDialog
+                open={showGuestBooking}
+                onClose={() => setShowGuestBooking(false)}
+                serviceKey={serviceKey}
+                serviceName={service.title}
+            />
         </div>
     );
 };

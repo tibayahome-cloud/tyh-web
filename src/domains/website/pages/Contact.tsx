@@ -1,5 +1,6 @@
 
 import { Phone, Mail, MapPin } from "lucide-react";
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
 
 export const Contact = () => {
     return (
@@ -24,7 +25,7 @@ export const Contact = () => {
                                 <div>
                                     <h3 className="font-bold text-slate-900">Call Us</h3>
                                     <p className="text-slate-600 mb-1">General Inquiries</p>
-                                    <a href="tel:+254700000000" className="text-lg font-bold text-blue-600">+254 700 000 000</a>
+                                    <a href={`tel:${COMPANY_PHONE}`} className="text-lg font-bold text-blue-600">{COMPANY_PHONE_DISPLAY}</a>
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">

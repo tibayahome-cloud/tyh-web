@@ -2,6 +2,7 @@
 import { Link } from "react-router-dom";
 import { Facebook, Twitter, Instagram, Linkedin, MapPin, Phone, Mail, ArrowRight } from "lucide-react";
 import logo from "../../../assets/images/logo.jpeg";
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
 
 export const WebsiteFooter = () => {
     return (
@@ -50,7 +51,7 @@ export const WebsiteFooter = () => {
                             </li>
                             <li className="flex items-center gap-4">
                                 <Phone className="w-6 h-6 text-tiba-gold flex-shrink-0" />
-                                <a href="tel:+254700000000" className="hover:text-tiba-gold">+254 700 000 000</a>
+                                <a href={`tel:${COMPANY_PHONE}`} className="hover:text-tiba-gold">{COMPANY_PHONE_DISPLAY}</a>
                             </li>
                             <li className="flex items-center gap-4">
                                 <Mail className="w-6 h-6 text-tiba-gold flex-shrink-0" />

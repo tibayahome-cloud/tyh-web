@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Phone, ChevronDown } from "lucide-react";
 import classNames from "classnames";
 import logo from "../../../assets/images/logo.jpeg";
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
 
 export const WebsiteHeader = () => {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -44,11 +45,11 @@ export const WebsiteHeader = () => {
                     {/* CTA Buttons */}
                     <div className="hidden lg:flex items-center gap-4">
                         <a
-                            href="tel:+254700000000"
+                            href={`tel:${COMPANY_PHONE}`}
                             className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium text-sm"
                         >
                             <Phone className="w-4 h-4" />
-                            <span>+254 700 000 000</span>
+                            <span>{COMPANY_PHONE_DISPLAY}</span>
                         </a>
                         <Link
                             to="/login"

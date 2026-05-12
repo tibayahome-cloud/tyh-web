@@ -14,6 +14,7 @@ import { FormField } from "../../../shared/components/FormField";
 import { Input } from "../../../shared/components/Input";
 import { Loading } from "../../../shared/components/Loading";
 import { api } from "../../../shared/libs/api";
+import { PHONE_PLACEHOLDER } from "../../../shared/constants/contact";
 
 type RoleOption = {
   id: string;
@@ -152,7 +153,14 @@ export const AddUserDialog = ({ open, onClose, onSuccess }: AddUserDialogProps) 
   const roles = useMemo(() => roleOptions ?? [], [roleOptions]);
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+    <Dialog
+      disablePortal={false}
+      container={() => document.body}
+      open={open}
+      onClose={handleClose}
+      fullWidth
+      maxWidth="sm"
+    >
       <DialogTitle>Invite a new user</DialogTitle>
       <DialogContent dividers>
         <form id="add-user-form" className="space-y-4" onSubmit={submit}>
@@ -190,7 +198,7 @@ export const AddUserDialog = ({ open, onClose, onSuccess }: AddUserDialogProps) 
                 <Input
                   {...field}
                   label="Phone"
-                  placeholder="+254700000000"
+                  placeholder={PHONE_PLACEHOLDER}
                   error={fieldState.error?.message}
                 />
               )}

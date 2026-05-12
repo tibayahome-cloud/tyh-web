@@ -41,7 +41,10 @@ export type PaymentRecord = z.infer<typeof PaymentRecordSchema>;
 export const PaymentSummarySchema = z.object({
   totalCollectedCents: z.number(),
   pendingCents: z.number(),
-  failedCount: z.number()
+  failedCount: z.number(),
+  totalProviderPayoutsCents: z.number(),
+  platformMarginCents: z.number(),
+  marginPercentage: z.number()
 });
 
 export type PaymentSummary = z.infer<typeof PaymentSummarySchema>;
@@ -53,6 +56,7 @@ export type PaymentListMeta = {
     total: number;
     totalPages: number;
   };
+  next_cursor?: string | null;
 };
 
 const mapAttempt = (payload: unknown): PaymentAttempt | null => {
@@ -125,7 +129,10 @@ export const mapPaymentSummary = (payload: unknown): PaymentSummary => {
   return {
     totalCollectedCents: coerceNumber(raw.total_collected_cents) ?? 0,
     pendingCents: coerceNumber(raw.pending_cents) ?? 0,
-    failedCount: coerceNumber(raw.failed_count) ?? 0
+    failedCount: coerceNumber(raw.failed_count) ?? 0,
+    totalProviderPayoutsCents: coerceNumber(raw.total_provider_payouts_cents) ?? 0,
+    platformMarginCents: coerceNumber(raw.platform_margin_cents) ?? 0,
+    marginPercentage: coerceNumber(raw.margin_percentage) ?? 0
   };
 };
 
@@ -139,10 +146,11 @@ export const mapPaymentListMeta = (meta: unknown, fallback?: Partial<PaymentList
   };
   return {
     page: {
-      number: toInt(pageRaw.number, defaultPage.number),
+      number: toInt(pageRaw.number ?? pageRaw.page, defaultPage.number),
       size: toInt(pageRaw.size, defaultPage.size),
       total: toInt(pageRaw.total, defaultPage.total),
       totalPages: toInt(pageRaw.total_pages ?? pageRaw.totalPages, defaultPage.totalPages)
-    }
+    },
+    next_cursor: coerceString(raw.next_cursor)
   };
 };

@@ -68,17 +68,27 @@ const FinanceOverviewPage = () => {
     {
       label: "Total collected",
       value: summary ? formatCurrency(summary.totalCollectedCents) : "—",
-      helper: "Captured via C2B flows"
+      helper: "Client payments received"
+    },
+    {
+      label: "Provider payouts",
+      value: summary ? formatCurrency(summary.totalProviderPayoutsCents) : "—",
+      helper: "Credited to provider wallets"
+    },
+    {
+      label: "Platform margin",
+      value: summary ? formatCurrency(summary.platformMarginCents) : "—",
+      helper: summary ? `${summary.marginPercentage}% of total` : "—"
     },
     {
       label: "Pending settlement",
       value: summary ? formatCurrency(summary.pendingCents) : "—",
-      helper: "Awaiting confirmation or webhook"
+      helper: "Awaiting confirmation"
     },
     {
-      label: "Failed payments (24h)",
+      label: "Failed payments",
       value: summary ? summary.failedCount.toString() : "—",
-      helper: "Needs manual intervention"
+      helper: "Needs attention"
     }
   ];
 
