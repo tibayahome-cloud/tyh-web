@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
 
 import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
@@ -10,6 +11,7 @@ import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
 import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
+import { AdminCreateBookingDialog } from "../../components/AdminCreateBookingDialog";
 import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
 
 const ACTIVE_STATUSES = [
@@ -33,6 +35,7 @@ const AdminBookingQueuePage = () => {
   const [tab, setTab] = useState<(typeof TABS)[number]>(TABS[0]);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [cancelReasonCode, setCancelReasonCode] = useState(ADMIN_CANCELLATION_REASONS[0].value);
   const [cancelNote, setCancelNote] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
@@ -225,6 +228,10 @@ const AdminBookingQueuePage = () => {
           <p className="text-sm text-slate-500">Triage client requests, escalations, and pending confirmations.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Create Booking
+          </Button>
           {TABS.map((option) => (
             <button
               key={option.key}
@@ -391,6 +398,12 @@ const AdminBookingQueuePage = () => {
           placeholder="Internal note (optional)"
         />
       </ConfirmDialog>
+
+      <AdminCreateBookingDialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onSuccess={() => bookingQuery.refetch()}
+      />
     </div>
   );
 };
