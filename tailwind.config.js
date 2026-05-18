@@ -6,8 +6,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "Inter var", ...defaultTheme.fontFamily.sans],
-        display: ["\"Space Grotesk\"", ...defaultTheme.fontFamily.sans]
+        sans: ["Inter", "Inter var", ...defaultTheme.fontFamily.sans]
       },
       colors: {
         tiba: {

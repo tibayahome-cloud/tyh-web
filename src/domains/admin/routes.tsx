@@ -201,7 +201,7 @@ const buildRoutes = (): RouteObject[] => [
         element: <Navigate to="/admin/conversations" replace />
       },
       {
-        path: "conversations",
+        path: "conversations/:threadId?",
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <AdminConversationsPage />

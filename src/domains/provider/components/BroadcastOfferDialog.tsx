@@ -51,17 +51,12 @@ export const BroadcastOfferDialog = ({
           <p className="text-xs uppercase tracking-wide text-primary-600">Service</p>
           <p className="text-lg font-semibold text-slate-900">{booking.service?.name ?? "Booking request"}</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Estimated payout</p>
-            <p className="font-semibold text-slate-900">{formatCurrency(booking.priceCents, booking.currency)}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Duration</p>
-            <p className="font-semibold text-slate-900">
-              {booking.estimateDurationMinutes ? `${booking.estimateDurationMinutes} mins` : "—"}
-            </p>
-          </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Estimated duration</p>
+          <p className="font-semibold text-slate-900">
+            {booking.estimateDurationMinutes ? `${booking.estimateDurationMinutes} mins` : "—"}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">Earnings credited to wallet after completion</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500">Location</p>

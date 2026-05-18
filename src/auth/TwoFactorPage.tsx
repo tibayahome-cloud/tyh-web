@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 
-import { Card } from "../shared/components/Card";
+import { AuthLayout } from "../shared/components/AuthLayout";
 import { Button } from "../shared/components/Button";
 import { Input } from "../shared/components/Input";
 import { useAuth } from "../shared/hooks/useAuth";
@@ -138,79 +138,106 @@ export const TwoFactorPage = () => {
 
   if (!challenge) {
     return (
-      <Card title="Two-factor authentication" description="Session expired">
-        <p className="text-sm text-slate-600">We could not find an active verification request. Please sign in again.</p>
-        <Button className="mt-4" onClick={() => navigate("/login", { replace: true })}>
+      <AuthLayout title="Two-factor authentication" subtitle="Session expired">
+        <p className="type-body text-slate-600">
+          We could not find an active verification request. Please sign in again.
+        </p>
+        <Button className="mt-8 w-full" onClick={() => navigate("/login", { replace: true })}>
           Back to login
         </Button>
-      </Card>
+      </AuthLayout>
     );
   }
 
   return (
-    <Card title="Verify it’s you" description={instructions}>
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <Input
-          label="Verification code"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          autoFocus
-          autoComplete="one-time-code"
-          maxLength={8}
-          inputMode="numeric"
-          required
-        />
-        {error && <p className="text-sm text-red-500">{error}</p>}
-        <Button type="submit" className="w-full" loading={submitting} disabled={!code.trim() || submitting}>
+    <AuthLayout
+      title="Verify it’s you"
+      subtitle={instructions}
+      footer={
+        <div className="flex flex-col items-center gap-4">
+          <button
+            type="button"
+            className="type-caption font-semibold text-tiba-blue hover:underline"
+            onClick={handleBackToLogin}
+          >
+            Cancel login
+          </button>
+          <span className="type-caption text-slate-400 italic">
+            Need another method? Contact support.
+          </span>
+        </div>
+      }
+    >
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          <Input
+            label="Verification code"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            autoFocus
+            autoComplete="one-time-code"
+            maxLength={8}
+            inputMode="numeric"
+            className="text-center font-mono text-xl tracking-widest"
+            required
+          />
+          {error && (
+            <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
+              <p className="type-caption text-red-600">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <Button type="submit" className="w-full h-11" loading={submitting} disabled={!code.trim() || submitting}>
           Confirm code
         </Button>
       </form>
-      <div className="mt-6 space-y-4 text-sm text-slate-500">
+
+      <div className="mt-8 space-y-6">
         {challenge?.methods && challenge.methods.length > 1 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Choose method:</span>
-            {challenge.methods.map((method) => (
-              <button
-                key={method}
-                type="button"
-                className={classNames(
-                  "rounded-full border px-3 py-1 text-xs font-semibold transition",
-                  method === selectedMethod
-                    ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-primary-300"
-                )}
-                onClick={() => setSelectedMethod(method)}
-              >
-                {method.toUpperCase()}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3">
+            <span className="type-caption text-slate-500 text-center">Switch verification method</span>
+            <div className="flex flex-wrap justify-center gap-2">
+              {challenge.methods.map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  className={classNames(
+                    "rounded-xl border px-4 py-2 text-xs font-semibold transition-all duration-200",
+                    method === selectedMethod
+                      ? "border-tiba-blue bg-tiba-blue/5 text-tiba-blue"
+                      : "border-slate-200 bg-white text-slate-500 hover:border-tiba-blue/30"
+                  )}
+                  onClick={() => setSelectedMethod(method)}
+                >
+                  {method.toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
         )}
+
         {resendOptions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Need a new code?</span>
-            {resendOptions.map((method) => (
-              <Button
-                key={method}
-                variant="ghost"
-                className="px-3 py-1 text-xs"
-                onClick={() => handleResend(method)}
-                loading={sendingMethod === method}
-                disabled={sendingMethod !== null}
-              >
-                Send via {method}
-              </Button>
-            ))}
+          <div className="flex flex-col gap-2">
+            <span className="type-caption text-slate-500 text-center">Didn't receive a code?</span>
+            <div className="flex flex-wrap justify-center gap-2">
+              {resendOptions.map((method) => (
+                <Button
+                  key={method}
+                  variant="ghost"
+                  className="px-3 py-1 text-[10px] h-auto"
+                  onClick={() => handleResend(method)}
+                  loading={sendingMethod === method}
+                  disabled={sendingMethod !== null}
+                >
+                  Resend via {method}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
-        <div className="flex items-center justify-between">
-          <button type="button" className="font-semibold text-primary-600 hover:text-primary-700" onClick={handleBackToLogin}>
-            Cancel login
-          </button>
-          <span className="text-xs text-slate-400">Need another method? Contact support.</span>
-        </div>
       </div>
-    </Card>
+    </AuthLayout>
   );
 };
 

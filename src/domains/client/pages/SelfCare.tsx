@@ -29,6 +29,7 @@ import {
 } from "../../../shared/hooks/useSelfCare";
 import type { SelfCareCheckin, SelfCareProfile } from "../../../shared/schemas/selfcare";
 import { AppLayout } from "../../../shared/components/AppLayout";
+import { ClientPageHeader } from "../components/ClientPageHeader";
 
 const moodOptions = [
   { label: "steady", Icon: Meh, color: "text-blue-500", bg: "bg-blue-50" },
@@ -245,110 +246,85 @@ const SelfCarePage = () => {
 
   return (
     <AppLayout fullWidth showHeader={false} disablePadding>
-      <div className="flex flex-col gap-8 pb-32">
-        {/* HERO HEADER */}
-        <section className="relative -mx-4 -mt-12 overflow-hidden px-4 pb-16 pt-16 sm:-mx-8 sm:px-8">
-          <div className="absolute inset-0 bg-brand-linear opacity-90" />
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-indigo-500/20 blur-3xl rounded-full translate-x-1/2" />
+      <div className="flex flex-col gap-4 pb-32">
+        <div className="px-4 sm:px-6 lg:px-8 pt-4">
+          <h1 className="type-h2 text-slate-900">Self-Care Hub</h1>
+        </div>
 
-          <div className="relative z-10">
-            <div className="flex flex-col gap-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50">Personal Health Space</p>
-              <h1 className="text-4xl font-black text-white leading-tight">
-                Care Hub <br />
-                <span className="text-white/70">Monitoring & Recovery</span>
-              </h1>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 backdrop-blur-md ring-1 ring-white/20 text-white text-[10px] font-bold">
-                  <ShieldCheck size={14} className="text-emerald-400" />
-                  Privacy Shield Active
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 backdrop-blur-md ring-1 ring-white/20 text-white text-[10px] font-bold">
-                  <Sparkles size={14} className="text-amber-400" />
-                  AI-Powered Insights
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-8 lg:grid-cols-12 -mt-10 px-4 sm:px-0">
+        <div className="grid gap-8 lg:grid-cols-12 px-4 sm:px-6 lg:px-8 relative z-20">
           {/* LEFT COLUMN: GUIDANCE & HISTORY */}
           <div className="lg:col-span-8 space-y-8 order-2 lg:order-1">
-            {/* PERSONALIZED GUIDANCE */}
-            <section className="relative overflow-hidden rounded-[40px] border border-slate-100 bg-white shadow-2xl p-8 sm:p-10">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+            {/* HEALTH RECOMMENDATIONS */}
+            <section className="relative overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 p-4">
+              <div className="flex items-center justify-between gap-3 mb-4">
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles size={16} className="text-brand-600" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-600">Smart Advice</p>
-                  </div>
-                  <h2 className="text-2xl font-black text-slate-900">Health Recommendations</h2>
-                  <p className="text-xs font-medium text-slate-500 mt-1">
+                  <h2 className="text-sm font-bold text-slate-900">Personalized Guidance</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     {latestCheckin?.checkinAt
-                      ? `Updated ${formatRelative(latestCheckin.checkinAt)} based on your last check-in.`
-                      : "Log an update to see your personalized guidance."}
+                      ? `Updated ${formatRelative(latestCheckin.checkinAt)}`
+                      : "Log an update to see guidance."}
                   </p>
                 </div>
                 {latestCheckin?.recommendation && <RiskBadge risk={latestCheckin.recommendation.riskLevel} />}
               </div>
 
               {!latestCheckin?.recommendation ? (
-                <div className="py-20 flex flex-col items-center justify-center text-center bg-slate-50/50 rounded-[32px] border border-dashed border-slate-200">
-                  <div className="h-20 w-20 rounded-3xl bg-white shadow-xl flex items-center justify-center text-brand-600 mb-6 transition-transform hover:scale-110">
-                    <Stethoscope size={40} />
+                <div className="py-12 flex flex-col items-center justify-center text-center bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+                  <div className="h-12 w-12 rounded-lg bg-white shadow-lg flex items-center justify-center text-brand-600 mb-3">
+                    <Stethoscope size={20} />
                   </div>
-                  <h3 className="text-lg font-black text-slate-900">Your first insight is waiting</h3>
-                  <p className="mt-2 text-sm font-medium text-slate-500 max-w-xs mx-auto">
-                    Share how you feel today using the check-in tool to unlock clinical guidance.
+                  <h3 className="text-sm font-bold text-slate-900">Your first insight is waiting</h3>
+                  <p className="mt-2 text-xs text-slate-500 max-w-xs mx-auto">
+                    Share how you feel today using the check-in tool to unlock guidance.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-8">
-                  <div className="p-8 rounded-[32px] bg-brand-50/50 border border-brand-100 relative group transition-all hover:bg-brand-50">
-                    <div className="absolute top-6 right-6 h-12 w-12 rounded-2xl bg-white shadow flex items-center justify-center text-brand-600">
-                      <TrendingUp size={24} />
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-brand-linear text-white shadow-md relative group overflow-hidden">
+                    <div className="absolute inset-0 bg-white/5 opacity-0 transition-opacity group-hover:opacity-100" />
+                    <div className="absolute top-3 right-3 h-8 w-8 rounded-lg bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-white">
+                      <TrendingUp size={16} />
                     </div>
-                    <h4 className="text-xs font-black text-brand-600 uppercase tracking-widest mb-2">Priority Insight</h4>
-                    <p className="text-xl font-black text-slate-900 leading-tight">
+                    <h4 className="text-xs text-white/60 mb-1 font-bold uppercase">Insight</h4>
+                    <p className="text-sm font-bold text-white leading-tight line-clamp-2">
                       {latestCheckin.recommendation.summary}
                     </p>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {(latestCheckin.recommendation.steps ?? []).map((step, idx: number) => (
-                      <div key={idx} className="p-6 rounded-[32px] bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="h-10 w-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all">
-                            <CheckCircle2 size={20} />
+                      <div key={idx} className="p-3 rounded-lg bg-white ring-1 ring-slate-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex items-start gap-2 mb-2">
+                          <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:bg-brand-600 group-hover:text-white transition-all">
+                            <CheckCircle2 size={16} />
                           </div>
-                          <h5 className="text-sm font-black text-slate-900">{step.title}</h5>
+                          <h5 className="text-xs font-bold text-slate-900">{step.title}</h5>
                         </div>
-                        <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                        <p className="text-xs text-slate-500 leading-snug">
                           {step.description}
                         </p>
                         {step.timeframe && (
-                          <div className="mt-4 pt-4 border-t border-slate-50 flex items-center gap-2">
-                            <Clock size={12} className="text-slate-400" />
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{step.timeframe}</p>
+                          <div className="mt-2 pt-2 border-t border-slate-50 flex items-center gap-1">
+                            <Clock size={10} className="text-slate-400" />
+                            <p className="text-[8px] text-slate-400 uppercase">{step.timeframe}</p>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
 
-                  <div className="p-8 rounded-[32px] bg-rose-50/50 border border-rose-100">
-                    <div className="flex items-center gap-3 mb-4">
-                      <AlertCircle size={20} className="text-rose-500" />
-                      <h4 className="text-xs font-black text-rose-900 uppercase tracking-widest">Protocol: When to seek help</h4>
+                  <div className="p-3 rounded-lg bg-rose-50/50 border border-rose-100">
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertCircle size={14} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                      <h4 className="text-xs font-bold text-rose-900">When to seek help</h4>
                     </div>
-                    <ul className="grid gap-3 sm:grid-cols-2">
+                    <ul className="grid gap-2 sm:grid-cols-2">
                       {(latestCheckin.recommendation.whenToSeekHelp ?? []).map((item, idx: number) => (
-                        <li key={idx} className="flex gap-4">
-                          <div className="h-1.5 w-1.5 rounded-full bg-rose-300 mt-2 shrink-0" />
+                        <li key={idx} className="flex gap-2">
+                          <div className="h-1 w-1 rounded-full bg-rose-300 mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-xs font-black text-slate-900 mb-0.5">{item.trigger}</p>
-                            <p className="text-[11px] font-medium text-slate-500 leading-relaxed">{item.description}</p>
+                            <p className="text-xs font-bold text-slate-900">{item.trigger}</p>
+                            <p className="text-xs text-slate-500 leading-snug">{item.description}</p>
                           </div>
                         </li>
                       ))}
@@ -359,23 +335,20 @@ const SelfCarePage = () => {
             </section>
 
             {/* HISTORY TIMELINE */}
-            <section className="rounded-[40px] border border-slate-100 bg-white/50 backdrop-blur-xl shadow-xl p-8 sm:p-10">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Activity Log</p>
-                  <h2 className="text-2xl font-black text-slate-900">Health History</h2>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-white shadow-xl flex items-center justify-center text-brand-600">
-                  <History size={24} />
+            <section className="rounded-xl bg-white shadow-sm ring-1 ring-slate-100 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-slate-900">Health History</h2>
+                <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-brand-600">
+                  <History size={16} />
                 </div>
               </div>
 
               {groupedCheckins.length === 0 ? (
-                <div className="p-10 text-center">
-                  <p className="text-sm font-medium text-slate-400">No logs found. Consistency is key to recovery!</p>
+                <div className="py-8 text-center bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+                  <p className="text-xs text-slate-400">No activity logged yet.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {groupedCheckins.map((group) => {
                     const collapsed = collapsedGroups[group.key] ?? false;
                     return (
@@ -383,61 +356,79 @@ const SelfCarePage = () => {
                         <button
                           onClick={() => toggleGroup(group.key)}
                           className={classNames(
-                            "w-full flex items-center justify-between p-6 rounded-[32px] transition-all",
-                            collapsed ? "bg-white/40 grayscale" : "bg-white shadow-xl ring-1 ring-slate-100"
+                            "w-full flex items-center justify-between p-3 rounded-lg transition-all",
+                            collapsed
+                              ? "bg-slate-50/50 text-slate-400"
+                              : "bg-white shadow-sm ring-1 ring-slate-100"
                           )}
                         >
-                          <div className="flex items-center gap-4 text-left">
-                            <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400">
-                              {collapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                          <div className="flex items-center gap-2 text-left">
+                            <div className={classNames(
+                              "h-7 w-7 rounded-lg flex items-center justify-center transition-colors",
+                              collapsed ? "bg-slate-100 text-slate-400" : "bg-brand-50 text-brand-600"
+                            )}>
+                              {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                             </div>
                             <div>
-                              <p className="text-sm font-black text-slate-900 uppercase tracking-widest">{group.label}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5">{group.entries.length} log points</p>
+                              <p className="text-xs font-bold text-slate-900">{group.label}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">{group.entries.length} record(s)</p>
                             </div>
                           </div>
                         </button>
                         {!collapsed && (
-                          <div className="mt-4 ml-6 pl-10 border-l-2 border-slate-100 space-y-6 pb-4">
+                          <div className="mt-3 ml-3 pl-6 border-l-2 border-slate-100 space-y-3 pb-2">
                             {group.entries.map((entry) => (
                               <div key={entry.id} className="relative group">
-                                <div className="absolute -left-[51px] top-4 h-5 w-5 rounded-full border-4 border-white bg-brand-600 ring-4 ring-brand-50 shadow-sm" />
-                                <div className="p-6 rounded-[32px] bg-white shadow-sm ring-1 ring-slate-100 hover:shadow-xl transition-all">
-                                  <div className="flex items-center justify-between mb-4">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                <div className="absolute -left-[23px] top-3 h-3 w-3 rounded-full border-2 border-white bg-brand-600 ring-2 ring-brand-50 shadow-sm" />
+                                <div className="p-3 rounded-lg bg-white shadow-sm ring-1 ring-slate-100 hover:shadow-md transition-all">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] text-slate-400">
                                       {formatDateTime(entry.checkinAt).split(",")[1]}
                                     </p>
                                     <RiskBadge risk={entry.aiRiskLevel} compact />
                                   </div>
 
-                                  {entry.mood && (
-                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-600 text-[10px] font-black uppercase tracking-widest mb-4">
-                                      {moodOptions.find(m => m.label === entry.mood)?.label ?? entry.mood}
-                                    </div>
-                                  )}
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {entry.mood && (
+                                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 text-slate-600 text-[9px] font-bold">
+                                        Mood: {moodOptions.find(m => m.label === entry.mood)?.label ?? entry.mood}
+                                      </div>
+                                    )}
+                                    {entry.symptoms && entry.symptoms.length > 0 && (
+                                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 text-[9px] font-bold">
+                                        {entry.symptoms.length} Symptoms
+                                      </div>
+                                    )}
+                                  </div>
 
                                   {entry.notes && (
-                                    <p className="text-sm font-medium text-slate-600 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 italic">
-                                      "{entry.notes}"
-                                    </p>
+                                    <blockquote className="text-xs text-slate-600 bg-slate-50/50 p-2 rounded-lg border-l-2 border-brand-200 italic mb-2">
+                                      "{entry.notes.substring(0, 50)}..."
+                                    </blockquote>
                                   )}
 
-                                  {entry.vitals?.bpSystolic && (
-                                    <div className="mt-4 flex flex-wrap gap-4">
-                                      <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center"><Activity size={14} /></div>
+                                  {entry.vitals && (entry.vitals.bpSystolic || entry.vitals.bpDiastolic) && (
+                                    <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-50">
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="h-6 w-6 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center">
+                                          <Activity size={12} />
+                                        </div>
                                         <div>
-                                          <p className="text-[8px] font-black text-slate-400 uppercase">Blood Pressure</p>
-                                          <p className="text-xs font-black text-slate-900">{entry.vitals.bpSystolic}/{entry.vitals.bpDiastolic}</p>
+                                          <p className="text-[8px] text-slate-400">BP</p>
+                                          <p className="text-xs font-bold text-slate-900">{entry.vitals.bpSystolic}/{entry.vitals.bpDiastolic}</p>
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center"><Heart size={14} /></div>
-                                        <div>
-                                          <p className="text-[8px] font-black text-slate-400 uppercase">Heart Rate</p>
-                                          <p className="text-xs font-black text-slate-900">{entry.vitals.heartRate} BPM</p>
+                                      {entry.vitals.heartRate && (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                                            <Heart size={12} />
+                                          </div>
+                                          <div>
+                                            <p className="text-[8px] text-slate-400">HR</p>
+                                            <p className="text-xs font-bold text-slate-900">{entry.vitals.heartRate}</p>
+                                          </div>
                                         </div>
-                                      </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -456,18 +447,18 @@ const SelfCarePage = () => {
           {/* RIGHT COLUMN: FORMS & PREFS */}
           <div className="lg:col-span-4 space-y-8 order-1 lg:order-2">
             {/* CHECK-IN FORM */}
-            <section className="rounded-[40px] border border-slate-100 bg-white shadow-2xl overflow-hidden">
-              <div className="p-8 pb-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-600">Action Center</p>
-                <h2 className="text-2xl font-black text-slate-900">Daily Pulse check</h2>
-                <p className="text-xs font-medium text-slate-500 mt-1">Updates your guidance score instantly.</p>
+            <section className="rounded-[2.5rem] bg-white shadow-card ring-1 ring-slate-100 overflow-hidden">
+              <div className="p-10 pb-4">
+                <p className="type-overline text-brand-600">Action Center</p>
+                <h2 className="type-h2 text-slate-900">Daily Health Puls</h2>
+                <p className="type-caption text-slate-500 mt-2 font-medium">Updates your guidance score instantly.</p>
               </div>
 
-              <form onSubmit={handleCheckinSubmit} className="p-8 space-y-8">
+              <form onSubmit={handleCheckinSubmit} className="p-10 space-y-10">
                 {/* MOOD SELECTION */}
-                <div className="space-y-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Overall Mood</p>
-                  <div className="flex gap-2">
+                <div className="space-y-5">
+                  <p className="type-overline text-slate-400 pl-1">Overall Mood</p>
+                  <div className="flex gap-3">
                     {moodOptions.map(({ label, Icon }) => (
                       <button
                         key={label}
@@ -476,65 +467,71 @@ const SelfCarePage = () => {
                         className={classNames(
                           "flex-1 h-16 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all",
                           checkinForm.mood === label
-                            ? "bg-brand-linear text-white shadow-xl scale-110 ring-2 ring-white"
-                            : "bg-slate-50 text-slate-400 grayscale border border-slate-100"
+                            ? "bg-slate-900 text-white shadow-elevated scale-110"
+                            : "bg-slate-50 text-slate-400 border border-slate-100 hover:border-slate-200"
                         )}
                       >
-                        <Icon size={20} />
+                        <Icon size={24} />
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Symptoms</p>
+                    <p className="type-overline text-slate-400 pl-1">Current Symptoms</p>
                     <input
                       value={checkinForm.symptoms}
                       onChange={(e) => setCheckinForm(p => ({ ...p, symptoms: e.target.value }))}
                       placeholder="e.g. Cough, Muscle Pain"
-                      className="w-full h-14 rounded-2xl bg-slate-50 border border-slate-100 px-6 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-brand-600/20 shadow-inner"
+                      className="w-full h-14 rounded-2xl bg-slate-50 border border-slate-100 px-6 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-brand-600/10 focus:border-brand-600/20 shadow-inner"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Detailed Observation</p>
+                    <p className="type-overline text-slate-400 pl-1">Detailed Observation</p>
                     <textarea
                       value={checkinForm.note}
                       onChange={(e) => setCheckinForm(p => ({ ...p, note: e.target.value }))}
-                      placeholder="Any changes in appetite or sleep?"
-                      className="w-full min-h-[120px] rounded-2xl bg-slate-50 border border-slate-100 p-6 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-brand-600/20 shadow-inner resize-none"
+                      placeholder="How was your sleep or appetite?"
+                      className="w-full min-h-[140px] rounded-2xl bg-slate-50 border border-slate-100 p-6 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-brand-600/10 focus:border-brand-600/20 shadow-inner resize-none"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Vitals (Optional)</p>
+                  <p className="type-overline text-slate-400 pl-1">Vitals (Optional)</p>
                   <div className="grid grid-cols-2 gap-4">
-                    <input
-                      placeholder="BP Sys (120)"
-                      value={checkinForm.bpSystolic}
-                      onChange={(e) => setCheckinForm(p => ({ ...p, bpSystolic: e.target.value }))}
-                      className="h-14 rounded-2xl bg-slate-50 border border-slate-100 px-5 text-xs font-black shadow-inner"
-                    />
-                    <input
-                      placeholder="Heart Rate"
-                      value={checkinForm.heartRate}
-                      onChange={(e) => setCheckinForm(p => ({ ...p, heartRate: e.target.value }))}
-                      className="h-14 rounded-2xl bg-slate-50 border border-slate-100 px-5 text-xs font-black shadow-inner"
-                    />
+                    <div className="space-y-1.5">
+                      <p className="type-overline text-slate-300 text-[8px] pl-1">BP Sys</p>
+                      <input
+                        placeholder="120"
+                        value={checkinForm.bpSystolic}
+                        onChange={(e) => setCheckinForm(p => ({ ...p, bpSystolic: e.target.value }))}
+                        className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 px-5 type-body font-bold shadow-inner"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="type-overline text-slate-300 text-[8px] pl-1">Heart Rate</p>
+                      <input
+                        placeholder="72"
+                        value={checkinForm.heartRate}
+                        onChange={(e) => setCheckinForm(p => ({ ...p, heartRate: e.target.value }))}
+                        className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 px-5 type-body font-bold shadow-inner"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={createCheckin.isPending}
-                  className="w-full h-16 rounded-3xl bg-slate-900 text-white text-xs font-black uppercase tracking-[0.2em] shadow-2xl transition-all hover:bg-brand-600 active:scale-95 flex items-center justify-center gap-3"
+                  className="w-full h-16 rounded-[2rem] bg-slate-900 text-white type-caption font-black uppercase tracking-widest shadow-elevated transition-all hover:bg-brand-600 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  {createCheckin.isPending ? <Spinner className="w-5 h-5 text-white" /> : (
+                  {createCheckin.isPending ? <Spinner className="w-6 h-6 text-white" /> : (
                     <>
-                      <Plus size={18} />
-                      Submit Review
+                      <Plus size={20} />
+                      Log Check-in
                     </>
                   )}
                 </button>
@@ -542,18 +539,24 @@ const SelfCarePage = () => {
             </section>
 
             {/* PREFERENCES */}
-            <section className="rounded-[40px] border border-slate-100 bg-slate-900/90 backdrop-blur-xl shadow-2xl p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-2xl bg-white/10 flex items-center justify-center text-white">
-                  <ShieldCheck size={20} />
+            <section className="rounded-[2.5rem] bg-slate-900 shadow-elevated p-10 text-white relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-linear opacity-20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
+
+              <div className="flex items-center gap-4 mb-8">
+                <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center text-white ring-1 ring-white/20">
+                  <ShieldCheck size={24} />
                 </div>
-                <h3 className="text-xl font-black text-white">Security & AI</h3>
+                <div>
+                  <h3 className="type-h3 text-white">Security & Privacy</h3>
+                  <p className="type-overline text-white/40">AI-Controlled Space</p>
+                </div>
               </div>
 
-              <form onSubmit={handleProfileSubmit} className="space-y-6">
-                <label className="flex items-center gap-4 group cursor-pointer">
+              <form onSubmit={handleProfileSubmit} className="space-y-8 relative z-10">
+                <label className="flex items-center justify-between group cursor-pointer">
+                  <span className="type-caption font-bold text-white/70 group-hover:text-white transition-colors">Personalize Guidance</span>
                   <div className={classNames(
-                    "h-6 w-11 rounded-full transition-all flex items-center px-1 shadow-inner",
+                    "h-7 w-12 rounded-full transition-all flex items-center px-1 shadow-inner",
                     profileForm.consentAi ? "bg-brand-600" : "bg-white/10"
                   )}>
                     <input
@@ -563,16 +566,16 @@ const SelfCarePage = () => {
                       onChange={(e) => setProfileForm(p => ({ ...p, consentAi: e.target.checked }))}
                     />
                     <div className={classNames(
-                      "h-4 w-4 rounded-full bg-white transition-all shadow-xl",
+                      "h-5 w-5 rounded-full bg-white transition-all shadow-xl",
                       profileForm.consentAi ? "translate-x-5" : "translate-x-0"
                     )} />
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">Personalize Guidance</span>
                 </label>
 
-                <label className="flex items-center gap-4 group cursor-pointer">
+                <label className="flex items-center justify-between group cursor-pointer">
+                  <span className="type-caption font-bold text-white/70 group-hover:text-white transition-colors">Shared Provider Sync</span>
                   <div className={classNames(
-                    "h-6 w-11 rounded-full transition-all flex items-center px-1 shadow-inner",
+                    "h-7 w-12 rounded-full transition-all flex items-center px-1 shadow-inner",
                     profileForm.consentData ? "bg-brand-600" : "bg-white/10"
                   )}>
                     <input
@@ -582,28 +585,27 @@ const SelfCarePage = () => {
                       onChange={(e) => setProfileForm(p => ({ ...p, consentData: e.target.checked }))}
                     />
                     <div className={classNames(
-                      "h-4 w-4 rounded-full bg-white transition-all shadow-xl",
+                      "h-5 w-5 rounded-full bg-white transition-all shadow-xl",
                       profileForm.consentData ? "translate-x-5" : "translate-x-0"
                     )} />
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">Shared Provider Sync</span>
                 </label>
 
-                <div className="space-y-2 pt-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 pl-1">Primary Health Goals</p>
+                <div className="space-y-3">
+                  <p className="type-overline text-white/30 pl-1">Primary Health Goals</p>
                   <textarea
                     value={profileForm.primaryGoals}
                     onChange={(e) => setProfileForm(p => ({ ...p, primaryGoals: e.target.value }))}
-                    placeholder="e.g. Improved mobility, pain management"
-                    className="w-full min-h-[80px] rounded-2xl bg-white/5 border border-white/10 p-4 text-xs font-medium text-white placeholder-white/20 focus:outline-none transition-all resize-none"
+                    placeholder="e.g. Improved mobility, better sleep"
+                    className="w-full min-h-[100px] rounded-2xl bg-white/5 border border-white/10 p-5 type-body text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-brand-600/50 transition-all resize-none"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full h-14 rounded-2xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:bg-brand-600 hover:text-white active:scale-95"
+                  className="w-full h-14 rounded-2xl bg-white text-slate-900 type-caption font-black uppercase tracking-widest transition-all hover:bg-brand-600 hover:text-white active:scale-95"
                 >
-                  Save Preferences
+                  Save Securely
                 </button>
               </form>
             </section>

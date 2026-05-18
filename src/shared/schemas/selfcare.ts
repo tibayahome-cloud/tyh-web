@@ -58,7 +58,24 @@ export interface SelfCareCheckin {
         temperature?: number;
         oxygenLevel?: number;
     } | null;
+    user?: UserResource | null;
+    checkedAt?: string; // For compatibility
 }
+
+export interface SelfCareCheckinInput {
+    mood: string;
+    note?: string;
+    symptoms?: string[];
+    checkedAt?: string;
+    vitals?: {
+        bpSystolic?: number;
+        bpDiastolic?: number;
+        heartRate?: number;
+        temperature?: number;
+        spo2?: number;
+    };
+}
+
 
 export interface SelfCareAlert {
     id: string;
@@ -70,6 +87,14 @@ export interface SelfCareAlert {
     resolvedAt: string | null;
     resolvedBy?: string | null;
     createdAt: string;
+    riskLevel?: string;
+    reason?: string;
+    client?: UserResource | null;
+    clientUserId?: string;
+    recommendation?: {
+        summary: string;
+        steps: Array<{ title: string; description: string }>;
+    } | null;
 }
 
 interface RawSelfCarePayload {
@@ -139,12 +164,18 @@ interface RawSelfCarePayload {
         oxygen_level?: number | string;
         oxygenLevel?: number | string;
     };
+    checked_at?: string;
     alert_type?: string;
     severity?: "low" | "medium" | "high" | "critical";
     message?: string;
     status?: "pending" | "acknowledged" | "resolved";
     resolved_at?: string;
     resolved_by?: string;
+    risk_level?: string;
+    riskLevel?: string;
+    reason?: string;
+    client?: unknown;
+    client_user_id?: string;
 }
 
 export const mapSelfCareProfile = (payload: unknown): SelfCareProfile | null => {
@@ -184,7 +215,9 @@ export const mapSelfCareCheckin = (payload: unknown): SelfCareCheckin | null => 
     const id = coerceId(raw.id);
     if (!id) return null;
 
-    const vitals = raw.vitals;
+    const vitalsRaw = raw.vitals;
+    const recommendationRaw = raw.recommendation;
+
     return {
         id,
         profileId: coerceId(raw.profile_id),
@@ -194,27 +227,29 @@ export const mapSelfCareCheckin = (payload: unknown): SelfCareCheckin | null => 
         waterIntakeLens: raw.water_intake_lens != null ? Number(raw.water_intake_lens) : null,
         notes: coerceString(raw.notes),
         checkinAt: coerceDate(raw.checkin_at) || new Date().toISOString(),
+        checkedAt: coerceDate(raw.checkin_at || raw.checked_at) || new Date().toISOString(),
         aiRiskLevel: coerceString(raw.ai_risk_level),
-        recommendation: raw.recommendation ? {
-            summary: coerceString(raw.recommendation.summary) || "",
-            riskLevel: coerceString(raw.recommendation.risk_level || raw.recommendation.riskLevel) || "low",
-            steps: Array.isArray(raw.recommendation.steps) ? raw.recommendation.steps.map((s) => ({
+        user: raw.user ? mapUserResource(raw.user) : null,
+        recommendation: recommendationRaw ? {
+            summary: coerceString(recommendationRaw.summary) || "",
+            riskLevel: coerceString(recommendationRaw.risk_level || recommendationRaw.riskLevel) || "low",
+            steps: Array.isArray(recommendationRaw.steps) ? recommendationRaw.steps.map((s) => ({
                 title: coerceString(s.title) || "",
                 description: coerceString(s.description) || "",
                 timeframe: coerceString(s.timeframe),
                 caution: coerceString(s.caution)
             })) : [],
-            whenToSeekHelp: Array.isArray(raw.recommendation.when_to_seek_help || raw.recommendation.whenToSeekHelp) ? (raw.recommendation.when_to_seek_help || raw.recommendation.whenToSeekHelp)!.map((h) => ({
+            whenToSeekHelp: Array.isArray(recommendationRaw.when_to_seek_help || recommendationRaw.whenToSeekHelp) ? (recommendationRaw.when_to_seek_help || recommendationRaw.whenToSeekHelp)!.map((h) => ({
                 trigger: coerceString(h.trigger) || "",
                 description: coerceString(h.description) || ""
             })) : []
         } : null,
-        vitals: vitals ? {
-            bpSystolic: Number(vitals.bp_systolic ?? vitals.bpSystolic) || undefined,
-            bpDiastolic: Number(vitals.bp_diastolic ?? vitals.bpDiastolic) || undefined,
-            heartRate: Number(vitals.heart_rate ?? vitals.heartRate) || undefined,
-            temperature: Number(vitals.temperature) || undefined,
-            oxygenLevel: Number(vitals.oxygen_level ?? vitals.oxygenLevel) || undefined
+        vitals: vitalsRaw ? {
+            bpSystolic: Number(vitalsRaw.bp_systolic ?? vitalsRaw.bpSystolic) || undefined,
+            bpDiastolic: Number(vitalsRaw.bp_diastolic ?? vitalsRaw.bpDiastolic) || undefined,
+            heartRate: Number(vitalsRaw.heart_rate ?? vitalsRaw.heartRate) || undefined,
+            temperature: Number(vitalsRaw.temperature) || undefined,
+            oxygenLevel: Number(vitalsRaw.oxygen_level ?? vitalsRaw.oxygenLevel) || undefined
         } : null
     };
 };
@@ -233,6 +268,42 @@ export const mapSelfCareAlert = (payload: unknown): SelfCareAlert | null => {
         status: raw.status || "pending",
         resolvedAt: coerceDate(raw.resolved_at),
         resolvedBy: coerceId(raw.resolved_by),
+        riskLevel: coerceString(raw.risk_level || raw.riskLevel) || "moderate",
+        reason: coerceString(raw.reason),
+        client: raw.client ? mapUserResource(raw.client) : null,
+        clientUserId: coerceId(raw.client_user_id || raw.user_id),
+        recommendation: raw.recommendation ? {
+            summary: coerceString(raw.recommendation.summary) || "",
+            steps: Array.isArray(raw.recommendation.steps) ? raw.recommendation.steps.map(s => ({
+                title: coerceString(s.title) || "",
+                description: coerceString(s.description) || ""
+            })) : []
+        } : null,
         createdAt: coerceDate(raw.created_at) || new Date().toISOString()
-    };
+    } as SelfCareAlert;
 };
+
+export interface SelfCareProfileUpdateInput {
+    id?: string;
+    userId?: string;
+    status?: string;
+    consentAi?: boolean;
+    consentDataSharing?: boolean;
+    primaryGoals?: string;
+    currentConditions?: string[];
+    medications?: string[];
+    riskFactors?: string[];
+    preferences?: {
+        notification_channel: string;
+        quiet_hours: string;
+        reminder_frequency?: string;
+    };
+    primaryProviderUserId?: string;
+}
+
+export interface SelfCareAlertFilters {
+    status?: string;
+    riskLevel?: string;
+    clientId?: string;
+    limit?: number;
+}

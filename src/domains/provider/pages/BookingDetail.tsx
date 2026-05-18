@@ -202,10 +202,10 @@ const ProviderBookingDetailPage = () => {
                   icon={<MapPin className="h-3.5 w-3.5 text-slate-400" />}
                 />
                 <InfoRow
-                  label="Operational Yield"
-                  value={formatCurrency(booking.priceCents, booking.currency ?? "KES")}
-                  helper={booking.estimateDurationMinutes ? `Est. ${booking.estimateDurationMinutes} min` : undefined}
-                  icon={<div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                  label="Duration"
+                  value={booking.estimateDurationMinutes ? `Est. ${booking.estimateDurationMinutes} min` : "—"}
+                  helper="Earnings credited to wallet after completion"
+                  icon={<Clock className="h-3.5 w-3.5 text-slate-400" />}
                 />
                 <InfoRow label="Protocol Status" value={booking.status.replace(/_/g, " ")} />
                 <div className="pt-4 border-t border-slate-100">

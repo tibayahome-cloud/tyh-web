@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   fetchThreads,
@@ -17,21 +17,25 @@ export const messagingKeys = {
 };
 
 export const useThreads = () => {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: messagingKeys.threads(),
-    queryFn: fetchThreads
+    queryFn: ({ pageParam }) => fetchThreads(pageParam as string | undefined),
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined
   });
 };
 
 export const useThreadMessages = (threadId: string | null) => {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: threadId ? messagingKeys.messages(threadId) : ["messaging", "threads", "unknown", "messages"],
-    queryFn: () => {
+    queryFn: ({ pageParam }) => {
       if (!threadId) {
         return Promise.reject(new Error("threadId required"));
       }
-      return fetchThreadMessages(threadId);
+      return fetchThreadMessages(threadId, pageParam as string | undefined);
     },
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined,
     enabled: Boolean(threadId)
   });
 };

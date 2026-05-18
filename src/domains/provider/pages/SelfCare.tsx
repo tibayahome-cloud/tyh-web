@@ -233,9 +233,9 @@ const ProviderSelfCarePage = () => {
             </div>
             <p className="text-xs text-slate-500">Logged by {formatLoggerName(entry)}</p>
             {(entry.symptoms ?? []).length > 0 && (
-              <p className="mt-1 text-sm text-slate-600">Symptoms: {(entry.symptoms ?? []).map((s: any) => s.label).join(", ")}</p>
+              <p className="mt-1 text-sm text-slate-600">Symptoms: {(entry.symptoms ?? []).join(", ")}</p>
             )}
-            {entry.vitals?.bpSystolic && (
+            {entry.vitals && (entry.vitals.bpSystolic || entry.vitals.bpDiastolic) && (
               <p className="mt-1 text-xs text-slate-500">
                 BP {entry.vitals.bpSystolic}/{entry.vitals.bpDiastolic ?? "--"} • HR {entry.vitals.heartRate ?? "--"} • Temp{" "}
                 {entry.vitals.temperature ?? "--"}
@@ -365,7 +365,7 @@ const ProviderSelfCarePage = () => {
                     <p className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3">AI Support Analysis</p>
                     <p className="text-sm font-medium text-slate-600 leading-relaxed">{selectedAlert.recommendation.summary}</p>
                     <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      {(selectedAlert.recommendation.steps ?? []).map((step: any) => (
+                      {(selectedAlert.recommendation.steps ?? []).map((step) => (
                         <div key={step.title} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 transition-transform hover:scale-[1.02]">
                           <p className="text-xs font-bold text-slate-900 uppercase tracking-tight">{step.title}</p>
                           <p className="mt-1 text-xs font-medium text-slate-500 leading-relaxed">{step.description}</p>

@@ -35,7 +35,14 @@ export const ConfirmDialog = ({
   children
 }: ConfirmDialogProps) => {
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog
+      disablePortal={false}
+      container={() => document.body}
+      open={open}
+      onClose={loading ? undefined : onClose}
+      maxWidth="xs"
+      fullWidth
+    >
       <DialogTitle>{title}</DialogTitle>
       {(description || error || children) && (
         <DialogContent>

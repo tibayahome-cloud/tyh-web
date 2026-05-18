@@ -61,7 +61,7 @@ describe("useAuth", () => {
             id: "1",
             attributes: {
               full_name: "Jane Client",
-              phone: "+254700000000",
+              phone: "+254712444422",
               roles: ["client"],
               permissions: []
             }
@@ -74,7 +74,7 @@ describe("useAuth", () => {
         id: "1",
         attributes: {
           full_name: "Jane Client",
-          phone: "+254700000000",
+          phone: "+254712444422",
           roles: ["client"],
           permissions: []
         }
@@ -110,7 +110,7 @@ describe("useAuth", () => {
     if (stored) {
       const parsed = JSON.parse(stored) as Record<string, unknown>;
       expect(parsed.fullName).toBe("Jane Client");
-      expect(parsed.phone).toBe("+254700000000");
+      expect(parsed.phone).toBe("+254712444422");
     }
   });
 
@@ -216,7 +216,7 @@ describe("useAuth", () => {
             id: "1",
             attributes: {
               full_name: "Jane Client",
-              phone: "+254700000000",
+              phone: "+254712444422",
               roles: ["client"],
               permissions: []
             }

@@ -343,3 +343,27 @@ export type BookingFeedbackInput = {
   comment?: string;
   tags?: string[];
 };
+
+export interface BookingFeedback {
+  id: string;
+  score: number;
+  tags: string[];
+  comment: string | null;
+  ratedAt: string | null;
+  rater: BookingParty | null;
+  target: BookingParty | null;
+  analysis?: {
+    sentimentScore: number;
+    sentimentLabel: string;
+    summary?: string | null;
+  } | null;
+}
+
+export interface BookingDispute {
+  id: string;
+  status: string;
+  reason: string | null;
+  resolution: string | null;
+  resolvedAt: string | null;
+  openedBy: BookingParty | null;
+}

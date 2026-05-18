@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { AxiosError } from "axios";
 
-import { Card } from "../shared/components/Card";
+import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
 import { Input } from "../shared/components/Input";
 import { Button } from "../shared/components/Button";
@@ -53,46 +53,50 @@ export const ForgotPassword = () => {
   });
 
   return (
-    <div className="w-full">
-      <Card className="mx-auto w-full max-w-lg" title={t("auth.passwordResetTitle")}>
-        <p className="mb-6 text-sm text-slate-600">{t("auth.passwordResetDescription")}</p>
+    <AuthLayout
+      title={t("auth.passwordResetTitle")}
+      subtitle={t("auth.passwordResetDescription")}
+      footer={
+        <Link to="/login" className="type-caption font-semibold text-tiba-blue hover:underline">
+          {t("auth.backToLogin")}
+        </Link>
+      }
+    >
+      <form className="space-y-6" onSubmit={submit} noValidate>
+        <FormField
+          control={control}
+          name="email"
+          render={({ field, fieldState }) => (
+            <Input
+              {...field}
+              type="email"
+              label={t("auth.email")}
+              placeholder="jane@example.com"
+              autoComplete="email"
+              error={fieldState.error?.message}
+            />
+          )}
+        />
 
-        <form className="space-y-4" onSubmit={submit} noValidate>
-          <FormField
-            control={control}
-            name="email"
-            render={({ field, fieldState }) => (
-              <Input
-                {...field}
-                type="email"
-                label={t("auth.email")}
-                placeholder="jane@example.com"
-                autoComplete="email"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-
-          {status === "success" && (
-            <p className="rounded-md bg-primary-50 px-3 py-2 text-sm text-primary-700" role="status">
+        {status === "success" && (
+          <div className="rounded-xl border border-green-100 bg-green-50 p-3 text-center">
+            <p className="type-caption text-green-700" role="status">
               {t("auth.passwordResetSuccess")}
             </p>
-          )}
+          </div>
+        )}
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && (
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
+            <p className="type-caption text-red-600">{error}</p>
+          </div>
+        )}
 
-          <Button type="submit" className="w-full" loading={isSubmitting}>
-            {t("auth.passwordResetCta")}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-slate-500">
-          <Link to="/login" className="font-semibold text-primary-600 hover:text-primary-700">
-            {t("auth.backToLogin")}
-          </Link>
-        </p>
-      </Card>
-    </div>
+        <Button type="submit" className="w-full h-11" loading={isSubmitting}>
+          {t("auth.passwordResetCta")}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 };
 

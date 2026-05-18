@@ -10,9 +10,23 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "playwright": "playwright test"
+    "playwright": "playwright test",
+    "cap:assets": "capacitor-assets generate --android",
+    "cap:sync": "cap sync android",
+    "cap:copy": "cap copy android",
+    "cap:open": "cap open android",
+    "android": "npm run build && cap sync android && cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.2",
+    "@capacitor/app": "^7.0.1",
+    "@capacitor/browser": "^7.0.1",
+    "@capacitor/core": "^7.4.2",
+    "@capacitor/geolocation": "^7.1.0",
+    "@capacitor/preferences": "^7.0.1",
+    "@capacitor/push-notifications": "^7.0.1",
+    "@capacitor/splash-screen": "^7.0.1",
+    "@capacitor/status-bar": "^7.0.1",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@hookform/resolvers": "^3.5.0",
@@ -38,6 +52,8 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.2",
+    "@capacitor/assets": "^3.0.5",
     "@playwright/test": "^1.46.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",

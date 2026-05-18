@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { type CursorMeta, type CursorResponse } from "./api";
 import { buildFieldParams, bookingCard, bookingDetail, bookingTimeline, bookingEventFields } from "./fieldInclude";
 import type {
   Booking,
@@ -277,16 +277,29 @@ import { mapBookingNotes, mapBookingNote, mapNoteTemplates } from "../schemas/bo
 
 export const fetchBookingNotes = async (
   bookingId: string,
-  noteType?: string
-): Promise<BookingNote[]> => {
-  const params: Record<string, string> = {};
+  noteType?: string,
+  cursor?: string | null,
+  limit?: number
+): Promise<CursorResponse<BookingNote>> => {
+  const params: Record<string, string | number> = {};
   if (noteType) {
     params["filter[note_type]"] = noteType;
+  }
+  if (cursor) {
+    params.cursor = cursor;
+  }
+  if (limit) {
+    params.limit = limit;
   }
   const response = await api.get(`/bookings/${bookingId}/notes`, { params });
   const payload = response.data ?? {};
   const data = Array.isArray(payload.data) ? payload.data : [];
-  return mapBookingNotes(data);
+  const meta = payload.meta as CursorMeta;
+
+  return {
+    data: mapBookingNotes(data),
+    meta: meta || { limit: limit ?? 20, next_cursor: null }
+  };
 };
 
 export const createBookingNote = async (

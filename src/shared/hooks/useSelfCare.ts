@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCursorInfiniteQuery } from "./useCursorInfiniteQuery";
 
 import {
   acknowledgeSelfCareAlert,
@@ -51,9 +52,25 @@ export const useSelfCareCheckins = (
 ) => {
   return useQuery<SelfCareCheckin[]>({
     queryKey: [...selfCareKeys.checkins(userId), params?.limit ?? 20],
-    queryFn: () => fetchSelfCareCheckins({ userId, limit: params?.limit }),
+    queryFn: async () => {
+      const res = await fetchSelfCareCheckins({ userId, limit: params?.limit });
+      return res.data;
+    },
     enabled: params?.enabled ?? true
   });
+};
+
+export const useSelfCareCheckinsInfinite = (
+  userId?: string | null,
+  params?: { limit?: number; enabled?: boolean }
+) => {
+  return useCursorInfiniteQuery(
+    [...selfCareKeys.checkins(userId), "infinite", params?.limit ?? 20],
+    ({ pageParam }) => fetchSelfCareCheckins({ userId, limit: params?.limit, cursor: pageParam }),
+    {
+      enabled: params?.enabled ?? true
+    }
+  );
 };
 
 export const useSelfCareAlerts = (

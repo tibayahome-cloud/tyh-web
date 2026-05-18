@@ -19,6 +19,7 @@ export type MapMarker = {
   variant?: "client" | "provider" | "destination" | "admin" | "neutral" | "alert";
   isFocused?: boolean;
   pulse?: boolean;
+  heading?: number;
 };
 
 export type MapPolyline = {
@@ -171,25 +172,54 @@ const AdvancedMarker = ({ marker }: { marker: MapMarker }) => {
   const color = getMarkerColor(marker);
   const variant = marker.variant ?? "neutral";
   const showPulse = marker.pulse ?? marker.isFocused ?? variant === "provider";
+  const heading = marker.heading;
 
   return createPortal(
-    <span className="relative flex h-4 w-4 items-center justify-center" title={marker.label}>
+    <div
+      className="relative flex items-center justify-center transition-all duration-300"
+      style={{
+        transform: heading !== undefined ? `rotate(${heading}deg)` : undefined,
+        width: "32px",
+        height: "32px"
+      }}
+      title={marker.label}
+    >
       {showPulse && (
         <span
           className={classNames(
-            "pointer-events-none absolute inline-flex h-7 w-7 animate-ping rounded-full",
-            variant === "provider" ? "bg-emerald-400/40" : "bg-sky-400/30"
+            "pointer-events-none absolute inline-flex h-8 w-8 animate-ping rounded-full",
+            variant === "provider" ? "bg-emerald-400/30" : "bg-sky-400/20"
           )}
         />
       )}
-      <span
-        className={classNames(
-          "relative inline-flex h-3.5 w-3.5 rounded-full border border-white shadow",
-          marker.isFocused ? "scale-110" : "scale-100"
-        )}
-        style={{ background: color }}
-      />
-    </span>,
+
+      {variant === "provider" && heading !== undefined ? (
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          className="drop-shadow-md"
+          style={{ filter: "drop-shadow(0px 2px 4px rgba(0,0,0,0.3))" }}
+        >
+          <path
+            d="M12 3L4 21L12 18L20 21L12 3Z"
+            fill={color}
+            stroke="white"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : (
+        <span
+          className={classNames(
+            "relative inline-flex h-4 w-4 rounded-full border-2 border-white shadow-md transition-transform",
+            marker.isFocused ? "scale-125" : "scale-100"
+          )}
+          style={{ background: color }}
+        />
+      )}
+    </div>,
     containerRef.current
   );
 };

@@ -32,6 +32,8 @@ export const Modal = ({
 
   return (
     <Dialog
+      disablePortal={false}
+      container={() => document.body}
       open={open}
       onClose={onClose}
       fullWidth={fullWidth}

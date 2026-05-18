@@ -19,6 +19,8 @@ export type PaymentPresetName = keyof typeof paymentPresetMap;
 export type PaymentListParams = {
   page?: number;
   pageSize?: number;
+  cursor?: string | null;
+  limit?: number;
   status?: string;
   bookingId?: string;
   preset?: PaymentPresetName;
@@ -38,16 +40,22 @@ export const fetchPaymentSummary = async (): Promise<PaymentSummary> => {
 export const fetchAdminPayments = async ({
   page = 1,
   pageSize = 25,
+  cursor,
+  limit = 25,
   status,
   bookingId,
   preset = "card"
 }: PaymentListParams = {}): Promise<PaymentListResult> => {
   const presetConfig = paymentPresetMap[preset] ?? paymentPresetMap.card;
   const params: Record<string, unknown> = {
+    // Legacy support for page/size if cursor is not present, though backend will likely enforce one style
     "page[number]": page,
-    "page[size]": pageSize,
+    "page[size]": cursor ? limit : pageSize,
     ...buildFieldParams(presetConfig)
   };
+  if (cursor) {
+    params.cursor = cursor;
+  }
   if (status) {
     params["filter[status]"] = status;
   }
@@ -58,7 +66,7 @@ export const fetchAdminPayments = async ({
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const payments = mapPayments(payload.data);
   const meta = mapPaymentListMeta(payload.meta, {
-    page: { number: page, size: pageSize, total: payments.length, totalPages: 1 }
+    page: { number: page, size: cursor ? limit : pageSize, total: payments.length, totalPages: 1 }
   });
   return { payments, meta, raw: payload };
 };

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -8,7 +8,7 @@
   :root {
     color-scheme: light;
     font-family: "Inter", "Inter var", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    
+
     /* Brand Colors */
     --tiba-blue: #1d4699;
     --tiba-gold: #c5a044;
@@ -37,14 +37,50 @@
   h5,
   h6 {
     @apply text-tiba-blue;
-    font-family: "Space Grotesk", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-weight: 700;
-    letter-spacing: -0.025em;
+    font-family: inherit;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 
-  h1 { @apply text-4xl md:text-5xl lg:text-6xl leading-tight; }
-  h2 { @apply text-3xl md:text-4xl leading-snug; }
-  h3 { @apply text-xl md:text-2xl; }
+  h1 {
+    @apply type-h1;
+  }
+
+  h2 {
+    @apply type-h2;
+  }
+
+  h3 {
+    @apply type-h3;
+  }
+
+  .type-h1 {
+    @apply text-[20px] font-normal leading-tight tracking-tight;
+  }
+
+  .type-h2 {
+    @apply text-[18px] font-normal leading-snug;
+  }
+
+  .type-h3 {
+    @apply text-[16px] font-normal leading-snug;
+  }
+
+  .type-title {
+    @apply text-[14px] font-normal leading-normal;
+  }
+
+  .type-body {
+    @apply text-[12px] font-normal leading-relaxed;
+  }
+
+  .type-caption {
+    @apply text-[10px] font-medium leading-normal;
+  }
+
+  .type-overline {
+    @apply text-[10px] font-normal uppercase tracking-wider leading-none;
+  }
 
   button,
   input,
@@ -53,9 +89,14 @@
     font: inherit;
   }
 }
+
 @layer utilities {
   .slide-in-right {
     animation: slide-in-right 0.3s ease-out;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .btn-primary {
@@ -74,6 +115,7 @@
     from {
       transform: translateX(100%);
     }
+
     to {
       transform: translateX(0);
     }

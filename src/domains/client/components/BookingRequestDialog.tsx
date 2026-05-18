@@ -18,8 +18,11 @@ import {
   Baby,
   Activity as VitalsIcon,
   Search,
-  Crosshair
+  Crosshair,
+  Phone,
+  RefreshCw
 } from "lucide-react";
+import { AxiosError } from "axios";
 
 import { Modal } from "../../../shared/components/Modal";
 import { Button } from "../../../shared/components/Button";
@@ -147,6 +150,12 @@ const toLatLng = (lat?: string | null, lng?: string | null) => {
 
 export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: BookingRequestDialogProps) => {
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpSent, setOtpSent] = useState(false);
   const { data: services, isLoading: loadingServices } = useServiceOptions(open);
   const { showToast } = useToast();
   const createBooking = useCreateBookingMutation("detail");
@@ -406,7 +415,65 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     reset(DEFAULT_VALUES);
     setLocationSource("none");
     setSubmitError(null);
+    setShowPhoneVerification(false);
+    setOtpCode("");
+    setOtpError(null);
+    setOtpSent(false);
     onClose();
+  };
+
+  const handleSendOtp = async () => {
+    setOtpError(null);
+    setOtpSending(true);
+    try {
+      await api.post("/auth/verify/phone/init");
+      setOtpSent(true);
+      showToast({
+        title: "Code sent",
+        description: "Check your phone for the verification code.",
+        variant: "success"
+      });
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        const message = err.response?.data?.error?.message ?? "Failed to send code. Please try again.";
+        setOtpError(message);
+      } else {
+        setOtpError("Failed to send code. Please try again.");
+      }
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length < 4) {
+      setOtpError("Please enter the verification code.");
+      return;
+    }
+    setOtpError(null);
+    setOtpVerifying(true);
+    try {
+      await api.post("/auth/verify/phone/confirm", { code: otpCode });
+      setShowPhoneVerification(false);
+      setOtpCode("");
+      setOtpSent(false);
+      showToast({
+        title: "Phone verified",
+        description: "Your phone is now verified. Completing your booking...",
+        variant: "success"
+      });
+      // Re-submit the booking form
+      onSubmit();
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        const message = err.response?.data?.error?.message ?? "Invalid code. Please try again.";
+        setOtpError(message);
+      } else {
+        setOtpError("Verification failed. Please try again.");
+      }
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   const onSubmit = handleSubmit(async (values) => {
@@ -478,16 +545,35 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       }
       closeAndReset();
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "We could not create the booking. Please try again.";
-      setSubmitError(message);
-      showToast({
-        title: "Booking failed",
-        description: message,
-        variant: "error"
-      });
+      if (error instanceof AxiosError) {
+        const errorData = error.response?.data?.error;
+        const action = errorData?.action;
+
+        if (action?.type === "verify_phone") {
+          setShowPhoneVerification(true);
+          setSubmitError(null);
+          return;
+        }
+
+        const message = errorData?.message ?? "We could not create the booking. Please try again.";
+        setSubmitError(message);
+        showToast({
+          title: "Booking failed",
+          description: message,
+          variant: "error"
+        });
+      } else {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "We could not create the booking. Please try again.";
+        setSubmitError(message);
+        showToast({
+          title: "Booking failed",
+          description: message,
+          variant: "error"
+        });
+      }
     }
   });
 
@@ -495,11 +581,100 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     <Modal
       open={open}
       onClose={closeAndReset}
-      title="Create Booking"
-      description="Tell us what you need and we'll match you with a provider."
+      title={showPhoneVerification ? "Verify Your Phone" : "Create Booking"}
+      description={showPhoneVerification
+        ? "Phone verification is required before you can book services."
+        : "Tell us what you need and we'll match you with a provider."}
       maxWidth="md"
     >
-      {loadingServices ? (
+      {showPhoneVerification ? (
+        <div className="py-6 space-y-6">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <Phone className="w-8 h-8 text-tiba-blue" />
+            </div>
+            <p className="text-slate-600 mb-2">
+              {otpSent
+                ? "Enter the verification code sent to your phone."
+                : "We'll send a verification code to your registered phone number."}
+            </p>
+          </div>
+
+          {!otpSent ? (
+            <Button
+              type="button"
+              fullWidth
+              onClick={handleSendOtp}
+              disabled={otpSending}
+              className="h-12"
+            >
+              {otpSending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                "Send Verification Code"
+              )}
+            </Button>
+          ) : (
+            <div className="space-y-4">
+              <Input
+                label="Verification Code"
+                placeholder="Enter 6-digit code"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                maxLength={6}
+                className="text-center text-2xl tracking-widest"
+              />
+
+              <Button
+                type="button"
+                fullWidth
+                onClick={handleVerifyOtp}
+                disabled={otpVerifying || otpCode.length < 4}
+                className="h-12"
+              >
+                {otpVerifying ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Verify & Continue Booking
+                  </>
+                )}
+              </Button>
+
+              <button
+                type="button"
+                onClick={handleSendOtp}
+                disabled={otpSending}
+                className="w-full text-sm text-tiba-blue hover:underline disabled:opacity-50"
+              >
+                {otpSending ? "Sending..." : "Resend code"}
+              </button>
+            </div>
+          )}
+
+          {otpError && (
+            <p className="text-sm text-red-600 text-center">{otpError}</p>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            fullWidth
+            onClick={() => setShowPhoneVerification(false)}
+            className="mt-2"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to booking
+          </Button>
+        </div>
+      ) : loadingServices ? (
         <div className="flex flex-col items-center justify-center py-20">
           <Loading label="Fetching care services..." />
         </div>
@@ -518,9 +693,9 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
+                  className="space-y-3"
                 >
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {(services ?? []).map((service) => (
                       <button
                         key={service.id}
@@ -530,27 +705,27 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                           setCurrentStep(1);
                         }}
                         className={classNames(
-                          "group relative flex flex-col rounded-3xl border-2 p-5 text-left transition-all duration-300",
+                          "group flex flex-col rounded-xl border p-3 text-left transition-all",
                           selectedServiceId === service.id
-                            ? "border-tiba-blue bg-blue-50/40 shadow-lg shadow-tiba-blue/10"
-                            : "border-neutral-100 bg-white hover:border-tiba-blue/20 hover:shadow-md"
+                            ? "border-tiba-blue bg-blue-50/50 ring-1 ring-tiba-blue/20"
+                            : "border-slate-100 bg-white hover:border-tiba-blue/30"
                         )}
                       >
                         <div className={classNames(
-                          "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-300",
-                          selectedServiceId === service.id ? "bg-tiba-blue text-white" : "bg-blue-50 text-tiba-blue group-hover:bg-blue-100"
+                          "mb-2 flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                          selectedServiceId === service.id ? "bg-tiba-blue text-white" : "bg-blue-50 text-tiba-blue"
                         )}>
-                          {service.name.toLowerCase().includes("nurse") ? <Stethoscope /> :
-                            service.name.toLowerCase().includes("baby") ? <Baby /> :
-                              service.name.toLowerCase().includes("heart") ? <Heart /> : <Activity />}
+                          {service.name.toLowerCase().includes("nurse") ? <Stethoscope size={16} /> :
+                            service.name.toLowerCase().includes("baby") ? <Baby size={16} /> :
+                              service.name.toLowerCase().includes("heart") ? <Heart size={16} /> : <Activity size={16} />}
                         </div>
-                        <h3 className="text-lg font-bold text-neutral-900">{service.name}</h3>
-                        <p className="mt-1 text-xs text-neutral-500 line-clamp-2">
-                          {service.description ?? "Reliable professional healthcare at your doorstep."}
+                        <h3 className="text-sm font-bold text-slate-900 leading-tight">{service.name}</h3>
+                        <p className="mt-0.5 text-[10px] text-slate-500 line-clamp-1">
+                          {service.description ?? "Professional healthcare"}
                         </p>
-                        <div className="mt-4 flex items-center justify-between">
-                          <span className="text-sm font-black text-tiba-blue">{formatCurrency(service.base_price_cents)}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{service.default_estimate_minutes} MINS</span>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-xs font-bold text-tiba-blue">{formatCurrency(service.base_price_cents)}</span>
+                          <span className="text-[10px] text-slate-400">{service.default_estimate_minutes}m</span>
                         </div>
                       </button>
                     ))}
@@ -565,9 +740,9 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
+                  className="space-y-4"
                 >
-                  <div className="relative overflow-hidden rounded-[32px] border border-neutral-100 shadow-xl">
+                  <div className="relative overflow-hidden rounded-xl border border-neutral-100 shadow-md">
                     <LocationPickerMap
                       value={mapLocation ?? undefined}
                       onChange={handleMapSelect}
@@ -575,7 +750,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                     />
 
                     <div className="absolute top-4 left-4 right-4 z-10 flex gap-2">
-                      <div className="flex-1 rounded-2xl bg-white/90 p-1 shadow-2xl backdrop-blur-md ring-1 ring-black/5">
+                      <div className="flex-1 rounded-lg bg-white/90 p-1 shadow-2xl backdrop-blur-md ring-1 ring-black/5">
                         <div className="flex items-center px-3">
                           <Search className="h-4 w-4 text-neutral-400" />
                           <input
@@ -589,14 +764,14 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       <button
                         type="button"
                         onClick={handleUseCurrentLocation}
-                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-lg active:scale-95 transition-transform"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-tiba-blue text-white shadow-lg active:scale-95 transition-transform"
                       >
                         {geoLoading ? <Loading /> : <Crosshair className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
                       control={control}
                       name="homeAddress"
@@ -606,7 +781,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                           label="Address Line"
                           placeholder="Estate, Street name"
                           error={fieldState.error?.message}
-                          className="rounded-2xl"
+                          className="rounded-lg"
                         />
                       )}
                     />
@@ -619,7 +794,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                           label="House / Unit"
                           placeholder="Apt 4B, Floor 2"
                           error={fieldState.error?.message}
-                          className="rounded-2xl"
+                          className="rounded-lg"
                         />
                       )}
                     />
@@ -627,21 +802,21 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
 
                   {recentLocations.length > 0 && (
                     <div className="space-y-3">
-                      <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Recents</p>
+                      <p className="type-overline text-neutral-400">Recents</p>
                       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                         {recentLocations.slice(0, 3).map((loc) => (
                           <button
                             key={loc.id}
                             type="button"
                             onClick={() => handleApplyRecent(loc)}
-                            className="flex shrink-0 items-center gap-3 rounded-2xl border border-neutral-100 bg-white p-3 text-left transition hover:border-brand-200"
+                            className="flex shrink-0 items-center gap-3 rounded-lg border border-neutral-100 bg-white p-2 text-left transition hover:border-brand-200"
                           >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
                               <MapPin className="h-4 w-4" />
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-neutral-900">{loc.label}</p>
-                              <p className="text-[10px] text-neutral-400">{loc.lat.toFixed(2)}, {loc.lng.toFixed(2)}</p>
+                              <p className="type-caption font-bold text-neutral-900">{loc.label}</p>
+                              <p className="type-overline text-neutral-400 lowercase">{loc.lat.toFixed(2)}, {loc.lng.toFixed(2)}</p>
                             </div>
                           </button>
                         ))}
@@ -649,8 +824,8 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-2xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-lg">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                     <Button
@@ -658,7 +833,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       type="button"
                       disabled={!locationComplete}
                       onClick={() => setCurrentStep(2)}
-                      className="rounded-2xl px-8"
+                      className="rounded-lg px-8"
                     >
                       Next Step <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -673,47 +848,47 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-8 py-4"
+                  className="space-y-4"
                 >
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-3 grid-cols-2">
                     <button
                       type="button"
                       onClick={() => setValue("scheduleForLater", false)}
                       className={classNames(
-                        "flex flex-col items-center justify-center rounded-[32px] border-2 p-8 text-center transition-all duration-300",
+                        "flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all",
                         !watch("scheduleForLater")
-                          ? "border-tiba-blue bg-blue-50/40 shadow-lg shadow-tiba-blue/10"
-                          : "border-neutral-100 bg-white hover:border-tiba-blue/20"
+                          ? "border-tiba-blue bg-blue-50/50 ring-1 ring-tiba-blue/20"
+                          : "border-slate-100 bg-white hover:border-tiba-blue/30"
                       )}
                     >
                       <div className={classNames(
-                        "mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] shadow-sm transition-colors",
+                        "mb-2 flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
                         !watch("scheduleForLater") ? "bg-tiba-blue text-white" : "bg-slate-50 text-slate-400"
                       )}>
-                        <VitalsIcon className="h-8 w-8" />
+                        <VitalsIcon className="h-5 w-5" />
                       </div>
-                      <h3 className="text-xl font-black text-neutral-900">Request Now</h3>
-                      <p className="mt-2 text-xs font-medium text-neutral-500">Immediate response from the nearest available provider.</p>
+                      <h3 className="text-sm font-bold text-slate-900">Now</h3>
+                      <p className="mt-1 text-[10px] text-slate-500">Immediate dispatch</p>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setValue("scheduleForLater", true)}
                       className={classNames(
-                        "flex flex-col items-center justify-center rounded-[32px] border-2 p-8 text-center transition-all duration-300",
+                        "flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all",
                         watch("scheduleForLater")
-                          ? "border-violet-500 bg-violet-50/40 shadow-lg shadow-violet-500/10"
-                          : "border-neutral-100 bg-white hover:border-violet-200"
+                          ? "border-violet-500 bg-violet-50/50 ring-1 ring-violet-500/20"
+                          : "border-slate-100 bg-white hover:border-violet-300"
                       )}
                     >
                       <div className={classNames(
-                        "mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] shadow-sm transition-colors",
+                        "mb-2 flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
                         watch("scheduleForLater") ? "bg-violet-600 text-white" : "bg-slate-50 text-slate-400"
                       )}>
-                        <Clock className="h-8 w-8" />
+                        <Clock className="h-5 w-5" />
                       </div>
-                      <h3 className="text-xl font-black text-neutral-900">Schedule</h3>
-                      <p className="mt-2 text-xs font-medium text-neutral-500">Pick a specific time that works best for your routine.</p>
+                      <h3 className="text-sm font-bold text-slate-900">Schedule</h3>
+                      <p className="mt-1 text-[10px] text-slate-500">Pick a time</p>
                     </button>
                   </div>
 
@@ -721,22 +896,22 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="rounded-[32px] bg-violet-50 p-6"
+                      className="rounded-xl bg-violet-50 p-4"
                     >
                       <FormField
                         control={control}
                         name="scheduledAt"
                         render={({ field, fieldState }) => (
-                          <div className="flex flex-col gap-3">
-                            <label className="text-sm font-black uppercase tracking-widest text-violet-700">Appointment Date & Time</label>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-violet-700">Date & Time</label>
                             <input
                               type="datetime-local"
                               {...field}
                               min={new Date().toISOString().slice(0, 16)}
-                              className="w-full rounded-2xl border-none bg-white px-4 py-3 text-sm text-neutral-900 shadow-sm ring-1 ring-black/5 focus:ring-2 focus:ring-violet-500"
+                              className="w-full rounded-lg border-none bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-violet-500"
                             />
                             {fieldState.error && (
-                              <span className="text-xs font-bold text-danger-600">{fieldState.error.message}</span>
+                              <span className="text-xs text-red-600">{fieldState.error.message}</span>
                             )}
                           </div>
                         )}
@@ -744,17 +919,17 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                     </motion.div>
                   )}
 
-                  <div className="flex items-center justify-between">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-2xl">
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                  <div className="flex items-center justify-between pt-2">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-lg h-9 text-xs">
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                     </Button>
                     <Button
                       variant="primary"
                       type="button"
                       onClick={() => setCurrentStep(3)}
-                      className="rounded-2xl px-12"
+                      className="rounded-lg h-9 px-6 text-xs"
                     >
-                      Continue <ArrowRight className="ml-2 h-4 w-4" />
+                      Continue <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </motion.div>
@@ -764,71 +939,68 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
               {currentStep === 3 && (
                 <motion.div
                   key="step3"
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="space-y-8"
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  className="space-y-4"
                 >
-                  <div className="relative overflow-hidden rounded-[40px] border border-white/60 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5">
-                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-tiba-blue/5 blur-3xl" />
-                    <div className="relative">
-                      <div className="mb-8 flex items-center justify-between">
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-slate-900">Confirm Booking</h2>
+                        <p className="text-[10px] text-slate-400">Review details</p>
+                      </div>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-tiba-blue text-white">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-tiba-blue">
+                          <ShieldCheck className="h-4 w-4" />
+                        </div>
                         <div>
-                          <h2 className="text-2xl font-black text-slate-900 leading-none">Confirm Booking</h2>
-                          <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Review Summary</p>
-                        </div>
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-lg shadow-tiba-blue/10">
-                          <CheckCircle2 className="h-7 w-7" />
+                          <p className="text-[10px] text-slate-400">Service</p>
+                          <p className="text-sm font-semibold text-slate-900">{selectedService?.name}</p>
                         </div>
                       </div>
 
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-tiba-blue">
-                            <ShieldCheck className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Service</p>
-                            <p className="text-sm font-bold text-slate-900">{selectedService?.name}</p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-indigo-600">
+                          <MapPin className="h-4 w-4" />
                         </div>
-
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-indigo-600">
-                            <MapPin className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Location</p>
-                            <p className="text-sm font-bold text-slate-900 line-clamp-1">{locationSummaryLabel}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-violet-600">
-                            <Clock className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Timing</p>
-                            <p className="text-sm font-bold text-slate-900">
-                              {watch("scheduleForLater") ? `Scheduled: ${new Date(watch("scheduledAt")!).toLocaleString()}` : "Ready for ASAP Dispatch"}
-                            </p>
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] text-slate-400">Location</p>
+                          <p className="text-sm font-semibold text-slate-900 truncate">{locationSummaryLabel}</p>
                         </div>
                       </div>
 
-                      <div className="mt-10 border-t border-dashed border-slate-200 pt-6">
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Base Estimate</p>
-                            <p className="text-3xl font-black text-brand-600 leading-none">{formatCurrency(derivedPriceCents ?? 0)}</p>
-                          </div>
-                          <p className="text-[10px] font-bold text-slate-400 italic mb-1">*Excl. extra consumables</p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-violet-600">
+                          <Clock className="h-4 w-4" />
                         </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Timing</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {watch("scheduleForLater") ? `${new Date(watch("scheduledAt")!).toLocaleString()}` : "ASAP"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 border-t border-dashed border-slate-100 pt-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-slate-400">Estimate</p>
+                          <p className="text-lg font-bold text-brand-600">{formatCurrency(derivedPriceCents ?? 0)}</p>
+                        </div>
+                        <p className="text-[9px] text-slate-400 italic">*Excl. extras</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <SlideToBook
                       onConfirm={onSubmit}
                       isLoading={isSubmitting || createBooking.isPending}
@@ -839,10 +1011,10 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       variant="ghost"
                       type="button"
                       fullWidth
-                      className="rounded-2xl h-12"
+                      className="rounded-lg h-9 text-xs"
                       onClick={() => setCurrentStep(2)}
                     >
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Change timing
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                     </Button>
                   </div>
                 </motion.div>

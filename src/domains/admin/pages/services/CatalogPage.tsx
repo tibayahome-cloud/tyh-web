@@ -171,20 +171,8 @@ export const ServiceCatalogPanel = () => {
   const rows = useMemo(
     () =>
       (data ?? []).map((category) => ({
-        id: category.id,
-        name: category.name,
-        key: category.key,
-        description: category.description || "—",
-        actions: (
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => openEdit(category)}>
-              Edit
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => confirmDelete(category)}>
-              Delete
-            </Button>
-          </div>
-        )
+        ...category,
+        description: category.description || "—"
       })),
     [data]
   );
@@ -209,7 +197,22 @@ export const ServiceCatalogPanel = () => {
             { field: "name", headerName: "Name", flex: 1.2, minWidth: 200 },
             { field: "key", headerName: "Key", flex: 1, minWidth: 160 },
             { field: "description", headerName: "Description", flex: 1.5, minWidth: 220 },
-            { field: "actions", headerName: "", minWidth: 160, sortable: false }
+            {
+              field: "actions",
+              headerName: "",
+              minWidth: 160,
+              sortable: false,
+              renderCell: (params) => (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => openEdit(params.row)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => confirmDelete(params.row)}>
+                    Delete
+                  </Button>
+                </div>
+              )
+            }
           ]}
           loading={isFetching || mutation.isLoading || deleteMutation.isLoading}
         />

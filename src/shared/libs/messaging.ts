@@ -4,28 +4,57 @@ import { buildFieldParams } from "./fieldInclude";
 import { mapThread, mapThreads, mapMessage } from "../schemas/messaging";
 import type { Thread, Message } from "../schemas/messaging";
 
-export const fetchThreads = async (): Promise<Thread[]> => {
+export type PaginatedResponse<T> = {
+  data: T[];
+  meta: {
+    next_cursor: string | null;
+    has_more: boolean;
+    size: number;
+  };
+};
+
+export const fetchThreads = async (cursor?: string): Promise<PaginatedResponse<Thread>> => {
   const response = await api.get("/messaging/threads", {
     params: {
       ...buildFieldParams(threadListPreset),
-      "page[size]": 50
+      "page[size]": 20,
+      "page[after]": cursor
     }
   });
-  const payload = response.data?.data;
-  return mapThreads(payload);
+  const data = response.data?.data;
+  const meta = response.data?.meta || {};
+  return {
+    data: mapThreads(data),
+    meta: {
+      next_cursor: meta.next_cursor || null,
+      has_more: !!meta.has_more,
+      size: meta.size || 20
+    }
+  };
 };
 
-export const fetchThreadMessages = async (threadId: string): Promise<Message[]> => {
+export const fetchThreadMessages = async (threadId: string, cursor?: string): Promise<PaginatedResponse<Message>> => {
   const response = await api.get(`/messaging/threads/${threadId}/messages`, {
-    params: buildFieldParams(messagePreset)
+    params: {
+      ...buildFieldParams(messagePreset),
+      "page[size]": 50,
+      "page[after]": cursor
+    }
   });
-  const payload = response.data?.data;
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-  return payload
-    .map((entry) => mapMessage(entry))
-    .filter((entry): entry is Message => Boolean(entry));
+  const data = response.data?.data;
+  const meta = response.data?.meta || {};
+  const messages = Array.isArray(data)
+    ? data.map((entry) => mapMessage(entry)).filter((entry): entry is Message => Boolean(entry))
+    : [];
+
+  return {
+    data: messages,
+    meta: {
+      next_cursor: meta.next_cursor || null,
+      has_more: !!meta.has_more,
+      size: meta.size || 50
+    }
+  };
 };
 
 export const postThreadMessage = async (threadId: string, body: string) => {

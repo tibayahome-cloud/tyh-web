@@ -7,6 +7,7 @@ export interface AuthUser {
     avatarUrl: string | null;
     email: string | null;
     phone: string | null;
+    phoneVerifiedAt: string | null;
     roles: string[];
     permissions: string[];
     meta?: Record<string, any> | null;
@@ -35,6 +36,7 @@ export const mapUserResource = (payload: unknown): AuthUser | null => {
         avatarUrl: coerceString(raw.avatar_url) || coerceString(raw.avatarUrl),
         email: coerceString(raw.email),
         phone: coerceString(raw.phone),
+        phoneVerifiedAt: coerceString(raw.phone_verified_at) || coerceString(raw.phoneVerifiedAt) || null,
         roles: roles.filter(Boolean),
         permissions: Array.isArray(raw.permissions) ? raw.permissions : [],
         meta: raw.meta_data || raw.meta || null,

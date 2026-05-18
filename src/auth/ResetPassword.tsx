@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { AxiosError } from "axios";
 
-import { Card } from "../shared/components/Card";
+import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
 import { PasswordField } from "../shared/components/PasswordField";
 import { Button } from "../shared/components/Button";
@@ -67,87 +67,92 @@ export const ResetPassword = () => {
   const missingToken = !initialToken;
 
   return (
-    <div className="w-full">
-      <Card className="mx-auto w-full max-w-lg" title={t("auth.resetPasswordTitle")}>
-        <p className="mb-6 text-sm text-slate-600">{t("auth.resetPasswordDescription")}</p>
-
-        {missingToken && (
-          <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{t("auth.resetPasswordMissingToken")}</p>
-        )}
-
-        <form className="space-y-4" onSubmit={submit} noValidate>
-          <FormField
-            control={control}
-            name="password"
-            render={({ field, fieldState }) => (
-              <PasswordField
-                {...field}
-                label={t("auth.password")}
-                autoComplete="new-password"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-
-          <FormField
-            control={control}
-            name="confirmPassword"
-            render={({ field, fieldState }) => (
-              <PasswordField
-                {...field}
-                label={t("auth.confirmPassword")}
-                autoComplete="new-password"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-
-          <FormField
-            control={control}
-            name="token"
-            render={({ field, fieldState }) => (
-              <input
-                {...field}
-                type="hidden"
-                aria-invalid={Boolean(fieldState.error)}
-                aria-describedby={fieldState.error ? "reset-token-error" : undefined}
-              />
-            )}
-          />
-
-          {status === "success" && (
-            <p className="rounded-md bg-primary-50 px-3 py-2 text-sm text-primary-700" role="status">
-              {t("auth.resetPasswordSuccess")}
-            </p>
-          )}
-
-          {error && (
-            <p className="text-sm text-red-500" role="alert">
-              {error}
-            </p>
-          )}
-
-          <Button type="submit" className="w-full" loading={isSubmitting} disabled={missingToken}>
-            {t("auth.resetPasswordCta")}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-slate-500">
-          <Link to="/login" className="font-semibold text-primary-600 hover:text-primary-700">
+    <AuthLayout
+      title={t("auth.resetPasswordTitle")}
+      subtitle={t("auth.resetPasswordDescription")}
+      footer={
+        <div className="flex flex-col items-center gap-3">
+          <Link to="/login" className="type-caption font-semibold text-tiba-blue hover:underline">
             {t("auth.backToLogin")}
           </Link>
-        </p>
+          {missingToken && (
+            <p className="text-center text-[10px] text-slate-400">
+              {t("auth.resetPasswordMissingTokenHelp")}{" "}
+              <Link to="/forgot-password" title={t("auth.forgotPassword")} className="font-semibold text-tiba-blue hover:underline">
+                {t("auth.forgotPassword")}
+              </Link>
+            </p>
+          )}
+        </div>
+      }
+    >
+      {missingToken && (
+        <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-3 text-center">
+          <p className="type-caption text-red-600">{t("auth.resetPasswordMissingToken")}</p>
+        </div>
+      )}
 
-        {missingToken && (
-          <p className="mt-3 text-center text-xs text-slate-500">
-            {t("auth.resetPasswordMissingTokenHelp")}
-            <Link to="/forgot-password" className="font-semibold text-primary-600 hover:text-primary-700">
-              {t("auth.forgotPassword")}
-            </Link>
-          </p>
+      <form className="space-y-4" onSubmit={submit} noValidate>
+        <FormField
+          control={control}
+          name="password"
+          render={({ field, fieldState }) => (
+            <PasswordField
+              {...field}
+              label={t("auth.password")}
+              autoComplete="new-password"
+              error={fieldState.error?.message}
+            />
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="confirmPassword"
+          render={({ field, fieldState }) => (
+            <PasswordField
+              {...field}
+              label={t("auth.confirmPassword")}
+              autoComplete="new-password"
+              error={fieldState.error?.message}
+            />
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="token"
+          render={({ field, fieldState }) => (
+            <input
+              {...field}
+              type="hidden"
+              aria-invalid={Boolean(fieldState.error)}
+              aria-describedby={fieldState.error ? "reset-token-error" : undefined}
+            />
+          )}
+        />
+
+        {status === "success" && (
+          <div className="rounded-xl border border-green-100 bg-green-50 p-3 text-center">
+            <p className="type-caption text-green-700" role="status">
+              {t("auth.resetPasswordSuccess")}
+            </p>
+          </div>
         )}
-      </Card>
-    </div>
+
+        {error && (
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
+            <p className="type-caption text-red-600" role="alert">
+              {error}
+            </p>
+          </div>
+        )}
+
+        <Button type="submit" className="w-full h-11" loading={isSubmitting} disabled={missingToken}>
+          {t("auth.resetPasswordCta")}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 };
 

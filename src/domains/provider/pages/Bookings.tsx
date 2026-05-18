@@ -422,8 +422,8 @@ const ProviderBookings = () => {
                                                 <p className="font-medium text-slate-900">{formatTimestamp(scheduledFor)}</p>
                                                 <p className="text-xs text-slate-500">{formatRelativeTime(lastUpdate)}</p>
                                             </td>
-                                            <td className="px-6 py-4 font-semibold text-slate-900">
-                                                {formatCurrency(booking.priceCents, booking.currency ?? "KES")}
+                                            <td className="px-6 py-4 text-slate-600">
+                                                {booking.estimateDurationMinutes ? `${booking.estimateDurationMinutes} min` : "—"}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">

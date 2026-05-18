@@ -111,7 +111,6 @@ export const ServiceListPanel = () => {
     control,
     handleSubmit,
     reset,
-    setValue,
     formState: { isSubmitting }
   } = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceSchema),
@@ -128,17 +127,27 @@ export const ServiceListPanel = () => {
 
   useEffect(() => {
     if (editing) {
-      setValue("name", editing.name);
-      setValue("description", editing.description ?? "");
-      setValue("category_id", editing.category?.id ?? "");
-      setValue("base_price", editing.base_price_cents / 100);
-      setValue("default_estimate_minutes", editing.default_estimate_minutes);
-      setValue("is_emergency_capable", editing.is_emergency_capable);
-      setValue("active", editing.active);
+      reset({
+        name: editing.name,
+        description: editing.description ?? "",
+        category_id: editing.category?.id ?? "",
+        base_price: editing.base_price_cents / 100,
+        default_estimate_minutes: editing.default_estimate_minutes,
+        is_emergency_capable: editing.is_emergency_capable,
+        active: Boolean(editing.active)
+      });
     } else {
-      reset();
+      reset({
+        name: "",
+        description: "",
+        category_id: "",
+        base_price: 0,
+        default_estimate_minutes: 60,
+        is_emergency_capable: false,
+        active: true
+      });
     }
-  }, [editing, reset, setValue]);
+  }, [editing, reset]);
 
   const mutation = useMutation({
     mutationFn: async (values: ServiceFormValues) => {
@@ -231,24 +240,12 @@ export const ServiceListPanel = () => {
       return [];
     }
     return services.map((service) => ({
-      id: service.id,
-      name: service.name,
-      key: service.key,
+      ...service,
       price: (service.base_price_cents / 100).toLocaleString(undefined, { style: "currency", currency: "KES" }),
       duration: `${service.default_estimate_minutes} min`,
       emergency: service.is_emergency_capable ? "Yes" : "No",
-      active: service.active ? "Active" : "Inactive",
-      category: service.category?.name ?? "Unassigned",
-      actions: (
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => openEdit(service)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => confirmDelete(service)}>
-            Delete
-          </Button>
-        </div>
-      )
+      activeStatus: service.active ? "Active" : "Inactive",
+      categoryName: service.category?.name ?? "Unassigned"
     }));
   }, [services]);
 
@@ -257,12 +254,27 @@ export const ServiceListPanel = () => {
   const columns: GridColDef[] = [
     { field: "name", headerName: "Service", flex: 1.2, minWidth: 220 },
     { field: "key", headerName: "Key", minWidth: 160 },
-    { field: "category", headerName: "Category", flex: 1, minWidth: 180 },
+    { field: "categoryName", headerName: "Category", flex: 1, minWidth: 180 },
     { field: "price", headerName: "Base price", minWidth: 140 },
     { field: "duration", headerName: "Duration", minWidth: 130 },
     { field: "emergency", headerName: "Emergency", minWidth: 120 },
-    { field: "active", headerName: "Status", minWidth: 120 },
-    { field: "actions", headerName: "", minWidth: 160, sortable: false }
+    { field: "activeStatus", headerName: "Status", minWidth: 120 },
+    {
+      field: "actions",
+      headerName: "",
+      minWidth: 160,
+      sortable: false,
+      renderCell: (params) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={() => openEdit(params.row)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => confirmDelete(params.row)}>
+            Delete
+          </Button>
+        </div>
+      )
+    }
   ];
 
   return (
@@ -310,13 +322,13 @@ export const ServiceListPanel = () => {
       </Card>
 
       <Card title="Catalog" padding="none">
-        <DataGrid rows={rows} columns={columns} loading={isFetching || mutation.isLoading || deleteMutation.isLoading} />
+        <DataGrid rows={rows} columns={columns} loading={isFetching || mutation.isPending || deleteMutation.isPending} />
       </Card>
 
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!mutation.isLoading) {
+          if (!mutation.isPending) {
             setModalOpen(false);
             setEditing(null);
           }
@@ -328,14 +340,26 @@ export const ServiceListPanel = () => {
             control={control}
             name="name"
             render={({ field, fieldState }) => (
-              <Input {...field} label="Name" placeholder="Post-operative wound care" error={fieldState.error?.message} />
+              <Input
+                {...field}
+                value={field.value as string}
+                label="Name"
+                placeholder="Post-operative wound care"
+                error={fieldState.error?.message}
+              />
             )}
           />
           <FormField
             control={control}
             name="description"
             render={({ field, fieldState }) => (
-              <Input {...field} label="Description" placeholder="Short summary of the service" error={fieldState.error?.message} />
+              <Input
+                {...field}
+                value={field.value as string}
+                label="Description"
+                placeholder="Short summary of the service"
+                error={fieldState.error?.message}
+              />
             )}
           />
           <FormField
@@ -346,6 +370,7 @@ export const ServiceListPanel = () => {
                 <label className="block text-sm font-medium text-slate-700">Category</label>
                 <select
                   {...field}
+                  value={field.value as string}
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 >
                   <option value="">Select category</option>
@@ -372,6 +397,7 @@ export const ServiceListPanel = () => {
                   label="Base price (KES)"
                   placeholder="5000"
                   error={fieldState.error?.message}
+                  value={field.value as number}
                   onChange={(event) => field.onChange(Number(event.target.value))}
                 />
               )}
@@ -386,6 +412,7 @@ export const ServiceListPanel = () => {
                   label="Default duration (minutes)"
                   placeholder="60"
                   error={fieldState.error?.message}
+                  value={field.value as number}
                   onChange={(event) => field.onChange(Number(event.target.value))}
                 />
               )}
@@ -400,7 +427,7 @@ export const ServiceListPanel = () => {
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                    checked={field.value}
+                    checked={Boolean(field.value)}
                     onChange={(event) => field.onChange(event.target.checked)}
                   />
                   Emergency capable
@@ -415,7 +442,7 @@ export const ServiceListPanel = () => {
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                    checked={field.value}
+                    checked={Boolean(field.value)}
                     onChange={(event) => field.onChange(event.target.checked)}
                   />
                   Active service
@@ -424,10 +451,15 @@ export const ServiceListPanel = () => {
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" type="button" disabled={isSubmitting} onClick={() => setModalOpen(false)}>
+            <Button
+              variant="secondary"
+              type="button"
+              disabled={isSubmitting || mutation.isPending}
+              onClick={() => setModalOpen(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" loading={isSubmitting}>
+            <Button type="submit" loading={isSubmitting || mutation.isPending}>
               {editing ? "Save changes" : "Create service"}
             </Button>
           </div>
@@ -445,10 +477,10 @@ export const ServiceListPanel = () => {
         description="This service will no longer appear in the catalog for providers or clients."
         confirmLabel="Delete"
         confirmVariant="secondary"
-        loading={deleteMutation.isLoading}
+        loading={deleteMutation.isPending}
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
         onClose={() => {
-          if (!deleteMutation.isLoading) {
+          if (!deleteMutation.isPending) {
             setPendingDelete(null);
           }
         }}

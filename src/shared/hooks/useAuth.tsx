@@ -146,6 +146,7 @@ const readStoredUser = (): AuthUser | null => {
       avatarUrl: parsed.avatarUrl ?? null,
       email: parsed.email ?? null,
       phone: parsed.phone ?? null,
+      phoneVerifiedAt: parsed.phoneVerifiedAt ?? null,
       roles,
       permissions,
       meta: metaValue
@@ -173,6 +174,7 @@ const writeStoredUser = (user: AuthUser | null) => {
       roles: user.roles,
       permissions: user.permissions,
       phone: user.phone,
+      phoneVerifiedAt: user.phoneVerifiedAt,
       meta: user.meta
     })
   );

@@ -20,6 +20,13 @@ Optional socket configuration:
 VITE_SOCKET_URL=http://localhost:6001
 ```
 
+Production values for the packaged Android app:
+
+```bash
+VITE_API_BASE_URL=https://api.tibayahome.com/api/v1
+VITE_SOCKET_URL=https://api.tibayahome.com/realtime
+```
+
 ## Development
 
 ```bash
@@ -30,6 +37,47 @@ npm run playwright # Playwright e2e (requires dev server running)
 ```
 
 For Playwright, ensure the dev server is running (defaults to `http://localhost:5173`) or set `PLAYWRIGHT_BASE_URL`.
+
+## Android Packaging With Capacitor
+
+This project can be packaged as an Android APK without rebuilding it as a native app. Capacitor wraps the production `dist/` build in an Android WebView shell while the backend remains hosted at:
+
+```bash
+https://api.tibayahome.com/api/v1
+```
+
+Typical flow:
+
+```bash
+npm install
+npx cap add android
+npm run build
+npm run cap:sync
+npm run cap:open
+```
+
+Useful scripts:
+
+```bash
+npm run cap:assets
+npm run cap:copy
+npm run cap:sync
+npm run cap:open
+npm run android
+```
+
+Recommended MVP validation in Android:
+
+- authentication and session resume
+- booking flows
+- Google Maps rendering
+- geolocation permission prompts
+- realtime socket updates
+- push/notifications only if explicitly in scope
+
+Detailed Android manifest, network security, app icon/splash, and push setup notes:
+
+- [docs/android-packaging.md](./docs/android-packaging.md)
 
 ## Project Highlights
 

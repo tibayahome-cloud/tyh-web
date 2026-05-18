@@ -23,6 +23,7 @@ import { api } from "../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin, svcCard } from "../../../shared/libs/fieldInclude";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { AppLayout } from "../../../shared/components/AppLayout";
+import { ClientPageHeader } from "../components/ClientPageHeader";
 
 type ServiceCategory = {
   id: string;
@@ -143,167 +144,152 @@ const ServicesPage = () => {
 
   return (
     <AppLayout fullWidth showHeader={false} disablePadding>
-      <div className="flex flex-col gap-4 sm:gap-8 pb-20">
-        {/* IMMERSIVE HERO */}
-        <section className="relative -mx-4 -mt-12 overflow-hidden px-4 pb-12 pt-16 sm:-mx-8 sm:px-8">
-          <div className="absolute inset-0 bg-brand-linear opacity-90" />
-          <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-2xl" />
-
-          <div className="relative z-10">
-            <div className="flex flex-col gap-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50">Service Marketplace</p>
-              <h1 className="text-4xl font-black text-white leading-tight">
-                Professional Care <br />
-                <span className="text-white/70">At Your Fingerprints</span>
-              </h1>
-              <p className="mt-2 max-w-sm text-sm font-medium text-white/60 leading-relaxed">
-                Choose from verified medical professionals and book instantly.
-              </p>
-            </div>
-
-            {/* SEARCH & QUICK FILTERS */}
-            <div className="mt-10 flex flex-col gap-4">
-              <div className="relative flex items-center">
-                <Search className="absolute left-5 h-5 w-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search for services (e.g. Nursing)"
-                  className="w-full h-16 rounded-3xl bg-white/10 pl-14 pr-16 text-white placeholder-white/40 backdrop-blur-2xl ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-white/40 transition-all shadow-2xl"
-                />
-                <button
-                  onClick={() => setFilterDrawerOpen(true)}
-                  className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-600 shadow-xl transition-all active:scale-90"
-                >
-                  <SlidersHorizontal className="h-5 w-5" />
-                  {activeFiltersCount > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* QUICK CATEGORIES */}
-              <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                {categoryOptions.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setCategory(item.id)}
-                    className={classNames(
-                      "shrink-0 rounded-2xl px-6 py-3 text-xs font-black uppercase tracking-widest transition-all backdrop-blur-md",
-                      category === item.id
-                        ? "bg-white text-brand-600 shadow-xl"
-                        : "bg-white/10 text-white hover:bg-white/20 ring-1 ring-white/10"
-                    )}
-                  >
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <div className="flex flex-col gap-4 pb-20">
+        <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 pt-4">
+          <div>
+            <h1 className="type-h2 text-slate-900">Care Marketplace</h1>
           </div>
-        </section>
-      </div>
-
-      {/* SERVICE GRID */}
-      <section className="px-4 sm:px-0">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black text-slate-900">Available Services</h2>
-          {isFetching && (
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-600">
-              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-600" />
-              Refreshing...
-            </div>
-          )}
+          <button
+            onClick={() => setFilterDrawerOpen(true)}
+            className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-all active:scale-95"
+          >
+            <SlidersHorizontal size={18} />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white shadow-lg">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredServices.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
-                <Search size={40} />
+        <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
+          {/* SEARCH & QUICK FILTERS */}
+          <section className="space-y-3">
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-brand-600" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search for services (e.g. Nursing, Physiotherapy)"
+                className="w-full h-12 rounded-lg bg-white border border-slate-100 pl-12 pr-4 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600/10 focus:border-brand-600/20 transition-all shadow-sm"
+              />
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+              {categoryOptions.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setCategory(item.id)}
+                  className={classNames(
+                    "shrink-0 rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all",
+                    category === item.id
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "bg-white text-slate-500 border border-slate-100 hover:border-slate-200"
+                  )}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* SERVICE GRID */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                {isFetching && (
+                  <p className="text-xs font-bold text-brand-600 animate-pulse">Refreshing...</p>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-slate-900">No services found</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Try adjusting filters or searching for something else.
-              </p>
-              <Button variant="ghost" className="mt-4" onClick={resetFilters}>
-                Clear all filters
-              </Button>
             </div>
-          ) : (
-            filteredServices.map((service) => (
-              <article
-                key={service.id}
-                className="group relative flex flex-col overflow-hidden rounded-[40px] border border-slate-100 bg-white p-2 shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
-              >
-                <div className="relative h-48 overflow-hidden rounded-[32px] bg-slate-50">
-                  <div className="absolute inset-0 bg-brand-linear opacity-0 transition-opacity group-hover:opacity-10" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-16 w-16 rounded-2xl bg-white shadow-xl flex items-center justify-center text-brand-600">
-                      {service.category?.name?.toLowerCase().includes("nurse") ? <ShieldCheck size={32} /> : <Heart size={32} />}
-                    </div>
-                  </div>
 
-                  {service.is_emergency_capable && (
-                    <div className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white shadow-lg">
-                      <Zap size={12} fill="currentColor" />
-                      Emergency
-                    </div>
-                  )}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredServices.length === 0 ? (
+                <div className="col-span-full py-20 text-center">
+                  <div className="mb-6 flex h-24 w-24 mx-auto items-center justify-center rounded-[2.5rem] bg-slate-50 text-slate-300">
+                    <Search size={40} />
+                  </div>
+                  <h3 className="type-h3 text-slate-900">No results found</h3>
+                  <p className="mt-2 type-body text-slate-500">
+                    Try adjusting your search or filters.
+                  </p>
+                  <Button variant="ghost" className="mt-8" onClick={resetFilters}>
+                    Clear all filters
+                  </Button>
                 </div>
-
-                <div className="flex flex-1 flex-col p-6">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      {service.category?.name ?? "General"}
-                    </span>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
-                      <Timer size={12} />
-                      {service.default_estimate_minutes}m
-                    </div>
-                  </div>
-
-                  <h3 className="text-xl font-black text-slate-900 group-hover:text-brand-600 transition-colors">
-                    {service.name}
-                  </h3>
-
-                  {service.description && (
-                    <p className="mt-2 text-sm font-medium text-slate-500 line-clamp-2">
-                      {service.description}
-                    </p>
-                  )}
-
-                  <div className="mt-auto pt-4">
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-4">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fixed Rate</p>
-                        <p className="text-lg font-black text-brand-600">{formatCurrency(service.base_price_cents)}</p>
+              ) : (
+                filteredServices.map((service) => (
+                  <article
+                    key={service.id}
+                    className="group flex flex-col overflow-hidden rounded-lg bg-white p-2 shadow-sm ring-1 ring-slate-100 transition-all hover:shadow-md hover:-translate-y-0.5"
+                  >
+                    <div className="relative h-28 overflow-hidden rounded-lg bg-slate-50">
+                      <div className="absolute inset-0 bg-brand-linear opacity-0 transition-opacity group-hover:opacity-10" />
+                      <div className="absolute inset-0 flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
+                        <div className="h-12 w-12 rounded-lg bg-white shadow-lg flex items-center justify-center text-brand-600">
+                          {service.category?.name?.toLowerCase().includes("nurse") ? <ShieldCheck size={24} /> : <Heart size={24} />}
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Link to={`/app/services/${service.id}`}>
-                          <button className="h-12 w-12 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 flex items-center justify-center transition-all hover:bg-slate-100 hover:text-brand-600 active:scale-95">
-                            <ChevronRight size={20} />
-                          </button>
-                        </Link>
-                        <button
-                          onClick={() => openBookingDialog(service.id)}
-                          className="h-12 rounded-2xl bg-slate-900 px-6 text-[11px] font-black uppercase tracking-widest text-white shadow-xl transition-all hover:bg-brand-600 active:scale-95"
-                        >
-                          Book Now
-                        </button>
+
+                      {service.is_emergency_capable && (
+                        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[8px] font-bold uppercase tracking-widest text-white shadow-lg">
+                          <Zap size={10} fill="currentColor" />
+                          Emergency
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-1 flex-col p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {service.category?.name ?? "General"}
+                        </span>
+                        <div className="flex items-center gap-0.5 text-slate-500">
+                          <Timer size={10} className="text-slate-400" />
+                          <span className="text-[10px] font-bold">{service.default_estimate_minutes}m</span>
+                        </div>
+                      </div>
+
+                      <h3 className="text-sm font-bold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-1">
+                        {service.name}
+                      </h3>
+
+                      {service.description && (
+                        <p className="mt-1 text-xs text-slate-500 line-clamp-1">
+                          {service.description}
+                        </p>
+                      )}
+
+                      <div className="mt-auto pt-3 border-t border-slate-50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[8px] font-bold text-slate-300 uppercase">Rate</p>
+                            <p className="text-sm font-bold text-brand-600">{formatCurrency(service.base_price_cents)}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Link to={`/app/services/${service.id}`}>
+                              <button className="h-8 w-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center transition-all hover:bg-slate-100 hover:text-brand-600 active:scale-95 ring-1 ring-slate-100">
+                                <ChevronRight size={14} />
+                              </button>
+                            </Link>
+                            <button
+                              onClick={() => openBookingDialog(service.id)}
+                              className="h-8 rounded-lg bg-slate-900 px-3 text-[10px] font-bold uppercase text-white shadow-sm transition-all hover:bg-brand-600 active:scale-95"
+                            >
+                              Book
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </article>
-            ))
-          )}
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
       {/* FILTER DRAWER */}
       <Drawer

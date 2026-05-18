@@ -43,6 +43,8 @@ export const BookingFeedbackDialog = ({
 
     return (
         <Dialog
+            disablePortal={false}
+            container={() => document.body}
             open={open}
             onClose={onClose}
             PaperProps={{ className: "rounded-3xl p-2 w-full max-w-sm" }}

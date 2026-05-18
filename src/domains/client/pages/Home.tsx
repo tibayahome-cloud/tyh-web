@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import Drawer from "@mui/material/Drawer";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
-import ChatIcon from "@mui/icons-material/ChatBubbleOutline";
-import PhoneIcon from "@mui/icons-material/PhoneOutlined";
-import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
 
-import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useBookingList, useConfirmBookingMutation, useCancelBookingMutation } from "../../../shared/hooks/useBookings";
@@ -20,9 +15,10 @@ import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCar
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { BookingSearchStatus } from "../components/BookingSearchStatus";
 import { AIRecommendationsCard } from "../components/AIRecommendationsCard";
+import { ClientPageHeader } from "../components/ClientPageHeader";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useSocket } from "../../../shared/hooks/useSocket";
-import { Star as StarIcon, Info as InfoIcon, MapPin as MapPinIcon } from "lucide-react";
+import { Star as StarIcon, MapPin as MapPinIcon } from "lucide-react";
 import { useLocationAccess } from "../../../shared/hooks/useLocationAccess";
 import { LocationPermissionBanner } from "../../../shared/components/LocationPermissionBanner";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
@@ -30,19 +26,19 @@ import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
 import { useWalletAccount } from "../../../shared/hooks/useWallet";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
-import { useNotificationBadge } from "../../../shared/hooks/useNotificationBadge";
 import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
 import {
   Plus,
   ArrowRight,
-  Activity as VitalsIcon,
+  Activity,
   Heart,
   Zap,
   ChevronRight,
-  TrendingDown,
+  ChevronDown,
+  ChevronUp,
   TrendingUp,
-  Clock as RecentIcon,
-  CalendarDays
+  Minus,
+  Calendar
 } from "lucide-react";
 
 const ACTIVE_STATUSES = [
@@ -52,14 +48,6 @@ const ACTIVE_STATUSES = [
   "arrived",
   "in_service",
   "completed_by_provider"
-];
-
-const TRACKING_STATUSES = [
-  "accepted",
-  "en_route",
-  "nearby",
-  "arrived",
-  "in_service"
 ];
 
 const HISTORY_STATUSES = [
@@ -72,64 +60,8 @@ const HISTORY_STATUSES = [
   "expired_no_accept",
   "disputed"
 ];
-const CANCELABLE_STATUSES = ["requested", "broadcasting"];
 
-// Status progression for the journey stepper
-const STATUS_STEPS = [
-  { key: "accepted", label: "Accepted" },
-  { key: "en_route", label: "En Route" },
-  { key: "arrived", label: "Arrived" },
-  { key: "in_service", label: "In Service" },
-  { key: "completed", label: "Complete" }
-];
 
-const COMPLETED_STATUS_SET = new Set([
-  "completed_by_provider",
-  "client_completed",
-  "client_confirmed",
-  "fully_completed",
-  "paid"
-]);
-
-const getStepIndex = (status: string): number => {
-  if (COMPLETED_STATUS_SET.has(status)) return 4;
-  const index = STATUS_STEPS.findIndex((s) => s.key === status);
-  return index >= 0 ? index : -1;
-};
-
-const getDestinationLabel = (booking?: Booking) => booking?.addressText || booking?.service?.name || "Destination";
-
-const getEtaLabel = (booking?: Booking) => {
-  if (!booking) {
-    return "—";
-  }
-  if (booking.estimateDurationMinutes) {
-    return `${booking.estimateDurationMinutes} mins`;
-  }
-  return booking.status === "completed_by_provider" ? "Awaiting confirmation" : "—";
-};
-
-const getTimerLabel = (booking?: Booking) => {
-  if (!booking) {
-    return "—";
-  }
-  const iso =
-    booking.serviceStartedAt ?? booking.arrivedAt ?? booking.acceptedAt ?? booking.clientConfirmedAt ?? booking.createdAt;
-  if (!iso) {
-    return "—";
-  }
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff <= 0) {
-    return "—";
-  }
-  const minutes = Math.floor(diff / 60000);
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
-  }
-  return `${minutes}m`;
-};
 
 const ClientHome = () => {
   const { user } = useAuth();
@@ -141,7 +73,7 @@ const ClientHome = () => {
   const locationAccess = useLocationAccess();
   const confirmCompletion = useConfirmBookingMutation("detail");
   const cancelBookingMutation = useCancelBookingMutation("detail");
-  const [completionPrompt, setCompletionPrompt] = useState<{ bookingId: string } | null>(null);
+  const [completionPrompt, setCompletionPrompt] = useState<Booking | null>(null);
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [completionError, setCompletionError] = useState<string | null>(null);
@@ -149,14 +81,13 @@ const ClientHome = () => {
   const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+
+
   const [isTracking, setIsTracking] = useState(true);
-  const [viewportHeight, setViewportHeight] = useState(
-    typeof window !== "undefined" ? window.innerHeight : 800
-  );
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
-  const notificationBadge = useNotificationBadge();
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
   const latestCheckin = checkinsQuery.data?.[0];
 
@@ -201,11 +132,8 @@ const ClientHome = () => {
   ) as { data?: { bookings?: Booking[] }, isLoading: boolean };
   const upcomingList = upcomingQuery.data;
   useEffect(() => {
-    if (!activeBooking) {
-      setSheetExpanded(false);
-    }
     if (activeBooking?.status === "completed_by_provider") {
-      setCompletionPrompt({ bookingId: activeBooking.id });
+      setCompletionPrompt(activeBooking);
       setCompletionError(null);
     }
   }, [activeBooking]);
@@ -220,25 +148,21 @@ const ClientHome = () => {
     { enabled: Boolean(user?.id) }
   ) as { data?: { bookings?: Booking[] } };
 
-  const upcomingCount = Number(upcomingList?.bookings?.length ?? 0);
-  const historyCount = Number(historyList?.bookings?.length ?? 0);
+
 
   const walletBalance = walletQuery.data ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}` : "—";
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  }, []);
+
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    // Only access window height on client
+    if (typeof window !== "undefined") {
+      const handler = () => {
+        // viewport height logic removed
+      };
+      window.addEventListener("resize", handler);
+      return () => window.removeEventListener("resize", handler);
     }
-    const handler = () => setViewportHeight(window.innerHeight);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
   }, []);
 
   const openBookingDialog = (serviceId?: string) => {
@@ -274,7 +198,7 @@ const ClientHome = () => {
     setCompletionError(null);
     try {
       await confirmCompletion.mutateAsync({
-        bookingId: completionPrompt.bookingId,
+        bookingId: completionPrompt.id,
         decision: "confirm"
       });
       toast.showToast({
@@ -300,7 +224,7 @@ const ClientHome = () => {
     setCompletionError(null);
     try {
       await confirmCompletion.mutateAsync({
-        bookingId: completionPrompt.bookingId,
+        bookingId: completionPrompt.id,
         decision: "decline",
         reason: declineReason.trim()
       });
@@ -332,7 +256,6 @@ const ClientHome = () => {
         variant: "info"
       });
       closeCancelPrompt();
-      setSheetExpanded(false);
     } catch (error) {
       setCancelError(error instanceof Error ? error.message : "Unable to cancel booking. Try again.");
     }
@@ -377,9 +300,7 @@ const ClientHome = () => {
     return () => {
       subscriptions.forEach(({ eventName, handler }) => socket.off(eventName, handler));
     };
-  }, [socket, toast, user?.id, activeBooking?.id]);
-
-  const firstName = user?.fullName?.split(" ")[0] || "there";
+  }, [socket, toast, user?.id, activeBooking]);
 
   return (
     <AppLayout fullWidth showHeader={false} disablePadding>
@@ -391,221 +312,193 @@ const ClientHome = () => {
         />
       )}
 
-      <div className="flex flex-col gap-4 sm:gap-8 pb-20">
+      <div className="flex flex-col gap-4 pb-20">
         <LocationPermissionBanner
           status={locationAccess.status}
           error={locationAccess.error}
           onRetry={locationAccess.requestAccess}
         />
 
-        {matchingBooking && (
-          <div className="px-0 sm:px-1">
+        <ClientPageHeader
+          showGreeting
+          title=""
+          hideInbox
+          hideBackground
+          className="pb-0 sm:pb-0 lg:pb-0"
+        />
+
+        {/* HEALTH PULSE CHIPS */}
+        <section className="px-4 -mt-2 overflow-x-auto no-scrollbar">
+          <div className="flex gap-2 min-w-max">
+            {latestCheckin?.vitals ? (
+              <>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-bold">
+                  <Heart className="w-3 h-3" />
+                  {latestCheckin.vitals.pulseRate || "--"} bpm
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-[11px] font-bold">
+                  <Activity className="w-3 h-3" />
+                  {latestCheckin.vitals.bpSystolic}/{latestCheckin.vitals.bpDiastolic}
+                </div>
+              </>
+            ) : (
+              <div onClick={() => navigate("/app/selfcare/checkin")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[11px] font-bold cursor-pointer">
+                <Plus className="w-3 h-3" />
+                Log Vitals
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-[11px] font-bold">
+              {walletBalance}
+            </div>
+          </div>
+        </section>
+
+        <div className="flex flex-col gap-4 px-4 sm:px-6">
+          {matchingBooking && (
             <BookingSearchStatus
               booking={matchingBooking}
               onView={() => navigate(`/app/bookings/${matchingBooking.id}`)}
               onCancel={() => setCancelPrompt({ bookingId: matchingBooking.id })}
             />
-          </div>
-        )}
+          )}
 
-        <div className="flex flex-col gap-8 pb-10">
-          <section className="relative -mx-4 -mt-12 overflow-hidden px-4 pb-12 pt-16 sm:-mx-8 sm:px-8">
-            <div className="absolute inset-0 bg-tiba-blue" />
-            <div className="absolute inset-0 bg-gradient-to-br from-tiba-blue via-tiba-blue/95 to-blue-900" />
-            <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-2xl" />
-
-            <div className="relative z-10 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-black uppercase tracking-widest text-white/60">{greeting}</p>
-                  <h1 className="text-3xl font-black text-white">
-                    Hello, <span className="text-white/80">{firstName}</span>
-                  </h1>
-                </div>
-                <button
-                  onClick={() => navigate("/app/inbox")}
-                  className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur-xl ring-1 ring-white/20 transition-all active:scale-95"
-                >
-                  <ChatIcon />
-                  {notificationBadge.unread > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-lg">
-                      {notificationBadge.unread}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-                <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-white backdrop-blur-xl ring-1 ring-white/10">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Wallet</p>
-                  <p className="text-base font-black">{walletBalance}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-white backdrop-blur-xl ring-1 ring-white/10">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Upcoming</p>
-                  <p className="text-base font-black">{upcomingCount}</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* BENTO ACTION HUB */}
-          <section className="grid grid-cols-2 gap-4">
+          {/* FOCUS CARD: THE PRIMARY ACTION */}
+          <section>
             {activeBooking ? (
-              /* LIVE TRACKER CARD */
               <button
                 onClick={() => setIsTracking(true)}
-                className="group relative col-span-2 flex items-center justify-between overflow-hidden rounded-[32px] bg-slate-900 p-8 text-left text-white shadow-2xl transition-all active:scale-[0.98]"
+                className="group relative w-full flex items-center justify-between overflow-hidden rounded-2xl bg-slate-900 p-5 text-left text-white shadow-lg transition-all active:scale-[0.99]"
               >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)]" />
-                <div className="relative z-10 max-w-[65%]">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live Booking</p>
+                <div className="relative z-10 flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
+                    <MapPinIcon size={20} />
                   </div>
-                  <h2 className="mt-2 text-2xl font-black leading-tight">
-                    {activeBooking.provider?.fullName?.split(" ")[0] || "Matching"} is {formatBookingStatus(activeBooking.status).toLowerCase()}
-                  </h2>
-                  <div className="mt-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-xl text-white">
-                      <MapPinIcon className="h-5 w-5" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <p className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Live</p>
                     </div>
-                    <p className="text-sm font-bold opacity-80">Tap to track arrival</p>
+                    <h2 className="mt-1 text-base font-bold text-white">
+                      {activeBooking.provider?.fullName?.split(" ")[0] || "Provider"} · {formatBookingStatus(activeBooking.status)}
+                    </h2>
                   </div>
                 </div>
-                <div className="relative z-10 hidden sm:flex h-32 w-32 items-center justify-center rounded-[40px] bg-white/5 backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden">
-                  <BookingLiveMapCard
-                    bookingId={activeBooking.id}
-                    role="client"
-                    variant="immersive"
-                    mapOnly
-                    hideOverlays
-                    className="h-full w-full opacity-50 grayscale contrast-125"
-                  />
-                </div>
+                <ChevronRight className="text-slate-500" size={20} />
               </button>
             ) : (
               <button
                 onClick={() => openBookingDialog()}
-                className="group relative col-span-2 flex items-center justify-between overflow-hidden rounded-[32px] bg-tiba-blue p-8 text-left text-white shadow-2xl transition-all active:scale-[0.98]"
+                className="group relative w-full flex items-center justify-between overflow-hidden rounded-2xl bg-tiba-blue p-5 text-left text-white shadow-lg transition-all active:scale-[0.99]"
               >
-                <div className="relative z-10 max-w-[60%]">
-                  <h2 className="text-2xl font-black leading-tight">Request Care Now</h2>
-                  <p className="mt-2 text-sm font-medium text-white/80">Connect with expert providers instantly.</p>
-                  <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-full bg-tiba-gold text-white shadow-xl transition-transform group-hover:translate-x-2">
-                    <ArrowRight className="h-5 w-5" />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                    <Heart size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Request Care Now</h2>
+                    <p className="text-sm text-white/70">Connect with medical professionals</p>
                   </div>
                 </div>
-                <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-[32px] bg-white/10 backdrop-blur-2xl ring-1 ring-white/20">
-                  <Heart className="h-12 w-12 text-white animate-pulse" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-tiba-blue transition-transform group-hover:translate-x-1">
+                  <ArrowRight size={20} />
                 </div>
-                <div className="absolute -bottom-8 -right-8 h-48 w-48 rounded-full bg-white/5" />
               </button>
             )}
-
-            {/* HEALTH PULSE */}
-            <div
-              onClick={() => navigate("/app/selfcare")}
-              className="group flex flex-col justify-between rounded-[32px] bg-white p-6 shadow-card ring-1 ring-black/5 active:scale-95 transition-transform cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                  <VitalsIcon className="h-5 w-5" />
-                </div>
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Health Pulse</p>
-                <h3 className="mt-1 text-xl font-black text-slate-900">
-                  {latestCheckin?.vitals && (latestCheckin.vitals.bpSystolic || latestCheckin.vitals.bpDiastolic)
-                    ? `${latestCheckin.vitals.bpSystolic || '--'}/${latestCheckin.vitals.bpDiastolic || '--'}`
-                    : "Norm"}
-                  <span className="ml-1 text-[10px] text-slate-400">mmHg</span>
-                </h3>
-              </div>
-            </div>
-
-            {/* DAILY CHECKIN */}
-            <div
-              onClick={() => navigate("/app/selfcare/checkin")}
-              className="group flex flex-col justify-between rounded-[32px] bg-slate-900 p-6 text-white shadow-card active:scale-95 transition-transform cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-tiba-gold">
-                  <Zap className="h-5 w-5 fill-current" />
-                </div>
-                <ChevronRight className="h-4 w-4 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Self Care</p>
-                <h3 className="mt-1 text-xl font-black">Daily Check-in</h3>
-              </div>
-            </div>
           </section>
 
-          {/* LISTS SECTION */}
-          <div className="space-y-10">
-            {/* UPCOMING */}
-            <section className="space-y-4">
+          {/* MAIN CONTENT GRID */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            {/* UPCOMING BOOKINGS */}
+            <div className="lg:col-span-2 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-tiba-blue" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Upcoming Care</h3>
-                </div>
-                <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-black uppercase tracking-widest text-tiba-blue hover:text-tiba-gold">View Schedule</button>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Upcoming</h3>
+                <button onClick={() => navigate("/app/bookings")} className="text-xs font-bold text-tiba-blue">
+                  View All
+                </button>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
-                  upcomingList.bookings.map((b) => (
+                  upcomingList.bookings.slice(0, 3).map((b) => (
                     <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
                   ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-100 p-10 text-center">
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-50 text-slate-300">
-                      <RecentIcon className="h-8 w-8" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-400">Your calendar is currently clear</p>
+                  <div className="py-8 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
+                    <p className="text-sm text-slate-400">No upcoming care scheduled</p>
                   </div>
                 )}
               </div>
-            </section>
 
-            {/* ARTIFICIAL INTELLIGENCE */}
-            <AIRecommendationsCard />
-
-            {/* RECENT HISTORY */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <RecentIcon className="h-5 w-5 text-slate-400" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Recent History</h3>
+              {/* RECENT ACTIVITY - Collapsed by default */}
+              <button
+                onClick={() => setActivityExpanded(!activityExpanded)}
+                className="w-full flex items-center justify-between py-2 group"
+              >
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Recent Activity</h3>
+                {activityExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+              </button>
+              {activityExpanded && (
+                <div className="space-y-2">
+                  {historyList?.bookings && historyList.bookings.length > 0 ? (
+                    historyList.bookings.map((b) => (
+                      <BookingCompactCard
+                        key={b.id}
+                        booking={b}
+                        onClick={() => navigate(`/app/bookings/${b.id}`)}
+                        onRate={() => b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed" ? setFeedbackPrompt({ bookingId: b.id, providerName: b.provider?.fullName || "the provider" }) : undefined}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-center py-6 text-xs text-slate-400">No past activity</p>
+                  )}
                 </div>
-                <button onClick={() => navigate("/app/bookings")} className="text-[10px] font-black uppercase tracking-widest text-slate-500">Full History</button>
+              )}
+            </div>
+
+            {/* SIDEBAR: QUICK ACTIONS */}
+            <aside className="space-y-3">
+              <div
+                onClick={() => navigate("/app/selfcare")}
+                className="flex items-center gap-3 p-4 rounded-xl bg-white ring-1 ring-slate-100 cursor-pointer hover:ring-slate-200 transition-all"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <Activity size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-slate-400">Health Pulse</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {latestCheckin?.vitals?.bpSystolic ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}` : "Normal"}
+                  </p>
+                </div>
+                <ChevronRight size={16} className="text-slate-300" />
               </div>
-              <div className="space-y-3">
-                {historyList?.bookings && historyList.bookings.length > 0 ? (
-                  historyList.bookings.map((b) => (
-                    <BookingCompactCard
-                      key={b.id}
-                      booking={b}
-                      onClick={() => navigate(`/app/bookings/${b.id}`)}
-                      onRate={() => b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed" ? setFeedbackPrompt({ bookingId: b.id, providerName: b.provider?.fullName || "the provider" }) : undefined}
-                    />
-                  ))
-                ) : (
-                  <p className="text-center py-4 text-xs font-bold text-slate-300 italic uppercase tracking-widest">No past bookings yet</p>
-                )}
+
+              <div
+                onClick={() => navigate("/app/selfcare/checkin")}
+                className="flex items-center gap-3 p-4 rounded-xl bg-slate-900 text-white cursor-pointer hover:bg-slate-800 transition-all"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-tiba-gold">
+                  <Zap size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-slate-400">Daily</p>
+                  <p className="text-sm font-bold">Check-in</p>
+                </div>
+                <ChevronRight size={16} className="text-slate-600" />
               </div>
-            </section>
+
+              <AIRecommendationsCard />
+            </aside>
           </div>
         </div>
       </div>
 
       {/* Dialogs ... */}
       <Dialog
+        disablePortal={false}
+        container={() => document.body}
         open={Boolean(completionPrompt)}
         onClose={confirmCompletion.isPending ? undefined : closeCompletionPrompt}
         PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
@@ -640,8 +533,8 @@ const ClientHome = () => {
                   Waiting for STK Push... If it doesn't appear, use manual payment:
                 </p>
                 <MpesaPaymentInstructions
-                  amountCents={activeBooking?.priceCents ?? 0}
-                  accountNumber={activeBooking?.id.slice(0, 8).toUpperCase() ?? "BOOKING"}
+                  amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
+                  accountNumber={completionPrompt?.id.slice(0, 8).toUpperCase() ?? activeBooking?.id.slice(0, 8).toUpperCase() ?? "BOOKING"}
                 />
                 <Button
                   variant="ghost"
@@ -675,6 +568,8 @@ const ClientHome = () => {
       </Dialog>
 
       <Dialog
+        disablePortal={false}
+        container={() => document.body}
         open={Boolean(cancelPrompt)}
         onClose={cancelBookingMutation.isPending ? undefined : closeCancelPrompt}
         PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
@@ -748,66 +643,48 @@ const BookingCompactCard = ({
   return (
     <div
       onClick={onClick}
-      className="group flex flex-col gap-3 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-slate-200 cursor-pointer"
+      className="group flex items-center justify-between gap-3 p-3 rounded-xl bg-white ring-1 ring-slate-100 transition-all hover:ring-slate-200 cursor-pointer"
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-            <CalendarIcon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-sm font-bold text-slate-900 truncate">
-              {booking.service?.name || "Booking Service"}
-            </h4>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={classNames("text-[10px] font-bold uppercase tracking-wider", theme.className.replace(/bg-\w+-\d+/, ""))}>
-                {formatBookingStatus(booking.status)}
-              </span>
-              <span className="text-[10px] text-slate-300">•</span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '—'}
-              </span>
-            </div>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
+          <Calendar size={16} />
+        </div>
+        <div className="min-w-0">
+          <h4 className="text-sm font-semibold text-slate-900 truncate">
+            {booking.service?.name || "Booking"}
+          </h4>
+          <div className="flex items-center gap-1.5">
+            <span className={classNames("text-[11px] font-bold", theme.className.replace(/bg-\w+-\d+/, ""))}>
+              {formatBookingStatus(booking.status)}
+            </span>
+            <span className="text-slate-300 text-[10px]">•</span>
+            <p className="text-[11px] text-slate-400">
+              {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '—'}
+            </p>
           </div>
         </div>
-        {!showRateButton && (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-brand-600 group-hover:text-white transition-all transform group-hover:translate-x-1">
-            <ArrowRightIcon className="h-4 w-4" />
-          </div>
-        )}
       </div>
-
-      {showRateButton && (
-        <div className="pt-2 border-t border-slate-50">
-          <Button
-            size="sm"
-            variant="secondary"
-            className="w-full h-9 rounded-xl text-[10px] uppercase tracking-widest font-bold group/btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRate?.();
-            }}
-          >
-            <StarIcon className="mr-2 h-3 w-3 group-hover/btn:fill-current" />
-            Rate Experience
-          </Button>
-        </div>
+      {showRateButton ? (
+        <button
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-[10px] font-bold hover:bg-amber-100 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRate?.();
+          }}
+        >
+          <StarIcon size={12} />
+          Rate
+        </button>
+      ) : (
+        <ChevronRight size={16} className="text-slate-300 group-hover:text-brand-600 transition-colors" />
       )}
     </div>
   );
 };
 
-const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
 
-const ArrowRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-  </svg>
-);
+
+
 
 
 

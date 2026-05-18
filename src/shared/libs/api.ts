@@ -88,4 +88,15 @@ api.interceptors.response.use(
   }
 );
 
+
+export interface CursorMeta {
+  limit: number;
+  next_cursor: string | null;
+}
+
+export interface CursorResponse<T> {
+  data: T[];
+  meta: CursorMeta;
+}
+
 export default api;

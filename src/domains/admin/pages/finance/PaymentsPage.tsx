@@ -9,6 +9,7 @@ import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
+import { useCursorInfiniteQuery } from "../../../../shared/hooks/useCursorInfiniteQuery";
 import {
   fetchAdminPayment,
   fetchAdminPayments,
@@ -50,7 +51,6 @@ const statusTone = (status: string) => {
 
 const PaymentsPage = () => {
   const toast = useToast();
-  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [bookingFilter, setBookingFilter] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -85,16 +85,15 @@ const PaymentsPage = () => {
     };
   }, [filtersOpen, isMobileFilters]);
 
-  const paymentsQuery = useQuery({
-    queryKey: ["admin", "finance", "payments", { page, statusFilter, bookingFilter }],
-    queryFn: () =>
+  const paymentsQuery = useCursorInfiniteQuery({
+    queryKey: ["admin", "finance", "payments", { statusFilter, bookingFilter }],
+    queryFn: ({ pageParam }) =>
       fetchAdminPayments({
-        page,
-        pageSize: PAGE_SIZE,
+        cursor: pageParam,
+        limit: PAGE_SIZE,
         status: statusFilter === "all" ? undefined : statusFilter,
         bookingId: bookingFilter.trim() || undefined
-      }),
-    keepPreviousData: true
+      })
   });
 
   const detailQuery = useQuery({
@@ -128,16 +127,10 @@ const PaymentsPage = () => {
     }
   });
 
-  const rows = paymentsQuery.data?.payments ?? [];
-  const pageMeta = paymentsQuery.data?.meta.page ?? {
-    number: page,
-    size: PAGE_SIZE,
-    total: rows.length,
-    totalPages: 1
-  };
-  const isLastPage = pageMeta.number >= pageMeta.totalPages;
-  const showingFrom = rows.length ? (pageMeta.number - 1) * pageMeta.size + 1 : 0;
-  const showingTo = rows.length ? showingFrom + rows.length - 1 : 0;
+  const rows = useMemo(
+    () => paymentsQuery.data?.pages.flatMap((page) => page.payments) ?? [],
+    [paymentsQuery.data]
+  );
 
   const openFilters = () => {
     setDraftStatus(statusFilter);
@@ -149,7 +142,6 @@ const PaymentsPage = () => {
     setStatusFilter(draftStatus);
     setBookingFilter(draftBooking.trim());
     setFiltersOpen(false);
-    setPage(1);
   };
 
   const clearFilters = () => {
@@ -158,11 +150,9 @@ const PaymentsPage = () => {
     setStatusFilter("all");
     setBookingFilter("");
     setFiltersOpen(false);
-    setPage(1);
   };
 
   const hasActiveFilters = statusFilter !== "all" || Boolean(bookingFilter);
-
   const selectedPayment = detailQuery.data;
 
   const filterSummary = useMemo(() => {
@@ -322,24 +312,26 @@ const PaymentsPage = () => {
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
-              <span>
-                Showing {showingFrom || 0}-{showingTo || 0} of {pageMeta.total}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" disabled={page <= 1 || paymentsQuery.isFetching} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
-                  Previous
+
+            <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+              {paymentsQuery.hasNextPage ? (
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => paymentsQuery.fetchNextPage()}
+                  loading={paymentsQuery.isFetchingNextPage}
+                >
+                  Load more payments
                 </Button>
-                <Button variant="secondary" disabled={isLastPage || paymentsQuery.isFetching} onClick={() => setPage((prev) => prev + 1)}>
-                  Next
-                </Button>
-              </div>
+              ) : (
+                <p className="text-center text-xs text-slate-400">All payments loaded</p>
+              )}
             </div>
           </>
         )}
       </Card>
 
-  <Modal
+      <Modal
         open={Boolean(detailId)}
         onClose={() => {
           if (!retryMutation.isPending) {

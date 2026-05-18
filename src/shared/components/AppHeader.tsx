@@ -56,15 +56,11 @@ export const AppHeader = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/60 bg-white/90 backdrop-blur-xl shadow-sm">
-      <div className={`mx-auto flex w-full ${containerMaxWidth} items-center justify-between px-4 py-3 sm:px-6 sm:py-4`}>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 h-10 w-10">
-            <img src={logoImage} alt="Tiba Ya Home" className="h-full w-full object-cover" />
-          </div>
-          <div className="hidden sm:block">
-            <span className="block text-lg font-black text-tiba-blue leading-none">Tiba Ya Home</span>
-            <span className="block text-[10px] font-bold text-tiba-gold uppercase tracking-widest mt-0.5">Divine Care @ Home</span>
+    <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/80 backdrop-blur-xl">
+      <div className={`mx-auto flex w-full ${containerMaxWidth} items-center justify-between px-4 h-16 sm:px-6`}>
+        <div className="flex items-center">
+          <div className="flex items-center justify-center h-10 w-10">
+            <img src={logoImage} alt="Tiba" className="h-8 w-auto object-contain" />
           </div>
         </div>
         {user ? (
@@ -87,15 +83,15 @@ export const AppHeader = ({
                     {initials}
                   </span>
                 )}
-                <span className="hidden max-w-[120px] truncate sm:inline-block">{user.fullName || user.email}</span>
+                <span className="hidden type-body font-medium max-w-[120px] truncate sm:inline-block">{user.fullName || user.email}</span>
               </button>
               {open && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
                   <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-neutral-100 bg-white text-neutral-700 shadow-xl">
                     <div className="border-b border-neutral-100 px-4 py-3">
-                      <p className="text-sm font-semibold text-neutral-900">{user.fullName || "Account"}</p>
-                      <p className="text-xs text-neutral-500 truncate">{user.email}</p>
+                      <p className="type-body font-semibold text-neutral-900">{user.fullName || "Account"}</p>
+                      <p className="type-caption text-neutral-500 truncate">{user.email}</p>
                     </div>
                     <nav className="flex flex-col py-1 text-sm">
                       <button
@@ -138,7 +134,7 @@ export const AppHeader = ({
             </div>
           </div>
         ) : (
-          <div className="text-xs font-black text-tiba-gold uppercase tracking-widest">Divine Care</div>
+          <div className="type-overline text-tiba-gold">Divine Care</div>
         )}
       </div>
     </header>

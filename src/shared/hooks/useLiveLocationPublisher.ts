@@ -4,6 +4,10 @@ import { useBookingLocationMutation } from "./useBookings";
 
 import { distanceMeters } from "../utils/location";
 
+const MIN_DISTANCE_METERS = 50;
+const MIN_INTERVAL_MS = 60_000; // 1 minute
+
+
 export const useLiveLocationPublisher = (bookingId: string | null, enabled: boolean) => {
   const mutation = useBookingLocationMutation();
   const watchIdRef = useRef<number | null>(null);

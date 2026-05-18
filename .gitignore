@@ -6,6 +6,8 @@ node_modules/
 # dist/
 dist-ssr/
 *.local
+android/
+.capacitor/
 
 # Tech-specific
 .env

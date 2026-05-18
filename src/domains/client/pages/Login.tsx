@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../../shared/components/Button";
-import { Card } from "../../../shared/components/Card";
+import { AuthLayout } from "../../../shared/components/AuthLayout";
 import { FormField } from "../../../shared/components/FormField";
 import { Input } from "../../../shared/components/Input";
 import { PasswordField } from "../../../shared/components/PasswordField";
@@ -109,45 +109,55 @@ const ClientLoginPage = () => {
   const disableSubmit = isSubmitting || redirecting;
 
   return (
-    <div className="w-full">
-      <div className="relative">
-        <Card className="mx-auto w-full max-w-lg" title={t("auth.loginTitle")}>
-          <form className="space-y-4" onSubmit={submitClient} noValidate>
-          <FormField
-            control={control}
-            name="emailOrPhone"
-            render={({ field, fieldState }) => (
-              <Input
-                {...field}
-                label={t("auth.emailOrPhone")}
-                placeholder="jane@example.com"
-                autoComplete="username"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
+    <AuthLayout
+      title={t("auth.loginTitle")}
+      subtitle="Welcome back! Please enter your details to continue."
+      footer={
+        <p className="type-caption text-slate-500">
+          {t("auth.noAccount")}{" "}
+          <Link to="/signup" className="font-semibold text-tiba-blue hover:underline">
+            {t("auth.signUp")}
+          </Link>
+        </p>
+      }
+    >
+      <form className="space-y-4" onSubmit={submitClient} noValidate>
+        <FormField
+          control={control}
+          name="emailOrPhone"
+          render={({ field, fieldState }) => (
+            <Input
+              {...field}
+              label={t("auth.emailOrPhone")}
+              placeholder="jane@example.com"
+              autoComplete="username"
+              error={fieldState.error?.message}
+            />
+          )}
+        />
 
-          <FormField
-            control={control}
-            name="password"
-            render={({ field, fieldState }) => (
-              <PasswordField
-                {...field}
-                label={t("auth.password")}
-                autoComplete="current-password"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
+        <FormField
+          control={control}
+          name="password"
+          render={({ field, fieldState }) => (
+            <PasswordField
+              {...field}
+              label={t("auth.password")}
+              autoComplete="current-password"
+              error={fieldState.error?.message}
+            />
+          )}
+        />
 
+        <div className="flex items-center justify-between">
           <FormField
             control={control}
             name="remember"
             render={({ field }) => (
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-600">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
                   checked={field.value ?? false}
                   onChange={(event) => field.onChange(event.target.checked)}
                 />
@@ -155,30 +165,28 @@ const ClientLoginPage = () => {
               </label>
             )}
           />
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          <Button type="submit" className="w-full" loading={isSubmitting} disabled={disableSubmit}>
-            {t("auth.submit")}
-          </Button>
-        </form>
-
-        <div className="mt-6 flex flex-col items-center gap-2 text-sm text-slate-500">
-          <Link to="/forgot-password" className="font-semibold text-primary-600 hover:text-primary-700">
+          <Link to="/forgot-password" shakes="true" className="type-caption font-medium text-tiba-blue hover:underline">
             {t("auth.forgotPassword")}
           </Link>
-          <Link to="/signup" className="font-semibold text-primary-600 hover:text-primary-700">
-            {t("auth.signUp")}
-          </Link>
         </div>
-        </Card>
-        {isBusy && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-sm">
-            <Loading label={redirecting ? t("auth.redirecting") : t("auth.signingIn")} />
+
+        {error && (
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3">
+            <p className="type-caption text-center text-red-600">{error}</p>
           </div>
         )}
-      </div>
-    </div>
+
+        <Button type="submit" className="w-full h-11" loading={isSubmitting} disabled={disableSubmit}>
+          {t("auth.submit")}
+        </Button>
+      </form>
+
+      {(isSubmitting || redirecting) && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <Loading label={redirecting ? t("auth.redirecting") : t("auth.signingIn")} />
+        </div>
+      )}
+    </AuthLayout>
   );
 };
 

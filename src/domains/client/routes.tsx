@@ -70,7 +70,7 @@ const buildRoutes = (): RouteObject[] => [
         )
       },
       {
-        path: "inbox",
+        path: "inbox/:threadId?",
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <ClientInboxPage />

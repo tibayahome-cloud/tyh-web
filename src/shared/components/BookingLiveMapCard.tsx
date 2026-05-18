@@ -7,6 +7,7 @@ import { Skeleton } from "./Skeleton";
 import { useBookingDetail, bookingKeys } from "../hooks/useBookings";
 import { useBookingStore } from "../stores/useBookingStore";
 import { useSocket } from "../hooks/useSocket";
+import { useBookingLiveLocation } from "../hooks/useBookingLiveLocation";
 import classNames from "classnames";
 import { useQueryClient } from "@tanstack/react-query";
 import { Navigation } from "lucide-react";
@@ -195,6 +196,31 @@ export const BookingLiveMapCard = ({
   const stored = useBookingStore((state) => state.active[bookingId]);
   const upsertBooking = useBookingStore((state) => state.upsertBooking);
   const socket = useSocket();
+
+  const providerInitial = useMemo(() => {
+    const points = bookingData?.locations ?? [];
+    const providerPoints = points.filter(l => l.who === "provider" && l.lat && l.lng);
+    return providerPoints.length ? { lat: providerPoints[providerPoints.length - 1].lat as number, lng: providerPoints[providerPoints.length - 1].lng as number } : null;
+  }, [bookingData?.locations]);
+
+  const clientInitial = useMemo(() => {
+    const points = bookingData?.locations ?? [];
+    const clientPoints = points.filter(l => l.who === "client" && l.lat && l.lng);
+    if (clientPoints.length) return { lat: clientPoints[clientPoints.length - 1].lat as number, lng: clientPoints[clientPoints.length - 1].lng as number };
+    if (bookingData?.lat && bookingData?.lng) return { lat: bookingData.lat, lng: bookingData.lng };
+    return null;
+  }, [bookingData?.locations, bookingData?.lat, bookingData?.lng]);
+
+  const { smoothLocation: providerSmooth, rawLocation: providerRaw, heading: providerHeading } = useBookingLiveLocation(bookingId, {
+    initialLocation: providerInitial,
+    who: "provider"
+  });
+
+  const { smoothLocation: clientSmooth, rawLocation: clientRaw } = useBookingLiveLocation(bookingId, {
+    initialLocation: clientInitial,
+    who: "client"
+  });
+
   const [routePolyline, setRoutePolyline] = useState<MapPolyline | null>(null);
   const [routeSummary, setRouteSummary] = useState<{ durationText: string | null; distanceText: string | null } | null>(
     null
@@ -222,17 +248,6 @@ export const BookingLiveMapCard = ({
       upsertBooking(bookingData);
     }
   }, [bookingData, upsertBooking]);
-
-  useEffect(() => {
-    if (!socket || !bookingId) {
-      return;
-    }
-    const room = `booking:${bookingId}`;
-    socket.emit?.("join_room", { room });
-    return () => {
-      socket.emit?.("leave_room", { room });
-    };
-  }, [bookingId, socket]);
 
   useEffect(() => {
     setShowAllSteps(false);
@@ -273,7 +288,17 @@ export const BookingLiveMapCard = ({
       }));
   }, [booking?.locations]);
 
-  const providerMarker = providerTrail.length ? providerTrail[providerTrail.length - 1] : null;
+  const providerMarker = useMemo(() => {
+    if (providerSmooth) {
+      return {
+        lat: providerSmooth.lat,
+        lng: providerSmooth.lng,
+        recordedAt: new Date().toISOString()
+      };
+    }
+    return providerTrail.length ? providerTrail[providerTrail.length - 1] : null;
+  }, [providerSmooth, providerTrail]);
+
   const clientMarker =
     clientTrail.length > 0
       ? clientTrail[clientTrail.length - 1]
@@ -289,8 +314,12 @@ export const BookingLiveMapCard = ({
       : null;
   const targetMarker = clientMarker ?? destinationMarker;
 
+
   useEffect(() => {
-    if (!providerMarker || !targetMarker) {
+    const origin = providerRaw || providerInitial;
+    const dest = clientRaw || clientInitial || destinationMarker;
+
+    if (!origin || !dest) {
       setRoutePolyline(null);
       setRouteSummary(null);
       setNavigationSteps([]);
@@ -304,14 +333,12 @@ export const BookingLiveMapCard = ({
     const service = new google.maps.DirectionsService();
     service.route(
       {
-        origin: { lat: providerMarker.lat, lng: providerMarker.lng },
-        destination: { lat: targetMarker.lat, lng: targetMarker.lng },
+        origin: { lat: origin.lat, lng: origin.lng },
+        destination: { lat: dest.lat, lng: dest.lng },
         travelMode: google.maps.TravelMode.DRIVING
       },
       (result, status) => {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
         if (status === "OK" && result?.routes?.length) {
           const route = result.routes[0];
           const pathPoints = (route.overview_path ?? []).map((point) => ({ lat: point.lat(), lng: point.lng() }));
@@ -355,10 +382,10 @@ export const BookingLiveMapCard = ({
       cancelled = true;
     };
   }, [
-    providerMarker?.lat,
-    providerMarker?.lng,
-    targetMarker?.lat,
-    targetMarker?.lng,
+    providerRaw,
+    clientRaw,
+    destinationMarker?.lat,
+    destinationMarker?.lng,
     booking?.id,
     onNavigationSteps,
     onProgressUpdate
@@ -513,10 +540,10 @@ export const BookingLiveMapCard = ({
       pulse: false
     });
   }
-  if (clientMarker) {
+  if (clientSmooth || clientMarker) {
     markers.push({
       id: `${booking.id}-client`,
-      position: clientMarker,
+      position: clientSmooth || (clientMarker as google.maps.LatLngLiteral),
       label: role === "provider" ? "Client" : "You",
       color: role === "provider" ? "#22c55e" : "#2563eb",
       zIndex: 3,
@@ -525,16 +552,17 @@ export const BookingLiveMapCard = ({
       pulse: !isProviderView
     });
   }
-  if (providerMarker) {
+  if (providerSmooth || providerMarker) {
     markers.push({
       id: `${booking.id}-provider`,
-      position: providerMarker,
+      position: providerSmooth || (providerMarker as google.maps.LatLngLiteral),
       label: role === "provider" ? "You" : "Provider",
       color: "#f97316",
       zIndex: 4,
       variant: "provider",
       isFocused: isClientView,
-      pulse: true
+      pulse: true,
+      heading: providerHeading ?? undefined
     });
   }
 

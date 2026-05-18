@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { type CursorResponse, type CursorMeta } from "./api";
 import {
   mapSelfCareAlert,
   mapSelfCareCheckin,
@@ -126,18 +126,26 @@ export const createSelfCareCheckin = async (
 };
 
 export const fetchSelfCareCheckins = async (
-  params: { userId?: string | null; limit?: number } = {}
-): Promise<SelfCareCheckin[]> => {
+  params: { userId?: string | null; limit?: number; cursor?: string | null } = {}
+): Promise<CursorResponse<SelfCareCheckin>> => {
   const response = await api.get("/selfcare/checkins", {
     params: {
       ...buildUserParams(params.userId),
-      limit: params.limit ?? 20
+      limit: params.limit ?? 20,
+      cursor: params.cursor
     }
   });
   const entries = Array.isArray(response.data?.data) ? response.data.data : [];
-  return entries
-    .map((entry) => mapSelfCareCheckin(entry))
-    .filter((entry): entry is SelfCareCheckin => Boolean(entry));
+  const meta = response.data?.meta as CursorMeta;
+
+  const data = entries
+    .map((entry: any) => mapSelfCareCheckin(entry))
+    .filter((entry: any): entry is SelfCareCheckin => Boolean(entry));
+
+  return {
+    data,
+    meta: meta || { limit: params.limit ?? 20, next_cursor: null }
+  };
 };
 
 const normalizeAlertFilters = (filters: SelfCareAlertFilters = {}) => ({

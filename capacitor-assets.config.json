@@ -1,0 +1,13 @@
+{
+  "android": {
+    "icon": {
+      "source": "src/assets/images/logo.jpeg",
+      "backgroundColor": "#ffffff"
+    },
+    "splash": {
+      "source": "src/assets/images/logo.jpeg",
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    }
+  }
+}

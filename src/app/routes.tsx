@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 
 import { LogoutGate } from "../auth/LogoutGate";
+import { PhoneVerificationGate } from "../auth/PhoneVerificationGate";
 import { RequirePerm, RequireRole } from "../shared/rbac/Can";
 import { Loading } from "../shared/components/Loading";
 import { ROLE_CLIENT, ROLE_PROVIDER, PERMISSION_ADMIN_ACCESS } from "../shared/rbac/roles";
@@ -25,11 +26,7 @@ const SuspenseWrapper = ({ children }: { children: JSX.Element }) => (
 );
 
 const PublicLayout = () => (
-  <div className="min-h-screen bg-slate-50">
-    <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center px-4 py-12">
-      <Outlet />
-    </div>
-  </div>
+  <Outlet />
 );
 
 import { websiteRoutes } from "../domains/website/routes";
@@ -108,11 +105,13 @@ export const router = createBrowserRouter(
       path: "/app/*",
       element: (
         <LogoutGate redirectTo="/login">
-          <RequireRole role={ROLE_CLIENT}>
-            <SuspenseWrapper>
-              <ClientRoutes />
-            </SuspenseWrapper>
-          </RequireRole>
+          <PhoneVerificationGate>
+            <RequireRole role={ROLE_CLIENT}>
+              <SuspenseWrapper>
+                <ClientRoutes />
+              </SuspenseWrapper>
+            </RequireRole>
+          </PhoneVerificationGate>
         </LogoutGate>
       )
     },
@@ -120,11 +119,13 @@ export const router = createBrowserRouter(
       path: "/pro/*",
       element: (
         <LogoutGate redirectTo="/login">
-          <RequireRole role={ROLE_PROVIDER}>
-            <SuspenseWrapper>
-              <ProviderRoutes />
-            </SuspenseWrapper>
-          </RequireRole>
+          <PhoneVerificationGate>
+            <RequireRole role={ROLE_PROVIDER}>
+              <SuspenseWrapper>
+                <ProviderRoutes />
+              </SuspenseWrapper>
+            </RequireRole>
+          </PhoneVerificationGate>
         </LogoutGate>
       )
     },

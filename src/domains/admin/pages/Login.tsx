@@ -5,12 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../../shared/components/Button";
-import { Card } from "../../../shared/components/Card";
+import { AuthLayout } from "../../../shared/components/AuthLayout";
 import { FormField } from "../../../shared/components/FormField";
 import { Input } from "../../../shared/components/Input";
 import { PasswordField } from "../../../shared/components/PasswordField";
 import { Loading } from "../../../shared/components/Loading";
-import type { AdminLoginSchema} from "../../../shared/schemas/auth";
+import type { AdminLoginSchema } from "../../../shared/schemas/auth";
 import { adminLoginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import {
@@ -90,82 +90,83 @@ const AdminLoginPage = () => {
   const disableSubmit = isSubmitting || redirecting;
 
   return (
-    <div className="w-full">
-      <div className="relative">
-        <Card className="mx-auto w-full max-w-lg" title={t("auth.adminLoginTitle")}>
-          {redirectedFromApp && (
-            <p className="mb-4 rounded-md bg-primary-50 px-3 py-2 text-sm text-primary-700">
-              {t("auth.adminRedirectNotice")}
-            </p>
+    <AuthLayout
+      title={t("auth.adminLoginTitle")}
+      subtitle={redirectedFromApp ? t("auth.adminRedirectNotice") : "Portal access for system administrators."}
+      footer={
+        <p className="type-caption text-slate-500">
+          Not an admin?{" "}
+          <button
+            type="button"
+            className="font-semibold text-tiba-blue hover:underline"
+            onClick={() => navigate("/login")}
+          >
+            {t("auth.switchUser")}
+          </button>
+        </p>
+      }
+    >
+      <form className="space-y-4" onSubmit={submit} noValidate>
+        <FormField
+          control={control}
+          name="email"
+          render={({ field, fieldState }) => (
+            <Input
+              {...field}
+              type="email"
+              label={t("auth.email")}
+              autoComplete="username"
+              error={fieldState.error?.message}
+            />
           )}
-          <form className="space-y-4" onSubmit={submit} noValidate>
-            <FormField
-              control={control}
-              name="email"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  type="email"
-                  label={t("auth.email")}
-                  autoComplete="username"
-                  error={fieldState.error?.message}
-                />
-              )}
+        />
+
+        <FormField
+          control={control}
+          name="password"
+          render={({ field, fieldState }) => (
+            <PasswordField
+              {...field}
+              label={t("auth.password")}
+              autoComplete="current-password"
+              error={fieldState.error?.message}
             />
+          )}
+        />
 
-            <FormField
-              control={control}
-              name="password"
-              render={({ field, fieldState }) => (
-                <PasswordField
-                  {...field}
-                  label={t("auth.password")}
-                  autoComplete="current-password"
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
+        <FormField
+          control={control}
+          name="remember"
+          render={({ field }) => (
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                checked={field.value ?? false}
+                onChange={(event) => field.onChange(event.target.checked)}
+              />
+              {t("auth.rememberMe")}
+            </label>
+          )}
+        />
 
-            <FormField
-              control={control}
-              name="remember"
-              render={({ field }) => (
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                    checked={field.value ?? false}
-                    onChange={(event) => field.onChange(event.target.checked)}
-                  />
-                  {t("auth.rememberMe")}
-                </label>
-              )}
-            />
-
-            {error && <p className="text-sm text-red-500">{error}</p>}
-
-            <Button type="submit" className="w-full" loading={isSubmitting} disabled={disableSubmit}>
-              {t("auth.submit")}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-slate-500">
-            <button
-              type="button"
-              className="font-semibold text-primary-600 hover:text-primary-700"
-              onClick={() => navigate("/login")}
-            >
-              {t("auth.switchUser")}
-            </button>
-          </div>
-        </Card>
-        {isBusy && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-sm">
-            <Loading label={redirecting ? t("auth.redirecting") : t("auth.signingIn")} />
+        {error && (
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
+            <p className="type-caption text-red-600">{error}</p>
           </div>
         )}
-      </div>
-    </div>
+
+        <Button type="submit" className="w-full h-11" loading={isSubmitting} disabled={disableSubmit}>
+          {t("auth.submit")}
+        </Button>
+      </form>
+
+      {(isSubmitting || redirecting) && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <Loading label={redirecting ? t("auth.redirecting") : t("auth.signingIn")} />
+        </div>
+      )}
+    </AuthLayout>
   );
 };
 

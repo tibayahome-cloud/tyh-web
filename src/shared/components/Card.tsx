@@ -23,7 +23,7 @@ export const Card = ({
   tone = "default",
   children
 }: PropsWithChildren<CardProps>) => {
-  const paddingClass = padding === "none" ? "p-0" : "p-6";
+  const paddingClass = padding === "none" ? "p-0" : "p-4 sm:p-6";
   const toneClass =
     tone === "brand"
       ? "bg-tiba-blue text-white border-transparent shadow-elevated"

@@ -18,8 +18,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           ref={ref}
           className={clsx(
-            "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50",
-            error && "border-red-400 focus:border-red-400 focus:ring-red-400/50",
+            "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition-all",
+            "focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20",
+            "placeholder:text-slate-400",
+            error && "border-red-400 focus:border-red-400 focus:ring-red-400/20",
             className
           )}
           aria-invalid={Boolean(error)}

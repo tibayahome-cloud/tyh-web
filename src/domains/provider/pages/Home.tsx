@@ -244,10 +244,10 @@ const ProviderHome = () => {
         />
       )}
 
-      <div className="space-y-10 pb-20">
+      <div className="space-y-5 pb-20">
 
         {/* Intelligence Layer */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <RevenueSnapshot />
           </div>
@@ -257,40 +257,40 @@ const ProviderHome = () => {
         </div>
 
         {/* Live Operations */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {activeBooking ? (
               <Card
-                className="overflow-hidden border-none shadow-2xl ring-1 ring-black/5"
+                className="overflow-hidden border-none shadow-lg ring-1 ring-black/5 p-4"
                 title="Active Booking"
                 description={activeBooking.service?.name}
-                badge={<span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 ring-1 ring-emerald-500/20">Live Intelligence</span>}
+                badge={<span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">Live</span>}
               >
-                <div className="mb-8 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white font-black">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white text-sm font-bold">
                       {activeBooking.client?.fullName?.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Client Contact</p>
-                      <p className="text-sm font-bold text-slate-900">{activeBooking.client?.fullName}</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Client</p>
+                      <p className="text-sm font-semibold text-slate-900">{activeBooking.client?.fullName}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="primary"
-                      className="h-11 rounded-xl px-6"
+                      className="h-9 rounded-lg px-4 text-xs"
                       onClick={() => setIsTracking(true)}
                     >
-                      <Activity className="mr-2 h-4 w-4" />
-                      Expand Link
+                      <Activity className="mr-1.5 h-3.5 w-3.5" />
+                      Expand
                     </Button>
                     <Button
                       variant="secondary"
-                      className="h-11 w-11 rounded-xl p-0"
+                      className="h-9 w-9 rounded-lg p-0"
                       onClick={() => dispatchChat(activeBooking.id)}
                     >
-                      <MessageCircle className="h-5 w-5" />
+                      <MessageCircle className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -298,37 +298,37 @@ const ProviderHome = () => {
                   bookingId={activeBooking.id}
                   role="provider"
                   onOpenChat={dispatchChat}
-                  className="rounded-3xl border border-slate-100 overflow-hidden shadow-inner aspect-video"
+                  className="rounded-xl border border-slate-100 overflow-hidden aspect-video"
                 />
               </Card>
             ) : (
-              <div className="flex flex-col items-center justify-center py-24 text-center rounded-[48px] border border-dashed border-slate-200 bg-slate-50/50">
-                <div className="flex h-20 w-20 items-center justify-center rounded-[32px] bg-white text-slate-300 shadow-xl ring-1 ring-black/5 mb-8">
-                  <Rocket className="h-10 w-10" />
+              <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-slate-300 shadow-md mb-4">
+                  <Rocket className="h-6 w-6" />
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900">No Active Booking</h2>
-                <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-widest">Awaiting ...</p>
+                <h2 className="text-sm font-bold text-slate-900">No Active Booking</h2>
+                <p className="mt-1 text-[11px] text-slate-500">Awaiting requests...</p>
               </div>
             )}
           </div>
 
-          <div className="space-y-8">
-            <Card className="border-none bg-slate-900 p-8 shadow-2xl transition-all">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
+          <div className="space-y-4">
+            <div className="bg-slate-900 p-4 rounded-xl shadow-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
                   <div className={classNames(
-                    "flex h-10 w-10 items-center justify-center rounded-2xl border-2 transition-colors",
+                    "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors",
                     profile?.is_available ? "bg-emerald-500/10 border-emerald-500 text-emerald-500" : "bg-slate-500/10 border-slate-500 text-slate-500"
                   )}>
-                    <Power className="h-5 w-5" />
+                    <Power className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold uppercase tracking-widest">Standby Mode</h3>
+                    <h3 className="text-sm font-bold text-white">Status</h3>
                     <p className={classNames(
-                      "text-[10px] font-bold uppercase tracking-widest",
+                      "text-[10px] font-bold",
                       profile?.is_available ? "text-emerald-400" : "text-slate-400"
                     )}>
-                      {profile?.is_available ? "Broadcasting Live" : "Offline"}
+                      {profile?.is_available ? "Online" : "Offline"}
                     </p>
                   </div>
                 </div>
@@ -336,99 +336,92 @@ const ProviderHome = () => {
                   onClick={toggleStatus}
                   disabled={updateStatusMutation.isPending}
                   className={classNames(
-                    "relative h-6 w-12 rounded-full transition-colors focus:outline-none ring-2 ring-white/10",
+                    "relative h-5 w-10 rounded-full transition-colors focus:outline-none",
                     profile?.is_available ? "bg-emerald-500" : "bg-slate-700"
                   )}
                 >
                   <div className={classNames(
-                    "absolute top-1 h-4 w-4 rounded-full bg-white transition-transform shadow-lg",
-                    profile?.is_available ? "left-7" : "left-1"
+                    "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow",
+                    profile?.is_available ? "left-5" : "left-0.5"
                   )} />
                 </button>
               </div>
-              <p className="text-xs font-bold leading-relaxed uppercase tracking-widest mb-6">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
                 {profile?.is_available
-                  ? "Your unit is visible to booking controllers. Standby for incoming broadcasts."
-                  : "Booking visibility disabled. Activate to receive field invitations."}
+                  ? "Visible for bookings"
+                  : "Activate to receive invitations"}
               </p>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-                <div className={classNames(
-                  "h-1.5 w-1.5 rounded-full animate-pulse",
-                  profile?.is_available ? "bg-emerald-500" : "bg-slate-500"
-                )} />
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Signal Strength: Optimal</span>
-              </div>
-            </Card>
+            </div>
 
-            <Card className="border border-white/80 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-tiba-blue text-white shadow-xl">
-                  <ExternalLink className="h-5 w-5" />
+            <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-tiba-blue text-white">
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Quick Links</h3>
+                <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wide">Quick Links</h3>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Inbox", icon: <MessageCircle className="h-4 w-4" />, to: "/pro/inbox", color: "bg-blue-50 text-blue-600" },
-                  { label: "Bookings", icon: <Calendar className="h-4 w-4" />, to: "/pro/bookings", color: "bg-emerald-50 text-emerald-600" },
-                  { label: "Payments", icon: <CreditCard className="h-4 w-4" />, to: "/pro/payments", color: "bg-amber-50 text-amber-600" },
-                  { label: "Settings", icon: <Settings className="h-4 w-4" />, to: "/pro/settings", color: "bg-slate-100 text-slate-600" }
+                  { label: "Inbox", icon: <MessageCircle className="h-3.5 w-3.5" />, to: "/pro/inbox", color: "bg-blue-50 text-blue-600" },
+                  { label: "Bookings", icon: <Calendar className="h-3.5 w-3.5" />, to: "/pro/bookings", color: "bg-emerald-50 text-emerald-600" },
+                  { label: "Payments", icon: <CreditCard className="h-3.5 w-3.5" />, to: "/pro/payments", color: "bg-amber-50 text-amber-600" },
+                  { label: "Settings", icon: <Settings className="h-3.5 w-3.5" />, to: "/pro/settings", color: "bg-slate-100 text-slate-600" }
                 ].map((link) => (
                   <button
                     key={link.label}
                     onClick={() => navigate(link.to)}
-                    className="flex items-center gap-3 p-3 rounded-2xl bg-white shadow-sm ring-1 ring-black/5 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 transition-all hover:bg-slate-100"
                   >
-                    <div className={classNames("flex h-8 w-8 items-center justify-center rounded-xl", link.color)}>
+                    <div className={classNames("flex h-6 w-6 items-center justify-center rounded-md", link.color)}>
                       {link.icon}
                     </div>
-                    <span className="text-xs font-bold text-slate-900 uppercase tracking-widest leading-none">{link.label}</span>
+                    <span className="text-[11px] font-semibold text-slate-700">{link.label}</span>
                   </button>
                 ))}
               </div>
-            </Card>
+            </div>
 
             <ClientHealthAlertsCard />
 
             {pendingInvites.length > 0 && (
-              <section className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-xl shadow-amber-100">
-                    <Activity className="h-5 w-5" />
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white">
+                    <Activity className="h-3.5 w-3.5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">Live Broadcast</h3>
-                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Immediate Response</p>
+                    <h3 className="text-xs font-bold text-slate-900">Live Broadcasts</h3>
+                    <p className="text-[10px] text-amber-600 font-bold">Respond now</p>
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {pendingInvites.map((offer) => (
                     <article
                       key={offer.booking.id}
-                      className="group relative flex flex-col gap-5 rounded-[32px] border border-white/60 bg-white/60 p-6 shadow-xl backdrop-blur-md transition-all hover:bg-white"
+                      className="flex flex-col gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-100"
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-lg font-black text-slate-900">{offer.booking.service?.name}</p>
-                          <p className="mt-1 text-[11px] font-bold text-slate-500">
-                            {offer.distanceM ? `${(offer.distanceM / 1000).toFixed(1)} km away` : "Unknown Vector"} • Radius {offer.radiusM}m
+                          <p className="text-sm font-bold text-slate-900">{offer.booking.service?.name}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {offer.distanceM ? `${(offer.distanceM / 1000).toFixed(1)} km` : "—"} • {offer.radiusM}m radius
                           </p>
                         </div>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-500/10 animate-pulse">
-                          <Clock className="h-4 w-4" />
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-amber-500 animate-pulse">
+                          <Clock className="h-3 w-3" />
                         </div>
                       </div>
-                      <div className="flex gap-3">
+                      <div className="flex gap-2">
                         <Button
-                          className="flex-1 h-11 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-tiba-blue/20"
+                          className="flex-1 h-8 rounded-lg text-[11px] font-bold"
                           onClick={() => handleAcceptInvite(offer.booking.id)}
                           loading={acceptBookingMutation.isPending}
                         >
-                          Accept Booking
+                          Accept
                         </Button>
                         <Button
                           variant="ghost"
-                          className="h-11 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          className="h-8 rounded-lg text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                           onClick={() => dismissBroadcast(offer.booking.id)}
                         >
                           Dismiss
@@ -443,112 +436,92 @@ const ProviderHome = () => {
         </div>
 
         {/* Secondary Intelligence */}
-        <div className="grid gap-8 lg:grid-cols-2">
-          <Card
-            title="Flight Schedule"
-            description="Your next confirmed visitations."
-            className="border-none bg-white p-8 shadow-2xl ring-1 ring-black/5"
-          >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Upcoming</h3>
+              <span className="text-[10px] text-slate-400">{upcomingBookings.length} scheduled</span>
+            </div>
             {upcomingFetching && !upcomingBookings.length ? (
               <Loading />
             ) : upcomingBookings.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-50 text-slate-300">
-                  <Calendar className="h-8 w-8" />
-                </div>
-                <p className="mt-6 text-base font-black text-slate-900">Operational Queue Empty</p>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Standby for next broadcast</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Calendar className="h-6 w-6 text-slate-300 mb-2" />
+                <p className="text-xs font-semibold text-slate-500">No upcoming bookings</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {upcomingBookings.map((booking) => {
                   const theme = getBookingStatusTheme(booking.status);
                   return (
                     <article
                       key={booking.id}
-                      className="group flex flex-col gap-4 rounded-3xl border border-slate-100 bg-slate-50/30 p-5 transition-all hover:bg-white hover:shadow-xl sm:flex-row sm:items-center sm:justify-between"
+                      onClick={() => navigate(`/pro/bookings/${booking.id}`)}
+                      className="group flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-lg shadow-black/5 ring-1 ring-black/5 text-brand-600">
-                          <Activity className="h-6 w-6" />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-brand-600 ring-1 ring-slate-100">
+                          <Activity className="h-4 w-4" />
                         </div>
-                        <div>
-                          <p className="text-sm font-black text-slate-900">{booking.service?.name}</p>
-                          <p className="text-[11px] font-bold text-slate-500">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{booking.service?.name}</p>
+                          <p className="text-[11px] text-slate-500">
                             {booking.client?.fullName} • {formatTimestamp(booking.acceptedAt)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className={classNames("rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest", theme.className)}>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={classNames("rounded-full px-2 py-0.5 text-[10px] font-bold", theme.className)}>
                           {theme.label}
                         </span>
-                        <span className="text-sm font-black text-slate-900">{formatPrice(booking.priceCents, booking.currency)}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-9 w-9 p-0 rounded-xl"
-                          onClick={() => navigate(`/pro/bookings/${booking.id}`)}
-                        >
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
+                        <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                       </div>
                     </article>
                   );
                 })}
               </div>
             )}
-          </Card>
+          </div>
 
-          <Card
-            title="Booking Logs"
-            description="Archive of historical operations."
-            className="border-none bg-white p-8 shadow-2xl ring-1 ring-black/5"
-          >
+          <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">History</h3>
+              <button onClick={() => navigate('/pro/bookings')} className="text-[10px] text-tiba-blue font-bold">View All</button>
+            </div>
             {historyFetching && !historyBookings.length ? (
               <Loading />
             ) : historyBookings.length > 0 ? (
-              <ul className="divide-y divide-slate-100">
+              <div className="space-y-1">
                 {historyBookings.slice(0, 5).map((booking) => {
                   const theme = getBookingStatusTheme(booking.status);
                   return (
-                    <li key={booking.id} className="group flex items-center justify-between gap-4 py-5 transition-all hover:px-2">
-                      <div className="flex flex-col">
-                        <p className="text-sm font-black text-slate-900 group-hover:text-brand-600 transition-colors">
+                    <div
+                      key={booking.id}
+                      onClick={() => navigate(`/pro/bookings/${booking.id}`)}
+                      className="group flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate group-hover:text-brand-600">
                           {booking.service?.name}
                         </p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                        <p className="text-[10px] text-slate-400">
                           {formatRelativeTime(booking.clientConfirmedAt ?? booking.paidAt ?? booking.serviceCompletedAt)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm font-black text-slate-900">
-                            {formatPrice(booking.priceCents, booking.currency)}
-                          </span>
-                          <span className={classNames("text-[9px] font-black uppercase tracking-[0.2em]", theme.className.replace(/bg-[\w-]+|ring-[\w-]+/g, ""))}>
-                            {theme.label}
-                          </span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          className="h-9 w-9 p-0 rounded-xl"
-                          onClick={() => navigate(`/pro/bookings/${booking.id}`)}
-                        >
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
+                      <span className={classNames("text-[10px] font-bold shrink-0", theme.className.replace(/bg-[\w-]+|ring-[\w-]+/g, ""))}>
+                        {theme.label}
+                      </span>
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-                <Activity className="h-8 w-8 opacity-20" />
-                <p className="mt-4 text-sm font-bold uppercase tracking-widest">No logs found</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Activity className="h-5 w-5 text-slate-300 mb-2" />
+                <p className="text-xs text-slate-400">No history yet</p>
               </div>
             )}
-          </Card>
+          </div>
         </div>
       </div>
 
