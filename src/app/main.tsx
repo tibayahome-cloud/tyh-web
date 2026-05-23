@@ -9,6 +9,7 @@ import { AppQueryProvider } from "./providers/QueryProvider";
 import { AppThemeProvider } from "./providers/ThemeProvider";
 import { AppI18nProvider } from "./providers/I18nProvider";
 import { SocketProvider } from "./providers/SocketProvider";
+import { CapacitorInit } from "./providers/CapacitorProvider";
 import { AuthProvider } from "../shared/hooks/useAuth";
 import { RefreshGate } from "../auth/RefreshGate";
 import { SessionEventBridge } from "./providers/SessionEventBridge";
@@ -23,27 +24,29 @@ if (!root) {
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <AppI18nProvider>
-      <AppThemeProvider>
-        <AppQueryProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <SocketProvider>
-                <SessionEventBridge />
-                <SyncService />
-                <RefreshGate>
-                  <RouterProvider
-                    router={router}
-                    future={{
-                      v7_startTransition: true
-                    }}
-                  />
-                </RefreshGate>
-              </SocketProvider>
-            </AuthProvider>
-          </ToastProvider>
-        </AppQueryProvider>
-      </AppThemeProvider>
-    </AppI18nProvider>
+    <CapacitorInit>
+      <AppI18nProvider>
+        <AppThemeProvider>
+          <AppQueryProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <SocketProvider>
+                  <SessionEventBridge />
+                  <SyncService />
+                  <RefreshGate>
+                    <RouterProvider
+                      router={router}
+                      future={{
+                        v7_startTransition: true
+                      }}
+                    />
+                  </RefreshGate>
+                </SocketProvider>
+              </AuthProvider>
+            </ToastProvider>
+          </AppQueryProvider>
+        </AppThemeProvider>
+      </AppI18nProvider>
+    </CapacitorInit>
   </React.StrictMode>
 );

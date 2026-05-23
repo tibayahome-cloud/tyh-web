@@ -11,7 +11,8 @@ export const createSocket = (token?: string): AppSocket => {
   }
   const url = token ? `${socketUrl}?token=${encodeURIComponent(token)}` : socketUrl;
   const socket = io(url, {
-    autoConnect: false
+    autoConnect: false,
+    transports: ['websocket']
   });
   return socket;
 };

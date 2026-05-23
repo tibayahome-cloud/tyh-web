@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { isNativePlatform } from "../libs/capacitor";
+import {
+  checkPermissions,
+  requestPermissions,
+  getCurrentPosition,
+  type GeoPosition
+} from "../libs/geolocation";
+
 export type LocationPermissionStatus = "checking" | "granted" | "prompt" | "denied";
 
 type LocationAccessState = {
   status: LocationPermissionStatus;
-  lastPosition: GeolocationPosition | null;
+  lastPosition: GeoPosition | null;
   error?: string | null;
 };
 
@@ -17,116 +25,79 @@ export const useLocationAccess = () => {
     error: null
   });
 
-  // Use ref to track latest status to avoid stale closures
   const statusRef = useRef(status);
   statusRef.current = status;
 
-  const requestAccess = useCallback((force = false) => {
-    if (!isBrowser() || !navigator.geolocation) {
-      setState({
-        status: "denied",
-        lastPosition: null,
-        error: "Geolocation is not supported on this device."
-      });
-      return;
-    }
-
+  const requestAccess = useCallback(async (force = false) => {
     const currentStatus = statusRef.current;
     if (!force && (currentStatus === "granted" || currentStatus === "denied")) {
-      // If already denied/granted, a regular request might be ignored by the browser. 
-      // But we still try if force is true or if we are in 'prompt'/'checking'
       return;
     }
 
     setState((prev) => ({ ...prev, status: "checking", error: null }));
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setState({
-          status: "granted",
-          lastPosition: position,
-          error: null
-        });
-      },
-      async (geoError) => {
-        // If timeout/position unavailable but permission is actually granted, still mark as granted
-        if (geoError.code === geoError.TIMEOUT || geoError.code === geoError.POSITION_UNAVAILABLE) {
-          try {
-            if (navigator.permissions?.query) {
-              const result = await navigator.permissions.query({ name: "geolocation" as PermissionName });
-              if (result.state === "granted") {
-                // Permission granted but position fetch failed - still allow access
-                setState({
-                  status: "granted",
-                  lastPosition: null,
-                  error: null
-                });
-                return;
-              }
-            }
-          } catch {
-            // Fall through to default handling
-          }
+    try {
+      if (isNativePlatform()) {
+        const permStatus = await requestPermissions();
+        if (permStatus === "denied") {
+          setState({ status: "denied", lastPosition: null, error: "Location permission denied" });
+          return;
         }
-
-        const denied = geoError.code === geoError.PERMISSION_DENIED;
-        setState({
-          status: denied ? "denied" : "prompt",
-          lastPosition: null,
-          error: geoError.message
-        });
-      },
-      {
-        enableHighAccuracy: false, // Use low accuracy for faster initial response
-        timeout: 15000,
-        maximumAge: 60000 // Accept cached positions up to 1 minute old
       }
-    );
-  }, []); // Remove status from deps - use ref instead
 
-  // Initial check and permission watching
+      const position = await getCurrentPosition(false);
+      setState({ status: "granted", lastPosition: position, error: null });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to get location";
+      const permStatus = await checkPermissions();
+      setState({
+        status: permStatus === "granted" ? "granted" : permStatus === "denied" ? "denied" : "prompt",
+        lastPosition: null,
+        error: errorMsg
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (!isBrowser()) return;
 
     let permissionStatus: PermissionStatus | null = null;
 
     const queryPermission = async () => {
-      if (!navigator.permissions?.query) {
-        requestAccess();
-        return;
-      }
-
       try {
-        permissionStatus = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+        const status = await checkPermissions();
+        if (status === "granted") {
+          setState((prev) => ({ ...prev, status: "granted", error: null }));
+          requestAccess(true);
+        } else if (status === "denied") {
+          setState((prev) => ({ ...prev, status: "denied", error: "Location permission denied" }));
+        } else {
+          setState((prev) => ({ ...prev, status: "prompt", error: null }));
+        }
 
-        const updateStatus = () => {
-          if (permissionStatus?.state === "granted") {
-            // If permission is granted, immediately set status and try to get position
-            setState(prev => ({ ...prev, status: "granted", error: null }));
-            requestAccess(true);
-          } else if (permissionStatus?.state === "denied") {
-            setState(prev => ({ ...prev, status: "denied", error: "Location permission denied" }));
-          } else {
-            setState(prev => ({ ...prev, status: "prompt", error: null }));
-          }
-        };
-
-        permissionStatus.onchange = updateStatus;
-        updateStatus();
-      } catch (e) {
+        if (!isNativePlatform() && navigator.permissions?.query) {
+          permissionStatus = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+          permissionStatus.onchange = () => {
+            if (permissionStatus?.state === "granted") {
+              setState((prev) => ({ ...prev, status: "granted", error: null }));
+              requestAccess(true);
+            } else if (permissionStatus?.state === "denied") {
+              setState((prev) => ({ ...prev, status: "denied", error: "Location permission denied" }));
+            } else {
+              setState((prev) => ({ ...prev, status: "prompt", error: null }));
+            }
+          };
+        }
+      } catch {
         requestAccess();
       }
     };
 
     queryPermission();
 
-    // Listen for visibility change (user comes back from settings)
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        // Use ref to get latest status (avoids stale closure)
-        if (statusRef.current !== "granted") {
-          requestAccess(true);
-        }
+      if (document.visibilityState === "visible" && statusRef.current !== "granted") {
+        requestAccess(true);
       }
     };
 
