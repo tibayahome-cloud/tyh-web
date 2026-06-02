@@ -1,1 +1,0 @@
-import{r as a}from"./vendor-icons-C6o1Qm_o.js";import{a as e}from"./AppLayout-BlQco6dW.js";const n=()=>{const{meta:o,isLoading:r}=e({page:1,pageSize:1,unreadOnly:!1});return a.useMemo(()=>({unread:(o==null?void 0:o.unread)??0,isLoading:r}),[o==null?void 0:o.unread,r])};export{n as u};

@@ -1,1 +1,0 @@
-import{$ as n}from"./index-Cc3RI6GR.js";import"./vendor-icons-C6o1Qm_o.js";import"./vendor-react-dom-RQY2dPN7.js";import"./vendor-maps-BnPbaZwR.js";import"./vendor-mui-DBfSaDJp.js";import"./vendor-mui-x-GSagHFKl.js";class d extends n{async show(e){}async hide(e){}}export{d as SplashScreenWeb};
