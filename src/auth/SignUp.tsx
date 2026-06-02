@@ -56,16 +56,26 @@ export const SignUp = () => {
         password: values.password
       });
 
+      const meta = response.data?.meta;
       if (values.phone?.trim()) {
         setRegisteredPhone(values.phone.trim());
-        const loginRes = await api.post("/auth/login", {
-          emailOrPhone: values.phone.trim(),
-          password: values.password
-        });
-        if (loginRes.data?.data?.access_token) {
-          setAccessToken(loginRes.data.data.access_token);
+
+        if (meta?.verification_required && meta?.otp_sent) {
+          setStep("verify");
+        } else {
+          try {
+            const loginRes = await api.post("/auth/login", {
+              emailOrPhone: values.phone.trim(),
+              password: values.password
+            });
+            if (loginRes.data?.data?.access_token) {
+              setAccessToken(loginRes.data.data.access_token);
+            }
+            setStep("verify");
+          } catch {
+            setStep("verify");
+          }
         }
-        setStep("verify");
       } else {
         setStep("success");
       }
