@@ -71,7 +71,7 @@ export const SignUp = () => {
             if (loginRes.data?.data?.access_token) {
               setAccessToken(loginRes.data.data.access_token);
             }
-            setStep("verify");
+            setStep("success");
           } catch {
             setStep("verify");
           }
