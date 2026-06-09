@@ -134,7 +134,7 @@ export const AdminCreateBookingDialog = ({
       return res.data.data;
     },
     onSuccess: (data) => {
-      toast.success("Booking created successfully");
+      // toast.success("Booking created successfully");
       onSuccess?.(data.id);
       handleClose();
     },
