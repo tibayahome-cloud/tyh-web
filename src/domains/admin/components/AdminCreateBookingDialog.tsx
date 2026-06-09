@@ -15,6 +15,7 @@ import { FormField } from "../../../shared/components/FormField";
 import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { useToast } from "../../../shared/components/ToastProvider";
+import { getApiError } from "../../../shared/utils/errors";
 
 type AdminCreateBookingDialogProps = {
   open: boolean;
@@ -134,12 +135,12 @@ export const AdminCreateBookingDialog = ({
       return res.data.data;
     },
     onSuccess: (data) => {
-      // toast.success("Booking created successfully");
+      toast.success("Booking created successfully");
       onSuccess?.(data.id);
       handleClose();
     },
-    onError: (err: Error) => {
-      toast.error(err.message || "Failed to create booking");
+    onError: (err) => {
+      toast.error(getApiError(err, "Failed to create booking"));
     },
   });
 
@@ -193,22 +194,20 @@ export const AdminCreateBookingDialog = ({
               <button
                 type="button"
                 onClick={() => { setValue("clientMode", "new"); setSelectedUser(null); }}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition ${
-                  clientMode === "new"
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition ${clientMode === "new"
                     ? "bg-blue-600 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
+                  }`}
               >
                 New Client
               </button>
               <button
                 type="button"
                 onClick={() => setValue("clientMode", "existing")}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition ${
-                  clientMode === "existing"
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition ${clientMode === "existing"
                     ? "bg-blue-600 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
+                  }`}
               >
                 Existing Client
               </button>
