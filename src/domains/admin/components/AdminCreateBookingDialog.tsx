@@ -15,7 +15,6 @@ import { FormField } from "../../../shared/components/FormField";
 import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { useToast } from "../../../shared/components/ToastProvider";
-import { getApiError } from "../../../shared/utils/errors";
 
 type AdminCreateBookingDialogProps = {
   open: boolean;
@@ -71,7 +70,7 @@ export const AdminCreateBookingDialog = ({
   onClose,
   onSuccess,
 }: AdminCreateBookingDialogProps) => {
-  const toast = useToast();
+  const { showToast } = useToast();
   const [showMap, setShowMap] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
@@ -135,12 +134,12 @@ export const AdminCreateBookingDialog = ({
       return res.data.data;
     },
     onSuccess: (data) => {
-      toast.success("Booking created successfully");
+      showToast({ variant: "success", title: "Booking created successfully" });
       onSuccess?.(data.id);
       handleClose();
     },
     onError: (err) => {
-      toast.error(getApiError(err, "Failed to create booking"));
+      showToast({ variant: "error", title: getApiError(err, "Failed to create booking") });
     },
   });
 
