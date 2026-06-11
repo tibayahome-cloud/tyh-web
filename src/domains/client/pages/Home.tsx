@@ -87,8 +87,14 @@ const ClientHome = () => {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
-  const [stkPhone, setStkPhone] = useState(user?.phone ?? "");
+  const [stkPhone, setStkPhone] = useState("");
   const [stkPhoneError, setStkPhoneError] = useState("");
+
+  useEffect(() => {
+    if (user?.phone) {
+      setStkPhone(user.phone.replace(/^\+254/, "0"));
+    }
+  }, [user?.phone]);
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
