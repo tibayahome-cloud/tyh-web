@@ -87,6 +87,12 @@ const ClientHome = () => {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
+  const [stkPhone, setStkPhone] = useState(
+    user?.phone ? user.phone.replace(/^\+254/, "0") : ""
+  );
+
+  const [stkPhoneError, setStkPhoneError] = useState("");
+
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
   const latestCheckin = checkinsQuery.data?.[0];
@@ -135,8 +141,10 @@ const ClientHome = () => {
     if (activeBooking?.status === "completed_by_provider") {
       setCompletionPrompt(activeBooking);
       setCompletionError(null);
+      setStkPhone(user?.phone ? user.phone.replace(/^\+254/, "0") : "");
+      setStkPhoneError("");
     }
-  }, [activeBooking]);
+  }, [activeBooking, user?.phone]);
 
   const { data: historyList } = useBookingList(
     {
