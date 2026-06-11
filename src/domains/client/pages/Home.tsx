@@ -87,8 +87,14 @@ const ClientHome = () => {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
-  const [stkPhone, setStkPhone] = useState(user?.phone ?? "");
+  const [stkPhone, setStkPhone] = useState("");
   const [stkPhoneError, setStkPhoneError] = useState("");
+
+  useEffect(() => {
+    if (user?.phone) {
+      setStkPhone(user.phone.replace(/^\+254/, "0"));
+    }
+  }, [user?.phone]);
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
@@ -200,7 +206,7 @@ const ClientHome = () => {
     if (!completionPrompt) return;
 
     // validate phone
-    if (!/^(07|01)\d{8}$|^2547\d{8}$/.test(stkPhone.trim())) {
+    if (!/^(07|01)\d{8}$|^(\+?254)(7|1)\d{8}$/.test(stkPhone.trim())) {
       setStkPhoneError("Enter a valid Safaricom number e.g. 0712345678");
       return;
     }
