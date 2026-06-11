@@ -144,7 +144,7 @@ const ClientHome = () => {
     if (activeBooking?.status === "completed_by_provider") {
       setCompletionPrompt(activeBooking);
       setCompletionError(null);
-      setStkPhone(user?.phone ?? "");  // ← add this
+      setStkPhone(user.phone.replace(/^\+254/, "0") ?? "");  
       setStkPhoneError("");             // ← add this
     }
   }, [activeBooking, user?.phone]);
