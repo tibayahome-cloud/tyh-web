@@ -87,14 +87,8 @@ const ClientHome = () => {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
-  const [stkPhone, setStkPhone] = useState("");
+  const [stkPhone, setStkPhone] = useState(user?.phone ?? "");
   const [stkPhoneError, setStkPhoneError] = useState("");
-
-  useEffect(() => {
-    if (user?.phone) {
-      setStkPhone(user.phone.replace(/^\+254/, "0"));
-    }
-  }, [user?.phone]);
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
@@ -144,8 +138,8 @@ const ClientHome = () => {
     if (activeBooking?.status === "completed_by_provider") {
       setCompletionPrompt(activeBooking);
       setCompletionError(null);
-      setStkPhone(user?.phone ? user.phone.replace(/^\+254/, "0") : "");
-      setStkPhoneError("");
+      setStkPhone(user?.phone ?? "");  // ← add this
+      setStkPhoneError("");             // ← add this
     }
   }, [activeBooking, user?.phone]);
 
@@ -203,14 +197,21 @@ const ClientHome = () => {
   };
 
   const handleConfirmCompletion = async () => {
-    if (!completionPrompt) {
+    if (!completionPrompt) return;
+
+    // validate phone
+    if (!/^(07|01)\d{8}$|^2547\d{8}$/.test(stkPhone.trim())) {
+      setStkPhoneError("Enter a valid Safaricom number e.g. 0712345678");
       return;
     }
+    setStkPhoneError("");
     setCompletionError(null);
+
     try {
       await confirmCompletion.mutateAsync({
         bookingId: completionPrompt.id,
-        decision: "confirm"
+        decision: "confirm",
+        phone: stkPhone.trim()   // ← pass phone
       });
       toast.showToast({
         title: "Payment requested",
@@ -556,22 +557,50 @@ const ClientHome = () => {
                 </Button>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  className="flex-1 rounded-xl h-12"
-                  onClick={handleDeclineCompletion}
-                  loading={confirmCompletion.isPending}
-                >
-                  Decline
-                </Button>
-                <Button
-                  className="flex-1 rounded-xl h-12 shadow-lg shadow-brand-100"
-                  onClick={handleConfirmCompletion}
-                  loading={confirmCompletion.isPending}
-                >
-                  Confirm & Pay
-                </Button>
+              <div className="space-y-3">
+                {/* Editable phone for STK push */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pl-1">
+                    M-Pesa Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={stkPhone}
+                    onChange={(e) => {
+                      setStkPhone(e.target.value);
+                      setStkPhoneError("");
+                    }}
+                    placeholder="e.g. 0712345678"
+                    disabled={confirmCompletion.isPending}
+                    className={classNames(
+                      "w-full rounded-xl border px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-colors",
+                      "placeholder:text-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500",
+                      stkPhoneError ? "border-red-400 bg-red-50" : "border-slate-200 bg-slate-50"
+                    )}
+                  />
+                  {stkPhoneError && (
+                    <p className="text-[11px] text-red-500 font-medium pl-1">{stkPhoneError}</p>
+                  )}
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    className="flex-1 rounded-xl h-12"
+                    onClick={handleDeclineCompletion}
+                    loading={confirmCompletion.isPending}
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    className="flex-1 rounded-xl h-12 shadow-lg shadow-brand-100"
+                    onClick={handleConfirmCompletion}
+                    loading={confirmCompletion.isPending}
+                  >
+                    Confirm & Pay
+                  </Button>
+                </div>
               </div>
             )}
           </div>
