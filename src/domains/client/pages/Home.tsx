@@ -206,7 +206,7 @@ const ClientHome = () => {
     if (!completionPrompt) return;
 
     // validate phone
-    if (!/^(07|01)\d{8}$|^2547\d{8}$/.test(stkPhone.trim())) {
+    if (!/^(07|01)\d{8}$|^(\+?254)(7|1)\d{8}$/.test(stkPhone.trim())) {
       setStkPhoneError("Enter a valid Safaricom number e.g. 0712345678");
       return;
     }
