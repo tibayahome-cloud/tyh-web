@@ -195,13 +195,12 @@ export const confirmBooking = async (
   bookingId: string,
   decision: BookingConfirmDecision,
   reason?: string,
-  phone?: string,           // ← add
   preset: BookingPresetName = "detail"
 ): Promise<Booking> => {
   const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.detail;
   const response = await api.post(
     `/bookings/${bookingId}/confirm`,
-    { decision, reason, phone },  // ← add phone
+    { decision, reason },
     { params: buildFieldParams(presetConfig) }
   );
   const booking = mapBooking(response.data?.data);
