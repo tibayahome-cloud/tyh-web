@@ -133,12 +133,14 @@ export const useConfirmBookingMutation = (preset: BookingPresetName = "detail") 
     mutationFn: ({
       bookingId,
       decision,
-      reason
+      reason,
+      phone             
     }: {
       bookingId: string;
       decision: BookingConfirmDecision;
       reason?: string;
-    }) => confirmBooking(bookingId, decision, reason, preset),
+      phone?: string;
+    }) => confirmBooking(bookingId, decision, reason, phone, preset),
     onSuccess: (booking) => {
       storeBooking(booking);
       invalidateLists();
