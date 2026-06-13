@@ -172,9 +172,9 @@ export const Home = () => {
                         </motion.div>
 
                         <div className="flex-1">
-                            <div className="mb-4 inline-block px-4 py-1.5 rounded-full bg-tiba-gold/10 text-tiba-gold font-bold text-sm">
+                            {/* <div className="mb-4 inline-block px-4 py-1.5 rounded-full bg-tiba-gold/10 text-tiba-gold font-bold text-sm">
                                 COMING SOON
-                            </div>
+                            </div> */}
                             <h2 className="mb-2">The Tiba Ya Home App</h2>
                             <h3 className="text-slate-800 mb-8">Care at Your Fingertips</h3>
 
@@ -195,12 +195,14 @@ export const Home = () => {
                                 ))}
                             </ul>
 
-                            <button
-                                onClick={handleServiceClick}
+                            <a
+                                href="https://median.co/share/eekzzbo#apk"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="btn-secondary"
                             >
-                                Request an Ambulance
-                            </button>
+                                Download App <ArrowRight className="w-4 h-4" />
+                            </a>
                         </div>
                     </div>
                 </div>
