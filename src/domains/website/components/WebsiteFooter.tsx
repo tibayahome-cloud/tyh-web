@@ -64,7 +64,7 @@ export const WebsiteFooter = () => {
                                 <h5 className="text-white font-bold mb-1">Download App</h5>
                                 <p className="text-sm text-slate-400">Book faster on the go.</p>
                                 <a
-                                    href="https://median.co/share/jbojorm#apk"
+                                    href="https://median.co/share/eekzzbo#apk"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-2 text-tiba-gold text-sm font-bold mt-3 group-hover:gap-3 transition-all"
