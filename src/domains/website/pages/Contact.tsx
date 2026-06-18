@@ -35,7 +35,7 @@ export const Contact = () => {
                                 <div>
                                     <h3 className="font-bold text-slate-900">Email Us</h3>
                                     <p className="text-slate-600 mb-1">Support & Inquiries</p>
-                                    <a href="mailto:care@tibahome.com" className="text-lg font-bold text-blue-600">care@tibahome.com</a>
+                                    <a href="mailto:clientscare@tibahome.co.ke" className="text-lg font-bold text-blue-600">clientscare@tibahome.co.ke</a>
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">
@@ -44,7 +44,7 @@ export const Contact = () => {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900">Visit Us</h3>
-                                    <p className="text-slate-600">Main Office, Westlands<br />Nairobi, Kenya</p>
+                                    <p className="text-slate-600">Marcus Garvey Road, Kilimani<br />Nairobi, Kenya</p>
                                 </div>
                             </div>
                         </div>

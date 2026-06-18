@@ -47,7 +47,7 @@ export const WebsiteFooter = () => {
                         <ul className="space-y-6">
                             <li className="flex items-start gap-4">
                                 <MapPin className="w-6 h-6 text-tiba-gold flex-shrink-0 mt-1" />
-                                <span>Nairobi, Kenya<br /><span className="text-slate-500 text-sm">Main Office, Westlands</span></span>
+                                <span>Nairobi, Kenya<br /><span className="text-slate-500 text-sm">Marcus Garvey Road, Kilimani</span></span>
                             </li>
                             <li className="flex items-center gap-4">
                                 <Phone className="w-6 h-6 text-tiba-gold flex-shrink-0" />
