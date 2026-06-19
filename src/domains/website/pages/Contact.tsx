@@ -35,7 +35,7 @@ export const Contact = () => {
                                 <div>
                                     <h3 className="font-bold text-slate-900">Email Us</h3>
                                     <p className="text-slate-600 mb-1">Support & Inquiries</p>
-                                    <a href="mailto:clientscare@tibahome.co.ke" className="text-lg font-bold text-blue-600">clientscare@tibahome.co.ke</a>
+                                    <a href="mailto:clientscare@tibayahome.co.ke" className="text-lg font-bold text-blue-600">clientscare@tibayahome.co.ke</a>
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">
