@@ -29,6 +29,7 @@ import nursingImage from "../../../assets/images/nursing.png";
 import therapyImage from "../../../assets/images/service-therapy.png";
 import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
+import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -219,7 +220,8 @@ export const Home = () => {
                             { name: "Nursing & Long-Term Care", img: nursingImage },
                             { name: "Therapy & Rehabilitation", img: therapyImage },
                             { name: "Elderly & Assisted Living Care", img: elderlyImage },
-                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage }
+                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage },
+                            { name: "Lab Sample Collection", img: labSampleCollectionImage }
                         ].map((service, i) => (
                             <button
                                 key={i}
