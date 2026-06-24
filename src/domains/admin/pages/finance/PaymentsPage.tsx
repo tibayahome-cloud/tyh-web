@@ -635,59 +635,18 @@ const PaymentsPage = () => {
 
       {/* Filters row */}
       <div className="flex flex-wrap items-start justify-between gap-4">
+        {/* Left — count + active chips */}
         <div className="flex flex-col gap-2">
-          <div ref={filterMenuRef} className="relative inline-flex">
-            <Button
-              variant={hasActiveFilters ? "primary" : "secondary"}
-              onClick={openFilters}
-              className="inline-flex items-center gap-2"
-            >
-              <span>Filters</span>
-              {hasActiveFilters && (
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                  {filterSummaryChips.length}
-                </span>
-              )}
-            </Button>
-
-            {filtersOpen &&
-              (isMobileFilters ? (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 bg-slate-900/40"
-                    onClick={() => setFiltersOpen(false)}
-                  />
-                  <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-base font-semibold text-slate-900">
-                        Filters
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setFiltersOpen(false)}
-                        className="text-sm font-medium text-slate-500"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    {filterPanel}
-                  </div>
-                </>
-              ) : (
-                <div className="absolute left-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl md:left-auto md:right-0">
-                  {filterPanel}
-                </div>
-              ))}
-          </div>
-
-          {/* Active filter chips */}
+          {!paymentsQuery.isLoading && (
+            <p className="text-sm text-slate-500">
+              {numberFormatter.format(analytics.total)} payments loaded
+              {paymentsQuery.hasNextPage && " (more available)"}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2 text-xs text-slate-600">
             {filterSummaryChips.length > 0 ? (
               filterSummaryChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-full bg-slate-200 px-3 py-1"
-                >
+                <span key={chip} className="rounded-full bg-slate-200 px-3 py-1">
                   {chip}
                 </span>
               ))
@@ -697,13 +656,48 @@ const PaymentsPage = () => {
           </div>
         </div>
 
-        {/* Total count badge */}
-        {!paymentsQuery.isLoading && (
-          <p className="self-center text-sm text-slate-500">
-            {numberFormatter.format(analytics.total)} payments loaded
-            {paymentsQuery.hasNextPage && " (more available)"}
-          </p>
-        )}
+        {/* Right — filter button + dropdown */}
+        <div ref={filterMenuRef} className="relative">
+          <Button
+            variant={hasActiveFilters ? "primary" : "secondary"}
+            onClick={openFilters}
+            className="inline-flex items-center gap-2"
+          >
+            <span>Filters</span>
+            {hasActiveFilters && (
+              <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                {filterSummaryChips.length}
+              </span>
+            )}
+          </Button>
+
+          {filtersOpen &&
+            (isMobileFilters ? (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-slate-900/40"
+                  onClick={() => setFiltersOpen(false)}
+                />
+                <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-base font-semibold text-slate-900">Filters</p>
+                    <button
+                      type="button"
+                      onClick={() => setFiltersOpen(false)}
+                      className="text-sm font-medium text-slate-500"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {filterPanel}
+                </div>
+              </>
+            ) : (
+              <div className="absolute right-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+                {filterPanel}
+              </div>
+            ))}
+        </div>
       </div>
 
       {/* Data table */}
