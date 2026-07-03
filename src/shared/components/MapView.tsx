@@ -280,7 +280,7 @@ export const MapView = ({
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey ?? "",
     libraries: MAP_LIBRARIES,
-    version: "beta",
+    version: "weekly",
     id: "shared-map"
   });
 
