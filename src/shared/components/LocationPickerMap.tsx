@@ -52,7 +52,7 @@ export const LocationPickerMap = ({
     googleMapsApiKey: apiKey ?? "",
     libraries: MAP_LIBRARIES,
     id: "shared-map",
-    version: "weekly"
+    version: "beta"
   });
   const [advancedReady, setAdvancedReady] = useState(false);
   const mapId = import.meta.env.VITE_GOOGLE_MAP_ID;
