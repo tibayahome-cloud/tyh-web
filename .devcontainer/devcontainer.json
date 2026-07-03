@@ -1,0 +1,22 @@
+{
+  "name": "TYH-WEB",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [3000, 5173],
+  "postCreateCommand": "npm install",
+  // run below in terminal
+  // npm install -g serve
+  // npm run build
+  // serve -s build -l 3000
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
