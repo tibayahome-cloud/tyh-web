@@ -229,6 +229,24 @@ export const cancelBooking = async (
   return booking;
 };
 
+export const payBooking = async (
+  bookingId: string,
+  options: { method?: string; phone?: string } = {},
+  preset: BookingPresetName = "detail"
+): Promise<{ booking: Booking; paymentId?: string }> => {
+  const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.detail;
+  const response = await api.post(
+    `/bookings/${bookingId}/pay`,
+    { method: options.method, phone: options.phone },
+    { params: buildFieldParams(presetConfig) }
+  );
+  const booking = mapBooking(response.data?.data);
+  if (!booking) {
+    throw new Error("Failed to trigger payment");
+  }
+  return { booking, paymentId: response.data?.meta?.payment_id };
+};
+
 export const postBookingLocation = async (bookingId: string, input: BookingLocationInput) => {
   return api.post(`/bookings/${bookingId}/location`, {
     lat: input.lat,
