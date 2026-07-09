@@ -26,7 +26,7 @@ const ACTIVE_STATUSES = [
 
 const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] }> = [
     { value: "all", label: "All bookings" },
-    { value: "active", label: "Active & in-progress", statuses: ["accepted", "en_route", "nearby", "arrived", "in_service"] },
+    { value: "active", label: "Active & In-Progress", statuses: ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider", "client_completed"] },
     { value: "upcoming", label: "Upcoming", statuses: ["accepted", "en_route", "nearby", "arrived"] },
     {
         value: "awaiting_client",
