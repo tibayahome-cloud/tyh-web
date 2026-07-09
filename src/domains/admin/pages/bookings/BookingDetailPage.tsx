@@ -134,7 +134,7 @@ const AdminBookingDetailPage = () => {
             Reassign provider
           </Button>
           {STK_PUSH_ELIGIBLE_STATUSES.includes(booking.status) && (
-            <Button variant="primary" onClick={openStkPushModal}>
+            <Button variant="secondary" onClick={openStkPushModal}>
               Request payment (STK push)
             </Button>
           )}
