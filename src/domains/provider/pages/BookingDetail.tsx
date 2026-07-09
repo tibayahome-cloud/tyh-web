@@ -19,44 +19,44 @@ const ACTION_COPY: Record<
   { label: string; helper: string; action?: "en_route" | "nearby" | "arrived" | "start_service" | "complete" }
 > = {
   accepted: {
-    label: "Begin trip",
+    label: "Begin Trip",
     helper: "Signal that you are on the way to the client.",
     action: "en_route"
   },
   en_route: {
-    label: "Mark as nearby",
+    label: "Mark as Nearby",
     helper: "Let the client know you are minutes away.",
     action: "nearby"
   },
   nearby: {
-    label: "Confirm arrival",
+    label: "Confirm Arrival",
     helper: "Updates the booking to show that you are on site.",
     action: "arrived"
   },
   arrived: {
-    label: "Start service",
+    label: "Start Service",
     helper: "Kick off the service timer and begin work.",
     action: "start_service"
   },
   in_service: {
-    label: "Complete service",
+    label: "Complete Service",
     helper: "Finish the session. The client will confirm delivery.",
     action: "complete"
   },
   completed_by_provider: {
-    label: "Awaiting client confirmation",
+    label: "Awaiting Client Confirmation",
     helper: "We have notified the client to confirm and pay."
   },
   client_completed: {
-    label: "Job finished",
+    label: "Job Finished",
     helper: "Thanks! Keep an eye on new requests."
   },
   client_confirmed: {
-    label: "Job finished",
+    label: "Job Finished",
     helper: "Thanks! Keep an eye on new requests."
   },
   default: {
-    label: "Tracking in progress",
+    label: "Tracking in Progress",
     helper: "No manual action is required at this stage."
   }
 };

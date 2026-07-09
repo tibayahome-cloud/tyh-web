@@ -30,10 +30,10 @@ const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] 
     { value: "upcoming", label: "Upcoming", statuses: ["accepted", "en_route", "nearby", "arrived"] },
     {
         value: "awaiting_client",
-        label: "Awaiting client confirmation",
+        label: "Awaiting Client Confirmation",
         statuses: ["completed_by_provider", "client_completed", "client_confirmed"]
     },
-    { value: "completed", label: "Fully completed", statuses: ["fully_completed", "paid"] },
+    { value: "completed", label: "Fully Completed", statuses: ["fully_completed", "paid"] },
     {
         value: "cancelled",
         label: "Cancelled",
