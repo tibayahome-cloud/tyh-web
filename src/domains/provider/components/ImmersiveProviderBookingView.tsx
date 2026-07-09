@@ -49,7 +49,7 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
     }, [booking.lat, booking.lng]);
 
     const handleStatusUpdate = useCallback(
-        (action: "en_route" | "nearby" | "arrived" | "start_service" | "complete") => {
+        (action: "en_route" | "nearby" | "arrived" | "start_service" | "complete" | "client_confirmed") => {
             markBooking.mutate({ bookingId: booking.id, action });
         },
         [booking.id, markBooking]
@@ -80,6 +80,12 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
                 return (
                     <Button onClick={() => handleStatusUpdate("complete")} loading={markBooking.isPending} className="flex-1">
                         Complete Service
+                    </Button>
+                );
+            case "completed_by_provider":
+                return (
+                    <Button onClick={() => handleStatusUpdate("client_confirmed")} loading={markBooking.isPending} className="flex-1">
+                        Request Payment (Send STK Push)
                     </Button>
                 );
             default:
