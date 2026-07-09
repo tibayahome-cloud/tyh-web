@@ -2,11 +2,7 @@
 services:
     app:
         image: node:22-alpine
-        command: >
-            sh -c "
-              npm install &&
-              sleep infinity
-            "
+        command: sleep infinity
         ports:
             - '3000:3000' # CRA
             - '5173:5173' # Vite
