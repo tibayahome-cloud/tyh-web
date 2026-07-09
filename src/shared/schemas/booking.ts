@@ -58,7 +58,7 @@ export const BookingSchema = z.object({
   lat: z.number().nullable(),
   lng: z.number().nullable(),
   priceCents: z.number(),
-  currency: z.string(),
+  currency: z.string().nullable(),
   estimateDurationMinutes: z.number().nullable(),
   acceptedAt: z.string().nullable(),
   arrivedAt: z.string().nullable(),
