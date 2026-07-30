@@ -22,7 +22,10 @@ export type PaymentListParams = {
   cursor?: string | null;
   limit?: number;
   status?: string;
+  method?: string;
   bookingId?: string;
+  dateFrom?: string;
+  dateTo?: string;
   preset?: PaymentPresetName;
 };
 
@@ -62,11 +65,40 @@ export const fetchAdminPayments = async ({
   if (bookingId) {
     params["filter[booking_id]"] = bookingId;
   }
+  if (method) {
+    params["filter[method]"] = method;
+  }
+  if (dateFrom) {
+    params["filter[date_from]"] = dateFrom;
+  }
+  if (dateTo) {
+    params["filter[date_to]"] = dateTo;
+  }
   const response = await api.get(`${ADMIN_PAYMENTS_BASE}/payments`, { params });
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const payments = mapPayments(payload.data);
   const meta = mapPaymentListMeta(payload.meta, {
     page: { number: page, size: cursor ? limit : pageSize, total: payments.length, totalPages: 1 }
+  });
+  return { payments, meta, raw: payload };
+};
+
+export const fetchFacilityPayments = async (
+  facilityId: string,
+  { page = 1, pageSize = 25, status }: { page?: number; pageSize?: number; status?: string } = {}
+): Promise<PaymentListResult> => {
+  const params: Record<string, unknown> = {
+    "page[number]": page,
+    "page[size]": pageSize
+  };
+  if (status) {
+    params["filter[status]"] = status;
+  }
+  const response = await api.get(`/admin/payments/facilities/${facilityId}/payments`, { params });
+  const payload = (response.data ?? {}) as Record<string, unknown>;
+  const payments = mapPayments(payload.data);
+  const meta = mapPaymentListMeta(payload.meta, {
+    page: { number: page, size: pageSize, total: payments.length, totalPages: 1 }
   });
   return { payments, meta, raw: payload };
 };

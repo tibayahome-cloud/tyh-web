@@ -13,24 +13,12 @@ import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
-import { mapPayments } from "../../../../shared/schemas/payment";
+import { fetchAdminPayments, fetchFacilityPayments } from "../../../../shared/libs/payments";
 import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schemas/payment";
-import { canUseGlobalPaymentLedger, FinanceScopeNotice } from "./paymentAccess";
+import type { PaymentListResult } from "../../../../shared/libs/payments";
+import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type RawPaymentsResponse = {
-  data: unknown[];
-  meta: {
-    next_cursor: string | null;
-    page: { size: number; total: number };
-  };
-};
-
-type PaymentsResponse = {
-  data: PaymentRecord[];
-  meta: RawPaymentsResponse["meta"];
-};
 
 type PaymentRow = {
   id: string;
@@ -124,30 +112,30 @@ const SettlementCell = ({ settlement }: { settlement: PaymentSettlement | null }
 // ─── API call ─────────────────────────────────────────────────────────────────
 
 const fetchPayments = async (params: {
-  cursor?: string | null;
+  facilityId?: string;
+  pageParam?: string | number;
   status?: string;
   method?: string;
   bookingId?: string;
   dateFrom?: string;
   dateTo?: string;
-}): Promise<PaymentsResponse> => {
-  const query: Record<string, string> = {
-    "page[size]": String(PAGE_SIZE),
-  };
-  if (params.cursor)    query["cursor"]           = params.cursor;
-  if (params.status)    query["filter[status]"]   = params.status;
-  if (params.method)    query["filter[method]"]   = params.method;
-  if (params.bookingId) query["filter[booking_id]"] = params.bookingId;
-  if (params.dateFrom)  query["filter[date_from]"] = params.dateFrom;
-  if (params.dateTo)    query["filter[date_to]"]   = params.dateTo;
-
-  const res = await api.get<RawPaymentsResponse>("/admin/payments/payments", {
-    params: query,
+}): Promise<PaymentListResult> => {
+  if (params.facilityId) {
+    return fetchFacilityPayments(params.facilityId, {
+      page: typeof params.pageParam === "number" ? params.pageParam : 1,
+      pageSize: PAGE_SIZE,
+      status: params.status
+    });
+  }
+  return fetchAdminPayments({
+    cursor: typeof params.pageParam === "string" ? params.pageParam : undefined,
+    pageSize: PAGE_SIZE,
+    status: params.status,
+    method: params.method,
+    bookingId: params.bookingId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo
   });
-  return {
-    ...res.data,
-    data: mapPayments(res.data.data)
-  };
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -210,6 +198,8 @@ const PaymentsPage = () => {
   const toast = useToast();
   const { roles } = useRbac();
   const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
+  const facilityScopeQuery = useAdminFacilityScope(!canReadGlobalLedger);
+  const facilityId = facilityScopeQuery.facility?.id;
 
   // ── Committed filter state ────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState("all");
@@ -250,19 +240,27 @@ const PaymentsPage = () => {
 
   // ── Infinite query ────────────────────────────────────────────────────────
   const paymentsQuery = useInfiniteQuery({
-    queryKey: ["admin", "finance", "payments", { statusFilter, methodFilter, bookingFilter, dateFrom, dateTo }],
+    queryKey: ["admin", "finance", "payments", { facilityId, statusFilter, methodFilter, bookingFilter, dateFrom, dateTo }],
     queryFn: ({ pageParam }) =>
       fetchPayments({
-        cursor:    pageParam as string | undefined,
+        facilityId,
+        pageParam,
         status:    statusFilter !== "all" ? statusFilter : undefined,
-        method:    methodFilter !== "all" ? methodFilter : undefined,
-        bookingId: bookingFilter.trim() || undefined,
-        dateFrom:  dateFrom || undefined,
-        dateTo:    dateTo   || undefined,
+        method:    canReadGlobalLedger && methodFilter !== "all" ? methodFilter : undefined,
+        bookingId: canReadGlobalLedger ? bookingFilter.trim() || undefined : undefined,
+        dateFrom:  canReadGlobalLedger ? dateFrom || undefined : undefined,
+        dateTo:    canReadGlobalLedger ? dateTo || undefined : undefined,
     }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined,
-    enabled: canReadGlobalLedger
+    initialPageParam: canReadGlobalLedger ? undefined : 1,
+    getNextPageParam: (lastPage) => {
+      if (facilityId) {
+        return lastPage.meta.page.number < lastPage.meta.page.totalPages
+          ? lastPage.meta.page.number + 1
+          : undefined;
+      }
+      return lastPage.meta.next_cursor ?? undefined;
+    },
+    enabled: canReadGlobalLedger || Boolean(facilityId)
   });
 
   // ── Retry mutation ────────────────────────────────────────────────────────
@@ -474,22 +472,21 @@ const PaymentsPage = () => {
     setFiltersOpen(false);
   };
 
-  const hasActiveFilters =
-    statusFilter !== "all" ||
-    methodFilter !== "all" ||
-    Boolean(bookingFilter) ||
-    Boolean(dateFrom) ||
-    Boolean(dateTo);
+  const hasActiveFilters = canReadGlobalLedger
+    ? statusFilter !== "all" || methodFilter !== "all" || Boolean(bookingFilter) || Boolean(dateFrom) || Boolean(dateTo)
+    : statusFilter !== "all";
 
   const filterSummaryChips = useMemo(() => {
     const chips: string[] = [];
     if (statusFilter !== "all") chips.push(`Status: ${STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label}`);
-    if (methodFilter !== "all") chips.push(`Method: ${METHOD_OPTIONS.find((o) => o.value === methodFilter)?.label}`);
-    if (bookingFilter) chips.push(`Booking: ${bookingFilter}`);
-    if (dateFrom)      chips.push(`From: ${dateFrom}`);
-    if (dateTo)        chips.push(`To: ${dateTo}`);
+    if (canReadGlobalLedger) {
+      if (methodFilter !== "all") chips.push(`Method: ${METHOD_OPTIONS.find((o) => o.value === methodFilter)?.label}`);
+      if (bookingFilter) chips.push(`Booking: ${bookingFilter}`);
+      if (dateFrom)      chips.push(`From: ${dateFrom}`);
+      if (dateTo)        chips.push(`To: ${dateTo}`);
+    }
     return chips;
-  }, [statusFilter, methodFilter, bookingFilter, dateFrom, dateTo]);
+  }, [canReadGlobalLedger, statusFilter, methodFilter, bookingFilter, dateFrom, dateTo]);
 
   const filterPanel = (
     <div className="space-y-4 text-left">
@@ -504,43 +501,47 @@ const PaymentsPage = () => {
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-        <span>Payment method</span>
-        <select
-          value={draftMethod}
-          onChange={(e) => setDraftMethod(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-        >
-          {METHOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </label>
+      {canReadGlobalLedger && (
+        <>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Payment method</span>
+            <select
+              value={draftMethod}
+              onChange={(e) => setDraftMethod(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+            >
+              {METHOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
 
-      <Input
-        label="Booking ID"
-        placeholder="e.g. 6c5fd013-..."
-        value={draftBooking}
-        onChange={(e) => setDraftBooking(e.target.value)}
-      />
+          <Input
+            label="Booking ID"
+            placeholder="e.g. 6c5fd013-..."
+            value={draftBooking}
+            onChange={(e) => setDraftBooking(e.target.value)}
+          />
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-        <span>Date from</span>
-        <input
-          type="date"
-          value={draftDateFrom}
-          onChange={(e) => setDraftDateFrom(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-        />
-      </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Date from</span>
+            <input
+              type="date"
+              value={draftDateFrom}
+              onChange={(e) => setDraftDateFrom(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+            />
+          </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-        <span>Date to</span>
-        <input
-          type="date"
-          value={draftDateTo}
-          onChange={(e) => setDraftDateTo(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-        />
-      </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Date to</span>
+            <input
+              type="date"
+              value={draftDateTo}
+              onChange={(e) => setDraftDateTo(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+            />
+          </label>
+        </>
+      )}
 
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button type="button" variant="ghost" onClick={clearFilters}>Clear</Button>
@@ -551,7 +552,12 @@ const PaymentsPage = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (!canReadGlobalLedger) {
-    return <FinanceScopeNotice />;
+    if (facilityScopeQuery.isLoading) {
+      return <FinanceScopeNotice title="Payments" description="Resolving your facility scope..." detail="Payment records will appear once the facility scope is available." />;
+    }
+    if (!facilityId) {
+      return <FinanceScopeNotice title="Payments" description="Your facility scope could not be resolved." detail="Payment data is hidden until the account is linked to exactly one facility." />;
+    }
   }
 
   return (
@@ -561,7 +567,7 @@ const PaymentsPage = () => {
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Payments</h1>
         <p className="text-sm text-slate-500">
-          Inspect transactions, retry failures, and review backend-calculated B2B settlement splits.
+          Inspect facility transactions and review backend-calculated B2B settlement splits.
         </p>
       </div>
 
@@ -785,7 +791,7 @@ const PaymentsPage = () => {
                 <Button variant="ghost" onClick={() => setDetailPayment(null)}>
                   Close
                 </Button>
-                {(detailPayment.status === "failed" || detailPayment.status === "pending") && (
+                {canReadGlobalLedger && (detailPayment.status === "failed" || detailPayment.status === "pending") && (
                   <Button
                     loading={retryMutation.isPending}
                     onClick={() => retryMutation.mutate(detailPayment.id)}
