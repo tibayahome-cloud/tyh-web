@@ -145,7 +145,7 @@ const extractErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : "Request failed";
 };
 
-const validateServiceForm = (form: ServiceFormState): string | null => {
+export const validateServiceForm = (form: ServiceFormState): string | null => {
   if (!form.serviceId) {
     return "Select a service.";
   }
@@ -196,7 +196,7 @@ const mapProviderCompensationForm = (provider: Provider): ProviderCompensationFo
   payoutPercentage: provider.compensation.payoutPercentage == null ? "" : String(provider.compensation.payoutPercentage)
 });
 
-const validateProviderForm = (form: ProviderCompensationFormState): string | null => {
+export const validateProviderForm = (form: ProviderCompensationFormState): string | null => {
   if (!form.userId.trim()) {
     return "Provider user ID is required.";
   }

@@ -6,7 +6,9 @@ import {
   facilityResponseCountdownTone,
   filterAssignableProviders,
   formatFacilityResponseCountdown,
-  priceToCents
+  priceToCents,
+  validateProviderForm,
+  validateServiceForm
 } from "../FacilityWorkspacePage";
 import type { Booking } from "../../../../../shared/schemas/booking";
 import type { Provider } from "../../../../../shared/schemas/provider";
@@ -34,6 +36,38 @@ describe("FacilityWorkspacePage helpers", () => {
       active: true,
       isEmergencyCapable: false
     });
+  });
+
+  it("validates facility service form requirements", () => {
+    expect(
+      validateServiceForm({
+        serviceId: "",
+        price: "1500",
+        estimateDurationMinutes: "45",
+        active: true,
+        isEmergencyCapable: false
+      })
+    ).toBe("Select a service.");
+
+    expect(
+      validateServiceForm({
+        serviceId: "service-1",
+        price: "-1",
+        estimateDurationMinutes: "45",
+        active: true,
+        isEmergencyCapable: false
+      })
+    ).toBe("Price must be zero or greater.");
+
+    expect(
+      validateServiceForm({
+        serviceId: "service-1",
+        price: "1500",
+        estimateDurationMinutes: "0",
+        active: true,
+        isEmergencyCapable: false
+      })
+    ).toBe("Duration must be at least 1 minute.");
   });
 
   it("builds provider compensation payloads by mode", () => {
@@ -75,6 +109,35 @@ describe("FacilityWorkspacePage helpers", () => {
       fixedPayoutCents: null,
       payoutPercentage: 40
     });
+  });
+
+  it("validates provider compensation form requirements", () => {
+    expect(
+      validateProviderForm({
+        userId: "",
+        mode: "employee",
+        fixedPayout: "",
+        payoutPercentage: ""
+      })
+    ).toBe("Provider user ID is required.");
+
+    expect(
+      validateProviderForm({
+        userId: "provider-user-1",
+        mode: "fixed",
+        fixedPayout: "-1",
+        payoutPercentage: ""
+      })
+    ).toBe("Fixed payout must be zero or greater.");
+
+    expect(
+      validateProviderForm({
+        userId: "provider-user-1",
+        mode: "percentage",
+        fixedPayout: "",
+        payoutPercentage: "101"
+      })
+    ).toBe("Payout percentage must be between 0 and 100.");
   });
 
   it("filters assignable providers by verification and service membership", () => {
