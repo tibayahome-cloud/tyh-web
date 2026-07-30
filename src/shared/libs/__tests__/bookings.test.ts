@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockPost } = vi.hoisted(() => ({
+const { mockGet, mockPost } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
   mockPost: vi.fn()
 }));
 
 vi.mock("../api", () => ({
   __esModule: true,
   default: {
+    get: mockGet,
     post: mockPost
   }
 }));
@@ -19,7 +21,7 @@ vi.mock("../fieldInclude", () => ({
   bookingTimeline: {}
 }));
 
-import { createBooking } from "../bookings";
+import { createBooking, fetchBookings } from "../bookings";
 
 describe("booking API helpers", () => {
   beforeEach(() => {
@@ -61,5 +63,39 @@ describe("booking API helpers", () => {
       }),
       { params: { fields: "id" } }
     );
+  });
+
+  it("scopes provider booking lists to the assigned provider user", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "booking-1",
+            status: "accepted",
+            booking_type: "immediate",
+            provider_user_id: "provider-user-1",
+            price_cents: 150000,
+            currency: "KES",
+            meta: {}
+          }
+        ],
+        meta: { page: { number: 1, size: 10, total: 1, total_pages: 1 } }
+      }
+    });
+
+    await fetchBookings({
+      providerId: "provider-user-1",
+      pageSize: 10,
+      statuses: ["accepted", "en_route"],
+      preset: "card"
+    });
+
+    expect(mockGet).toHaveBeenCalledWith("/bookings", {
+      params: expect.objectContaining({
+        "page[size]": 10,
+        "filter[provider_user_id]": "provider-user-1",
+        "filter[status]": "accepted,en_route"
+      })
+    });
   });
 });
