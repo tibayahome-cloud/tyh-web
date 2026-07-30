@@ -60,7 +60,15 @@ type ServiceOption = {
 
 type LocationSource = "none" | "map" | "current" | "saved" | "manual";
 
-const BOOKING_STEPS = [
+export const BOOKING_STEP_INDEX = {
+  service: 0,
+  location: 1,
+  facility: 2,
+  timing: 3,
+  confirm: 4
+} as const;
+
+export const BOOKING_STEPS = [
   {
     title: "Service",
     description: "What do you need?"
@@ -278,7 +286,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       setLocationSource("none");
       setRequestMode("fastest_available");
       setSelectedFacilityId(null);
-      setCurrentStep(0);
+      setCurrentStep(BOOKING_STEP_INDEX.service);
       setRecentLocations(loadRecentLocations());
       setSubmitError(null);
       defaultLocationAppliedRef.current = false;
@@ -733,7 +741,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                         type="button"
                         onClick={() => {
                           setValue("serviceId", service.id);
-                          setCurrentStep(1);
+                          setCurrentStep(BOOKING_STEP_INDEX.location);
                         }}
                         className={classNames(
                           "group flex flex-col rounded-xl border p-3 text-left transition-all",
@@ -856,14 +864,14 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   )}
 
                   <div className="flex items-center justify-between gap-3">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(0)} className="rounded-lg">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(BOOKING_STEP_INDEX.service)} className="rounded-lg">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                     <Button
                       variant="primary"
                       type="button"
                       disabled={!locationComplete}
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => setCurrentStep(BOOKING_STEP_INDEX.facility)}
                       className="rounded-lg px-8"
                     >
                       Next Step <ArrowRight className="ml-2 h-4 w-4" />
@@ -977,14 +985,14 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   )}
 
                   <div className="flex items-center justify-between pt-2">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-lg h-9 text-xs">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(BOOKING_STEP_INDEX.location)} className="rounded-lg h-9 text-xs">
                       <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                     </Button>
                     <Button
                       variant="primary"
                       type="button"
                       disabled={!resolvedFacilitySelection}
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => setCurrentStep(BOOKING_STEP_INDEX.timing)}
                       className="rounded-lg h-9 px-6 text-xs"
                     >
                       Continue <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -1072,13 +1080,13 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   )}
 
                   <div className="flex items-center justify-between pt-2">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(2)} className="rounded-lg h-9 text-xs">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(BOOKING_STEP_INDEX.facility)} className="rounded-lg h-9 text-xs">
                       <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                     </Button>
                     <Button
                       variant="primary"
                       type="button"
-                      onClick={() => setCurrentStep(4)}
+                      onClick={() => setCurrentStep(BOOKING_STEP_INDEX.confirm)}
                       className="rounded-lg h-9 px-6 text-xs"
                     >
                       Continue <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -1181,7 +1189,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       type="button"
                       fullWidth
                       className="rounded-lg h-9 text-xs"
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => setCurrentStep(BOOKING_STEP_INDEX.facility)}
                     >
                       <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                     </Button>

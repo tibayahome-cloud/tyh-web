@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveBookingFacilitySelection } from "../BookingRequestDialog";
+import { BOOKING_STEP_INDEX, BOOKING_STEPS, resolveBookingFacilitySelection } from "../BookingRequestDialog";
 import type { FacilityDiscoveryItem } from "../../../../shared/schemas/facility";
 
 const facility = (id: string): FacilityDiscoveryItem =>
@@ -35,6 +35,17 @@ const facility = (id: string): FacilityDiscoveryItem =>
   }) satisfies FacilityDiscoveryItem;
 
 describe("BookingRequestDialog facility selection", () => {
+  it("keeps facility selection between location and timing", () => {
+    expect(BOOKING_STEPS.map((step) => step.title)).toEqual(["Service", "Location", "Facility", "Timing", "Confirm"]);
+    expect(BOOKING_STEP_INDEX).toEqual({
+      service: 0,
+      location: 1,
+      facility: 2,
+      timing: 3,
+      confirm: 4
+    });
+  });
+
   it("uses the first discovered facility for fastest available bookings", () => {
     expect(resolveBookingFacilitySelection("fastest_available", null, [facility("facility-1"), facility("facility-2")])).toEqual({
       facilityId: "facility-1",
