@@ -59,14 +59,16 @@ describe("facility API helpers", () => {
     const result = await discoverFacilities({
       serviceId: "service-1",
       lat: -1.2921,
-      lng: 36.8219
+      lng: 36.8219,
+      excludeFacilityId: "facility-1"
     });
 
     expect(mockGet).toHaveBeenCalledWith("/facilities/discover", {
       params: {
         service_id: "service-1",
         lat: -1.2921,
-        lng: 36.8219
+        lng: 36.8219,
+        exclude_facility_id: "facility-1"
       }
     });
     expect(result).toEqual({ radiusM: 1500, nextRadiusM: 3000, facilities: [] });

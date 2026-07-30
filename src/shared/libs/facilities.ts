@@ -40,6 +40,7 @@ export type FacilityDiscoveryParams = {
   serviceId: string;
   lat: number;
   lng: number;
+  excludeFacilityId?: string;
 };
 
 export type FacilityBookingListParams = {
@@ -250,13 +251,15 @@ export const assignFacilityAdmin = async (facilityId: string, userId: string): P
 export const discoverFacilities = async ({
   serviceId,
   lat,
-  lng
+  lng,
+  excludeFacilityId
 }: FacilityDiscoveryParams): Promise<FacilityDiscoveryResult> => {
   const response = await api.get("/facilities/discover", {
     params: {
       service_id: serviceId,
       lat,
-      lng
+      lng,
+      ...(excludeFacilityId ? { exclude_facility_id: excludeFacilityId } : {})
     }
   });
   return mapFacilityDiscoveryResult(payloadData(response.data));

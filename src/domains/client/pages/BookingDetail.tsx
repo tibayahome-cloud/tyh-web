@@ -57,7 +57,8 @@ const BookingDetailPage = () => {
     queryFn: () => discoverFacilities({
       serviceId: booking?.service?.id ?? "",
       lat: booking?.lat ?? 0,
-      lng: booking?.lng ?? 0
+      lng: booking?.lng ?? 0,
+      excludeFacilityId: booking?.facilityId ?? undefined
     }),
     enabled: rerouteEligible && Boolean(booking?.service?.id) && booking?.lat !== null && booking?.lat !== undefined && booking?.lng !== null && booking?.lng !== undefined,
     staleTime: 30_000
