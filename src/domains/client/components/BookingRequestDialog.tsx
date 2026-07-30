@@ -32,7 +32,9 @@ import { useCreateBookingMutation } from "../../../shared/hooks/useBookings";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { Loading } from "../../../shared/components/Loading";
 import { api } from "../../../shared/libs/api";
+import { discoverFacilities } from "../../../shared/libs/facilities";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
+import type { BookingRequestMode, FacilityDiscoveryItem } from "../../../shared/schemas/facility";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { loadRecentLocations, saveRecentLocation, type StoredLocation } from "../../../shared/utils/recentLocations";
 import { Stepper } from "../../../shared/components/Stepper";
@@ -58,14 +60,6 @@ type ServiceOption = {
 
 type LocationSource = "none" | "map" | "current" | "saved" | "manual";
 
-const LOCATION_SOURCE_LABEL: Record<LocationSource, string> = {
-  none: "Not set",
-  map: "Map pin",
-  current: "Live location",
-  saved: "Recent location",
-  manual: "Manual coordinates"
-};
-
 const BOOKING_STEPS = [
   {
     title: "Service",
@@ -74,6 +68,10 @@ const BOOKING_STEPS = [
   {
     title: "Location",
     description: "Where are you?"
+  },
+  {
+    title: "Facility",
+    description: "Choose care site"
   },
   {
     title: "Timing",
@@ -148,6 +146,28 @@ const toLatLng = (lat?: string | null, lng?: string | null) => {
   return { lat: latNum, lng: lngNum };
 };
 
+const formatDistance = (distanceM: number | null): string => {
+  if (distanceM == null) {
+    return "Distance unavailable";
+  }
+  if (distanceM < 1000) {
+    return `${Math.round(distanceM)} m`;
+  }
+  return `${(distanceM / 1000).toFixed(1)} km`;
+};
+
+export const resolveBookingFacilitySelection = (
+  requestMode: BookingRequestMode,
+  selectedFacilityId: string | null,
+  facilities: FacilityDiscoveryItem[]
+): { facilityId: string; requestMode: BookingRequestMode } | null => {
+  if (requestMode === "fastest_available") {
+    const firstFacility = facilities[0];
+    return firstFacility ? { facilityId: firstFacility.id, requestMode } : null;
+  }
+  return selectedFacilityId ? { facilityId: selectedFacilityId, requestMode } : null;
+};
+
 export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: BookingRequestDialogProps) => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
@@ -156,6 +176,8 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
+  const [requestMode, setRequestMode] = useState<BookingRequestMode>("fastest_available");
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const { data: services, isLoading: loadingServices } = useServiceOptions(open);
   const { showToast } = useToast();
   const createBooking = useCreateBookingMutation("detail");
@@ -163,7 +185,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { isSubmitting },
     reset,
     watch,
     setValue,
@@ -174,7 +196,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
   });
   const [geoLoading, setGeoLoading] = useState(false);
   const [recentLocations, setRecentLocations] = useState<StoredLocation[]>([]);
-  const [locationSource, setLocationSource] = useState<LocationSource>("none");
+  const [, setLocationSource] = useState<LocationSource>("none");
 
   const selectedServiceId = watch("serviceId");
   const latField = watch("lat");
@@ -183,7 +205,6 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
   const homeAddressField = watch("homeAddress");
   const houseNumberField = watch("houseNumber");
   const apartmentField = watch("apartment");
-  const estimateField = watch("estimateDurationMinutes");
   const mapLocation = useMemo(() => toLatLng(latField, lngField), [latField, lngField]);
   const selectedService = useMemo(
     () => (services ?? []).find((service) => service.id === selectedServiceId),
@@ -197,24 +218,32 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       (apartmentField?.trim().length ?? 0) > 0;
     return Boolean(mapLocation && hasText);
   }, [mapLocation, homeAddressField, addressField, houseNumberField, apartmentField]);
-  const derivedStep = useMemo(() => {
-    if (!selectedService) {
-      return 0;
-    }
-    if (!locationComplete) {
-      return 1;
-    }
-    return 2;
-  }, [selectedService, locationComplete]);
   const [currentStep, setCurrentStep] = useState(0);
-  const derivedEstimateMinutes = useMemo(() => {
-    if (estimateField && estimateField.trim().length) {
-      const value = Number(estimateField);
-      return Number.isNaN(value) ? null : value;
-    }
-    return selectedService?.default_estimate_minutes ?? null;
-  }, [estimateField, selectedService?.default_estimate_minutes]);
-  const derivedPriceCents = selectedService?.base_price_cents ?? null;
+  const facilityDiscoveryQuery = useQuery({
+    queryKey: ["client", "facilities", "discover", selectedServiceId, mapLocation?.lat, mapLocation?.lng],
+    queryFn: () =>
+      discoverFacilities({
+        serviceId: selectedServiceId,
+        lat: Number(mapLocation?.lat),
+        lng: Number(mapLocation?.lng)
+      }),
+    enabled: open && Boolean(selectedServiceId) && Boolean(mapLocation) && locationComplete
+  });
+  const discoveredFacilities = useMemo(
+    () => facilityDiscoveryQuery.data?.facilities ?? [],
+    [facilityDiscoveryQuery.data?.facilities]
+  );
+  const resolvedFacilitySelection = useMemo(
+    () => resolveBookingFacilitySelection(requestMode, selectedFacilityId, discoveredFacilities),
+    [discoveredFacilities, requestMode, selectedFacilityId]
+  );
+  const selectedFacility = useMemo(
+    () =>
+      discoveredFacilities.find((facility) => facility.id === resolvedFacilitySelection?.facilityId) ??
+      discoveredFacilities[0],
+    [discoveredFacilities, resolvedFacilitySelection?.facilityId]
+  );
+  const derivedPriceCents = selectedFacility?.service.priceCents ?? selectedService?.base_price_cents ?? null;
   const locationSummaryLabel = useMemo(() => {
     const summaryParts: string[] = [];
     if (homeAddressField?.trim()) {
@@ -247,6 +276,9 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
         serviceId: serviceId ?? ""
       });
       setLocationSource("none");
+      setRequestMode("fastest_available");
+      setSelectedFacilityId(null);
+      setCurrentStep(0);
       setRecentLocations(loadRecentLocations());
       setSubmitError(null);
       defaultLocationAppliedRef.current = false;
@@ -258,6 +290,11 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       setValue("serviceId", serviceId);
     }
   }, [serviceId, setValue]);
+
+  useEffect(() => {
+    setRequestMode("fastest_available");
+    setSelectedFacilityId(null);
+  }, [selectedServiceId, mapLocation?.lat, mapLocation?.lng]);
 
   const applyLocation = useCallback(
     (coords: { lat: number; lng: number }, source: LocationSource) => {
@@ -301,19 +338,6 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       },
       "saved"
     );
-
-  const handleClearLocation = () => {
-    setValue("lat", "", { shouldDirty: true, shouldTouch: true });
-    setValue("lng", "", { shouldDirty: true, shouldTouch: true });
-
-    // Also clear address text if it looks like a raw coordinate pair
-    const currentAddress = getValues("addressText");
-    if (currentAddress && coordinateRegex.test(currentAddress)) {
-      setValue("addressText", "", { shouldDirty: true, shouldTouch: true });
-    }
-
-    setLocationSource("none");
-  };
 
   const handleUseCurrentLocation = () => {
     if (geoLoading) {
@@ -493,6 +517,11 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       return;
     }
     const trimmedAddress = values.addressText?.trim();
+    const facilitySelection = resolveBookingFacilitySelection(requestMode, selectedFacilityId, discoveredFacilities);
+    if (!facilitySelection) {
+      setSubmitError("Select a facility before submitting.");
+      return;
+    }
 
     // Validate scheduled time if scheduling for later
     let scheduledAt: string | undefined;
@@ -526,7 +555,9 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
         lat,
         lng,
         emergency: values.emergency ?? false,
-        scheduledAt
+        scheduledAt,
+        facilityId: facilitySelection.facilityId,
+        requestMode: facilitySelection.requestMode
       });
       const locationHistoryLabel =
         locationSummaryLabel === "Add detailed directions for your provider"
@@ -825,14 +856,14 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   )}
 
                   <div className="flex items-center justify-between gap-3">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-lg">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(0)} className="rounded-lg">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                     <Button
                       variant="primary"
                       type="button"
                       disabled={!locationComplete}
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => setCurrentStep(3)}
                       className="rounded-lg px-8"
                     >
                       Next Step <ArrowRight className="ml-2 h-4 w-4" />
@@ -841,10 +872,131 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                 </motion.div>
               )}
 
-              {/* STEP 3: TIMING */}
+              {/* STEP 3: FACILITY */}
               {currentStep === 2 && (
                 <motion.div
                   key="step2"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRequestMode("fastest_available");
+                        setSelectedFacilityId(null);
+                      }}
+                      disabled={discoveredFacilities.length === 0}
+                      className={classNames(
+                        "rounded-xl border p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                        requestMode === "fastest_available"
+                          ? "border-tiba-blue bg-blue-50/50 ring-1 ring-tiba-blue/20"
+                          : "border-slate-100 bg-white hover:border-tiba-blue/30"
+                      )}
+                    >
+                      <p className="text-sm font-bold text-slate-900">Fastest available</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Start with the nearest matching facility and allow rerouting if they do not respond.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestMode("selected_facility")}
+                      disabled={discoveredFacilities.length === 0}
+                      className={classNames(
+                        "rounded-xl border p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                        requestMode === "selected_facility"
+                          ? "border-tiba-blue bg-blue-50/50 ring-1 ring-tiba-blue/20"
+                          : "border-slate-100 bg-white hover:border-tiba-blue/30"
+                      )}
+                    >
+                      <p className="text-sm font-bold text-slate-900">Choose facility</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Pick a specific facility. If it times out, rerouting will require confirmation.
+                      </p>
+                    </button>
+                  </div>
+
+                  {facilityDiscoveryQuery.isLoading ? (
+                    <div className="rounded-xl border border-slate-100 bg-white p-6">
+                      <Loading label="Finding nearby facilities..." />
+                    </div>
+                  ) : facilityDiscoveryQuery.isError ? (
+                    <p className="rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-600">
+                      We could not load nearby facilities. Try again after confirming your location.
+                    </p>
+                  ) : discoveredFacilities.length === 0 ? (
+                    <p className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-600">
+                      No nearby facilities currently offer this service.
+                    </p>
+                  ) : (
+                    <div className="grid gap-3">
+                      {discoveredFacilities.map((facility) => {
+                        const isSelected =
+                          requestMode === "selected_facility"
+                            ? selectedFacilityId === facility.id
+                            : resolvedFacilitySelection?.facilityId === facility.id;
+                        return (
+                          <button
+                            key={facility.id}
+                            type="button"
+                            onClick={() => {
+                              setRequestMode("selected_facility");
+                              setSelectedFacilityId(facility.id);
+                            }}
+                            className={classNames(
+                              "rounded-xl border p-4 text-left transition-all",
+                              isSelected
+                                ? "border-tiba-blue bg-blue-50/50 ring-1 ring-tiba-blue/20"
+                                : "border-slate-100 bg-white hover:border-tiba-blue/30"
+                            )}
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-slate-900">{facility.name}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {facility.facilityType} • {facility.county} • {formatDistance(facility.distanceM)}
+                                </p>
+                                <p className="mt-1 line-clamp-1 text-xs text-slate-400">{facility.address}</p>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <p className="text-sm font-bold text-tiba-blue">
+                                  {formatCurrency(facility.service.priceCents)}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {facility.service.estimateDurationMinutes ?? selectedService?.default_estimate_minutes ?? "-"}m
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-lg h-9 text-xs">
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+                    </Button>
+                    <Button
+                      variant="primary"
+                      type="button"
+                      disabled={!resolvedFacilitySelection}
+                      onClick={() => setCurrentStep(3)}
+                      className="rounded-lg h-9 px-6 text-xs"
+                    >
+                      Continue <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 4: TIMING */}
+              {currentStep === 3 && (
+                <motion.div
+                  key="step3"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
@@ -920,13 +1072,13 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   )}
 
                   <div className="flex items-center justify-between pt-2">
-                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(1)} className="rounded-lg h-9 text-xs">
+                    <Button variant="ghost" type="button" onClick={() => setCurrentStep(2)} className="rounded-lg h-9 text-xs">
                       <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                     </Button>
                     <Button
                       variant="primary"
                       type="button"
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => setCurrentStep(4)}
                       className="rounded-lg h-9 px-6 text-xs"
                     >
                       Continue <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -935,10 +1087,10 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                 </motion.div>
               )}
 
-              {/* STEP 4: CONFIRMATION */}
-              {currentStep === 3 && (
+              {/* STEP 5: CONFIRMATION */}
+              {currentStep === 4 && (
                 <motion.div
-                  key="step3"
+                  key="step4"
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
@@ -963,6 +1115,23 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                         <div>
                           <p className="text-[10px] text-slate-400">Service</p>
                           <p className="text-sm font-semibold text-slate-900">{selectedService?.name}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-emerald-600">
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] text-slate-400">Facility</p>
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {requestMode === "fastest_available" ? "Fastest available" : selectedFacility?.name}
+                          </p>
+                          {selectedFacility && (
+                            <p className="text-[10px] text-slate-400">
+                              {selectedFacility.name} • {formatDistance(selectedFacility.distanceM)}
+                            </p>
+                          )}
                         </div>
                       </div>
 
