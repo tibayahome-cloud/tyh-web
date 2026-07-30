@@ -17,9 +17,11 @@ vi.mock("../api", () => ({
 
 import {
   assignFacilityAdmin,
+  assignFacilityBookingProvider,
   createFacility,
   discoverFacilities,
   bootstrapFacilityProvider,
+  fetchFacilityBookings,
   fetchFacilityProviders,
   facilityServiceUpdatePayload,
   updateFacilityProviderCompensation
@@ -204,6 +206,78 @@ describe("facility API helpers", () => {
       })
     });
     expect(result.providers.map((provider) => provider.userId)).toEqual(["user-1"]);
+  });
+
+  it("fetches facility booking queues with facility status filters", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "booking-1",
+            status: "pending",
+            booking_type: "immediate",
+            facility_id: "facility-1",
+            facility_status: "pending",
+            request_mode: "selected_facility",
+            price_cents: 120000,
+            currency: "KES"
+          }
+        ],
+        meta: { page: { number: 1, size: 25, total: 1, total_pages: 1 } }
+      }
+    });
+
+    const result = await fetchFacilityBookings("facility-1", {
+      pageSize: 25,
+      facilityStatus: "pending,claimed"
+    });
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/bookings", {
+      params: {
+        "page[number]": 1,
+        "page[size]": 25,
+        "filter[facility_status]": "pending,claimed"
+      }
+    });
+    expect(result.bookings[0]).toMatchObject({
+      id: "booking-1",
+      facilityId: "facility-1",
+      facilityStatus: "pending"
+    });
+  });
+
+  it("assigns a provider to a facility booking with backend field names", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        data: {
+          id: "booking-1",
+          status: "accepted",
+          booking_type: "immediate",
+          facility_id: "facility-1",
+          facility_status: "claimed",
+          request_mode: "selected_facility",
+          provider: { id: "provider-user-1", full_name: "Provider One" },
+          price_cents: 120000,
+          currency: "KES"
+        }
+      }
+    });
+
+    const result = await assignFacilityBookingProvider("facility-1", "booking-1", {
+      providerUserId: "provider-user-1",
+      reason: "facility_assignment"
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/bookings/booking-1/assign", {
+      provider_user_id: "provider-user-1",
+      reason: "facility_assignment"
+    });
+    expect(result).toMatchObject({
+      id: "booking-1",
+      facilityId: "facility-1",
+      facilityStatus: "claimed",
+      provider: { id: "provider-user-1", fullName: "Provider One" }
+    });
   });
 
   it("bootstraps a provider into a facility", async () => {

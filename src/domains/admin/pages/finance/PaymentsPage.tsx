@@ -11,6 +11,7 @@ import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
+import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
 import { mapPayments } from "../../../../shared/schemas/payment";
 import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schemas/payment";
@@ -87,6 +88,11 @@ const formatDateTime = (iso: string | null | undefined) =>
         timeStyle: "short",
       })
     : "—";
+
+export const canUseGlobalPaymentLedger = (roles: string[]): boolean => {
+  const roleSet = new Set(roles);
+  return roleSet.has("admin.super") || roleSet.has("admin");
+};
 
 // ─── Status styling ───────────────────────────────────────────────────────────
 
@@ -206,6 +212,8 @@ const DetailField = ({
 
 const PaymentsPage = () => {
   const toast = useToast();
+  const { roles } = useRbac();
+  const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
 
   // ── Committed filter state ────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState("all");
@@ -255,9 +263,10 @@ const PaymentsPage = () => {
         bookingId: bookingFilter.trim() || undefined,
         dateFrom:  dateFrom || undefined,
         dateTo:    dateTo   || undefined,
-      }),
+    }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined,
+    enabled: canReadGlobalLedger
   });
 
   // ── Retry mutation ────────────────────────────────────────────────────────
@@ -545,6 +554,22 @@ const PaymentsPage = () => {
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!canReadGlobalLedger) {
+    return (
+      <Card>
+        <div className="space-y-2">
+          <h1 className="text-xl font-semibold text-slate-900">Payments</h1>
+          <p className="text-sm text-slate-600">
+            Facility-scoped payment reporting is not available from the backend yet.
+          </p>
+          <p className="text-sm text-slate-500">
+            Use booking records for now; facility wallet and automatic facility payout views stay hidden until the backend exposes scoped settlement data.
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
 

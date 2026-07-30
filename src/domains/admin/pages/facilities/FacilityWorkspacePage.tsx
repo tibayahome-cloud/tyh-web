@@ -333,7 +333,7 @@ const ProviderRow = ({
   </article>
 );
 
-const FacilityBookingRow = ({
+export const FacilityBookingRow = ({
   booking,
   onAssign,
   canAssign,
