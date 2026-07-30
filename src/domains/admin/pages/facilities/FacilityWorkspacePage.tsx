@@ -19,7 +19,9 @@ import { api } from "../../../../shared/libs/api";
 import {
   createFacilityService,
   deleteFacilityService,
+  assignFacilityBookingProvider,
   fetchFacility,
+  fetchFacilityBookings,
   fetchFacilityProviders,
   fetchFacilityServices,
   bootstrapFacilityProvider,
@@ -39,6 +41,7 @@ import {
   formatProviderCompensation
 } from "../../../../shared/schemas/facility";
 import type { Provider } from "../../../../shared/schemas/provider";
+import type { Booking } from "../../../../shared/schemas/booking";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 
 type Envelope<T> = {
@@ -67,6 +70,11 @@ type ProviderCompensationFormState = {
   mode: ProviderCompensationMode;
   fixedPayout: string;
   payoutPercentage: string;
+};
+
+type AssignmentFormState = {
+  providerUserId: string;
+  reason: string;
 };
 
 const initialServiceForm: ServiceFormState = {
@@ -167,6 +175,16 @@ const validateProviderForm = (form: ProviderCompensationFormState): string | nul
     }
   }
   return null;
+};
+
+export const filterAssignableProviders = (booking: Booking | null, providers: Provider[]): Provider[] => {
+  if (!booking?.service?.id) {
+    return providers.filter((provider) => provider.verified);
+  }
+  return providers.filter((provider) =>
+    provider.verified &&
+    provider.services.some((service) => service.active && service.serviceId === booking.service?.id)
+  );
 };
 
 const fetchCatalogServices = async (): Promise<CatalogService[]> => {
@@ -277,6 +295,59 @@ const ProviderRow = ({
   </article>
 );
 
+const FacilityBookingRow = ({
+  booking,
+  onAssign,
+  canAssign
+}: {
+  booking: Booking;
+  onAssign: (booking: Booking) => void;
+  canAssign: boolean;
+}) => (
+  <article className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <h3 className="truncate text-sm font-semibold text-slate-900">{booking.service?.name ?? "Service request"}</h3>
+        <p className="mt-1 text-sm text-slate-500">{booking.client?.fullName ?? "Client"} • {booking.addressText ?? "Location set"}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase text-slate-600">
+          {booking.status.replace(/_/g, " ")}
+        </span>
+        {booking.facilityStatus && (
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold uppercase text-tiba-blue">
+            {booking.facilityStatus}
+          </span>
+        )}
+      </div>
+    </div>
+    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+      <div>
+        <p className="text-xs font-semibold uppercase text-slate-500">Provider</p>
+        <p className="mt-1 text-slate-800">{booking.provider?.fullName ?? "Unassigned"}</p>
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase text-slate-500">Due</p>
+        <p className="mt-1 text-slate-800">
+          {booking.facilityResponseDueAt ? new Date(booking.facilityResponseDueAt).toLocaleTimeString() : "-"}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase text-slate-500">Mode</p>
+        <p className="mt-1 text-slate-800">{booking.requestMode?.replace(/_/g, " ") ?? "-"}</p>
+      </div>
+    </div>
+    {canAssign && (
+      <div className="mt-4 flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => onAssign(booking)}>
+          <EditIcon fontSize="small" />
+          {booking.provider ? "Reassign" : "Assign"}
+        </Button>
+      </div>
+    )}
+  </article>
+);
+
 const FacilityWorkspacePage = () => {
   const { facilityId } = useParams();
   const queryClient = useQueryClient();
@@ -284,6 +355,8 @@ const FacilityWorkspacePage = () => {
   const canReadFacilities = hasPermission("facility:read");
   const canManageFacility = hasPermission("facility:manage");
   const canManageServices = hasPermission("facility:services.manage");
+  const canVerifyProviders = hasPermission("provider:verify");
+  const canManageBookings = hasPermission("booking:manage");
 
   const [financialsVisible, setFinancialsVisible] = useState(true);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
@@ -296,6 +369,9 @@ const FacilityWorkspacePage = () => {
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [providerForm, setProviderForm] = useState<ProviderCompensationFormState>(initialProviderForm);
   const [providerFormError, setProviderFormError] = useState<string | null>(null);
+  const [assignmentBooking, setAssignmentBooking] = useState<Booking | null>(null);
+  const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>({ providerUserId: "", reason: "" });
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   const facilityQuery = useQuery({
@@ -322,12 +398,27 @@ const FacilityWorkspacePage = () => {
       fetchFacilityProviders(String(facilityId), {
         search: providerSearch.trim() || undefined
       }),
-    enabled: Boolean(facilityId) && canReadFacilities && hasPermission("provider:verify")
+    enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders
+  });
+
+  const bookingsQuery = useQuery({
+    queryKey: ["admin", "facilities", facilityId, "bookings", "assignment"],
+    queryFn: () =>
+      fetchFacilityBookings(String(facilityId), {
+        pageSize: 25,
+        facilityStatus: "pending,claimed"
+      }),
+    enabled: Boolean(facilityId) && canReadFacilities && canManageBookings
   });
 
   const facility = facilityQuery.data;
   const facilityServices = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
-  const providers = providersQuery.data?.providers ?? [];
+  const providers = useMemo(() => providersQuery.data?.providers ?? [], [providersQuery.data?.providers]);
+  const facilityBookings = bookingsQuery.data?.bookings ?? [];
+  const assignableProviders = useMemo(
+    () => filterAssignableProviders(assignmentBooking, providers),
+    [assignmentBooking, providers]
+  );
 
   useEffect(() => {
     if (facility) {
@@ -345,6 +436,7 @@ const FacilityWorkspacePage = () => {
   const invalidateWorkspace = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "services"] });
+    queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "bookings"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities"] });
   };
 
@@ -411,6 +503,23 @@ const FacilityWorkspacePage = () => {
     }
   });
 
+  const assignmentMutation = useMutation({
+    mutationFn: ({ booking, form }: { booking: Booking; form: AssignmentFormState }) =>
+      assignFacilityBookingProvider(String(facilityId), booking.id, {
+        providerUserId: form.providerUserId,
+        reason: form.reason.trim() || undefined
+      }),
+    onSuccess: () => {
+      invalidateWorkspace();
+      setAssignmentBooking(null);
+      setAssignmentForm({ providerUserId: "", reason: "" });
+      setAssignmentError(null);
+    },
+    onError: (error) => {
+      setAssignmentError(extractErrorMessage(error));
+    }
+  });
+
   const openServiceModal = (service?: FacilityService) => {
     setEditingService(service ?? null);
     setServiceForm(service ? mapServiceForm(service) : initialServiceForm);
@@ -454,6 +563,16 @@ const FacilityWorkspacePage = () => {
     }
     setProviderFormError(null);
     providerMutation.mutate(providerForm);
+  };
+
+  const openAssignmentModal = (booking: Booking) => {
+    const options = filterAssignableProviders(booking, providers);
+    setAssignmentBooking(booking);
+    setAssignmentForm({
+      providerUserId: options[0]?.userId ?? "",
+      reason: booking.provider ? "facility_reassignment" : "facility_assignment"
+    });
+    setAssignmentError(null);
   };
 
   if (!canReadFacilities) {
@@ -641,6 +760,33 @@ const FacilityWorkspacePage = () => {
         )}
       </Card>
 
+      <Card
+        title="Facility booking queue"
+        description="Assign or reassign providers for bookings routed to this facility."
+        badge={`${facilityBookings.length} open`}
+      >
+        {!canManageBookings ? (
+          <p className="text-sm text-slate-600">You do not have permission to manage facility bookings.</p>
+        ) : bookingsQuery.isLoading ? (
+          <Loading />
+        ) : bookingsQuery.isError ? (
+          <p className="text-sm text-danger-600">{extractErrorMessage(bookingsQuery.error)}</p>
+        ) : facilityBookings.length === 0 ? (
+          <p className="text-sm text-slate-600">No pending facility bookings.</p>
+        ) : (
+          <div className="grid gap-3">
+            {facilityBookings.map((booking) => (
+              <FacilityBookingRow
+                key={booking.id}
+                booking={booking}
+                canAssign={canManageBookings && canVerifyProviders}
+                onAssign={openAssignmentModal}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
+
       <Modal
         open={serviceModalOpen}
         title={editingService ? "Edit facility service" : "Add facility service"}
@@ -794,6 +940,61 @@ const FacilityWorkspacePage = () => {
             </Button>
             <Button type="button" loading={providerMutation.isPending} onClick={handleSaveProvider}>
               {editingProvider ? "Save compensation" : "Bootstrap provider"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(assignmentBooking)}
+        title={assignmentBooking?.provider ? "Reassign provider" : "Assign provider"}
+        description={assignmentBooking ? `Choose a provider configured for ${assignmentBooking.service?.name ?? "this service"}.` : undefined}
+        onClose={() => setAssignmentBooking(null)}
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Provider</span>
+            <select
+              value={assignmentForm.providerUserId}
+              onChange={(event) => setAssignmentForm((current) => ({ ...current, providerUserId: event.target.value }))}
+              className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+            >
+              <option value="">Select provider</option>
+              {assignableProviders.map((provider) => (
+                <option key={provider.userId} value={provider.userId}>
+                  {providerName(provider)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Reason</span>
+            <textarea
+              value={assignmentForm.reason}
+              onChange={(event) => setAssignmentForm((current) => ({ ...current, reason: event.target.value }))}
+              className="min-h-20 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+            />
+          </label>
+          {assignableProviders.length === 0 && (
+            <p className="text-sm text-warning-500">No verified provider in this facility is configured for this service.</p>
+          )}
+          {assignmentError && <p className="text-sm text-danger-600">{assignmentError}</p>}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setAssignmentBooking(null)} disabled={assignmentMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={assignmentMutation.isPending}
+              disabled={!assignmentBooking || !assignmentForm.providerUserId}
+              onClick={() => {
+                if (assignmentBooking) {
+                  assignmentMutation.mutate({ booking: assignmentBooking, form: assignmentForm });
+                }
+              }}
+            >
+              Save assignment
             </Button>
           </div>
         </div>

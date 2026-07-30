@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFacilityServiceInput, buildProviderCompensationInput, priceToCents } from "../FacilityWorkspacePage";
+import {
+  buildFacilityServiceInput,
+  buildProviderCompensationInput,
+  filterAssignableProviders,
+  priceToCents
+} from "../FacilityWorkspacePage";
+import type { Booking } from "../../../../../shared/schemas/booking";
+import type { Provider } from "../../../../../shared/schemas/provider";
 
 describe("FacilityWorkspacePage helpers", () => {
   it("converts facility service pricing into cents", () => {
@@ -66,5 +73,37 @@ describe("FacilityWorkspacePage helpers", () => {
       fixedPayoutCents: null,
       payoutPercentage: 40
     });
+  });
+
+  it("filters assignable providers by verification and service membership", () => {
+    const booking = {
+      service: {
+        id: "service-1"
+      }
+    } as Booking;
+    const providers = [
+      {
+        userId: "provider-1",
+        verified: true,
+        services: [{ serviceId: "service-1", active: true }]
+      },
+      {
+        userId: "provider-2",
+        verified: false,
+        services: [{ serviceId: "service-1", active: true }]
+      },
+      {
+        userId: "provider-3",
+        verified: true,
+        services: [{ serviceId: "service-2", active: true }]
+      },
+      {
+        userId: "provider-4",
+        verified: true,
+        services: [{ serviceId: "service-1", active: false }]
+      }
+    ] as Provider[];
+
+    expect(filterAssignableProviders(booking, providers).map((provider) => provider.userId)).toEqual(["provider-1"]);
   });
 });
