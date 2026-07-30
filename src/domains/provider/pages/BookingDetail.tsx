@@ -1,18 +1,20 @@
 import { useCallback, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ChevronRight, Clock, MapPin, MessageCircle, Phone, Navigation, X, StarIcon, List } from "lucide-react";
+import { Clock, MapPin, MessageCircle, Phone, Navigation, X, List } from "lucide-react";
 import type { NavigationStep } from "../../../shared/components/BookingLiveMapCard";
 import classNames from "classnames";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { useBookingDetail, useMarkBookingMutation } from "../../../shared/hooks/useBookings";
+import { useAuth } from "../../../shared/hooks/useAuth";
 import { Loading } from "../../../shared/components/Loading";
 import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { BookingNotesPanel } from "../components/BookingNotesPanel";
 import type { Booking } from "../../../shared/schemas/booking";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 
 const ACTION_COPY: Record<
   string,
@@ -61,24 +63,13 @@ const ACTION_COPY: Record<
   }
 };
 
-const formatCurrency = (amountCents?: number | null, currency = "KES") => {
-  if (amountCents == null) {
-    return "—";
-  }
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency
-    }).format(amountCents / 100);
-  } catch {
-    return `${currency} ${(amountCents / 100).toFixed(2)}`;
-  }
-};
-
 const ProviderBookingDetailPage = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
+  const { user } = useAuth();
+  const profileQuery = useProviderProfile(user?.id);
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const booking = detailQuery.data;
+  const financialsVisible = !profileQuery.isLoading && providerFinancialsAreVisible(profileQuery.data);
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
@@ -204,7 +195,7 @@ const ProviderBookingDetailPage = () => {
                 <InfoRow
                   label="Duration"
                   value={booking.estimateDurationMinutes ? `Est. ${booking.estimateDurationMinutes} min` : "—"}
-                  helper="Earnings credited to wallet after completion"
+                  helper={financialsVisible ? "Earnings credited to wallet after completion" : "Facility manages payout details"}
                   icon={<Clock className="h-3.5 w-3.5 text-slate-400" />}
                 />
                 <InfoRow label="Protocol Status" value={booking.status.replace(/_/g, " ")} />

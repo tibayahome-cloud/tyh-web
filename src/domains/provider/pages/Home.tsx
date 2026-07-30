@@ -10,7 +10,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { useLocationAccess } from "../../../shared/hooks/useLocationAccess";
-import { useProviderProfile } from "../hooks/useProviderProfile";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { bookingKeys, useBookingList, useAcceptBookingMutation } from "../../../shared/hooks/useBookings";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
@@ -26,7 +26,6 @@ import { useUpdateProviderStatus } from "../hooks/useProviderProfile";
 import {
   Power,
   Activity,
-  TrendingUp,
   Rocket,
   MessageCircle,
   ArrowRight,
@@ -37,7 +36,7 @@ import {
   Settings
 } from "lucide-react";
 
-import { Booking } from "../../../shared/schemas/booking";
+import type { Booking } from "../../../shared/schemas/booking";
 
 const ACTIVE_BOOKING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider"] as const;
 const ACTIVE_STATUS_PRIORITY: Record<string, number> = {
@@ -102,15 +101,6 @@ const formatTimestamp = (iso?: string | null) => {
     hour: "2-digit",
     minute: "2-digit"
   });
-};
-
-const formatPrice = (amountCents?: number, currency = "KES") => {
-  const value = typeof amountCents === "number" ? amountCents / 100 : 0;
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value);
-  } catch {
-    return `${currency} ${value.toFixed(2)}`;
-  }
 };
 
 const ProviderHome = () => {
@@ -225,6 +215,7 @@ const ProviderHome = () => {
   }, [upcomingList?.bookings, activeBooking]);
 
   const historyBookings = historyList?.bookings ?? [];
+  const financialsVisible = providerFinancialsAreVisible(profile);
 
   if (loadingProfile) return <Loading fullHeight />;
 
@@ -249,7 +240,7 @@ const ProviderHome = () => {
         {/* Intelligence Layer */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-4">
-            <RevenueSnapshot />
+            <RevenueSnapshot financialsVisible={financialsVisible} />
           </div>
           <div className="lg:col-span-8">
             <PerformanceStats />

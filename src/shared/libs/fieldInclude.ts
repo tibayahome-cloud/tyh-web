@@ -145,6 +145,9 @@ export const providerProfile: FieldPreset = {
     "zone_id"
   ],
   includes: {
+    facility: {
+      fields: ["id", "name", "provider_financials_visible"]
+    },
     user: {
       fields: ["id", "full_name", "email", "phone", "avatar_url"]
     },
@@ -185,6 +188,9 @@ export const providerDetail: FieldPreset = {
     "payout_percentage"
   ],
   includes: {
+    facility: {
+      fields: ["id", "name", "provider_financials_visible"]
+    },
     user: {
       fields: ["id", "full_name", "email", "phone", "avatar_url", "status"]
     },

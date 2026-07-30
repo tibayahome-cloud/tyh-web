@@ -12,18 +12,6 @@ import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { StarIcon } from "lucide-react";
 
-const ACTIVE_STATUSES = [
-    "broadcasting",
-    "accepted",
-    "en_route",
-    "nearby",
-    "arrived",
-    "in_service",
-    "completed_by_provider",
-    "client_completed",
-    "client_confirmed"
-] as const;
-
 const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] }> = [
     { value: "all", label: "All bookings" },
     { value: "active", label: "Active & In-Progress", statuses: ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider", "client_completed"] },
@@ -120,15 +108,6 @@ const computeDateRange = (value: string) => {
         return { from: from.toISOString(), to: now.toISOString() };
     }
     return null;
-};
-
-const formatCurrency = (amountCents?: number, currency = "KES") => {
-    const value = typeof amountCents === "number" ? amountCents / 100 : 0;
-    try {
-        return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value);
-    } catch {
-        return `${currency} ${value.toFixed(2)}`;
-    }
 };
 
 const ProviderBookings = () => {
@@ -308,7 +287,7 @@ const ProviderBookings = () => {
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Bookings</p>
                     <h1 className="text-2xl font-semibold text-slate-900">Manage every request</h1>
-                    <p className="text-sm text-slate-500">Track history and payouts in one place.</p>
+                    <p className="text-sm text-slate-500">Track active work, history, and client handoffs in one place.</p>
                 </div>
                 <div ref={filterMenuRef} className="relative inline-flex">
                     <Button variant={hasActiveFilters ? "primary" : "secondary"} onClick={toggleFilters} className="inline-flex items-center gap-2">
@@ -384,7 +363,7 @@ const ProviderBookings = () => {
                                     <th className="px-6 py-3">Client</th>
                                     <th className="px-6 py-3">Status</th>
                                     <th className="px-6 py-3">Scheduled / Updated</th>
-                                    <th className="px-6 py-3">Payout</th>
+                                    <th className="px-6 py-3">Duration</th>
                                     <th className="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
