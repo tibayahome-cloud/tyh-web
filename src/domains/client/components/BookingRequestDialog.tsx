@@ -91,6 +91,10 @@ export const BOOKING_STEPS = [
   }
 ];
 
+/** Returns the first booking step for the caller's entry point. */
+export const getInitialBookingStep = (serviceId?: string | null): number =>
+  serviceId ? BOOKING_STEP_INDEX.location : BOOKING_STEP_INDEX.service;
+
 const coordinateRegex =
   /^\s*(-?\d+(?:\.\d+)?)\s*(?:,|\s)\s*(-?\d+(?:\.\d+)?)/;
 
@@ -286,7 +290,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       setLocationSource("none");
       setRequestMode("fastest_available");
       setSelectedFacilityId(null);
-      setCurrentStep(BOOKING_STEP_INDEX.service);
+      setCurrentStep(getInitialBookingStep(serviceId));
       setRecentLocations(loadRecentLocations());
       setSubmitError(null);
       defaultLocationAppliedRef.current = false;
@@ -802,6 +806,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                       </div>
                       <button
                         type="button"
+                        aria-label="Use current location"
                         onClick={handleUseCurrentLocation}
                         className="flex h-9 w-9 items-center justify-center rounded-lg bg-tiba-blue text-white shadow-lg active:scale-95 transition-transform"
                       >

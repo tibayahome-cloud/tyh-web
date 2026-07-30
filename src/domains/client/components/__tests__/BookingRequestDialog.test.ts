@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { BOOKING_STEP_INDEX, BOOKING_STEPS, resolveBookingFacilitySelection } from "../BookingRequestDialog";
+import {
+  BOOKING_STEP_INDEX,
+  BOOKING_STEPS,
+  getInitialBookingStep,
+  resolveBookingFacilitySelection
+} from "../BookingRequestDialog";
 import type { FacilityDiscoveryItem } from "../../../../shared/schemas/facility";
 
 const facility = (id: string): FacilityDiscoveryItem =>
@@ -35,6 +40,12 @@ const facility = (id: string): FacilityDiscoveryItem =>
   }) satisfies FacilityDiscoveryItem;
 
 describe("BookingRequestDialog facility selection", () => {
+  it("starts at location when a service was selected before opening", () => {
+    expect(getInitialBookingStep("service-1")).toBe(BOOKING_STEP_INDEX.location);
+    expect(getInitialBookingStep(null)).toBe(BOOKING_STEP_INDEX.service);
+    expect(getInitialBookingStep()).toBe(BOOKING_STEP_INDEX.service);
+  });
+
   it("keeps facility selection between location and timing", () => {
     expect(BOOKING_STEPS.map((step) => step.title)).toEqual(["Service", "Location", "Facility", "Timing", "Confirm"]);
     expect(BOOKING_STEP_INDEX).toEqual({
