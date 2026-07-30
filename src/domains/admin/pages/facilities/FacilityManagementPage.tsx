@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import { useNavigate } from "react-router-dom";
 import BusinessIcon from "@mui/icons-material/BusinessOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutline";
 import MoreTimeIcon from "@mui/icons-material/MoreTimeOutlined";
 import PersonAddIcon from "@mui/icons-material/PersonAddAltOutlined";
 import BlockIcon from "@mui/icons-material/BlockOutlined";
+import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -165,12 +167,14 @@ const FacilityCard = ({
   canManageFacilities,
   canManageAdmins,
   onStatus,
+  onOpen,
   onAssignAdmin
 }: {
   facility: Facility;
   canManageFacilities: boolean;
   canManageAdmins: boolean;
   onStatus: (facility: Facility, status: FacilityStatus) => void;
+  onOpen: (facility: Facility) => void;
   onAssignAdmin: (facility: Facility) => void;
 }) => {
   const primaryPhone = facility.phones.find((phone) => phone.isPrimary) ?? facility.phones[0];
@@ -190,6 +194,10 @@ const FacilityCard = ({
           <p className="mt-1 text-sm text-slate-500">{facility.address}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button size="sm" variant="outline" onClick={() => onOpen(facility)}>
+            <VisibilityIcon fontSize="small" />
+            Open
+          </Button>
           {canManageFacilities && facility.status !== "active" && (
             <Button size="sm" variant="outline" onClick={() => onStatus(facility, "active")}>
               <CheckCircleIcon fontSize="small" />
@@ -245,6 +253,7 @@ const FacilityCard = ({
 
 const FacilityManagementPage = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { hasPermission, hasRole } = useRbac();
   const canReadFacilities = hasPermission("facility:read");
   const canManageFacilities = hasPermission("facility:manage");
@@ -439,6 +448,7 @@ const FacilityManagementPage = () => {
                 setMutationError(null);
                 setStatusDialog({ facility: target, status: nextStatus });
               }}
+              onOpen={(target) => navigate(`/admin/facilities/${target.id}`)}
               onAssignAdmin={(target) => {
                 setMutationError(null);
                 setAdminDialog({ facility: target, userId: "" });
