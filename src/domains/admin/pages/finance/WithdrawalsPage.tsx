@@ -8,8 +8,10 @@ import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
+import { useRbac } from "../../../../shared/hooks/useRbac";
 import { fetchAdminWithdrawals } from "../../../../shared/libs/wallet";
 import type { WalletWithdrawal } from "../../../../shared/schemas/wallet";
+import { canUseGlobalPaymentLedger, FinanceScopeNotice } from "./paymentAccess";
 
 const STATUS_OPTIONS = [
   { label: "All statuses", value: "all" },
@@ -46,6 +48,8 @@ const statusTone = (status: string) => {
 };
 
 const WithdrawalsPage = () => {
+  const { roles } = useRbac();
+  const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [providerFilter, setProviderFilter] = useState("");
@@ -89,10 +93,12 @@ const WithdrawalsPage = () => {
         size: PAGE_SIZE,
         status: statusFilter === "all" ? undefined : statusFilter
       }),
-    keepPreviousData: true
+    keepPreviousData: true,
+    enabled: canReadGlobalLedger
   });
 
-  const rows = withdrawalsQuery.data?.withdrawals ?? [];
+  const withdrawalRows = withdrawalsQuery.data?.withdrawals;
+  const rows = useMemo(() => withdrawalRows ?? [], [withdrawalRows]);
   const meta = withdrawalsQuery.data?.meta ?? {
     total: rows.length,
     page,
@@ -151,6 +157,10 @@ const WithdrawalsPage = () => {
     const query = providerFilter.trim().toLowerCase();
     return rows.filter((row) => (row.requestedByUserId ?? "").toLowerCase().includes(query));
   }, [rows, providerFilter]);
+
+  if (!canReadGlobalLedger) {
+    return <FinanceScopeNotice />;
+  }
 
   const filterPanel = (
     <div className="space-y-4 text-left">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canUseGlobalPaymentLedger } from "../PaymentsPage";
+import { canUseGlobalPaymentLedger } from "../paymentAccess";
 
 describe("PaymentsPage access helpers", () => {
   it("keeps the global payment ledger limited to platform admins", () => {
