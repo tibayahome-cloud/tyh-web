@@ -12,10 +12,8 @@ const navSummary = (roles: string[]) =>
 describe("AdminShell navigation", () => {
   it("points admin ops to their facility workspace landing route", () => {
     expect(navSummary(["admin.ops"])).toEqual([
-      { label: "Overview", to: "/admin/dashboard", badge: undefined },
       { label: "Queue", to: "/admin/bookings", badge: undefined },
       { label: "Self Care", to: "/admin/selfcare", badge: undefined },
-      { label: "Services", to: "/admin/services", badge: undefined },
       { label: "Facility", to: "/admin/facility", badge: undefined },
       { label: "Payments", to: "/admin/finance/payments", badge: undefined },
       { label: "Inbox", to: "/admin/conversations", badge: 4 }

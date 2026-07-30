@@ -33,10 +33,8 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
 
   if (isFacilityAdmin) {
     return [
-      { label: "Overview", to: "/admin/dashboard", icon: <DashboardIcon /> },
       { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
       { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
-      { label: "Services", to: "/admin/services", icon: <ViewListIcon /> },
       { label: "Facility", to: "/admin/facility", icon: <BusinessIcon /> },
       { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
       { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread }
