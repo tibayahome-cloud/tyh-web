@@ -245,10 +245,13 @@ const FacilityCard = ({
 
 const FacilityManagementPage = () => {
   const queryClient = useQueryClient();
-  const { hasPermission } = useRbac();
+  const { hasPermission, hasRole } = useRbac();
   const canReadFacilities = hasPermission("facility:read");
   const canManageFacilities = hasPermission("facility:manage");
-  const canManageAdmins = hasPermission("facility:admins.manage");
+  const isSuperAdmin = hasRole("admin.super");
+  const canCreateFacilities = isSuperAdmin && canManageFacilities;
+  const canChangeFacilityStatus = isSuperAdmin && canManageFacilities;
+  const canManageAdmins = isSuperAdmin && hasPermission("facility:admins.manage");
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<FacilityStatus | "all">("all");
@@ -373,7 +376,7 @@ const FacilityManagementPage = () => {
             Manage facility tenants, lifecycle status, admin ownership, and platform fee baselines.
           </p>
         </div>
-        {canManageFacilities && (
+        {canCreateFacilities && (
           <Button className="w-full sm:w-auto" onClick={() => setIsCreateOpen(true)}>
             <BusinessIcon fontSize="small" />
             Add facility
@@ -430,7 +433,7 @@ const FacilityManagementPage = () => {
             <FacilityCard
               key={facility.id}
               facility={facility}
-              canManageFacilities={canManageFacilities}
+              canManageFacilities={canChangeFacilityStatus}
               canManageAdmins={canManageAdmins}
               onStatus={(target, nextStatus) => {
                 setMutationError(null);
