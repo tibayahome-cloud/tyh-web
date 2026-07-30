@@ -19,6 +19,8 @@ import {
   assignFacilityAdmin,
   createFacility,
   discoverFacilities,
+  bootstrapFacilityProvider,
+  fetchFacilityProviders,
   facilityServiceUpdatePayload,
   updateFacilityProviderCompensation
 } from "../facilities";
@@ -148,9 +150,20 @@ describe("facility API helpers", () => {
   });
 
   it("updates provider compensation with backend field names", async () => {
-    mockPatch.mockResolvedValueOnce({ data: { data: {} } });
+    mockPatch.mockResolvedValueOnce({
+      data: {
+        data: {
+          id: "provider-1",
+          user_id: "provider-user-1",
+          facility_id: "facility-1",
+          compensation_mode: "percentage",
+          payout_percentage: "40",
+          verified: true
+        }
+      }
+    });
 
-    await updateFacilityProviderCompensation("facility-1", "provider-user-1", {
+    const result = await updateFacilityProviderCompensation("facility-1", "provider-user-1", {
       mode: "percentage",
       payoutPercentage: 40,
       fixedPayoutCents: null
@@ -164,5 +177,67 @@ describe("facility API helpers", () => {
         payout_percentage: 40
       }
     );
+    expect(result.compensation).toEqual({
+      mode: "percentage",
+      fixedPayoutCents: null,
+      payoutPercentage: 40
+    });
+  });
+
+  it("filters facility provider list by facility id from provider payload", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [
+          { id: "provider-1", user_id: "user-1", facility_id: "facility-1", verified: true },
+          { id: "provider-2", user_id: "user-2", facility_id: "facility-2", verified: true }
+        ],
+        meta: { page: { number: 1, size: 25, total: 2, total_pages: 1 } }
+      }
+    });
+
+    const result = await fetchFacilityProviders("facility-1");
+
+    expect(mockGet).toHaveBeenCalledWith("/providers", {
+      params: expect.objectContaining({
+        "filter[facility_id]": "facility-1",
+        fields: expect.stringContaining("facility_id")
+      })
+    });
+    expect(result.providers.map((provider) => provider.userId)).toEqual(["user-1"]);
+  });
+
+  it("bootstraps a provider into a facility", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        data: {
+          provider: {
+            id: "provider-1",
+            user_id: "user-1",
+            facility_id: "facility-1",
+            verified: false
+          },
+          application: { id: "application-1" }
+        }
+      }
+    });
+
+    const result = await bootstrapFacilityProvider("facility-1", "user-1", {
+      services: ["service-1"],
+      compensation: {
+        mode: "employee",
+        fixedPayoutCents: null,
+        payoutPercentage: null
+      }
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/providers/user-1/bootstrap", {
+      services: ["service-1"],
+      compensation: {
+        mode: "employee",
+        fixed_payout_cents: null,
+        payout_percentage: null
+      }
+    });
+    expect(result.provider?.facilityId).toBe("facility-1");
   });
 });

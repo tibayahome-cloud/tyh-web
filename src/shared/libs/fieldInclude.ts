@@ -127,10 +127,14 @@ export const providerProfile: FieldPreset = {
   fields: [
     "id",
     "user_id",
+    "facility_id",
     "verified",
     "is_available",
     "daily_request_limit",
     "can_emergency",
+    "compensation_mode",
+    "fixed_payout_cents",
+    "payout_percentage",
     "home_lat",
     "home_lng",
     "rating_avg",
@@ -160,6 +164,7 @@ export const providerDetail: FieldPreset = {
   fields: [
     "id",
     "user_id",
+    "facility_id",
     "verified",
     "verified_at",
     "is_available",
@@ -174,7 +179,10 @@ export const providerDetail: FieldPreset = {
     "current_lng",
     "location_updated_at",
     "zone_id",
-    "priority_score"
+    "priority_score",
+    "compensation_mode",
+    "fixed_payout_cents",
+    "payout_percentage"
   ],
   includes: {
     user: {

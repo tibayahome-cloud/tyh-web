@@ -1,6 +1,8 @@
 import api from "./api";
+import { buildFieldParams, providerProfile } from "./fieldInclude";
 import { mapBooking, mapBookingListMeta, mapBookings } from "../schemas/booking";
 import type { Booking, BookingListMeta } from "../schemas/booking";
+import { mapProvider, mapProviders, type Provider } from "../schemas/provider";
 import {
   mapFacilities,
   mapFacility,
@@ -62,6 +64,24 @@ export type ProviderCompensationInput = {
 export type FacilityProviderBootstrapInput = {
   services?: string[];
   compensation?: ProviderCompensationInput;
+};
+
+export type FacilityProviderListParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  verified?: boolean;
+};
+
+export type FacilityProviderListResult = {
+  providers: Provider[];
+  meta: BookingListMeta;
+  raw?: Record<string, unknown>;
+};
+
+export type FacilityProviderBootstrapResult = {
+  provider: Provider | null;
+  application: unknown;
 };
 
 export type FacilityProviderApplicationReviewInput = {
@@ -331,22 +351,52 @@ export const updateFacilityProviderCompensation = async (
   facilityId: string,
   providerUserId: string,
   input: ProviderCompensationInput
-): Promise<void> => {
-  await api.patch(
+): Promise<Provider> => {
+  const response = await api.patch(
     `/facilities/${facilityId}/providers/${providerUserId}/compensation`,
     providerCompensationPayload(input)
   );
+  const provider = mapProvider(payloadData(response.data));
+  if (!provider) {
+    throw new Error("Failed to update provider compensation");
+  }
+  return provider;
+};
+
+export const fetchFacilityProviders = async (
+  facilityId: string,
+  { page = 1, pageSize = 25, search, verified }: FacilityProviderListParams = {}
+): Promise<FacilityProviderListResult> => {
+  const params: Record<string, unknown> = {
+    ...buildFieldParams(providerProfile),
+    "filter[facility_id]": facilityId,
+    "page[number]": page,
+    "page[size]": pageSize
+  };
+  if (search) params["filter[q]"] = search;
+  if (verified !== undefined) params["filter[verified]"] = String(verified);
+
+  const response = await api.get("/providers", { params });
+  const payload = (response.data ?? {}) as Record<string, unknown>;
+  const rows = Array.isArray(payload.data) ? payload.data : [];
+  const providers = mapProviders(rows).filter((provider) => provider.facilityId === facilityId);
+  return { providers, meta: mapListMeta(payload.meta, page, pageSize, providers.length), raw: payload };
 };
 
 export const bootstrapFacilityProvider = async (
   facilityId: string,
   userId: string,
   input: FacilityProviderBootstrapInput = {}
-): Promise<void> => {
-  await api.post(`/facilities/${facilityId}/providers/${userId}/bootstrap`, {
+): Promise<FacilityProviderBootstrapResult> => {
+  const response = await api.post(`/facilities/${facilityId}/providers/${userId}/bootstrap`, {
     services: input.services,
     compensation: input.compensation ? providerCompensationPayload(input.compensation) : undefined
   });
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    provider: mapProvider(data.provider),
+    application: data.application
+  };
 };
 
 export const reviewFacilityProviderApplication = async (

@@ -20,12 +20,25 @@ import {
   createFacilityService,
   deleteFacilityService,
   fetchFacility,
+  fetchFacilityProviders,
   fetchFacilityServices,
+  bootstrapFacilityProvider,
   updateFacility,
+  updateFacilityProviderCompensation,
   updateFacilityService
 } from "../../../../shared/libs/facilities";
-import type { FacilityService, FacilityServiceInput } from "../../../../shared/schemas/facility";
-import { formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
+import type {
+  FacilityService,
+  FacilityServiceInput,
+  ProviderCompensation,
+  ProviderCompensationMode
+} from "../../../../shared/schemas/facility";
+import {
+  PROVIDER_COMPENSATION_MODES,
+  formatOperatingHoursSummary,
+  formatProviderCompensation
+} from "../../../../shared/schemas/facility";
+import type { Provider } from "../../../../shared/schemas/provider";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 
 type Envelope<T> = {
@@ -49,12 +62,26 @@ type ServiceFormState = {
   isEmergencyCapable: boolean;
 };
 
+type ProviderCompensationFormState = {
+  userId: string;
+  mode: ProviderCompensationMode;
+  fixedPayout: string;
+  payoutPercentage: string;
+};
+
 const initialServiceForm: ServiceFormState = {
   serviceId: "",
   price: "",
   estimateDurationMinutes: "60",
   active: true,
   isEmergencyCapable: false
+};
+
+const initialProviderForm: ProviderCompensationFormState = {
+  userId: "",
+  mode: "employee",
+  fixedPayout: "",
+  payoutPercentage: ""
 };
 
 export const priceToCents = (value: string): number => Math.round(Number(value) * 100);
@@ -96,6 +123,18 @@ export const buildFacilityServiceInput = (form: ServiceFormState): FacilityServi
   isEmergencyCapable: form.isEmergencyCapable
 });
 
+export const buildProviderCompensationInput = (
+  form: ProviderCompensationFormState
+): {
+  mode: ProviderCompensation["mode"];
+  fixedPayoutCents: number | null;
+  payoutPercentage: number | null;
+} => ({
+  mode: form.mode,
+  fixedPayoutCents: form.mode === "fixed" ? priceToCents(form.fixedPayout) : null,
+  payoutPercentage: form.mode === "percentage" ? Number(form.payoutPercentage) : null
+});
+
 const mapServiceForm = (service: FacilityService): ServiceFormState => ({
   serviceId: service.serviceId,
   price: centsToPrice(service.priceCents),
@@ -104,12 +143,41 @@ const mapServiceForm = (service: FacilityService): ServiceFormState => ({
   isEmergencyCapable: service.isEmergencyCapable
 });
 
+const mapProviderCompensationForm = (provider: Provider): ProviderCompensationFormState => ({
+  userId: provider.userId,
+  mode: provider.compensation.mode,
+  fixedPayout: provider.compensation.fixedPayoutCents == null ? "" : centsToPrice(provider.compensation.fixedPayoutCents),
+  payoutPercentage: provider.compensation.payoutPercentage == null ? "" : String(provider.compensation.payoutPercentage)
+});
+
+const validateProviderForm = (form: ProviderCompensationFormState): string | null => {
+  if (!form.userId.trim()) {
+    return "Provider user ID is required.";
+  }
+  if (form.mode === "fixed") {
+    const amount = Number(form.fixedPayout);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return "Fixed payout must be zero or greater.";
+    }
+  }
+  if (form.mode === "percentage") {
+    const percentage = Number(form.payoutPercentage);
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+      return "Payout percentage must be between 0 and 100.";
+    }
+  }
+  return null;
+};
+
 const fetchCatalogServices = async (): Promise<CatalogService[]> => {
   const response = await api.get<Envelope<CatalogService[]>>("/services", {
     params: { "filter[active]": "true" }
   });
   return response.data.data;
 };
+
+const providerName = (provider: Provider): string =>
+  provider.user?.fullName || provider.user?.email || provider.userId;
 
 const WorkspaceStat = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -164,6 +232,51 @@ const ServiceRow = ({
   </article>
 );
 
+const ProviderRow = ({
+  provider,
+  onEditCompensation,
+  canManage
+}: {
+  provider: Provider;
+  onEditCompensation: (provider: Provider) => void;
+  canManage: boolean;
+}) => (
+  <article className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <h3 className="truncate text-sm font-semibold text-slate-900">{providerName(provider)}</h3>
+        <p className="mt-1 break-words text-sm text-slate-500">{provider.user?.email ?? provider.userId}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+          {provider.verified ? "Verified" : "Unverified"}
+        </span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+          {provider.isAvailable ? "Available" : "Offline"}
+        </span>
+      </div>
+    </div>
+    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+      <div>
+        <p className="text-xs font-semibold uppercase text-slate-500">Compensation</p>
+        <p className="mt-1 text-slate-800">{formatProviderCompensation(provider.compensation)}</p>
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase text-slate-500">Services</p>
+        <p className="mt-1 text-slate-800">{provider.services.filter((service) => service.active).length} active</p>
+      </div>
+    </div>
+    {canManage && (
+      <div className="mt-4 flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => onEditCompensation(provider)}>
+          <EditIcon fontSize="small" />
+          Compensation
+        </Button>
+      </div>
+    )}
+  </article>
+);
+
 const FacilityWorkspacePage = () => {
   const { facilityId } = useParams();
   const queryClient = useQueryClient();
@@ -178,6 +291,11 @@ const FacilityWorkspacePage = () => {
   const [serviceForm, setServiceForm] = useState<ServiceFormState>(initialServiceForm);
   const [serviceFormError, setServiceFormError] = useState<string | null>(null);
   const [pendingDisable, setPendingDisable] = useState<FacilityService | null>(null);
+  const [providerSearch, setProviderSearch] = useState("");
+  const [providerModalOpen, setProviderModalOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+  const [providerForm, setProviderForm] = useState<ProviderCompensationFormState>(initialProviderForm);
+  const [providerFormError, setProviderFormError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   const facilityQuery = useQuery({
@@ -198,8 +316,18 @@ const FacilityWorkspacePage = () => {
     enabled: canManageServices
   });
 
+  const providersQuery = useQuery({
+    queryKey: ["admin", "facilities", facilityId, "providers", providerSearch],
+    queryFn: () =>
+      fetchFacilityProviders(String(facilityId), {
+        search: providerSearch.trim() || undefined
+      }),
+    enabled: Boolean(facilityId) && canReadFacilities && hasPermission("provider:verify")
+  });
+
   const facility = facilityQuery.data;
   const facilityServices = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
+  const providers = providersQuery.data?.providers ?? [];
 
   useEffect(() => {
     if (facility) {
@@ -262,6 +390,27 @@ const FacilityWorkspacePage = () => {
     }
   });
 
+  const providerMutation = useMutation({
+    mutationFn: async (form: ProviderCompensationFormState) => {
+      const compensation = buildProviderCompensationInput(form);
+      if (editingProvider) {
+        return updateFacilityProviderCompensation(String(facilityId), editingProvider.userId, compensation);
+      }
+      const result = await bootstrapFacilityProvider(String(facilityId), form.userId.trim(), { compensation });
+      return result.provider;
+    },
+    onSuccess: () => {
+      invalidateWorkspace();
+      setProviderModalOpen(false);
+      setEditingProvider(null);
+      setProviderForm(initialProviderForm);
+      setProviderFormError(null);
+    },
+    onError: (error) => {
+      setProviderFormError(extractErrorMessage(error));
+    }
+  });
+
   const openServiceModal = (service?: FacilityService) => {
     setEditingService(service ?? null);
     setServiceForm(service ? mapServiceForm(service) : initialServiceForm);
@@ -281,6 +430,30 @@ const FacilityWorkspacePage = () => {
     }
     setServiceFormError(null);
     serviceMutation.mutate(buildFacilityServiceInput(serviceForm));
+  };
+
+  const openProviderModal = (provider?: Provider) => {
+    setEditingProvider(provider ?? null);
+    setProviderForm(provider ? mapProviderCompensationForm(provider) : initialProviderForm);
+    setProviderFormError(null);
+    setProviderModalOpen(true);
+  };
+
+  const updateProviderForm = <K extends keyof ProviderCompensationFormState>(
+    key: K,
+    value: ProviderCompensationFormState[K]
+  ) => {
+    setProviderForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSaveProvider = () => {
+    const validationMessage = validateProviderForm(providerForm);
+    if (validationMessage) {
+      setProviderFormError(validationMessage);
+      return;
+    }
+    setProviderFormError(null);
+    providerMutation.mutate(providerForm);
   };
 
   if (!canReadFacilities) {
@@ -428,6 +601,46 @@ const FacilityWorkspacePage = () => {
         )}
       </Card>
 
+      <Card
+        title="Facility providers"
+        description="Onboard existing users into this facility and manage provider compensation."
+        badge={`${providers.length} listed`}
+      >
+        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <Input
+            label="Search providers"
+            value={providerSearch}
+            onChange={(event) => setProviderSearch(event.target.value)}
+            placeholder="Name, email, or phone"
+          />
+          {hasPermission("provider:verify") && (
+            <Button className="w-full md:w-auto" onClick={() => openProviderModal()}>
+              <AddIcon fontSize="small" />
+              Bootstrap provider
+            </Button>
+          )}
+        </div>
+
+        {providersQuery.isLoading ? (
+          <Loading />
+        ) : providersQuery.isError ? (
+          <p className="text-sm text-danger-600">{extractErrorMessage(providersQuery.error)}</p>
+        ) : providers.length === 0 ? (
+          <p className="text-sm text-slate-600">No providers are currently visible for this facility.</p>
+        ) : (
+          <div className="grid gap-3">
+            {providers.map((provider) => (
+              <ProviderRow
+                key={provider.id}
+                provider={provider}
+                canManage={canManageFacility}
+                onEditCompensation={openProviderModal}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
+
       <Modal
         open={serviceModalOpen}
         title={editingService ? "Edit facility service" : "Add facility service"}
@@ -520,6 +733,71 @@ const FacilityWorkspacePage = () => {
           }
         }}
       />
+
+      <Modal
+        open={providerModalOpen}
+        title={editingProvider ? "Edit provider compensation" : "Bootstrap provider"}
+        description={
+          editingProvider
+            ? `Update compensation for ${providerName(editingProvider)}.`
+            : "Create or fetch a provider profile for an existing user inside this facility."
+        }
+        onClose={() => setProviderModalOpen(false)}
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Provider user ID"
+            value={providerForm.userId}
+            disabled={Boolean(editingProvider)}
+            onChange={(event) => updateProviderForm("userId", event.target.value)}
+          />
+          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Compensation mode</span>
+            <select
+              value={providerForm.mode}
+              onChange={(event) => updateProviderForm("mode", event.target.value as ProviderCompensationMode)}
+              className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+            >
+              {PROVIDER_COMPENSATION_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode === "employee" ? "Employee" : mode === "fixed" ? "Fixed payout" : "Percentage split"}
+                </option>
+              ))}
+            </select>
+          </label>
+          {providerForm.mode === "fixed" && (
+            <Input
+              label="Fixed payout"
+              type="number"
+              min="0"
+              step="1"
+              value={providerForm.fixedPayout}
+              onChange={(event) => updateProviderForm("fixedPayout", event.target.value)}
+            />
+          )}
+          {providerForm.mode === "percentage" && (
+            <Input
+              label="Provider payout percentage"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={providerForm.payoutPercentage}
+              onChange={(event) => updateProviderForm("payoutPercentage", event.target.value)}
+            />
+          )}
+          {providerFormError && <p className="text-sm text-danger-600">{providerFormError}</p>}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setProviderModalOpen(false)} disabled={providerMutation.isPending}>
+              Cancel
+            </Button>
+            <Button type="button" loading={providerMutation.isPending} onClick={handleSaveProvider}>
+              {editingProvider ? "Save compensation" : "Bootstrap provider"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

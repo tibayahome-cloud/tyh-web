@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFacilityServiceInput, priceToCents } from "../FacilityWorkspacePage";
+import { buildFacilityServiceInput, buildProviderCompensationInput, priceToCents } from "../FacilityWorkspacePage";
 
 describe("FacilityWorkspacePage helpers", () => {
   it("converts facility service pricing into cents", () => {
@@ -24,6 +24,47 @@ describe("FacilityWorkspacePage helpers", () => {
       estimateDurationMinutes: 45,
       active: true,
       isEmergencyCapable: false
+    });
+  });
+
+  it("builds provider compensation payloads by mode", () => {
+    expect(
+      buildProviderCompensationInput({
+        userId: "user-1",
+        mode: "employee",
+        fixedPayout: "500",
+        payoutPercentage: "40"
+      })
+    ).toEqual({
+      mode: "employee",
+      fixedPayoutCents: null,
+      payoutPercentage: null
+    });
+
+    expect(
+      buildProviderCompensationInput({
+        userId: "user-1",
+        mode: "fixed",
+        fixedPayout: "500",
+        payoutPercentage: ""
+      })
+    ).toEqual({
+      mode: "fixed",
+      fixedPayoutCents: 50000,
+      payoutPercentage: null
+    });
+
+    expect(
+      buildProviderCompensationInput({
+        userId: "user-1",
+        mode: "percentage",
+        fixedPayout: "",
+        payoutPercentage: "40"
+      })
+    ).toEqual({
+      mode: "percentage",
+      fixedPayoutCents: null,
+      payoutPercentage: 40
     });
   });
 });
