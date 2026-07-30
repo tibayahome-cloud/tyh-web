@@ -54,6 +54,12 @@ export const BookingSchema = z.object({
   bookingType: z.enum(["immediate", "scheduled", "recurring_template"]),
   parentBookingId: z.string().nullable(),
   preferredProviderId: z.string().nullable(),
+  facilityId: z.string().nullable(),
+  requestMode: z.enum(["selected_facility", "fastest_available"]).nullable(),
+  facilityStatus: z.string().nullable(),
+  facilityClaimedAt: z.string().nullable(),
+  facilityResponseDueAt: z.string().nullable(),
+  clientConfirmedRerouteAt: z.string().nullable(),
   addressText: z.string().nullable(),
   lat: z.number().nullable(),
   lng: z.number().nullable(),
@@ -185,22 +191,6 @@ export const mapBookingEvent = (payload: unknown): BookingEvent | null => {
   };
 };
 
-const mapDispute = (payload: unknown): BookingDispute | null => {
-  const raw = toObject(payload);
-  const id = coerceId(raw.id);
-  if (!id) {
-    return null;
-  }
-  return {
-    id,
-    status: coerceString(raw.status) ?? "open",
-    reason: coerceString(raw.reason),
-    resolution: coerceString(raw.resolution),
-    resolvedAt: coerceDate(raw.resolved_at),
-    openedBy: mapUserParty(raw.opened_by)
-  };
-};
-
 export const mapFeedback = (payload: unknown): BookingFeedback | null => {
   const raw = toObject(payload);
   const id = coerceId(raw.id);
@@ -232,13 +222,6 @@ export const mapFeedback = (payload: unknown): BookingFeedback | null => {
   };
 };
 
-const mapMeta = (value: unknown): Record<string, unknown> => {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return {};
-};
-
 export const mapBooking = (payload: unknown): Booking | null => {
   if (!payload) return null;
   const raw = toObject(payload);
@@ -250,7 +233,18 @@ export const mapBooking = (payload: unknown): Booking | null => {
     bookingType: coerceString(raw.booking_type) ?? "immediate",
     parentBookingId: coerceId(raw.parent_booking_id),
     preferredProviderId: coerceId(raw.preferred_provider_id),
+    facilityId: coerceId(raw.facility_id) || null,
+    requestMode:
+      raw.request_mode === "selected_facility" || raw.request_mode === "fastest_available"
+        ? raw.request_mode
+        : null,
+    facilityStatus: coerceString(raw.facility_status),
+    facilityClaimedAt: coerceDate(raw.facility_claimed_at),
+    facilityResponseDueAt: coerceDate(raw.facility_response_due_at),
+    clientConfirmedRerouteAt: coerceDate(raw.client_confirmed_reroute_at),
     addressText: coerceString(raw.address_text),
+    lat: coerceNumber(raw.lat),
+    lng: coerceNumber(raw.lng),
     priceCents: coerceNumber(raw.price_cents) ?? 0,
     estimateDurationMinutes: coerceNumber(raw.estimate_duration_minutes),
     acceptedAt: coerceDate(raw.accepted_at),
@@ -318,6 +312,8 @@ export const mapBookingListMeta = (meta: unknown, fallback?: Partial<BookingList
 
 export type BookingMutateInput = {
   serviceId: string;
+  facilityId?: string;
+  requestMode?: "selected_facility" | "fastest_available";
   addressText?: string;
   lat?: number;
   lng?: number;

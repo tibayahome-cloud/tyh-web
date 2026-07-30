@@ -139,6 +139,8 @@ export const createBooking = async (
   const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.detail;
   const payload: Record<string, unknown> = {
     service_id: input.serviceId,
+    facility_id: input.facilityId,
+    request_mode: input.requestMode,
     address_text: input.addressText,
     lat: input.lat,
     lng: input.lng,
