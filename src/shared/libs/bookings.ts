@@ -162,6 +162,24 @@ export const createBooking = async (
   return { booking, meta: response.data?.meta };
 };
 
+export const rerouteBooking = async (
+  bookingId: string,
+  facilityId: string,
+  preset: BookingPresetName = "detail"
+): Promise<Booking> => {
+  const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.detail;
+  const response = await api.post(
+    `/bookings/${bookingId}/reroute`,
+    { facility_id: facilityId },
+    { params: buildFieldParams(presetConfig) }
+  );
+  const booking = mapBooking(response.data?.data);
+  if (!booking) {
+    throw new Error("Failed to reroute booking");
+  }
+  return booking;
+};
+
 export const acceptBooking = async (
   bookingId: string,
   preset: BookingPresetName = "detail"

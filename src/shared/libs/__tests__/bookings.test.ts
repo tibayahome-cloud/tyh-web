@@ -21,7 +21,7 @@ vi.mock("../fieldInclude", () => ({
   bookingTimeline: {}
 }));
 
-import { createBooking, fetchBookings } from "../bookings";
+import { createBooking, fetchBookings, rerouteBooking } from "../bookings";
 
 describe("booking API helpers", () => {
   beforeEach(() => {
@@ -97,5 +97,32 @@ describe("booking API helpers", () => {
         "filter[status]": "accepted,en_route"
       })
     });
+  });
+
+  it("confirms a manual facility reroute with the selected facility", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        data: {
+          id: "booking-1",
+          status: "broadcasting",
+          booking_type: "immediate",
+          facility_id: "facility-2",
+          request_mode: "selected_facility",
+          facility_status: "pending",
+          client_confirmed_reroute_at: "2026-07-30T12:00:00Z",
+          price_cents: 160000,
+          currency: "KES",
+          meta: {}
+        }
+      }
+    });
+
+    await rerouteBooking("booking-1", "facility-2");
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/bookings/booking-1/reroute",
+      { facility_id: "facility-2" },
+      { params: { fields: "id" } }
+    );
   });
 });

@@ -1,26 +1,30 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft,
   MapPin,
   Calendar,
-  ShieldCheck,
   MessageCircle,
   Phone,
   ArrowRight,
   Info as InfoIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  RefreshCw
 } from "lucide-react";
 import classNames from "classnames";
 import Drawer from "@mui/material/Drawer";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
-import { useBookingDetail, useCancelBookingMutation } from "../../../shared/hooks/useBookings";
+import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
+import { Modal } from "../../../shared/components/Modal";
+import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { useToast } from "../../../shared/components/ToastProvider";
+import { canConfirmFacilityReroute } from "../utils/reroute";
 
 const TRACKING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service"];
 
@@ -30,11 +34,14 @@ const BookingDetailPage = () => {
   const toast = useToast();
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const cancelMutation = useCancelBookingMutation("detail");
+  const rerouteMutation = useRerouteBookingMutation("detail");
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
+  const [rerouteOpen, setRerouteOpen] = useState(false);
+  const [selectedRerouteFacilityId, setSelectedRerouteFacilityId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -44,6 +51,19 @@ const BookingDetailPage = () => {
   }, []);
 
   const booking = detailQuery.data;
+  const rerouteEligible = Boolean(booking && canConfirmFacilityReroute(booking));
+  const alternativeFacilitiesQuery = useQuery({
+    queryKey: ["bookings", "reroute-facilities", booking?.id, booking?.facilityId, booking?.service?.id, booking?.lat, booking?.lng],
+    queryFn: () => discoverFacilities({
+      serviceId: booking?.service?.id ?? "",
+      lat: booking?.lat ?? 0,
+      lng: booking?.lng ?? 0
+    }),
+    enabled: rerouteEligible && Boolean(booking?.service?.id) && booking?.lat !== null && booking?.lat !== undefined && booking?.lng !== null && booking?.lng !== undefined,
+    staleTime: 30_000
+  });
+  const alternativeFacilities = (alternativeFacilitiesQuery.data?.facilities ?? [])
+    .filter((facility) => facility.id !== booking?.facilityId);
 
   // Auto-open sheet if map is not the primary focus (e.g. not tracking yet)
   const showMap = booking && TRACKING_STATUSES.includes(booking.status) && Boolean(booking.provider);
@@ -92,8 +112,34 @@ const BookingDetailPage = () => {
       await cancelMutation.mutateAsync({ bookingId: booking.id, reason: "Cancelled from detail page" });
       toast.showToast({ title: "Booking cancelled", variant: "info" });
       setSheetExpanded(true); // Ensure details are visible after cancel
-    } catch (e: any) {
-      toast.showToast({ title: "Error cancelling booking", description: e.message, variant: "error" });
+    } catch (error: unknown) {
+      toast.showToast({
+        title: "Error cancelling booking",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "error"
+      });
+    }
+  };
+
+  const handleOpenReroute = () => {
+    setSelectedRerouteFacilityId(alternativeFacilities[0]?.id ?? null);
+    setRerouteOpen(true);
+  };
+
+  const handleConfirmReroute = async () => {
+    if (!booking || !selectedRerouteFacilityId) {
+      return;
+    }
+    try {
+      await rerouteMutation.mutateAsync({ bookingId: booking.id, facilityId: selectedRerouteFacilityId });
+      setRerouteOpen(false);
+      toast.showToast({ title: "Facility request rerouted", description: "The new facility is reviewing your request.", variant: "success" });
+    } catch (error) {
+      toast.showToast({
+        title: "Unable to reroute booking",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "error"
+      });
     }
   };
 
@@ -241,6 +287,25 @@ const BookingDetailPage = () => {
 
       {/* Actions */}
       <div className="pt-4 space-y-3">
+        {rerouteEligible && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <RefreshCw className="mt-0.5 h-5 w-5 flex-none text-amber-700" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-amber-950">This facility could not accept the request</p>
+                <p className="mt-1 text-xs leading-5 text-amber-800">Choose another nearby facility to continue your request.</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="mt-3 w-full text-xs"
+                  onClick={handleOpenReroute}
+                >
+                  Choose another facility
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {!booking.provider && !['cancelled_by_client', 'cancelled_by_admin', 'completed_by_provider', 'client_confirmed', 'fully_completed'].includes(booking.status) && (
           <Button
             variant="secondary"
@@ -349,6 +414,76 @@ const BookingDetailPage = () => {
           </div>
           <BookingDetailsContent />
         </Drawer>
+
+        <Modal
+          open={rerouteOpen}
+          onClose={() => {
+            if (!rerouteMutation.isPending) {
+              setRerouteOpen(false);
+            }
+          }}
+          title="Choose another facility"
+          description="Your original facility did not accept the request. Select a nearby facility to try next."
+        >
+          {alternativeFacilitiesQuery.isLoading ? (
+            <div className="flex min-h-32 items-center justify-center">
+              <Loading />
+            </div>
+          ) : alternativeFacilities.length === 0 ? (
+            <div className="space-y-4 py-4 text-center">
+              <p className="text-sm text-slate-600">No other nearby facility is available right now.</p>
+              <Button type="button" variant="secondary" fullWidth onClick={() => setRerouteOpen(false)}>
+                Keep current request
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                {alternativeFacilities.map((facility) => {
+                  const selected = selectedRerouteFacilityId === facility.id;
+                  return (
+                    <button
+                      key={facility.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setSelectedRerouteFacilityId(facility.id)}
+                      className={classNames(
+                        "w-full rounded-xl border p-3 text-left transition-colors",
+                        selected ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/20" : "border-slate-200 bg-white hover:border-slate-300"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-900">{facility.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">{facility.facilityType} · {facility.address}</p>
+                        </div>
+                        <span className="flex-none text-xs font-semibold text-slate-700">
+                          {facility.distanceM === null ? "Nearby" : `${(facility.distanceM / 1000).toFixed(1)} km`}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs font-semibold text-brand-700">
+                        {facility.service.currency} {(facility.service.priceCents / 100).toLocaleString()}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="ghost" onClick={() => setRerouteOpen(false)} disabled={rerouteMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmReroute}
+                  loading={rerouteMutation.isPending}
+                  disabled={!selectedRerouteFacilityId}
+                >
+                  Confirm facility
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
       </div>
     </AppLayout>
   );
