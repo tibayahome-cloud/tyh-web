@@ -20,6 +20,7 @@ import {
   createFacilityService,
   deleteFacilityService,
   assignFacilityBookingProvider,
+  fetchFacilities,
   fetchFacility,
   fetchFacilityBookings,
   fetchFacilityProviders,
@@ -30,6 +31,7 @@ import {
   updateFacilityService
 } from "../../../../shared/libs/facilities";
 import type {
+  Facility,
   FacilityService,
   FacilityServiceInput,
   ProviderCompensation,
@@ -93,6 +95,20 @@ const initialProviderForm: ProviderCompensationFormState = {
 };
 
 export const priceToCents = (value: string): number => Math.round(Number(value) * 100);
+
+/** Keep admin ops inside the one facility returned by the backend scope query. */
+export const canAdminOpsAccessFacility = (
+  facilityId: string | undefined,
+  roles: string[],
+  facilities: Pick<Facility, "id">[]
+): boolean => {
+  const roleSet = new Set(roles);
+  const isFacilityAdmin = roleSet.has("admin.ops") && !roleSet.has("admin.super") && !roleSet.has("admin");
+  if (!isFacilityAdmin) {
+    return true;
+  }
+  return Boolean(facilityId) && facilities.length === 1 && facilities[0].id === facilityId;
+};
 
 const centsToPrice = (value: number): string => String(value / 100);
 
@@ -398,7 +414,8 @@ export const FacilityBookingRow = ({
 const FacilityWorkspacePage = () => {
   const { facilityId } = useParams();
   const queryClient = useQueryClient();
-  const { hasPermission } = useRbac();
+  const { roles, hasPermission } = useRbac();
+  const isFacilityAdmin = roles.includes("admin.ops") && !roles.includes("admin.super") && !roles.includes("admin");
   const canReadFacilities = hasPermission("facility:read");
   const canManageFacility = hasPermission("facility:manage");
   const canManageServices = hasPermission("facility:services.manage");
@@ -422,22 +439,30 @@ const FacilityWorkspacePage = () => {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  const facilityScopeQuery = useQuery({
+    queryKey: ["admin", "facility-scope"],
+    queryFn: () => fetchFacilities({ pageSize: 2 }),
+    enabled: isFacilityAdmin && canReadFacilities
+  });
+  const scopedFacilities = facilityScopeQuery.data?.facilities ?? [];
+  const hasFacilityScope = canAdminOpsAccessFacility(String(facilityId), roles, scopedFacilities);
+
   const facilityQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId],
     queryFn: () => fetchFacility(String(facilityId)),
-    enabled: Boolean(facilityId) && canReadFacilities
+    enabled: Boolean(facilityId) && canReadFacilities && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const servicesQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId, "services"],
     queryFn: () => fetchFacilityServices(String(facilityId)),
-    enabled: Boolean(facilityId) && canReadFacilities
+    enabled: Boolean(facilityId) && canReadFacilities && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const catalogQuery = useQuery({
     queryKey: ["admin", "services", "catalog", "active"],
     queryFn: fetchCatalogServices,
-    enabled: canManageServices
+    enabled: canManageServices && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const providersQuery = useQuery({
@@ -446,7 +471,7 @@ const FacilityWorkspacePage = () => {
       fetchFacilityProviders(String(facilityId), {
         search: providerSearch.trim() || undefined
       }),
-    enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders
+    enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const bookingsQuery = useQuery({
@@ -456,7 +481,7 @@ const FacilityWorkspacePage = () => {
         pageSize: 25,
         facilityStatus: "pending,claimed"
       }),
-    enabled: Boolean(facilityId) && canReadFacilities && canManageBookings
+    enabled: Boolean(facilityId) && canReadFacilities && canManageBookings && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const facility = facilityQuery.data;
@@ -632,6 +657,18 @@ const FacilityWorkspacePage = () => {
     return (
       <Card>
         <p className="text-sm text-slate-600">You do not have permission to view this facility.</p>
+      </Card>
+    );
+  }
+
+  if (isFacilityAdmin && (facilityScopeQuery.isLoading || facilityScopeQuery.isError || !hasFacilityScope)) {
+    return (
+      <Card>
+        <p className="text-sm text-danger-600">
+          {facilityScopeQuery.isError
+            ? extractErrorMessage(facilityScopeQuery.error)
+            : "This facility is not assigned to your admin ops account."}
+        </p>
       </Card>
     );
   }

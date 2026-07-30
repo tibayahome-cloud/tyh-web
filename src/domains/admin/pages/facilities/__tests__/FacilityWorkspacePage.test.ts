@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFacilityServiceInput,
   buildProviderCompensationInput,
+  canAdminOpsAccessFacility,
   facilityResponseCountdownTone,
   filterAssignableProviders,
   formatFacilityResponseCountdown,
@@ -11,9 +12,19 @@ import {
   validateServiceForm
 } from "../FacilityWorkspacePage";
 import type { Booking } from "../../../../../shared/schemas/booking";
+import type { Facility } from "../../../../../shared/schemas/facility";
 import type { Provider } from "../../../../../shared/schemas/provider";
 
 describe("FacilityWorkspacePage helpers", () => {
+  it("limits admin ops to its single backend-scoped facility", () => {
+    const facilities = [{ id: "facility-1" }] as Facility[];
+
+    expect(canAdminOpsAccessFacility("facility-1", ["admin.ops"], facilities)).toBe(true);
+    expect(canAdminOpsAccessFacility("facility-2", ["admin.ops"], facilities)).toBe(false);
+    expect(canAdminOpsAccessFacility("facility-1", ["admin.ops"], [...facilities, { id: "facility-2" }])).toBe(false);
+    expect(canAdminOpsAccessFacility("facility-2", ["admin.super"], facilities)).toBe(true);
+  });
+
   it("converts facility service pricing into cents", () => {
     expect(priceToCents("1200")).toBe(120000);
     expect(priceToCents("1200.50")).toBe(120050);
