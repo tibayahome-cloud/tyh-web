@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildFacilityServiceInput,
   buildProviderCompensationInput,
+  facilityResponseCountdownTone,
   filterAssignableProviders,
+  formatFacilityResponseCountdown,
   priceToCents
 } from "../FacilityWorkspacePage";
 import type { Booking } from "../../../../../shared/schemas/booking";
@@ -105,5 +107,18 @@ describe("FacilityWorkspacePage helpers", () => {
     ] as Provider[];
 
     expect(filterAssignableProviders(booking, providers).map((provider) => provider.userId)).toEqual(["provider-1"]);
+  });
+
+  it("formats facility response countdown urgency", () => {
+    const now = new Date("2026-07-30T08:00:00Z").getTime();
+
+    expect(formatFacilityResponseCountdown("2026-07-30T08:03:05Z", now)).toBe("3m 05s");
+    expect(formatFacilityResponseCountdown("2026-07-30T08:00:30Z", now)).toBe("30s");
+    expect(formatFacilityResponseCountdown("2026-07-30T07:59:59Z", now)).toBe("Expired");
+    expect(formatFacilityResponseCountdown(null, now)).toBe("-");
+
+    expect(facilityResponseCountdownTone("2026-07-30T08:03:05Z", now)).toBe("text-slate-800");
+    expect(facilityResponseCountdownTone("2026-07-30T08:00:30Z", now)).toBe("text-warning-500");
+    expect(facilityResponseCountdownTone("2026-07-30T07:59:59Z", now)).toBe("text-danger-600");
   });
 });

@@ -99,6 +99,44 @@ const centsToPrice = (value: number): string => String(value / 100);
 const formatMoney = (cents: number, currency = "KES") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
 
+export const formatFacilityResponseCountdown = (dueAt: string | null | undefined, nowMs = Date.now()): string => {
+  if (!dueAt) {
+    return "-";
+  }
+  const dueMs = new Date(dueAt).getTime();
+  if (Number.isNaN(dueMs)) {
+    return "-";
+  }
+  const remainingSeconds = Math.max(0, Math.ceil((dueMs - nowMs) / 1000));
+  if (remainingSeconds === 0) {
+    return "Expired";
+  }
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+};
+
+export const facilityResponseCountdownTone = (dueAt: string | null | undefined, nowMs = Date.now()): string => {
+  if (!dueAt) {
+    return "text-slate-800";
+  }
+  const dueMs = new Date(dueAt).getTime();
+  if (Number.isNaN(dueMs)) {
+    return "text-slate-800";
+  }
+  const remainingMs = dueMs - nowMs;
+  if (remainingMs <= 0) {
+    return "text-danger-600";
+  }
+  if (remainingMs <= 60_000) {
+    return "text-warning-500";
+  }
+  return "text-slate-800";
+};
+
 const extractErrorMessage = (error: unknown): string => {
   if (isAxiosError(error)) {
     const data = error.response?.data as { data?: { message?: string }; meta?: { message?: string } } | undefined;
@@ -298,12 +336,17 @@ const ProviderRow = ({
 const FacilityBookingRow = ({
   booking,
   onAssign,
-  canAssign
+  canAssign,
+  nowMs
 }: {
   booking: Booking;
   onAssign: (booking: Booking) => void;
   canAssign: boolean;
-}) => (
+  nowMs: number;
+}) => {
+  const countdown = formatFacilityResponseCountdown(booking.facilityResponseDueAt, nowMs);
+  const countdownTone = facilityResponseCountdownTone(booking.facilityResponseDueAt, nowMs);
+  return (
   <article className="rounded-xl border border-slate-200 bg-white p-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
@@ -327,8 +370,11 @@ const FacilityBookingRow = ({
         <p className="mt-1 text-slate-800">{booking.provider?.fullName ?? "Unassigned"}</p>
       </div>
       <div>
-        <p className="text-xs font-semibold uppercase text-slate-500">Due</p>
-        <p className="mt-1 text-slate-800">
+        <p className="text-xs font-semibold uppercase text-slate-500">Response window</p>
+        <p className={`mt-1 font-semibold ${countdownTone}`}>
+          {countdown}
+        </p>
+        <p className="text-xs text-slate-500">
           {booking.facilityResponseDueAt ? new Date(booking.facilityResponseDueAt).toLocaleTimeString() : "-"}
         </p>
       </div>
@@ -341,12 +387,13 @@ const FacilityBookingRow = ({
       <div className="mt-4 flex justify-end">
         <Button size="sm" variant="outline" onClick={() => onAssign(booking)}>
           <EditIcon fontSize="small" />
-          {booking.provider ? "Reassign" : "Assign"}
+          {booking.provider ? "Reassign" : "Assign & claim"}
         </Button>
       </div>
     )}
   </article>
-);
+  );
+};
 
 const FacilityWorkspacePage = () => {
   const { facilityId } = useParams();
@@ -373,6 +420,7 @@ const FacilityWorkspacePage = () => {
   const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>({ providerUserId: "", reason: "" });
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const facilityQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId],
@@ -425,6 +473,11 @@ const FacilityWorkspacePage = () => {
       setFinancialsVisible(facility.providerFinancialsVisible);
     }
   }, [facility]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const availableCatalogServices = useMemo(() => {
     const used = new Set(facilityServices.map((service) => service.serviceId));
@@ -780,6 +833,7 @@ const FacilityWorkspacePage = () => {
                 key={booking.id}
                 booking={booking}
                 canAssign={canManageBookings && canVerifyProviders}
+                nowMs={nowMs}
                 onAssign={openAssignmentModal}
               />
             ))}
