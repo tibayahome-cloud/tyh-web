@@ -127,7 +127,7 @@ export const buildFacilityCreateInput = (form: CreateFormState): FacilityCreateI
   platformFeePercent: Number(form.platformFeePercent)
 });
 
-const validateCreateForm = (form: CreateFormState): string | null => {
+export const validateCreateForm = (form: CreateFormState): string | null => {
   if (!form.name.trim() || !form.address.trim() || !form.county.trim() || !form.email.trim()) {
     return "Name, address, county, and facility email are required.";
   }

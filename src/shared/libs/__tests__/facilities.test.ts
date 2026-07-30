@@ -24,6 +24,7 @@ import {
   fetchFacilityBookings,
   fetchFacilityProviders,
   facilityServiceUpdatePayload,
+  updateFacilityStatus,
   updateFacilityProviderCompensation
 } from "../facilities";
 
@@ -149,6 +150,22 @@ describe("facility API helpers", () => {
       active: false,
       price_cents: 120000
     });
+  });
+
+  it("updates facility lifecycle status with backend field names", async () => {
+    mockPatch.mockResolvedValueOnce({
+      data: {
+        data: {
+          ...facilityResponse,
+          status: "suspended"
+        }
+      }
+    });
+
+    const result = await updateFacilityStatus("facility-1", "suspended");
+
+    expect(mockPatch).toHaveBeenCalledWith("/facilities/facility-1/status", { status: "suspended" });
+    expect(result.status).toBe("suspended");
   });
 
   it("updates provider compensation with backend field names", async () => {
