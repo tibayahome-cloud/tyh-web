@@ -12,32 +12,22 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
 import { api } from "../../../../shared/libs/api";
+import { mapPayments } from "../../../../shared/schemas/payment";
+import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schemas/payment";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** Shape returned by GET /api/v1/admin/payments/payments */
-type ApiPayment = {
-  id: string;
-  booking_id: string;
-  client_user_id: string;
-  provider_user_id: string;
-  amount_cents: number;
-  status: string;
-  method: string;
-  provider_ref: string | null;
-  retry_count: number;
-  initiated_at: string;
-  succeeded_at: string | null;
-  failed_at: string | null;
-  failure_reason: string | null;
-};
-
-type ApiPaymentsResponse = {
-  data: ApiPayment[];
+type RawPaymentsResponse = {
+  data: unknown[];
   meta: {
     next_cursor: string | null;
     page: { size: number; total: number };
   };
+};
+
+type PaymentsResponse = {
+  data: PaymentRecord[];
+  meta: RawPaymentsResponse["meta"];
 };
 
 type PaymentRow = {
@@ -46,6 +36,7 @@ type PaymentRow = {
   bookingId: string;
   amountFormatted: string;
   amountCents: number;
+  settlement: PaymentSettlement | null;
   status: string;
   method: string;
   providerRef: string;
@@ -53,7 +44,7 @@ type PaymentRow = {
   initiatedAt: string;
   settledAt: string;
   /** Keep the raw record for the detail modal */
-  _raw: ApiPayment;
+  _raw: PaymentRecord;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -109,6 +100,25 @@ const statusTone = (status: string) => {
   }
 };
 
+const SettlementCell = ({ settlement }: { settlement: PaymentSettlement | null }) => {
+  if (!settlement) {
+    return <span className="text-xs font-medium text-slate-400">Not returned</span>;
+  }
+  return (
+    <div className="space-y-0.5 py-1 text-xs leading-5 text-slate-600">
+      <p>
+        <span className="font-semibold text-slate-900">TYH:</span> {formatKES(settlement.platformFeeCents)}
+      </p>
+      <p>
+        <span className="font-semibold text-slate-900">Facility:</span> {formatKES(settlement.facilityShareCents)}
+      </p>
+      <p>
+        <span className="font-semibold text-slate-900">Provider:</span> {formatKES(settlement.providerPayoutCents)}
+      </p>
+    </div>
+  );
+};
+
 // ─── API call ─────────────────────────────────────────────────────────────────
 
 const fetchPayments = async (params: {
@@ -118,7 +128,7 @@ const fetchPayments = async (params: {
   bookingId?: string;
   dateFrom?: string;
   dateTo?: string;
-}): Promise<ApiPaymentsResponse> => {
+}): Promise<PaymentsResponse> => {
   const query: Record<string, string> = {
     "page[size]": String(PAGE_SIZE),
   };
@@ -129,10 +139,13 @@ const fetchPayments = async (params: {
   if (params.dateFrom)  query["filter[date_from]"] = params.dateFrom;
   if (params.dateTo)    query["filter[date_to]"]   = params.dateTo;
 
-  const res = await api.get<ApiPaymentsResponse>("/admin/payments/payments", {
+  const res = await api.get<RawPaymentsResponse>("/admin/payments/payments", {
     params: query,
   });
-  return res.data;
+  return {
+    ...res.data,
+    data: mapPayments(res.data.data)
+  };
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -212,7 +225,7 @@ const PaymentsPage = () => {
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const isMobileFilters = useMediaQuery("(max-width: 640px)");
 
-  const [detailPayment, setDetailPayment] = useState<ApiPayment | null>(null);
+  const [detailPayment, setDetailPayment] = useState<PaymentRecord | null>(null);
 
   // Close desktop dropdown on click-away / Escape
   useEffect(() => {
@@ -265,7 +278,7 @@ const PaymentsPage = () => {
   });
 
   // ── Flatten pages → raw payments ─────────────────────────────────────────
-  const allPayments = useMemo<ApiPayment[]>(
+  const allPayments = useMemo<PaymentRecord[]>(
     () => paymentsQuery.data?.pages.flatMap((p) => p.data) ?? [],
     [paymentsQuery.data]
   );
@@ -276,15 +289,16 @@ const PaymentsPage = () => {
       allPayments.map((p, i) => ({
         id:              p.id,
         rowNumber:       i + 1,
-        bookingId:       p.booking_id,
-        amountCents:     p.amount_cents,
-        amountFormatted: formatKES(p.amount_cents),
+        bookingId:       p.bookingId,
+        amountCents:     p.amountCents,
+        amountFormatted: formatKES(p.amountCents),
+        settlement:      p.settlement,
         status:          p.status,
-        method:          p.method,
-        providerRef:     p.provider_ref ?? "—",
-        retryCount:      p.retry_count,
-        initiatedAt:     formatDateTime(p.initiated_at),
-        settledAt:       formatDateTime(p.succeeded_at ?? p.failed_at),
+        method:          p.channel ?? "mpesa",
+        providerRef:     p.providerRef ?? p.mpesaReceiptNumber ?? "—",
+        retryCount:      p.retryCount,
+        initiatedAt:     formatDateTime(p.initiatedAt ?? p.createdAt),
+        settledAt:       formatDateTime(p.completedAt ?? p.failedAt ?? p.updatedAt),
         _raw:            p,
       })),
     [allPayments]
@@ -297,8 +311,8 @@ const PaymentsPage = () => {
     const failed    = allPayments.filter((p) => p.status === "failed");
     const refunded  = allPayments.filter((p) => p.status === "refunded");
 
-    const sum = (arr: ApiPayment[]) =>
-      arr.reduce((s, p) => s + p.amount_cents, 0);
+    const sum = (arr: PaymentRecord[]) =>
+      arr.reduce((s, p) => s + p.amountCents, 0);
 
     const failureRate =
       allPayments.length > 0
@@ -307,7 +321,7 @@ const PaymentsPage = () => {
 
     const avgRetries =
       failed.length > 0
-        ? (failed.reduce((s, p) => s + p.retry_count, 0) / failed.length).toFixed(1)
+        ? (failed.reduce((s, p) => s + p.retryCount, 0) / failed.length).toFixed(1)
         : "0";
 
     return {
@@ -344,6 +358,13 @@ const PaymentsPage = () => {
         renderCell: ({ value }) => (
           <span className="font-semibold text-slate-900">{value}</span>
         ),
+      },
+      {
+        field: "settlement",
+        headerName: "B2B settlement",
+        minWidth: 220,
+        sortable: false,
+        renderCell: ({ value }) => <SettlementCell settlement={value as PaymentSettlement | null} />,
       },
       {
         field: "status",
@@ -531,7 +552,7 @@ const PaymentsPage = () => {
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Payments</h1>
         <p className="text-sm text-slate-500">
-          Inspect transactions, retry failures, and track revenue totals.
+          Inspect transactions, retry failures, and review backend-calculated B2B settlement splits.
         </p>
       </div>
 
@@ -683,11 +704,11 @@ const PaymentsPage = () => {
                 {detailPayment.status.replace(/_/g, " ")}
               </span>
               <span className="text-lg font-semibold text-slate-900">
-                {formatKES(detailPayment.amount_cents)}
+                {formatKES(detailPayment.amountCents)}
               </span>
-              {detailPayment.retry_count > 0 && (
+              {detailPayment.retryCount > 0 && (
                 <span className="ml-auto text-xs text-amber-600">
-                  {detailPayment.retry_count} retr{detailPayment.retry_count === 1 ? "y" : "ies"}
+                  {detailPayment.retryCount} retr{detailPayment.retryCount === 1 ? "y" : "ies"}
                 </span>
               )}
             </div>
@@ -695,30 +716,57 @@ const PaymentsPage = () => {
             {/* Fields grid */}
             <div className="grid gap-4 sm:grid-cols-2">
               <DetailField label="Payment ID"       value={detailPayment.id}               mono />
-              <DetailField label="Booking ID"       value={detailPayment.booking_id}       mono />
-              <DetailField label="Client user ID"   value={detailPayment.client_user_id}   mono />
-              <DetailField label="Provider user ID" value={detailPayment.provider_user_id} mono />
-              <DetailField label="Method"           value={detailPayment.method} />
-              <DetailField label="Provider ref"     value={detailPayment.provider_ref}     mono />
-              <DetailField label="Initiated"        value={formatDateTime(detailPayment.initiated_at)} />
-              <DetailField label="Succeeded"        value={formatDateTime(detailPayment.succeeded_at)} />
-              {detailPayment.failed_at && (
-                <DetailField label="Failed at" value={formatDateTime(detailPayment.failed_at)} />
+              <DetailField label="Booking ID"       value={detailPayment.bookingId}       mono />
+              <DetailField label="Client user ID"   value={detailPayment.clientUserId}   mono />
+              <DetailField label="Provider user ID" value={detailPayment.providerUserId} mono />
+              <DetailField label="Method"           value={detailPayment.channel ?? "mpesa"} />
+              <DetailField label="Provider ref"     value={detailPayment.providerRef ?? detailPayment.mpesaReceiptNumber}     mono />
+              <DetailField label="Initiated"        value={formatDateTime(detailPayment.initiatedAt ?? detailPayment.createdAt)} />
+              <DetailField label="Succeeded"        value={formatDateTime(detailPayment.succeededAt ?? detailPayment.completedAt)} />
+              {detailPayment.failedAt && (
+                <DetailField label="Failed at" value={formatDateTime(detailPayment.failedAt)} />
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">B2B settlement</p>
+                  <p className="text-sm text-slate-500">Displayed only when backend settlement metadata is available.</p>
+                </div>
+                {detailPayment.settlement?.providerCompensationMode && (
+                  <span className="mt-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mt-0">
+                    {detailPayment.settlement.providerCompensationMode.replace(/_/g, " ")}
+                  </span>
+                )}
+              </div>
+              {detailPayment.settlement ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <DetailField label="Booking amount" value={formatKES(detailPayment.settlement.bookingAmountCents)} />
+                  <DetailField label="TYH platform fee" value={formatKES(detailPayment.settlement.platformFeeCents)} />
+                  <DetailField label="Facility share" value={formatKES(detailPayment.settlement.facilityShareCents)} />
+                  <DetailField label="Provider payout" value={formatKES(detailPayment.settlement.providerPayoutCents)} />
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">
+                  Settlement metadata was not returned for this payment. Facility wallet and automatic facility payout
+                  flows should remain hidden until backend support exists.
+                </p>
               )}
             </div>
 
             {/* Failure reason */}
-            {detailPayment.failure_reason && (
+            {detailPayment.failureReason && (
               <div className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">
                 <span className="font-semibold">Failure reason: </span>
-                {detailPayment.failure_reason}
+                {detailPayment.failureReason}
               </div>
             )}
 
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Link
-                to={`/admin/bookings/${detailPayment.booking_id}`}
+                to={`/admin/bookings/${detailPayment.bookingId}`}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 onClick={() => setDetailPayment(null)}
               >
