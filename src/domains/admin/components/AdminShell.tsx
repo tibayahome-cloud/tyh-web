@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import DashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import GroupIcon from "@mui/icons-material/GroupsOutlined";
@@ -11,6 +11,7 @@ import ForumIcon from "@mui/icons-material/ForumOutlined";
 import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplicationsOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import PaymentIcon from "@mui/icons-material/PaymentOutlined";
+import BusinessIcon from "@mui/icons-material/BusinessOutlined";
 
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
@@ -21,7 +22,6 @@ import type { NavItem } from "../../../shared/components/AppSidebar";
 
 export const AdminShell = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const socket = useSocket();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -62,6 +62,7 @@ export const AdminShell = () => {
     { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
     { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
     { label: "Services", to: "/admin/services", icon: <ViewListIcon /> },
+    { label: "Facilities", to: "/admin/facilities", icon: <BusinessIcon /> },
     { label: "Map", to: "/admin/providers/directory", icon: <MapIcon /> },
     { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
     { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread },

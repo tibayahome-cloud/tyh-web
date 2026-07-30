@@ -4,10 +4,12 @@ import type { Booking, BookingListMeta } from "../schemas/booking";
 import {
   mapFacilities,
   mapFacility,
+  mapFacilityAdmin,
   mapFacilityDiscoveryResult,
   mapFacilityService,
   type BookingRequestMode,
   type Facility,
+  type FacilityAdmin,
   type FacilityBookingAssignmentInput,
   type FacilityCreateInput,
   type FacilityDiscoveryResult,
@@ -216,13 +218,13 @@ export const updateFacilityStatus = async (facilityId: string, status: FacilityS
   return facility;
 };
 
-export const assignFacilityAdmin = async (facilityId: string, email: string): Promise<Facility> => {
-  const response = await api.post(`/facilities/${facilityId}/admins`, { email });
-  const facility = mapFacility(payloadData(response.data));
-  if (!facility) {
+export const assignFacilityAdmin = async (facilityId: string, userId: string): Promise<FacilityAdmin> => {
+  const response = await api.post(`/facilities/${facilityId}/admins`, { user_id: userId });
+  const admin = mapFacilityAdmin(payloadData(response.data));
+  if (!admin) {
     throw new Error("Failed to assign facility admin");
   }
-  return facility;
+  return admin;
 };
 
 export const discoverFacilities = async ({

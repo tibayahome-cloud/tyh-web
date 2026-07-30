@@ -16,6 +16,7 @@ vi.mock("../api", () => ({
 }));
 
 import {
+  assignFacilityAdmin,
   createFacility,
   discoverFacilities,
   facilityServiceUpdatePayload,
@@ -111,6 +112,31 @@ describe("facility API helpers", () => {
       ],
       initial_admin_email: "admin@nairobi.test",
       platform_fee_percent: 10
+    });
+  });
+
+  it("assigns facility admin ops by backend user id", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        data: {
+          id: "admin-link-1",
+          facility_id: "facility-1",
+          user_id: "user-1",
+          role_key: "admin.ops",
+          active: true
+        }
+      }
+    });
+
+    const result = await assignFacilityAdmin("facility-1", "user-1");
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins", { user_id: "user-1" });
+    expect(result).toEqual({
+      id: "admin-link-1",
+      facilityId: "facility-1",
+      userId: "user-1",
+      roleKey: "admin.ops",
+      active: true
     });
   });
 
