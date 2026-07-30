@@ -15,6 +15,7 @@ const ProviderDetailPage = lazy(() => import("./pages/providers/ProviderDetailPa
 const ProviderOnboardingWizardPage = lazy(() => import("./pages/providers/OnboardingWizardPage"));
 const ProviderZonesPage = lazy(() => import("./pages/providers/ProviderZonesPage"));
 const ServiceManagementPage = lazy(() => import("./pages/services/ServiceManagementPage"));
+const FacilityHomePage = lazy(() => import("./pages/facilities/FacilityHomePage"));
 const FacilityManagementPage = lazy(() => import("./pages/facilities/FacilityManagementPage"));
 const FacilityWorkspacePage = lazy(() => import("./pages/facilities/FacilityWorkspacePage"));
 const AdminNotificationsPage = lazy(() => import("./pages/notifications/AdminNotificationsPage"));
@@ -159,6 +160,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <ServiceManagementPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "facility",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <FacilityHomePage />
           </Suspense>
         )
       },
