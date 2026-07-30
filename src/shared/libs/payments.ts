@@ -46,6 +46,9 @@ export const fetchAdminPayments = async ({
   cursor,
   limit = 25,
   status,
+  method,
+  dateFrom,
+  dateTo,
   bookingId,
   preset = "card"
 }: PaymentListParams = {}): Promise<PaymentListResult> => {

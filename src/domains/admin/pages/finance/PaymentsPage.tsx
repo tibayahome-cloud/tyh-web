@@ -282,7 +282,7 @@ const PaymentsPage = () => {
 
   // ── Flatten pages → raw payments ─────────────────────────────────────────
   const allPayments = useMemo<PaymentRecord[]>(
-    () => paymentsQuery.data?.pages.flatMap((p) => p.data) ?? [],
+    () => paymentsQuery.data?.pages.flatMap((p) => p.payments) ?? [],
     [paymentsQuery.data]
   );
 
