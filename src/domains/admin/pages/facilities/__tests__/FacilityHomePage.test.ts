@@ -13,10 +13,9 @@ describe("FacilityHomePage helpers", () => {
     });
   });
 
-  it("falls back to global management when multiple facilities are visible", () => {
+  it("fails closed when multiple facilities are returned for admin ops", () => {
     expect(resolveFacilityWorkspaceRoute([facility("facility-1"), facility("facility-2")])).toEqual({
-      kind: "management",
-      to: "/admin/facilities"
+      kind: "scope_error"
     });
   });
 

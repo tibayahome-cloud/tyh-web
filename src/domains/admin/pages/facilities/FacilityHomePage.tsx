@@ -10,7 +10,7 @@ import type { Facility } from "../../../../shared/schemas/facility";
 
 type FacilityWorkspaceResolution =
   | { kind: "workspace"; to: string }
-  | { kind: "management"; to: string }
+  | { kind: "scope_error" }
   | { kind: "empty" };
 
 /** Resolve the tenant workspace route from the backend-scoped facility list. */
@@ -19,7 +19,7 @@ export const resolveFacilityWorkspaceRoute = (facilities: Facility[]): FacilityW
     return { kind: "workspace", to: `/admin/facilities/${facilities[0].id}` };
   }
   if (facilities.length > 1) {
-    return { kind: "management", to: "/admin/facilities" };
+    return { kind: "scope_error" };
   }
   return { kind: "empty" };
 };
@@ -63,9 +63,11 @@ const FacilityHomePage = () => {
   const facilities = facilitiesQuery.data?.facilities ?? [];
   const resolution = resolveFacilityWorkspaceRoute(facilities);
 
-  if (resolution.kind !== "empty") {
+  if (resolution.kind === "workspace") {
     return <Navigate to={resolution.to} replace />;
   }
+
+  const hasScopeError = resolution.kind === "scope_error";
 
   return (
     <Card>
@@ -75,7 +77,9 @@ const FacilityHomePage = () => {
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Facility</h1>
             <p className="mt-1 text-sm text-slate-600">
-              No active facility is linked to your admin ops account yet.
+              {hasScopeError
+                ? "Your admin ops account is linked to more than one facility. Access is blocked until the facility assignment is corrected."
+                : "No active facility is linked to your admin ops account yet."}
             </p>
           </div>
         </div>
