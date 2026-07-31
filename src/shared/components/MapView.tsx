@@ -430,7 +430,10 @@ export const MapView = ({
               zoomControl: intentTheme.options.zoomControl,
               tilt: intentTheme.options.tilt,
               heading: intentTheme.options.heading,
-              gestureHandling: "greedy",
+              // "cooperative" requires scroll+hover to zoom the map.
+              // "greedy" captures ALL scroll events page-wide, making the whole
+              // page behave like a map even when it's a small embedded card.
+              gestureHandling: immersive ? "greedy" : "cooperative",
               backgroundColor: "#f8fafc",
               maxZoom: 18
             }}
