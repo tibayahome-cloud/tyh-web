@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
 
@@ -112,8 +112,31 @@ const ProviderHome = () => {
   const { queue: broadcastQueue, dismiss: dismissBroadcast } = useBroadcastQueueContext();
   const updateStatusMutation = useUpdateProviderStatus(user?.id);
   const acceptBookingMutation = useAcceptBookingMutation("detail");
-  const [isTracking, setIsTracking] = useState(true);
+  const location = useLocation();
+  const isOnHomePage = location.pathname === "/pro/home" || location.pathname === "/pro";
+  const [isTracking, setIsTracking] = useState(() => {
+    // Default to true if not explicitly closed in this session
+    return sessionStorage.getItem("pro_is_tracking") !== "false";
+  });
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; clientName: string } | null>(null);
+
+  // Sync session storage on change
+  const handleSetIsTracking = (value: boolean) => {
+    setIsTracking(value);
+    sessionStorage.setItem("pro_is_tracking", String(value));
+  };
+
+  // Auto-hide the immersive overlay when user navigates away from home
+  // The portal renders to document.body, so it would block all tab navigation
+  // if left mounted while on a different route.
+  useEffect(() => {
+    if (!isOnHomePage) {
+      setIsTracking(false);
+    } else if (isOnHomePage && sessionStorage.getItem("pro_is_tracking") !== "false") {
+      // Restore tracking state when returning to home
+      setIsTracking(true);
+    }
+  }, [isOnHomePage]);
 
   const { data: activeList } = useBookingList(
     {
@@ -137,6 +160,13 @@ const ProviderHome = () => {
       return (timeB ? new Date(timeB).getTime() : 0) - (timeA ? new Date(timeA).getTime() : 0);
     })[0] ?? null;
   }, [activeList?.bookings]);
+
+  useEffect(() => {
+    if (!activeBooking) {
+      sessionStorage.removeItem("pro_is_tracking");
+      setIsTracking(true); // Default next booking to expand
+    }
+  }, [activeBooking]);
 
   const { data: upcomingList, isFetching: upcomingFetching } = useBookingList(
     {
@@ -227,10 +257,10 @@ const ProviderHome = () => {
 
   return (
     <>
-      {activeBooking && isTracking && (
+      {activeBooking && isTracking && isOnHomePage && (
         <ImmersiveProviderBookingView
           booking={activeBooking}
-          onClose={() => setIsTracking(false)}
+          onClose={() => handleSetIsTracking(false)}
           onOpenChat={() => dispatchChat(activeBooking.id)}
         />
       )}
@@ -271,7 +301,7 @@ const ProviderHome = () => {
                     <Button
                       variant="primary"
                       className="h-9 rounded-lg px-4 text-xs"
-                      onClick={() => setIsTracking(true)}
+                      onClick={() => handleSetIsTracking(true)}
                     >
                       <Activity className="mr-1.5 h-3.5 w-3.5" />
                       Expand
@@ -288,8 +318,10 @@ const ProviderHome = () => {
                 <BookingLiveMapCard
                   bookingId={activeBooking.id}
                   role="provider"
+                  height={240}
+                  hideOverlays
                   onOpenChat={dispatchChat}
-                  className="rounded-xl border border-slate-100 overflow-hidden aspect-video"
+                  className="rounded-xl border border-slate-100 overflow-hidden"
                 />
               </Card>
             ) : (
