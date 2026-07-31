@@ -17,6 +17,7 @@ const mapListMeta = (meta: unknown, fallback: WithdrawalListMeta): WithdrawalLis
     return fallback;
   }
   const raw = meta as Record<string, unknown>;
+  const pageMeta = raw.page && typeof raw.page === "object" ? raw.page as Record<string, unknown> : {};
   const toInt = (value: unknown, defaultValue: number): number => {
     if (typeof value === "number" && Number.isFinite(value)) {
       return value;
@@ -28,10 +29,10 @@ const mapListMeta = (meta: unknown, fallback: WithdrawalListMeta): WithdrawalLis
     return defaultValue;
   };
   return {
-    total: toInt(raw.total, fallback.total),
-    page: toInt(raw.page, fallback.page),
-    size: toInt(raw.size, fallback.size),
-    totalPages: toInt(raw.total_pages ?? raw.totalPages, fallback.totalPages)
+    total: toInt(raw.total ?? pageMeta.total, fallback.total),
+    page: toInt(typeof raw.page === "number" ? raw.page : pageMeta.number, fallback.page),
+    size: toInt(raw.size ?? pageMeta.size, fallback.size),
+    totalPages: toInt(raw.total_pages ?? raw.totalPages ?? pageMeta.total_pages ?? pageMeta.totalPages, fallback.totalPages)
   };
 };
 
@@ -83,6 +84,27 @@ export const fetchAdminWithdrawals = async ({
     params["filter[status]"] = status;
   }
   const response = await api.get(`${ADMIN_PAYMENTS_BASE}/wallet/withdrawals`, { params });
+  const payload = (response.data ?? {}) as Record<string, unknown>;
+  const data = Array.isArray(payload.data) ? payload.data : [];
+  const withdrawals = data
+    .map((entry) => mapWalletWithdrawal(entry))
+    .filter((entry): entry is WalletWithdrawal => Boolean(entry));
+  const meta = mapListMeta(payload.meta, { total: withdrawals.length, page, size, totalPages: 1 });
+  return { withdrawals, meta, raw: payload };
+};
+
+export const fetchFacilityWithdrawals = async (
+  facilityId: string,
+  { page = 1, size = 25, status }: { page?: number; size?: number; status?: string } = {}
+): Promise<WithdrawalListResult> => {
+  const params: Record<string, unknown> = {
+    "page[number]": page,
+    "page[size]": size
+  };
+  if (status) {
+    params["filter[status]"] = status;
+  }
+  const response = await api.get(`/admin/payments/facilities/${facilityId}/withdrawals`, { params });
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const data = Array.isArray(payload.data) ? payload.data : [];
   const withdrawals = data

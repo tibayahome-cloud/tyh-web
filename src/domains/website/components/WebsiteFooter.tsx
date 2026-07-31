@@ -47,7 +47,7 @@ export const WebsiteFooter = () => {
                         <ul className="space-y-6">
                             <li className="flex items-start gap-4">
                                 <MapPin className="w-6 h-6 text-tiba-gold flex-shrink-0 mt-1" />
-                                <span>Nairobi, Kenya<br /><span className="text-slate-500 text-sm">Main Office, Westlands</span></span>
+                                <span>Nairobi, Kenya<br /><span className="text-slate-500 text-sm">Marcus Garvey Road, Kilimani</span></span>
                             </li>
                             <li className="flex items-center gap-4">
                                 <Phone className="w-6 h-6 text-tiba-gold flex-shrink-0" />
@@ -55,7 +55,7 @@ export const WebsiteFooter = () => {
                             </li>
                             <li className="flex items-center gap-4">
                                 <Mail className="w-6 h-6 text-tiba-gold flex-shrink-0" />
-                                <a href="mailto:care@tibahome.com" className="hover:text-tiba-gold">care@tibahome.com</a>
+                                <a href="mailto:clientscare@tibayahome.co.ke" className="hover:text-tiba-gold">clientscare@tibayahome.co.ke</a>
                             </li>
                         </ul>
 
@@ -63,9 +63,14 @@ export const WebsiteFooter = () => {
                             <div className="relative z-10">
                                 <h5 className="text-white font-bold mb-1">Download App</h5>
                                 <p className="text-sm text-slate-400">Book faster on the go.</p>
-                                <Link to="/app" className="inline-flex items-center gap-2 text-tiba-gold text-sm font-bold mt-3 group-hover:gap-3 transition-all">
+                                <a
+                                    href="https://median.co/share/eekzzbo#apk"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 text-tiba-gold text-sm font-bold mt-3 group-hover:gap-3 transition-all"
+                                >
                                     Get App <ArrowRight className="w-4 h-4" />
-                                </Link>
+                                </a>
                             </div>
                         </div>
                     </div>

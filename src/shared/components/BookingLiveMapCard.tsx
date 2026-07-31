@@ -830,6 +830,23 @@ export const BookingLiveMapCard = ({
     );
   }
 
+  // Compact thumbnail mode — used on dashboards where only the live map is needed
+  // without the full status panels and info grid below it.
+  if (hideOverlays) {
+    return (
+      <MapView
+        center={{ lat: center.lat, lng: center.lng }}
+        markers={markers}
+        polylines={[displayRoute, polyline, clientPolyline].filter(Boolean) as MapPolyline[]}
+        height={computedHeight}
+        intent={role}
+        autoFit
+        emptyLabel="No live location yet."
+        className={className}
+      />
+    );
+  }
+
   return (
     <Card className={classNames("space-y-6", className)}>
       <div className="rounded-[34px] bg-gradient-to-br from-emerald-50/70 via-white to-white p-2">

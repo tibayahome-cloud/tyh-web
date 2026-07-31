@@ -7,6 +7,8 @@ import { fetchPaymentSummary, fetchAdminPayments } from "../../../../shared/libs
 import { fetchAdminWithdrawals } from "../../../../shared/libs/wallet";
 import type { PaymentRecord } from "../../../../shared/schemas/payment";
 import type { WalletWithdrawal } from "../../../../shared/schemas/wallet";
+import { useRbac } from "../../../../shared/hooks/useRbac";
+import { canUseGlobalPaymentLedger, FinanceScopeNotice } from "./paymentAccess";
 
 const formatCurrency = (valueCents: number, currency = "KES") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency }).format((valueCents ?? 0) / 100);
@@ -44,23 +46,33 @@ const statusTone = (status: string) => {
 };
 
 const FinanceOverviewPage = () => {
+  const { roles } = useRbac();
+  const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
+
   const summaryQuery = useQuery({
     queryKey: ["admin", "finance", "summary"],
     queryFn: fetchPaymentSummary,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: canReadGlobalLedger
   });
 
   const recentPaymentsQuery = useQuery({
     queryKey: ["admin", "finance", "payments", "recent"],
     queryFn: () => fetchAdminPayments({ pageSize: 5 }),
-    staleTime: 30_000
+    staleTime: 30_000,
+    enabled: canReadGlobalLedger
   });
 
   const withdrawalQueueQuery = useQuery({
     queryKey: ["admin", "finance", "withdrawals", "recent"],
     queryFn: () => fetchAdminWithdrawals({ size: 5 }),
-    staleTime: 30_000
+    staleTime: 30_000,
+    enabled: canReadGlobalLedger
   });
+
+  if (!canReadGlobalLedger) {
+    return <FinanceScopeNotice />;
+  }
 
   const summary = summaryQuery.data;
 

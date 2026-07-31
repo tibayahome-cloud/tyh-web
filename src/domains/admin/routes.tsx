@@ -4,6 +4,7 @@ import { Navigate, useRoutes } from "react-router-dom";
 
 import { Loading } from "../../shared/components/Loading";
 import { AdminShell } from "./components/AdminShell";
+import { PlatformAdminGuard } from "./guards";
 
 const AdminDashboard = lazy(() => import("./pages/Dashboard"));
 const UserManagementPage = lazy(() => import("./pages/UserManagement"));
@@ -15,6 +16,9 @@ const ProviderDetailPage = lazy(() => import("./pages/providers/ProviderDetailPa
 const ProviderOnboardingWizardPage = lazy(() => import("./pages/providers/OnboardingWizardPage"));
 const ProviderZonesPage = lazy(() => import("./pages/providers/ProviderZonesPage"));
 const ServiceManagementPage = lazy(() => import("./pages/services/ServiceManagementPage"));
+const FacilityHomePage = lazy(() => import("./pages/facilities/FacilityHomePage"));
+const FacilityManagementPage = lazy(() => import("./pages/facilities/FacilityManagementPage"));
+const FacilityWorkspacePage = lazy(() => import("./pages/facilities/FacilityWorkspacePage"));
 const AdminNotificationsPage = lazy(() => import("./pages/notifications/AdminNotificationsPage"));
 const AdminNotificationPreferencesPage = lazy(() => import("./pages/notifications/NotificationPreferencesPage"));
 const BookingMonitoringPage = lazy(() => import("./pages/bookings/MonitoringPage"));
@@ -27,6 +31,10 @@ const FinanceWithdrawalsPage = lazy(() => import("./pages/finance/WithdrawalsPag
 const SystemSettingsPage = lazy(() => import("./pages/system/SystemSettingsPage"));
 const AdminSelfCareAlertsPage = lazy(() => import("./pages/selfcare/AlertsPage"));
 
+const platformAdmin = (element: JSX.Element) => (
+  <PlatformAdminGuard>{element}</PlatformAdminGuard>
+);
+
 const buildRoutes = (): RouteObject[] => [
   {
     element: <AdminShell />,
@@ -34,7 +42,7 @@ const buildRoutes = (): RouteObject[] => [
       { index: true, element: <Navigate to="dashboard" replace /> },
       {
         path: "dashboard",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <AdminDashboard />
           </Suspense>
@@ -86,7 +94,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "users",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <UserManagementPage />
           </Suspense>
@@ -94,7 +102,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "users/:userId",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <UserDetailPage />
           </Suspense>
@@ -102,7 +110,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "providers/applications",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderApplicationsPage />
           </Suspense>
@@ -110,7 +118,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "providers/applications/:applicationId",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderApplicationReviewPage />
           </Suspense>
@@ -118,11 +126,11 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "providers/requirements",
-        element: <Navigate to="/admin/providers/applications?tab=requirements" replace />
+        element: platformAdmin(<Navigate to="/admin/providers/applications?tab=requirements" replace />)
       },
       {
         path: "providers/directory",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderDirectoryPage />
           </Suspense>
@@ -130,7 +138,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "providers/onboarding",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderOnboardingWizardPage />
           </Suspense>
@@ -138,7 +146,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "providers/zones",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderZonesPage />
           </Suspense>
@@ -146,7 +154,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "providers/:userId",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderDetailPage />
           </Suspense>
@@ -154,23 +162,47 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "services",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <ServiceManagementPage />
           </Suspense>
         )
       },
       {
+        path: "facility",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <FacilityHomePage />
+          </Suspense>
+        )
+      },
+      {
+        path: "facilities",
+        element: platformAdmin(
+          <Suspense fallback={<Loading fullHeight />}>
+            <FacilityManagementPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "facilities/:facilityId",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <FacilityWorkspacePage />
+          </Suspense>
+        )
+      },
+      {
         path: "services/catalog",
-        element: <Navigate to="/admin/services" replace />
+        element: platformAdmin(<Navigate to="/admin/services" replace />)
       },
       {
         path: "services/list",
-        element: <Navigate to="/admin/services" replace />
+        element: platformAdmin(<Navigate to="/admin/services" replace />)
       },
       {
         path: "services/localization",
-        element: <Navigate to="/admin/services" replace />
+        element: platformAdmin(<Navigate to="/admin/services" replace />)
       },
       {
         path: "notifications",
@@ -190,7 +222,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "system-settings",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <SystemSettingsPage />
           </Suspense>
@@ -210,7 +242,7 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "bookings/monitoring",
-        element: (
+        element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <BookingMonitoringPage />
           </Suspense>

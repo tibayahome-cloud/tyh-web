@@ -29,6 +29,7 @@ import nursingImage from "../../../assets/images/nursing.png";
 import therapyImage from "../../../assets/images/service-therapy.png";
 import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
+import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -172,9 +173,9 @@ export const Home = () => {
                         </motion.div>
 
                         <div className="flex-1">
-                            <div className="mb-4 inline-block px-4 py-1.5 rounded-full bg-tiba-gold/10 text-tiba-gold font-bold text-sm">
+                            {/* <div className="mb-4 inline-block px-4 py-1.5 rounded-full bg-tiba-gold/10 text-tiba-gold font-bold text-sm">
                                 COMING SOON
-                            </div>
+                            </div> */}
                             <h2 className="mb-2">The Tiba Ya Home App</h2>
                             <h3 className="text-slate-800 mb-8">Care at Your Fingertips</h3>
 
@@ -195,12 +196,14 @@ export const Home = () => {
                                 ))}
                             </ul>
 
-                            <button
-                                onClick={handleServiceClick}
+                            <a
+                                href="https://median.co/share/eekzzbo#apk"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="btn-secondary"
                             >
-                                Request an Ambulance
-                            </button>
+                                Download App <ArrowRight className="w-4 h-4" />
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -217,7 +220,8 @@ export const Home = () => {
                             { name: "Nursing & Long-Term Care", img: nursingImage },
                             { name: "Therapy & Rehabilitation", img: therapyImage },
                             { name: "Elderly & Assisted Living Care", img: elderlyImage },
-                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage }
+                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage },
+                            { name: "Lab Sample Collection", img: labSampleCollectionImage }
                         ].map((service, i) => (
                             <button
                                 key={i}

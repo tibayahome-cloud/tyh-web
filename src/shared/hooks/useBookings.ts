@@ -8,7 +8,7 @@ import type {
   BookingMutateInput,
   BookingFeedbackInput
 } from "../schemas/booking";
-import { fetchBooking, fetchBookingEvents, fetchBookings, createBooking, acceptBooking, markBooking, confirmBooking, cancelBooking, postBookingLocation, reassignBooking, submitBookingFeedback } from "../libs/bookings";
+import { fetchBooking, fetchBookingEvents, fetchBookings, createBooking, acceptBooking, markBooking, confirmBooking, cancelBooking, postBookingLocation, reassignBooking, rerouteBooking, submitBookingFeedback, payBooking } from "../libs/bookings";
 import type { BookingListParams, BookingPresetName } from "../libs/bookings";
 
 const normalizeListParams = (params: BookingListParams = {}) => ({
@@ -161,6 +161,19 @@ export const useCancelBookingMutation = (preset: BookingPresetName = "detail") =
   });
 };
 
+export const useRerouteBookingMutation = (preset: BookingPresetName = "detail") => {
+  const storeBooking = useStoreBookingDetail();
+  const invalidateLists = useInvalidateBookingLists();
+  return useMutation({
+    mutationFn: ({ bookingId, facilityId }: { bookingId: string; facilityId: string }) =>
+      rerouteBooking(bookingId, facilityId, preset),
+    onSuccess: (booking) => {
+      storeBooking(booking);
+      invalidateLists();
+    }
+  });
+};
+
 export const useBookingLocationMutation = () => {
   return useMutation({
     mutationFn: ({ bookingId, input }: { bookingId: string; input: BookingLocationInput }) =>
@@ -189,6 +202,19 @@ export const useCreateFeedbackMutation = () => {
       return submitBookingFeedback(bookingId, input);
     },
     onSuccess: () => {
+      invalidateLists();
+    }
+  });
+};
+
+export const usePayBookingMutation = (preset: BookingPresetName = "detail") => {
+  const storeBooking = useStoreBookingDetail();
+  const invalidateLists = useInvalidateBookingLists();
+  return useMutation({
+    mutationFn: ({ bookingId, phone, method }: { bookingId: string; phone?: string; method?: string }) =>
+      payBooking(bookingId, { phone, method }, preset),
+    onSuccess: ({ booking }) => {
+      storeBooking(booking);
       invalidateLists();
     }
   });
