@@ -69,6 +69,11 @@ const ProviderBookingDetailPage = () => {
   const profileQuery = useProviderProfile(user?.id);
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const booking = detailQuery.data;
+  console.log("=== DEBUG PROVIDER BOOKING DETAIL ===");
+  console.log("bookingId:", bookingId);
+  console.log("detailQuery status:", detailQuery.status);
+  console.log("detailQuery error:", detailQuery.error);
+  console.log("detailQuery data:", detailQuery.data);
   const financialsVisible = !profileQuery.isLoading && providerFinancialsAreVisible(profileQuery.data);
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
@@ -101,11 +106,17 @@ const ProviderBookingDetailPage = () => {
     return (
       <AppLayout fullWidth showHeader={false}>
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
-          Booking not found.{" "}
-          <Link className="text-primary-600" to="/pro/home">
-            Return home
-          </Link>
-          .
+          <p className="font-semibold text-rose-600 mb-2">
+            Error: {detailQuery.error ? (detailQuery.error as any).message || String(detailQuery.error) : "Booking not found."}
+          </p>
+          <p>
+            bookingId: <code className="bg-slate-100 px-1 rounded">{bookingId}</code>
+          </p>
+          <p className="mt-4">
+            <Link className="text-primary-600 font-semibold underline" to="/pro/home">
+              Return home
+            </Link>
+          </p>
         </div>
       </AppLayout>
     );

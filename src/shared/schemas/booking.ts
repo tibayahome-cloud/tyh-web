@@ -246,6 +246,7 @@ export const mapBooking = (payload: unknown): Booking | null => {
     lat: coerceNumber(raw.lat),
     lng: coerceNumber(raw.lng),
     priceCents: coerceNumber(raw.price_cents) ?? 0,
+    currency: coerceString(raw.currency) ?? "KES",
     estimateDurationMinutes: coerceNumber(raw.estimate_duration_minutes),
     acceptedAt: coerceDate(raw.accepted_at),
     arrivedAt: coerceDate(raw.arrived_at),

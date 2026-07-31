@@ -222,14 +222,8 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     () => (services ?? []).find((service) => service.id === selectedServiceId),
     [services, selectedServiceId]
   );
-  const locationComplete = useMemo(() => {
-    const hasText =
-      (homeAddressField?.trim().length ?? 0) > 0 ||
-      (addressField?.trim().length ?? 0) > 0 ||
-      (houseNumberField?.trim().length ?? 0) > 0 ||
-      (apartmentField?.trim().length ?? 0) > 0;
-    return Boolean(mapLocation && hasText);
-  }, [mapLocation, homeAddressField, addressField, houseNumberField, apartmentField]);
+  // Coordinates alone are sufficient — text fields are optional extra detail
+  const locationComplete = Boolean(mapLocation);
   const [currentStep, setCurrentStep] = useState(0);
   const facilityDiscoveryQuery = useQuery({
     queryKey: ["client", "facilities", "discover", selectedServiceId, mapLocation?.lat, mapLocation?.lng],
@@ -239,7 +233,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
         lat: Number(mapLocation?.lat),
         lng: Number(mapLocation?.lng)
       }),
-    enabled: open && Boolean(selectedServiceId) && Boolean(mapLocation) && locationComplete
+    enabled: open && Boolean(selectedServiceId) && Boolean(mapLocation)
   });
   const discoveredFacilities = useMemo(
     () => facilityDiscoveryQuery.data?.facilities ?? [],
