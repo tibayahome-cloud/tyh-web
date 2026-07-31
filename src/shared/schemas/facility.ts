@@ -271,7 +271,22 @@ export const mapFacilityDiscoveryItem = (payload: unknown): FacilityDiscoveryIte
   const raw = toResourceRecord(payload);
   const id = coerceId(raw.id);
   const facilityType = coerceString(raw.facility_type ?? raw.facilityType);
-  const service = mapFacilityService(raw.service);
+  // Discovery response: raw.service has { id: catalogServiceId, facility_service_id: fsId, price_cents, ... }
+  const svcRaw = raw.service ? toResourceRecord(raw.service) : null;
+  // Build a FacilityService-compatible object from the flat discovery service block
+  const service: FacilityService | null = svcRaw
+    ? {
+        id: coerceId(svcRaw.facility_service_id ?? svcRaw.facilityServiceId ?? svcRaw.id) ?? "",
+        facilityId: id ?? undefined,
+        serviceId: coerceId(svcRaw.id) ?? undefined,
+        priceCents: coerceNumber(svcRaw.price_cents ?? svcRaw.priceCents) ?? 0,
+        currency: coerceString(svcRaw.currency) ?? "KES",
+        estimateDurationMinutes: coerceNumber(svcRaw.estimate_duration_minutes ?? svcRaw.estimateDurationMinutes),
+        active: true,
+        isEmergencyCapable: toBoolean(svcRaw.is_emergency_capable ?? svcRaw.isEmergencyCapable),
+        service: null
+      }
+    : null;
   if (!id || !isFacilityType(facilityType) || !service) {
     return null;
   }
