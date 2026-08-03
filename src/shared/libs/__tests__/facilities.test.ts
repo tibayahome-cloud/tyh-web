@@ -27,7 +27,8 @@ import {
   fetchFacilityProviders,
   facilityServiceUpdatePayload,
   updateFacilityStatus,
-  updateFacilityProviderCompensation
+  updateFacilityProviderCompensation,
+  updateFacilityProvider
 } from "../facilities";
 
 const facilityResponse = {
@@ -280,6 +281,40 @@ describe("facility API helpers", () => {
       provider_financials_visible: false
     });
     expect(result).toMatchObject({ created: true, invitationSent: true, provider: { facilityId: "facility-1" } });
+  });
+
+  it("updates provider details, services, compensation, and visibility in one facility-scoped request", async () => {
+    mockPatch.mockResolvedValueOnce({
+      data: {
+        data: {
+          id: "provider-1",
+          user_id: "user-1",
+          facility_id: "facility-1",
+          provider_financials_visible: null
+        }
+      }
+    });
+
+    const result = await updateFacilityProvider("facility-1", "user-1", {
+      fullName: "Updated Provider",
+      email: "updated@example.com",
+      phone: "+254700000001",
+      serviceIds: ["service-2"],
+      providerFinancialsVisible: null,
+      compensation: { mode: "fixed", fixedPayoutCents: 150000, payoutPercentage: null }
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith("/facilities/facility-1/providers/user-1", {
+      full_name: "Updated Provider",
+      email: "updated@example.com",
+      phone: "+254700000001",
+      service_ids: ["service-2"],
+      provider_financials_visible: null,
+      mode: "fixed",
+      fixed_payout_cents: 150000,
+      payout_percentage: null
+    });
+    expect(result.facilityId).toBe("facility-1");
   });
 
   it("fetches facility booking queues with facility status filters", async () => {

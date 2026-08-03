@@ -101,6 +101,27 @@ export type FacilityProviderOnboardingResult = FacilityProviderBootstrapResult &
   invitationSent: boolean;
 };
 
+export type FacilityAdminInvitation = {
+  created: boolean;
+  facilityAdminId: string;
+  invitationSent: boolean;
+  invitationExpiresAt: string | null;
+};
+
+export type FacilityCreateResult = {
+  facility: Facility;
+  adminInvitation: FacilityAdminInvitation | null;
+};
+
+export type FacilityProviderUpdateInput = {
+  fullName?: string;
+  email?: string | null;
+  phone?: string | null;
+  serviceIds?: string[];
+  providerFinancialsVisible?: boolean | null;
+  compensation?: ProviderCompensationInput;
+};
+
 export type FacilityProviderApplicationReviewInput = {
   approved: boolean;
   notes?: string;
@@ -255,13 +276,25 @@ export const fetchFacilityOverview = async (facilityId: string): Promise<Facilit
   };
 };
 
-export const createFacility = async (input: FacilityCreateInput): Promise<Facility> => {
+export const createFacility = async (input: FacilityCreateInput): Promise<FacilityCreateResult> => {
   const response = await api.post("/facilities", facilityCreatePayload(input));
-  const facility = mapFacility(payloadData(response.data));
+  const data = payloadData(response.data) as Record<string, unknown>;
+  const facility = mapFacility(data?.facility ?? data);
   if (!facility) {
     throw new Error("Failed to create facility");
   }
-  return facility;
+  const invitation = data?.admin_invitation as Record<string, unknown> | undefined;
+  return {
+    facility,
+    adminInvitation: invitation
+      ? {
+          created: Boolean(invitation.created),
+          facilityAdminId: String(invitation.facility_admin_id ?? ""),
+          invitationSent: Boolean(invitation.invitation_sent),
+          invitationExpiresAt: invitation.invitation_expires_at ? String(invitation.invitation_expires_at) : null
+        }
+      : null
+  };
 };
 
 export const updateFacility = async (facilityId: string, input: FacilityUpdateInput): Promise<Facility> => {
@@ -405,6 +438,28 @@ export const updateFacilityProviderCompensation = async (
   const provider = mapProvider(payloadData(response.data));
   if (!provider) {
     throw new Error("Failed to update provider compensation");
+  }
+  return provider;
+};
+
+export const updateFacilityProvider = async (
+  facilityId: string,
+  providerUserId: string,
+  input: FacilityProviderUpdateInput
+): Promise<Provider> => {
+  const response = await api.patch(`/facilities/${facilityId}/providers/${providerUserId}`, {
+    ...(input.fullName !== undefined ? { full_name: input.fullName } : {}),
+    ...(input.email !== undefined ? { email: input.email } : {}),
+    ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    ...(input.serviceIds !== undefined ? { service_ids: input.serviceIds } : {}),
+    ...(input.providerFinancialsVisible !== undefined
+      ? { provider_financials_visible: input.providerFinancialsVisible }
+      : {}),
+    ...(input.compensation ? providerCompensationPayload(input.compensation) : {})
+  });
+  const provider = mapProvider(payloadData(response.data));
+  if (!provider) {
+    throw new Error("Failed to update provider");
   }
   return provider;
 };

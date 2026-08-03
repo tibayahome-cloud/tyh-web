@@ -8,6 +8,8 @@ import MoreTimeIcon from "@mui/icons-material/MoreTimeOutlined";
 import PersonAddIcon from "@mui/icons-material/PersonAddAltOutlined";
 import BlockIcon from "@mui/icons-material/BlockOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -24,14 +26,14 @@ import {
 import type { Facility, FacilityCreateInput, FacilityStatus } from "../../../../shared/schemas/facility";
 import { FACILITY_TYPES, WEEKDAYS, formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
 import { useRbac } from "../../../../shared/hooks/useRbac";
+import LocationPickerMap from "../../../../shared/components/LocationPickerMap";
 
 type CreateFormState = {
   name: string;
   facilityType: FacilityCreateInput["facilityType"];
   address: string;
   county: string;
-  phone: string;
-  phoneLabel: string;
+  phones: Array<{ phone: string; label: string; isPrimary: boolean }>;
   email: string;
   initialAdminEmail: string;
   lat: string;
@@ -57,8 +59,7 @@ const initialFormState: CreateFormState = {
   facilityType: "hospital",
   address: "",
   county: "",
-  phone: "",
-  phoneLabel: "Reception",
+  phones: [{ phone: "", label: "Reception", isPrimary: true }],
   email: "",
   initialAdminEmail: "",
   lat: "",
@@ -112,13 +113,7 @@ export const buildFacilityCreateInput = (form: CreateFormState): FacilityCreateI
   facilityType: form.facilityType,
   address: form.address.trim(),
   county: form.county.trim(),
-  phones: [
-    {
-      phone: form.phone.trim(),
-      label: form.phoneLabel.trim() || null,
-      isPrimary: true
-    }
-  ],
+  phones: form.phones.map((phone) => ({ ...phone, phone: phone.phone.trim(), label: phone.label.trim() || null })),
   email: form.email.trim(),
   initialAdminEmail: form.initialAdminEmail.trim(),
   lat: parseOptionalNumber(form.lat),
@@ -131,7 +126,7 @@ export const validateCreateForm = (form: CreateFormState): string | null => {
   if (!form.name.trim() || !form.address.trim() || !form.county.trim() || !form.email.trim()) {
     return "Name, address, county, and facility email are required.";
   }
-  if (!form.phone.trim()) {
+  if (!form.phones.some((phone) => phone.phone.trim())) {
     return "At least one facility phone number is required.";
   }
   if (!form.initialAdminEmail.trim()) {
@@ -146,11 +141,8 @@ export const validateCreateForm = (form: CreateFormState): string | null => {
   }
   const lat = parseOptionalNumber(form.lat);
   const lng = parseOptionalNumber(form.lng);
-  if ((form.lat.trim() && lat === undefined) || (lat !== undefined && (lat < -90 || lat > 90))) {
-    return "Latitude must be a number between -90 and 90.";
-  }
-  if ((form.lng.trim() && lng === undefined) || (lng !== undefined && (lng < -180 || lng > 180))) {
-    return "Longitude must be a number between -180 and 180.";
+  if (lat === undefined || lng === undefined) {
+    return "Select the facility location on the map.";
   }
   return null;
 };
@@ -270,6 +262,7 @@ const FacilityManagementPage = () => {
   const [statusDialog, setStatusDialog] = useState<StatusDialogState | null>(null);
   const [adminDialog, setAdminDialog] = useState<AdminDialogState | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const facilitiesQuery = useQuery({
     queryKey: ["admin", "facilities", { status, search }],
@@ -316,10 +309,13 @@ const FacilityManagementPage = () => {
 
   const createMutation = useMutation({
     mutationFn: createFacility,
-    onSuccess: () => {
+    onSuccess: (result) => {
       invalidateFacilities();
       setIsCreateOpen(false);
       setForm(initialFormState);
+      setSuccessMessage(result.adminInvitation?.invitationSent
+        ? "Facility created. The initial admin has been sent a password setup email."
+        : "Facility created.");
     },
     onError: (error) => {
       setFormError(extractErrorMessage(error));
@@ -392,6 +388,8 @@ const FacilityManagementPage = () => {
           </Button>
         )}
       </div>
+
+      {successMessage && <div className="rounded-xl border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">{successMessage}</div>}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <FacilityMetric label="Total" value={String(metrics.total)} />
@@ -484,13 +482,21 @@ const FacilityManagementPage = () => {
             </label>
             <Input label="County" value={form.county} onChange={(event) => updateForm("county", event.target.value)} />
             <Input label="Facility email" type="email" value={form.email} onChange={(event) => updateForm("email", event.target.value)} />
-            <Input
-              label="Primary phone"
-              value={form.phone}
-              onChange={(event) => updateForm("phone", event.target.value)}
-              placeholder="+254..."
-            />
-            <Input label="Phone label" value={form.phoneLabel} onChange={(event) => updateForm("phoneLabel", event.target.value)} />
+            <div className="md:col-span-2 rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div><p className="text-sm font-semibold text-slate-800">Facility phone numbers</p><p className="text-xs text-slate-500">Add reception, billing, emergency, or other contacts.</p></div>
+                <Button type="button" size="sm" variant="outline" onClick={() => updateForm("phones", [...form.phones, { phone: "", label: "", isPrimary: false }])}><AddCircleOutlineIcon fontSize="small" />Add phone</Button>
+              </div>
+              <div className="mt-3 space-y-3">
+                {form.phones.map((phone, index) => (
+                  <div key={`phone-${index}`} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <Input label={index === 0 ? "Phone number" : `Phone number ${index + 1}`} value={phone.phone} onChange={(event) => updateForm("phones", form.phones.map((item, itemIndex) => itemIndex === index ? { ...item, phone: event.target.value } : item))} placeholder="+254..." />
+                    <Input label="Label" value={phone.label} onChange={(event) => updateForm("phones", form.phones.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} placeholder="Reception" />
+                    <div className="flex items-center gap-2 pb-2"><label className="flex items-center gap-2 text-xs text-slate-600"><input type="radio" name="primary-facility-phone" checked={phone.isPrimary} onChange={() => updateForm("phones", form.phones.map((item, itemIndex) => ({ ...item, isPrimary: itemIndex === index })))} />Primary</label>{form.phones.length > 1 && <button type="button" className="text-danger-600" title="Remove phone" onClick={() => updateForm("phones", form.phones.filter((_, itemIndex) => itemIndex !== index))}><RemoveCircleOutlineIcon fontSize="small" /></button>}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <Input
               label="Initial admin email"
               type="email"
@@ -506,8 +512,6 @@ const FacilityManagementPage = () => {
               value={form.platformFeePercent}
               onChange={(event) => updateForm("platformFeePercent", event.target.value)}
             />
-            <Input label="Latitude" value={form.lat} onChange={(event) => updateForm("lat", event.target.value)} />
-            <Input label="Longitude" value={form.lng} onChange={(event) => updateForm("lng", event.target.value)} />
             <label className="md:col-span-2">
               <span className="mb-1 block text-sm font-medium text-slate-700">Address</span>
               <textarea
@@ -516,6 +520,17 @@ const FacilityManagementPage = () => {
                 className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
               />
             </label>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 p-4">
+            <div className="mb-3"><p className="text-sm font-semibold text-slate-800">Facility location</p><p className="text-xs text-slate-500">Select the facility on the map. Coordinates are captured automatically.</p></div>
+            <LocationPickerMap
+              value={form.lat && form.lng ? { lat: Number(form.lat), lng: Number(form.lng) } : null}
+              onChange={(location) => { updateForm("lat", String(location.lat)); updateForm("lng", String(location.lng)); }}
+              onAddressChange={(address) => updateForm("address", address)}
+              height={280}
+            />
+            {form.lat && form.lng && <p className="mt-2 text-xs text-slate-500">Location selected: {Number(form.lat).toFixed(5)}, {Number(form.lng).toFixed(5)}</p>}
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">
