@@ -105,10 +105,27 @@ describe("facility schema mappers", () => {
       operatingStatus: "open",
       service: {
         id: "facility-service-1",
+        serviceId: "service-1",
         priceCents: 150000,
         estimateDurationMinutes: 45
       }
     });
+  });
+
+  it("ignores discovery facilities without service identities", () => {
+    const result = mapFacilityDiscoveryResult({
+      facilities: [
+        {
+          id: "facility-1",
+          facility_type: "clinic",
+          service: {
+            price_cents: 150000
+          }
+        }
+      ]
+    });
+
+    expect(result.facilities).toEqual([]);
   });
 });
 
