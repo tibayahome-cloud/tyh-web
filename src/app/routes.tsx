@@ -17,29 +17,25 @@ function lazyWithRetry<T extends { default: React.ComponentType<unknown> }>(
   importer: () => Promise<T>
 ) {
   return lazy(() =>
-    importer().catch((error) => {
-      const alreadyTried = sessionStorage.getItem(RELOAD_FLAG_KEY);
-      if (!alreadyTried) {
-        sessionStorage.setItem(RELOAD_FLAG_KEY, "1");
-        window.location.reload();
-        // Suspend forever; the page is about to hard-reload anyway.
-        return new Promise<T>(() => {});
-      }
-      // We already tried reloading once and it still failed —
-      // a genuine network/module error, not a stale chunk. Rethrow
-      // so it surfaces normally (e.g. to an error boundary) instead
-      // of reload-looping forever.
-      throw error;
-    })
+    importer()
+      .then((module) => {
+        // Clear the retry marker only after the requested chunk actually loads.
+        sessionStorage.removeItem(RELOAD_FLAG_KEY);
+        return module;
+      })
+      .catch((error) => {
+        const alreadyTried = sessionStorage.getItem(RELOAD_FLAG_KEY);
+        if (!alreadyTried) {
+          sessionStorage.setItem(RELOAD_FLAG_KEY, "1");
+          window.location.reload();
+          // Suspend forever; the page is about to hard-reload anyway.
+          return new Promise<T>(() => {});
+        }
+        // We already tried reloading once and it still failed — surface the
+        // module error instead of trapping the application in a reload loop.
+        throw error;
+      })
   );
-}
-
-// Clear the retry flag once a lazy import succeeds, so a real future
-// deploy-related failure can trigger a fresh reload again.
-if (typeof window !== "undefined") {
-  window.addEventListener("load", () => {
-    sessionStorage.removeItem(RELOAD_FLAG_KEY);
-  });
 }
 
 const ClientRoutes = lazyWithRetry(() => import("../domains/client/routes"));
