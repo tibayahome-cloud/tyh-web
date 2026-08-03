@@ -13,7 +13,7 @@ import { ROLE_CLIENT, ROLE_PROVIDER, PERMISSION_ADMIN_ACCESS } from "../shared/r
 // while a user still has the old index.html/JS loaded in their tab.
 const RELOAD_FLAG_KEY = "chunk-reload-attempted";
 
-function lazyWithRetry<T extends { default: React.ComponentType<any> }>(
+function lazyWithRetry<T extends { default: React.ComponentType<unknown> }>(
   importer: () => Promise<T>
 ) {
   return lazy(() =>
