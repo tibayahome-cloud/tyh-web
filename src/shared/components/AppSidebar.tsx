@@ -57,6 +57,11 @@ export const AppSidebar = ({ items, collapsed, onToggle }: AppSidebarProps) => {
                         <NavLink
                             key={item.to}
                             to={item.to}
+                            end={
+                                item.to === "/admin/facility" ||
+                                item.to === "/admin/facility/overview" ||
+                                item.to === "/admin/facility/providers"
+                            }
                             className={({ isActive }) =>
                                 classNames(
                                     "flex items-center gap-3 px-4 h-12 rounded-2xl transition-all duration-300 group relative",
