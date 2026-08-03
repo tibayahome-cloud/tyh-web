@@ -11,6 +11,7 @@ import {
   mapFacilityService,
   type BookingRequestMode,
   type Facility,
+  type FacilityOverview,
   type FacilityAdmin,
   type FacilityBookingAssignmentInput,
   type FacilityCreateInput,
@@ -83,6 +84,21 @@ export type FacilityProviderListResult = {
 export type FacilityProviderBootstrapResult = {
   provider: Provider | null;
   application: unknown;
+};
+
+export type FacilityProviderOnboardingInput = {
+  fullName: string;
+  email?: string;
+  phone?: string;
+  serviceIds: string[];
+  invitationChannel?: "email" | "sms";
+  compensation: ProviderCompensationInput;
+  providerFinancialsVisible: boolean | null;
+};
+
+export type FacilityProviderOnboardingResult = FacilityProviderBootstrapResult & {
+  created: boolean;
+  invitationSent: boolean;
 };
 
 export type FacilityProviderApplicationReviewInput = {
@@ -210,6 +226,33 @@ export const fetchFacility = async (facilityId: string): Promise<Facility> => {
     throw new Error("Facility not found");
   }
   return facility;
+};
+
+export const fetchFacilityOverview = async (facilityId: string): Promise<FacilityOverview> => {
+  const response = await api.get(`/facilities/${facilityId}/overview`);
+  const raw = payloadData(response.data) as Record<string, unknown>;
+  const facility = mapFacility(raw.facility);
+  const metrics = (raw.metrics ?? {}) as Record<string, unknown>;
+  const readiness = (raw.readiness ?? {}) as Record<string, unknown>;
+  if (!facility) {
+    throw new Error("Facility overview not found");
+  }
+  return {
+    facility,
+    metrics: {
+      openBookings: Number(metrics.open_bookings) || 0,
+      unassignedBookings: Number(metrics.unassigned_bookings) || 0,
+      providersTotal: Number(metrics.providers_total) || 0,
+      providersAvailable: Number(metrics.providers_available) || 0,
+      providersPendingVerification: Number(metrics.providers_pending_verification) || 0,
+      activeServices: Number(metrics.active_services) || 0
+    },
+    readiness: {
+      locationReady: Boolean(readiness.location_ready),
+      contactReady: Boolean(readiness.contact_ready),
+      operatingHoursConfigured: Boolean(readiness.operating_hours_configured)
+    }
+  };
 };
 
 export const createFacility = async (input: FacilityCreateInput): Promise<Facility> => {
@@ -399,6 +442,30 @@ export const bootstrapFacilityProvider = async (
   return {
     provider: mapProvider(data.provider),
     application: data.application
+  };
+};
+
+export const createFacilityProvider = async (
+  facilityId: string,
+  input: FacilityProviderOnboardingInput
+): Promise<FacilityProviderOnboardingResult> => {
+  const response = await api.post(`/facilities/${facilityId}/providers`, {
+    full_name: input.fullName,
+    email: input.email,
+    phone: input.phone,
+    service_ids: input.serviceIds,
+    invitation_channel: input.invitationChannel,
+    compensation_mode: input.compensation.mode,
+    fixed_payout_cents: input.compensation.fixedPayoutCents,
+    payout_percentage: input.compensation.payoutPercentage,
+    provider_financials_visible: input.providerFinancialsVisible
+  });
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    provider: mapProvider(data.provider),
+    application: data.application,
+    created: Boolean(data.created),
+    invitationSent: Boolean(data.invitation_sent)
   };
 };
 

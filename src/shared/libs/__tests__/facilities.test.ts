@@ -20,7 +20,9 @@ import {
   assignFacilityBookingProvider,
   createFacility,
   discoverFacilities,
+  fetchFacilityOverview,
   bootstrapFacilityProvider,
+  createFacilityProvider,
   fetchFacilityBookings,
   fetchFacilityProviders,
   facilityServiceUpdatePayload,
@@ -225,6 +227,59 @@ describe("facility API helpers", () => {
       })
     });
     expect(result.providers.map((provider) => provider.userId)).toEqual(["user-1"]);
+  });
+
+  it("maps the facility overview summary without exposing collections", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: {
+          facility: { ...facilityResponse, lat: -1.2, lng: 36.8 },
+          metrics: {
+            open_bookings: 4,
+            unassigned_bookings: 2,
+            providers_total: 8,
+            providers_available: 3,
+            providers_pending_verification: 1,
+            active_services: 5
+          },
+          readiness: { location_ready: true, contact_ready: true, operating_hours_configured: false }
+        }
+      }
+    });
+
+    await expect(fetchFacilityOverview("facility-1")).resolves.toMatchObject({
+      facility: { id: "facility-1" },
+      metrics: { openBookings: 4, unassignedBookings: 2, providersTotal: 8, activeServices: 5 },
+      readiness: { locationReady: true, operatingHoursConfigured: false }
+    });
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/overview");
+  });
+
+  it("creates a provider with facility services, compensation, and visibility settings", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { data: { provider: { id: "provider-1", user_id: "user-1", facility_id: "facility-1" }, created: true, invitation_sent: true } }
+    });
+
+    const result = await createFacilityProvider("facility-1", {
+      fullName: "Provider One",
+      email: "provider@example.com",
+      serviceIds: ["service-1"],
+      compensation: { mode: "percentage", fixedPayoutCents: null, payoutPercentage: 60 },
+      providerFinancialsVisible: false
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/providers", {
+      full_name: "Provider One",
+      email: "provider@example.com",
+      phone: undefined,
+      service_ids: ["service-1"],
+      invitation_channel: undefined,
+      compensation_mode: "percentage",
+      fixed_payout_cents: null,
+      payout_percentage: 60,
+      provider_financials_visible: false
+    });
+    expect(result).toMatchObject({ created: true, invitationSent: true, provider: { facilityId: "facility-1" } });
   });
 
   it("fetches facility booking queues with facility status filters", async () => {

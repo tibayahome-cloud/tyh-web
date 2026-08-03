@@ -90,6 +90,23 @@ export const FacilitySchema = z.object({
 
 export type Facility = z.infer<typeof FacilitySchema>;
 
+export type FacilityOverview = {
+  facility: Facility;
+  metrics: {
+    openBookings: number;
+    unassignedBookings: number;
+    providersTotal: number;
+    providersAvailable: number;
+    providersPendingVerification: number;
+    activeServices: number;
+  };
+  readiness: {
+    locationReady: boolean;
+    contactReady: boolean;
+    operatingHoursConfigured: boolean;
+  };
+};
+
 export const FacilityDiscoveryItemSchema = z.object({
   id: z.string(),
   name: z.string(),

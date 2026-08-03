@@ -48,6 +48,7 @@ export interface Provider {
     zoneId: string | null;
     priorityScore: number | null;
     compensation: ProviderCompensation;
+    financialsVisible: boolean | null;
     user?: UserResource | null;
     services: ProviderService[];
     availability: ProviderAvailability[];
@@ -100,6 +101,10 @@ export const mapProvider = (payload: unknown): Provider | null => {
         zoneId: coerceString(raw.zone_id),
         priorityScore: coerceNumber(raw.priority_score),
         compensation: mapProviderCompensation(raw),
+        financialsVisible:
+            raw.provider_financials_visible === null || raw.provider_financials_visible === undefined
+                ? null
+                : Boolean(raw.provider_financials_visible),
         user: raw.user ? mapUserResource(raw.user) : null,
         services: servicesRaw
             .map((s) => mapProviderService(s))

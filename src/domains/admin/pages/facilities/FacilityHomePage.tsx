@@ -64,7 +64,7 @@ const FacilityHomePage = () => {
   const resolution = resolveFacilityWorkspaceRoute(facilities);
 
   if (resolution.kind === "workspace") {
-    return <Navigate to={resolution.to} replace />;
+    return <Navigate to="/admin/facility/overview" replace />;
   }
 
   const hasScopeError = resolution.kind === "scope_error";
