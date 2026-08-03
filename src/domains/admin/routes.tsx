@@ -206,7 +206,7 @@ const buildRoutes = (): RouteObject[] => [
         path: "facilities/:facilityId",
         element: (
           <Suspense fallback={<Loading fullHeight />}>
-            <FacilityWorkspacePage />
+            <FacilityWorkspacePage showOperationalSections={false} />
           </Suspense>
         )
       },

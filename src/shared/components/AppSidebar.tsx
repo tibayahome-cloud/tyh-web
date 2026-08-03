@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -17,6 +17,8 @@ interface AppSidebarProps {
 }
 
 export const AppSidebar = ({ items, collapsed, onToggle }: AppSidebarProps) => {
+    const location = useLocation();
+
     return (
         <aside
             className={classNames(
@@ -62,14 +64,17 @@ export const AppSidebar = ({ items, collapsed, onToggle }: AppSidebarProps) => {
                                 item.to === "/admin/facility/overview" ||
                                 item.to === "/admin/facility/providers"
                             }
-                            className={({ isActive }) =>
-                                classNames(
+                            className={({ isActive }) => {
+                                const facilityWorkspaceActive =
+                                    item.to === "/admin/facility" &&
+                                    (location.pathname === "/admin/facility" || location.pathname.startsWith("/admin/facilities/"));
+                                return classNames(
                                     "flex items-center gap-3 px-4 h-12 rounded-2xl transition-all duration-300 group relative",
-                                    isActive
+                                    isActive || facilityWorkspaceActive
                                         ? "bg-gradient-to-r from-tiba-blue to-primary-600 text-white shadow-xl shadow-tiba-blue/20"
                                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                                )
-                            }
+                                );
+                            }}
                         >
                             <div className={classNames(
                                 "shrink-0 transition-transform duration-300 group-hover:scale-110",

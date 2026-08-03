@@ -79,6 +79,10 @@ type AssignmentFormState = {
   reason: string;
 };
 
+type FacilityWorkspacePageProps = {
+  showOperationalSections?: boolean;
+};
+
 const initialServiceForm: ServiceFormState = {
   serviceId: "",
   price: "",
@@ -411,7 +415,7 @@ export const FacilityBookingRow = ({
   );
 };
 
-const FacilityWorkspacePage = () => {
+const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorkspacePageProps) => {
   const { facilityId } = useParams();
   const queryClient = useQueryClient();
   const { roles, hasPermission } = useRbac();
@@ -471,7 +475,7 @@ const FacilityWorkspacePage = () => {
       fetchFacilityProviders(String(facilityId), {
         search: providerSearch.trim() || undefined
       }),
-    enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
+    enabled: showOperationalSections && Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const bookingsQuery = useQuery({
@@ -481,7 +485,7 @@ const FacilityWorkspacePage = () => {
         pageSize: 25,
         facilityStatus: "pending,claimed"
       }),
-    enabled: Boolean(facilityId) && canReadFacilities && canManageBookings && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
+    enabled: showOperationalSections && Boolean(facilityId) && canReadFacilities && canManageBookings && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const facility = facilityQuery.data;
@@ -810,6 +814,8 @@ const FacilityWorkspacePage = () => {
         )}
       </Card>
 
+      {showOperationalSections && (
+        <>
       <Card
         title="Facility providers"
         description="Onboard existing users into this facility and manage provider compensation."
@@ -877,6 +883,8 @@ const FacilityWorkspacePage = () => {
           </div>
         )}
       </Card>
+        </>
+      )}
 
       <Modal
         open={serviceModalOpen}
@@ -971,6 +979,8 @@ const FacilityWorkspacePage = () => {
         }}
       />
 
+      {showOperationalSections && (
+        <>
       <Modal
         open={providerModalOpen}
         title={editingProvider ? "Edit provider compensation" : "Bootstrap provider"}
@@ -1035,7 +1045,11 @@ const FacilityWorkspacePage = () => {
           </div>
         </div>
       </Modal>
+        </>
+      )}
 
+      {showOperationalSections && (
+        <>
       <Modal
         open={Boolean(assignmentBooking)}
         title={assignmentBooking?.provider ? "Reassign provider" : "Assign provider"}
@@ -1090,6 +1104,8 @@ const FacilityWorkspacePage = () => {
           </div>
         </div>
       </Modal>
+        </>
+      )}
     </div>
   );
 };
