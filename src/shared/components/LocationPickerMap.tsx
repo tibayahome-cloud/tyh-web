@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef } from "react";
 import classNames from "classnames";
 import { Autocomplete, GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
-import type { Libraries } from "@react-google-maps/api";
 
 import { MAP_LIBRARIES } from "../constants/maps";
 
