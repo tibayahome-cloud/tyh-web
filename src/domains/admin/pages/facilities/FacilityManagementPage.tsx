@@ -55,7 +55,7 @@ type StatusDialogState = {
 
 type AdminDialogState = {
   facility: Facility;
-  userId: string;
+  email: string;
 };
 
 const initialFormState: CreateFormState = {
@@ -357,7 +357,7 @@ const FacilityManagementPage = () => {
   });
 
   const adminMutation = useMutation({
-    mutationFn: ({ facility, userId }: AdminDialogState) => assignFacilityAdmin(facility.id, userId.trim()),
+    mutationFn: ({ facility, email }: AdminDialogState) => assignFacilityAdmin(facility.id, email.trim()),
     onSuccess: () => {
       invalidateFacilities();
       setAdminDialog(null);
@@ -522,7 +522,7 @@ const FacilityManagementPage = () => {
               onOpen={(target) => navigate(`/admin/facilities/${target.id}`)}
               onAssignAdmin={(target) => {
                 setMutationError(null);
-                setAdminDialog({ facility: target, userId: "" });
+                setAdminDialog({ facility: target, email: "" });
               }}
             />
           ))}
@@ -675,10 +675,12 @@ const FacilityManagementPage = () => {
       >
         <div className="space-y-4">
           <Input
-            label="Admin user ID"
-            value={adminDialog?.userId ?? ""}
+            label="Admin email"
+            type="email"
+            placeholder="admin@facility.example"
+            value={adminDialog?.email ?? ""}
             onChange={(event) =>
-              setAdminDialog((current) => (current ? { ...current, userId: event.target.value } : current))
+              setAdminDialog((current) => (current ? { ...current, email: event.target.value } : current))
             }
           />
           {mutationError && <p className="text-sm text-danger-600">{mutationError}</p>}
@@ -689,7 +691,7 @@ const FacilityManagementPage = () => {
             <Button
               type="button"
               loading={adminMutation.isPending}
-              disabled={!adminDialog?.userId.trim()}
+              disabled={!adminDialog?.email.trim()}
               onClick={() => {
                 if (adminDialog) {
                   adminMutation.mutate(adminDialog);
