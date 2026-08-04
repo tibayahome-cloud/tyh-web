@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdminBookingPayload, resolveAdminBookingFacilityId } from "../AdminCreateBookingDialog";
+import {
+  buildAdminBookingPayload,
+  getAdminBookingFacilityScopeMessage,
+  resolveAdminBookingFacilityId,
+} from "../AdminCreateBookingDialog";
 
 const facility = (id: string) => ({ id });
 
@@ -12,6 +16,11 @@ describe("AdminCreateBookingDialog facility selection", () => {
   it("does not guess a facility for missing or malformed admin ops scope", () => {
     expect(resolveAdminBookingFacilityId(["admin.ops"], [])).toBe("");
     expect(resolveAdminBookingFacilityId(["admin.ops"], [facility("facility-1"), facility("facility-2")])).toBe("");
+  });
+
+  it("explains when admin ops facility scope is unavailable", () => {
+    expect(getAdminBookingFacilityScopeMessage("")).toContain("Booking creation is blocked");
+    expect(getAdminBookingFacilityScopeMessage("facility-1")).toBe("Using your assigned facility.");
   });
 
   it("requires an explicit facility selection for super admins", () => {

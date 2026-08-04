@@ -69,11 +69,6 @@ const ProviderBookingDetailPage = () => {
   const profileQuery = useProviderProfile(user?.id);
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const booking = detailQuery.data;
-  console.log("=== DEBUG PROVIDER BOOKING DETAIL ===");
-  console.log("bookingId:", bookingId);
-  console.log("detailQuery status:", detailQuery.status);
-  console.log("detailQuery error:", detailQuery.error);
-  console.log("detailQuery data:", detailQuery.data);
   const financialsVisible = !profileQuery.isLoading && providerFinancialsAreVisible(profileQuery.data);
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);

@@ -48,6 +48,13 @@ export const resolveAdminBookingFacilityId = (
   return isFacilityAdmin && facilities.length === 1 ? facilities[0].id : "";
 };
 
+/** Explains the facility scope required for admin.ops booking creation. */
+export const getAdminBookingFacilityScopeMessage = (facilityId: string): string => (
+  facilityId
+    ? "Using your assigned facility."
+    : "Facility scope is unavailable. Booking creation is blocked until your account is linked to exactly one facility."
+);
+
 const bookingSchema = z.object({
   facilityId: z.string().min(1, "Select a facility"),
   clientMode: z.enum(["existing", "new"]),
@@ -247,8 +254,10 @@ export const AdminCreateBookingDialog = ({
                       </option>
                     ))}
                   </select>
-                  {isFacilityAdmin && defaultFacilityId && (
-                    <p className="text-xs text-slate-500 mt-1">Using your assigned facility.</p>
+                  {isFacilityAdmin && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {getAdminBookingFacilityScopeMessage(defaultFacilityId)}
+                    </p>
                   )}
                   {facilitiesQuery.isError && (
                     <p className="text-sm text-red-600 mt-1">Unable to load facilities.</p>
