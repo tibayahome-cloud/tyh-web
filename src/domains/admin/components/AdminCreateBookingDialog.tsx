@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +16,8 @@ import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { getApiError } from "../../../shared/utils/errors";
+import { fetchFacilities } from "../../../shared/libs/facilities";
+import { useRbac } from "../../../shared/hooks/useRbac";
 
 type AdminCreateBookingDialogProps = {
   open: boolean;
@@ -36,7 +38,25 @@ type UserSearchResult = {
   email: string | null;
 };
 
+/** Resolves a safe default without guessing across facility tenants. */
+export const resolveAdminBookingFacilityId = (
+  roles: string[],
+  facilities: Array<{ id: string }>
+): string => {
+  const roleSet = new Set(roles);
+  const isFacilityAdmin = roleSet.has("admin.ops") && !roleSet.has("admin.super") && !roleSet.has("admin");
+  return isFacilityAdmin && facilities.length === 1 ? facilities[0].id : "";
+};
+
+/** Explains the facility scope required for admin.ops booking creation. */
+export const getAdminBookingFacilityScopeMessage = (facilityId: string): string => (
+  facilityId
+    ? "Using your assigned facility."
+    : "Facility scope is unavailable. Booking creation is blocked until your account is linked to exactly one facility."
+);
+
 const bookingSchema = z.object({
+  facilityId: z.string().min(1, "Select a facility"),
   clientMode: z.enum(["existing", "new"]),
   clientUserId: z.string().optional(),
   clientName: z.string().optional(),
@@ -57,7 +77,28 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
+export const buildAdminBookingPayload = (values: BookingFormValues): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {
+    facility_id: values.facilityId,
+    request_mode: "selected_facility",
+    service_id: values.serviceId,
+    address_text: values.addressText,
+    lat: values.lat,
+    lng: values.lng,
+  };
+
+  if (values.clientMode === "existing" && values.clientUserId) {
+    payload.client_user_id = values.clientUserId;
+  } else {
+    payload.client_phone = values.clientPhone;
+    payload.client_name = values.clientName;
+  }
+
+  return payload;
+};
+
 const DEFAULT_VALUES: Partial<BookingFormValues> = {
+  facilityId: "",
   clientMode: "new",
   clientUserId: "",
   clientName: "",
@@ -72,6 +113,8 @@ export const AdminCreateBookingDialog = ({
   onSuccess,
 }: AdminCreateBookingDialogProps) => {
   const { showToast } = useToast();
+  const { roles } = useRbac();
+  const isFacilityAdmin = roles.includes("admin.ops") && !roles.includes("admin.super") && !roles.includes("admin");
   const [showMap, setShowMap] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
@@ -92,6 +135,21 @@ export const AdminCreateBookingDialog = ({
   const lat = watch("lat");
   const lng = watch("lng");
   const hasLocation = typeof lat === "number" && typeof lng === "number";
+
+  const facilitiesQuery = useQuery({
+    queryKey: ["admin", "booking-facilities"],
+    queryFn: () => fetchFacilities({ pageSize: 50 }),
+    enabled: open,
+  });
+  const facilities = facilitiesQuery.data?.facilities ?? [];
+  const facilityId = watch("facilityId");
+  const defaultFacilityId = resolveAdminBookingFacilityId(roles, facilities);
+
+  useEffect(() => {
+    if (open && defaultFacilityId && facilityId !== defaultFacilityId) {
+      setValue("facilityId", defaultFacilityId);
+    }
+  }, [defaultFacilityId, facilityId, open, setValue]);
 
   const servicesQuery = useQuery({
     queryKey: ["admin", "services", "active"],
@@ -117,21 +175,7 @@ export const AdminCreateBookingDialog = ({
 
   const createBooking = useMutation({
     mutationFn: async (values: BookingFormValues) => {
-      const payload: Record<string, unknown> = {
-        service_id: values.serviceId,
-        address_text: values.addressText,
-        lat: values.lat,
-        lng: values.lng,
-      };
-
-      if (values.clientMode === "existing" && values.clientUserId) {
-        payload.client_user_id = values.clientUserId;
-      } else {
-        payload.client_phone = values.clientPhone;
-        payload.client_name = values.clientName;
-      }
-
-      const res = await api.post<{ data: { id: string } }>("/bookings/admin", payload);
+      const res = await api.post<{ data: { id: string } }>("/bookings/admin", buildAdminBookingPayload(values));
       return res.data.data;
     },
     onSuccess: (data) => {
@@ -190,6 +234,41 @@ export const AdminCreateBookingDialog = ({
           </div>
         ) : (
           <form onSubmit={onSubmit} className="space-y-5 pt-2">
+            <FormField
+              control={control}
+              name="facilityId"
+              render={({ field, fieldState }) => (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Facility</label>
+                  <select
+                    {...field}
+                    disabled={isFacilityAdmin || facilitiesQuery.isLoading}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {facilitiesQuery.isLoading ? "Loading facilities..." : "Select a facility"}
+                    </option>
+                    {facilities.map((facility) => (
+                      <option key={facility.id} value={facility.id}>
+                        {facility.name}
+                      </option>
+                    ))}
+                  </select>
+                  {isFacilityAdmin && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {getAdminBookingFacilityScopeMessage(defaultFacilityId)}
+                    </p>
+                  )}
+                  {facilitiesQuery.isError && (
+                    <p className="text-sm text-red-600 mt-1">Unable to load facilities.</p>
+                  )}
+                  {fieldState.error && (
+                    <p className="text-sm text-red-600 mt-1">{fieldState.error.message}</p>
+                  )}
+                </div>
+              )}
+            />
+
             <div className="flex gap-2 mb-4">
               <button
                 type="button"

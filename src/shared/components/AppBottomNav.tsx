@@ -9,14 +9,14 @@ interface AppBottomNavProps {
 export const AppBottomNav = ({ items }: AppBottomNavProps) => {
     return (
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white/80 backdrop-blur-xl border-t border-slate-100 pb-safe">
-            <div className="grid grid-cols-5 h-[72px]">
+            <div className="flex h-[72px] snap-x overflow-x-auto overscroll-x-contain scrollbar-none">
                 {items.map((item) => (
                     <NavLink
                         key={item.to}
                         to={item.to}
                         className={({ isActive }: { isActive: boolean }) =>
                             classNames(
-                                "flex flex-col items-center justify-center gap-1 transition-all duration-200",
+                                "flex min-w-[76px] flex-1 snap-start flex-col items-center justify-center gap-1 transition-all duration-200",
                                 isActive ? "text-tiba-blue" : "text-slate-400"
                             )
                         }

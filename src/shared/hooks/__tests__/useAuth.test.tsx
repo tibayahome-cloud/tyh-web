@@ -100,7 +100,7 @@ describe("useAuth", () => {
       emailOrPhone: "jane@example.com",
       password: "secret123"
     }, {
-      params: { fields: "id,full_name,phone", include: "roles:id,key,name" }
+      params: { fields: "id,full_name,email,phone,avatar_url,meta_data", include: "roles:id,key,name" }
     });
     expect(result.current.accessToken).toBe("access-1");
     expect(result.current.refreshToken).toBe("refresh-1");

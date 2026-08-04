@@ -8,8 +8,10 @@ import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
-import { fetchAdminWithdrawals } from "../../../../shared/libs/wallet";
+import { useRbac } from "../../../../shared/hooks/useRbac";
+import { fetchAdminWithdrawals, fetchFacilityWithdrawals } from "../../../../shared/libs/wallet";
 import type { WalletWithdrawal } from "../../../../shared/schemas/wallet";
+import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
 
 const STATUS_OPTIONS = [
   { label: "All statuses", value: "all" },
@@ -46,6 +48,10 @@ const statusTone = (status: string) => {
 };
 
 const WithdrawalsPage = () => {
+  const { roles } = useRbac();
+  const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
+  const facilityScopeQuery = useAdminFacilityScope(!canReadGlobalLedger);
+  const facilityId = facilityScopeQuery.facility?.id;
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [providerFilter, setProviderFilter] = useState("");
@@ -82,17 +88,24 @@ const WithdrawalsPage = () => {
   }, [filtersOpen, isMobileFilters]);
 
   const withdrawalsQuery = useQuery({
-    queryKey: ["admin", "finance", "withdrawals", { page, statusFilter, providerFilter }],
-    queryFn: () =>
-      fetchAdminWithdrawals({
-        page,
-        size: PAGE_SIZE,
-        status: statusFilter === "all" ? undefined : statusFilter
-      }),
-    keepPreviousData: true
+    queryKey: ["admin", "finance", "withdrawals", { facilityId, page, statusFilter, providerFilter }],
+    queryFn: () => facilityId
+      ? fetchFacilityWithdrawals(facilityId, {
+          page,
+          size: PAGE_SIZE,
+          status: statusFilter === "all" ? undefined : statusFilter
+        })
+      : fetchAdminWithdrawals({
+          page,
+          size: PAGE_SIZE,
+          status: statusFilter === "all" ? undefined : statusFilter
+        }),
+    keepPreviousData: true,
+    enabled: canReadGlobalLedger || Boolean(facilityId)
   });
 
-  const rows = withdrawalsQuery.data?.withdrawals ?? [];
+  const withdrawalRows = withdrawalsQuery.data?.withdrawals;
+  const rows = useMemo(() => withdrawalRows ?? [], [withdrawalRows]);
   const meta = withdrawalsQuery.data?.meta ?? {
     total: rows.length,
     page,
@@ -151,6 +164,15 @@ const WithdrawalsPage = () => {
     const query = providerFilter.trim().toLowerCase();
     return rows.filter((row) => (row.requestedByUserId ?? "").toLowerCase().includes(query));
   }, [rows, providerFilter]);
+
+  if (!canReadGlobalLedger) {
+    if (facilityScopeQuery.isLoading) {
+      return <FinanceScopeNotice title="Withdrawals" description="Resolving your facility scope..." detail="Withdrawal records will appear once the facility scope is available." />;
+    }
+    if (!facilityId) {
+      return <FinanceScopeNotice title="Withdrawals" description="Your facility scope could not be resolved." detail="Withdrawal data is hidden until the account is linked to exactly one facility." />;
+    }
+  }
 
   const filterPanel = (
     <div className="space-y-4 text-left">

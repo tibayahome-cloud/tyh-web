@@ -8,7 +8,7 @@ import { Loading } from "../../../shared/components/Loading";
 import ConfirmDialog from "../../../shared/components/ConfirmDialog";
 import { Input } from "../../../shared/components/Input";
 import { useAuth } from "../../../shared/hooks/useAuth";
-import { useProviderProfile } from "../hooks/useProviderProfile";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -62,7 +62,9 @@ const useProviderServices = (userId: string | undefined) =>
 
 const ServicesPage = () => {
   const { user } = useAuth();
-  const { data: profile } = useProviderProfile(user?.id);
+  const profileQuery = useProviderProfile(user?.id);
+  const profile = profileQuery.data;
+  const financialsVisible = providerFinancialsAreVisible(profile);
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data: catalog, isLoading: loadingCatalog } = useServiceCatalog();
@@ -138,7 +140,7 @@ const ServicesPage = () => {
     }
   });
 
-  if (loadingCatalog || loadingMembership || !catalog) {
+  if (loadingCatalog || loadingMembership || profileQuery.isLoading || !catalog) {
     return <Loading fullHeight />;
   }
 
@@ -218,7 +220,9 @@ const ServicesPage = () => {
                     <h3 className="text-sm font-semibold text-slate-900">{service.name}</h3>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">
-                    {`KES ${(service.base_price_cents / 100).toLocaleString()} · ${service.default_estimate_minutes} mins`}
+                    {financialsVisible
+                      ? `KES ${(service.base_price_cents / 100).toLocaleString()} · ${service.default_estimate_minutes} mins`
+                      : `${service.default_estimate_minutes} mins · Facility-managed rate`}
                   </p>
                   {service.is_emergency_capable && (
                     <p className="mt-2 text-xs font-semibold text-emerald-600">Emergency capable</p>

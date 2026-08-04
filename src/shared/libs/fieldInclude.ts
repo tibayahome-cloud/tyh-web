@@ -127,10 +127,14 @@ export const providerProfile: FieldPreset = {
   fields: [
     "id",
     "user_id",
+    "facility_id",
     "verified",
     "is_available",
     "daily_request_limit",
     "can_emergency",
+    "compensation_mode",
+    "fixed_payout_cents",
+    "payout_percentage",
     "home_lat",
     "home_lng",
     "rating_avg",
@@ -141,6 +145,9 @@ export const providerProfile: FieldPreset = {
     "zone_id"
   ],
   includes: {
+    facility: {
+      fields: ["id", "name", "provider_financials_visible"]
+    },
     user: {
       fields: ["id", "full_name", "email", "phone", "avatar_url"]
     },
@@ -160,6 +167,7 @@ export const providerDetail: FieldPreset = {
   fields: [
     "id",
     "user_id",
+    "facility_id",
     "verified",
     "verified_at",
     "is_available",
@@ -174,9 +182,15 @@ export const providerDetail: FieldPreset = {
     "current_lng",
     "location_updated_at",
     "zone_id",
-    "priority_score"
+    "priority_score",
+    "compensation_mode",
+    "fixed_payout_cents",
+    "payout_percentage"
   ],
   includes: {
+    facility: {
+      fields: ["id", "name", "provider_financials_visible"]
+    },
     user: {
       fields: ["id", "full_name", "email", "phone", "avatar_url", "status"]
     },
@@ -514,17 +528,23 @@ export const paymentAdminList: FieldPreset = {
     "provider_user_id",
     "status",
     "channel",
+    "method",
     "amount_cents",
     "currency",
     "retry_count",
     "failure_reason",
+    "provider_ref",
     "mpesa_receipt_number",
+    "meta_data",
+    "initiated_at",
+    "succeeded_at",
+    "failed_at",
     "completed_at",
     "created_at"
   ],
   includes: {
     booking: {
-      fields: ["id", "status", "price_cents", "currency"],
+      fields: ["id", "status", "facility_id", "request_mode", "price_cents", "currency"],
       children: {
         client: {
           fields: ["id", "full_name"]
@@ -546,14 +566,20 @@ export const paymentDetailPreset: FieldPreset = {
     "provider_user_id",
     "status",
     "channel",
+    "method",
     "amount_cents",
     "currency",
     "description",
+    "provider_ref",
     "merchant_request_id",
     "checkout_request_id",
     "mpesa_receipt_number",
     "failure_reason",
     "retry_count",
+    "meta_data",
+    "initiated_at",
+    "succeeded_at",
+    "failed_at",
     "completed_at",
     "created_at",
     "updated_at",
@@ -565,7 +591,7 @@ export const paymentDetailPreset: FieldPreset = {
       fields: ["id", "status", "request_payload", "response_payload", "created_at"]
     },
     booking: {
-      fields: ["id", "status", "price_cents", "currency"],
+      fields: ["id", "status", "facility_id", "request_mode", "price_cents", "currency"],
       children: {
         client: {
           fields: ["id", "full_name"]

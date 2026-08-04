@@ -8,7 +8,7 @@ import type {
   BookingMutateInput,
   BookingFeedbackInput
 } from "../schemas/booking";
-import { fetchBooking, fetchBookingEvents, fetchBookings, createBooking, acceptBooking, markBooking, confirmBooking, cancelBooking, postBookingLocation, reassignBooking, submitBookingFeedback, payBooking } from "../libs/bookings";
+import { fetchBooking, fetchBookingEvents, fetchBookings, createBooking, acceptBooking, markBooking, confirmBooking, cancelBooking, postBookingLocation, reassignBooking, rerouteBooking, submitBookingFeedback, payBooking } from "../libs/bookings";
 import type { BookingListParams, BookingPresetName } from "../libs/bookings";
 
 const normalizeListParams = (params: BookingListParams = {}) => ({
@@ -154,6 +154,19 @@ export const useCancelBookingMutation = (preset: BookingPresetName = "detail") =
   return useMutation({
     mutationFn: ({ bookingId, reason }: { bookingId: string; reason?: string }) =>
       cancelBooking(bookingId, reason, preset),
+    onSuccess: (booking) => {
+      storeBooking(booking);
+      invalidateLists();
+    }
+  });
+};
+
+export const useRerouteBookingMutation = (preset: BookingPresetName = "detail") => {
+  const storeBooking = useStoreBookingDetail();
+  const invalidateLists = useInvalidateBookingLists();
+  return useMutation({
+    mutationFn: ({ bookingId, facilityId }: { bookingId: string; facilityId: string }) =>
+      rerouteBooking(bookingId, facilityId, preset),
     onSuccess: (booking) => {
       storeBooking(booking);
       invalidateLists();

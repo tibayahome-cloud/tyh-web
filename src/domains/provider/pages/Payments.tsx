@@ -4,11 +4,12 @@ import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
 import { Input } from "../../../shared/components/Input";
 import ConfirmDialog from "../../../shared/components/ConfirmDialog";
-import { Loading } from "../../../shared/components/Loading";
 import { useToast } from "../../../shared/components/ToastProvider";
+import { useAuth } from "../../../shared/hooks/useAuth";
 import { useWalletAccount, useWalletWithdrawalRequest } from "../../../shared/hooks/useWallet";
 import { motion, AnimatePresence } from "framer-motion";
 import { prefetchBooking } from "../../../shared/libs/query";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 
 const formatCurrency = (amountCents: number | undefined, currency = "KES") => {
   const value = typeof amountCents === "number" ? amountCents / 100 : 0;
@@ -42,7 +43,10 @@ const TransactionSkeleton = () => (
 
 const ProviderPayments = () => {
   const toast = useToast();
-  const walletQuery = useWalletAccount();
+  const { user } = useAuth();
+  const profileQuery = useProviderProfile(user?.id);
+  const financialsVisible = providerFinancialsAreVisible(profileQuery.data);
+  const walletQuery = useWalletAccount({ enabled: !profileQuery.isLoading && financialsVisible });
   const withdrawMutation = useWalletWithdrawalRequest();
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -80,7 +84,7 @@ const ProviderPayments = () => {
       });
   };
 
-  if (walletQuery.isLoading && !wallet) {
+  if (profileQuery.isLoading || (walletQuery.isLoading && !wallet && financialsVisible)) {
     return (
       <div className="space-y-8 p-4">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -91,6 +95,26 @@ const ProviderPayments = () => {
         <div className="space-y-4">
           {[1, 2, 3, 4, 5].map(i => <TransactionSkeleton key={i} />)}
         </div>
+      </div>
+    );
+  }
+
+  if (!financialsVisible) {
+    return (
+      <div className="space-y-6">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold text-slate-900">Payments & Wallet</h1>
+          <p className="text-sm text-slate-500">Your facility manages service pricing, payouts, and settlements.</p>
+        </header>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Payout visibility</p>
+          <h2 className="mt-2 text-xl font-bold text-neutral-900">Facility-managed</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+            Financial details are handled by your facility administrator. Booking work remains visible in your
+            booking history, but wallet balances, payment amounts, commissions, and withdrawal actions are hidden.
+          </p>
+        </section>
       </div>
     );
   }
