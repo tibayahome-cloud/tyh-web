@@ -13,7 +13,8 @@ import {
   fetchFacilities,
   fetchFacilityProviders,
   fetchFacilityServices,
-  updateFacilityProvider
+  updateFacilityProvider,
+  updateFacilityProviderLifecycle
 } from "../../../../shared/libs/facilities";
 import type { Provider } from "../../../../shared/schemas/provider";
 import type { ProviderCompensationMode } from "../../../../shared/schemas/facility";
@@ -179,6 +180,20 @@ const FacilityProvidersPage = () => {
     }
   });
 
+  const lifecycleMutation = useMutation({
+    mutationFn: ({ provider, action }: { provider: Provider; action: "verify" | "activate" | "suspend" | "available" | "unavailable" }) => {
+      const input = action === "verify"
+        ? { verified: true }
+        : action === "activate"
+          ? { status: "active" as const }
+          : action === "suspend"
+            ? { status: "suspended" as const }
+            : { isAvailable: action === "available" };
+      return updateFacilityProviderLifecycle(facilityId as string, provider.userId, input);
+    },
+    onSuccess: () => invalidateProviders()
+  });
+
   if (facilitiesQuery.isLoading || providersQuery.isLoading) return <Loading fullHeight />;
   if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
 
@@ -219,10 +234,20 @@ const FacilityProvidersPage = () => {
           {providersQuery.data?.providers.map((provider) => (
             <div key={provider.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p></div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold"><span className="rounded-lg bg-slate-100 px-2 py-1">{provider.verified ? "Verified" : "Pending verification"}</span><span className="rounded-lg bg-slate-100 px-2 py-1">{provider.isAvailable ? "Available" : "Unavailable"}</span><Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button></div>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.user?.status ?? "pending"}</span>
+                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.verified ? "Verified" : "Pending verification"}</span>
+                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.isAvailable ? "Available" : "Unavailable"}</span>
+                {!provider.verified && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
+                {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
+                {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
+                <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
+                <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
+              </div>
             </div>
           ))}
         </div>
+        {lifecycleMutation.error && <p className="mt-3 text-sm text-danger-600">{lifecycleMutation.error instanceof Error ? lifecycleMutation.error.message : "Provider lifecycle update failed."}</p>}
       </Card>
     </div>
   );

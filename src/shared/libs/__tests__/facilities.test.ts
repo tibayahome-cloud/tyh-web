@@ -30,7 +30,8 @@ import {
   facilityServiceUpdatePayload,
   updateFacilityStatus,
   updateFacilityProviderCompensation,
-  updateFacilityProvider
+  updateFacilityProvider,
+  updateFacilityProviderLifecycle
 } from "../facilities";
 
 const facilityResponse = {
@@ -344,6 +345,24 @@ describe("facility API helpers", () => {
       payout_percentage: null
     });
     expect(result.facilityId).toBe("facility-1");
+  });
+
+  it("updates provider lifecycle through the facility-scoped endpoint", async () => {
+    mockPatch.mockResolvedValueOnce({
+      data: { data: { id: "provider-1", user_id: "user-1", facility_id: "facility-1", verified: true, is_available: true } }
+    });
+
+    const result = await updateFacilityProviderLifecycle("facility-1", "user-1", {
+      status: "active",
+      verified: true,
+      isAvailable: true
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      "/facilities/facility-1/providers/user-1/lifecycle",
+      { status: "active", verified: true, is_available: true }
+    );
+    expect(result).toMatchObject({ facilityId: "facility-1", verified: true, isAvailable: true });
   });
 
   it("fetches facility booking queues with facility status filters", async () => {
