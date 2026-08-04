@@ -6,6 +6,8 @@ import AddIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import SaveIcon from "@mui/icons-material/SaveOutlined";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOffOutlined";
 
@@ -39,10 +41,11 @@ import type {
 } from "../../../../shared/schemas/facility";
 import {
   PROVIDER_COMPENSATION_MODES,
+  WEEKDAYS,
   formatOperatingHoursSummary,
   formatProviderCompensation
 } from "../../../../shared/schemas/facility";
-import type { Provider } from "../../../../shared/schemas/provider";
+import type { FacilityOperatingHour, FacilityPhone, Provider } from "../../../../shared/schemas/facility";
 import type { Booking } from "../../../../shared/schemas/booking";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 
@@ -81,6 +84,52 @@ type AssignmentFormState = {
 
 type FacilityWorkspacePageProps = {
   showOperationalSections?: boolean;
+};
+
+type FacilitySettingsFormState = {
+  phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
+  operatingHours: Array<Omit<FacilityOperatingHour, "id">>;
+};
+
+const defaultOperatingHours = (): FacilitySettingsFormState["operatingHours"] =>
+  WEEKDAYS.map((weekday) => ({
+    weekday,
+    openTime: "08:00",
+    closeTime: "17:00",
+    isClosed: false,
+    is24Hours: true
+  }));
+
+export const buildFacilitySettingsForm = (facility: Facility): FacilitySettingsFormState => ({
+  phones: facility.phones.map(({ phone, label, isPrimary }) => ({ phone, label, isPrimary })),
+  operatingHours: WEEKDAYS.map((weekday) => {
+    const existing = facility.operatingHours.find((hour) => hour.weekday === weekday);
+    return existing
+      ? {
+          weekday,
+          openTime: existing.openTime,
+          closeTime: existing.closeTime,
+          isClosed: existing.isClosed,
+          is24Hours: existing.is24Hours
+        }
+      : defaultOperatingHours().find((hour) => hour.weekday === weekday)!;
+  })
+});
+
+export const validateFacilitySettingsForm = (form: FacilitySettingsFormState): string | null => {
+  if (!form.phones.some((phone) => phone.phone.trim())) {
+    return "At least one facility phone number is required.";
+  }
+  if (form.phones.some((phone) => !phone.phone.trim() && (phone.label ?? "").trim())) {
+    return "Remove empty phone rows or enter a phone number.";
+  }
+  for (const hour of form.operatingHours) {
+    if (hour.isClosed || hour.is24Hours) continue;
+    if (!hour.openTime || !hour.closeTime) {
+      return "Enter opening and closing times for every open day.";
+    }
+  }
+  return null;
 };
 
 const initialServiceForm: ServiceFormState = {
@@ -427,6 +476,12 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const canManageBookings = hasPermission("booking:manage");
 
   const [financialsVisible, setFinancialsVisible] = useState(true);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsForm, setSettingsForm] = useState<FacilitySettingsFormState>({
+    phones: [],
+    operatingHours: defaultOperatingHours()
+  });
+  const [settingsFormError, setSettingsFormError] = useState<string | null>(null);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<FacilityService | null>(null);
   const [serviceForm, setServiceForm] = useState<ServiceFormState>(initialServiceForm);
@@ -532,6 +587,31 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       setMutationError(extractErrorMessage(error));
     }
   });
+
+  const settingsMutation = useMutation({
+    mutationFn: (form: FacilitySettingsFormState) =>
+      updateFacility(String(facilityId), {
+        phones: form.phones.map((phone) => ({
+          phone: phone.phone.trim(),
+          label: phone.label.trim() || null,
+          isPrimary: phone.isPrimary
+        })),
+        operatingHours: form.operatingHours
+      }),
+    onSuccess: () => {
+      invalidateWorkspace();
+      setSettingsModalOpen(false);
+      setSettingsFormError(null);
+    },
+    onError: (error) => setSettingsFormError(extractErrorMessage(error))
+  });
+
+  const openSettingsModal = () => {
+    if (!facility) return;
+    setSettingsForm(buildFacilitySettingsForm(facility));
+    setSettingsFormError(null);
+    setSettingsModalOpen(true);
+  };
 
   const serviceMutation = useMutation({
     mutationFn: (input: FacilityServiceInput) => {
@@ -719,6 +799,14 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       </section>
 
       <Card title="Facility settings">
+        {canManageFacility && (
+          <div className="mb-4 flex justify-end">
+            <Button variant="outline" onClick={openSettingsModal}>
+              <EditIcon fontSize="small" />
+              Edit operations settings
+            </Button>
+          </div>
+        )}
         <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
           <div className="space-y-3">
             <div>
@@ -727,6 +815,9 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
               <p className="mt-1 text-sm text-slate-600">
                 {facility.phones.find((phone) => phone.isPrimary)?.phone ?? facility.phones[0]?.phone ?? "-"}
               </p>
+              {facility.phones.length > 1 && (
+                <p className="mt-1 text-xs text-slate-500">{facility.phones.length} contact numbers configured</p>
+              )}
             </div>
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Operating hours</p>
@@ -774,6 +865,64 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           </div>
         </div>
       </Card>
+
+      <Modal
+        open={settingsModalOpen}
+        title="Edit facility operations settings"
+        description="Manage facility contact numbers and operating hours. Facility identity, email, and location are managed by a super admin."
+        onClose={() => setSettingsModalOpen(false)}
+        maxWidth="lg"
+      >
+        <div className="space-y-6">
+          <section className="rounded-xl border border-slate-200 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Facility phone numbers</h2>
+                <p className="mt-1 text-xs text-slate-500">Use labels to distinguish reception, billing, emergency, or other contacts.</p>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={() => setSettingsForm((current) => ({ ...current, phones: [...current.phones, { phone: "", label: "", isPrimary: false }] }))}>
+                <AddCircleOutlineIcon fontSize="small" />
+                Add phone
+              </Button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {settingsForm.phones.map((phone, index) => (
+                <div key={`settings-phone-${index}`} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                  <Input label={index === 0 ? "Phone number" : `Phone number ${index + 1}`} value={phone.phone} onChange={(event) => setSettingsForm((current) => ({ ...current, phones: current.phones.map((item, itemIndex) => itemIndex === index ? { ...item, phone: event.target.value } : item) }))} placeholder="+254..." />
+                  <Input label="Label" value={phone.label ?? ""} onChange={(event) => setSettingsForm((current) => ({ ...current, phones: current.phones.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) }))} placeholder="Reception" />
+                  <div className="flex items-center gap-3 pb-2">
+                    <label className="flex items-center gap-2 text-xs text-slate-600"><input type="radio" name="settings-primary-facility-phone" checked={phone.isPrimary} onChange={() => setSettingsForm((current) => ({ ...current, phones: current.phones.map((item, itemIndex) => ({ ...item, isPrimary: itemIndex === index })) }))} />Primary</label>
+                    {settingsForm.phones.length > 1 && <button type="button" className="text-danger-600" title="Remove phone" aria-label={`Remove phone ${index + 1}`} onClick={() => setSettingsForm((current) => ({ ...current, phones: current.phones.filter((_, itemIndex) => itemIndex !== index) }))}><RemoveCircleOutlineIcon fontSize="small" /></button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 p-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Operating hours</h2>
+              <p className="mt-1 text-xs text-slate-500">Set each day independently, including closed days and 24-hour coverage.</p>
+            </div>
+            <div className="mt-4 space-y-3">
+              {settingsForm.operatingHours.map((hour, index) => (
+                <div key={hour.weekday} className="grid gap-3 rounded-lg border border-slate-100 p-3 sm:grid-cols-[100px_110px_1fr_1fr] sm:items-end">
+                  <span className="text-sm font-semibold uppercase text-slate-700">{hour.weekday}</span>
+                  <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={hour.isClosed} onChange={(event) => setSettingsForm((current) => ({ ...current, operatingHours: current.operatingHours.map((item, itemIndex) => itemIndex === index ? { ...item, isClosed: event.target.checked, is24Hours: false } : item) }))} />Closed</label>
+                  <Input label="Opens" type="time" value={hour.openTime ?? ""} disabled={hour.isClosed || hour.is24Hours} onChange={(event) => setSettingsForm((current) => ({ ...current, operatingHours: current.operatingHours.map((item, itemIndex) => itemIndex === index ? { ...item, openTime: event.target.value } : item) }))} />
+                  <div className="flex items-end gap-3"><Input label="Closes" type="time" value={hour.closeTime ?? ""} disabled={hour.isClosed || hour.is24Hours} onChange={(event) => setSettingsForm((current) => ({ ...current, operatingHours: current.operatingHours.map((item, itemIndex) => itemIndex === index ? { ...item, closeTime: event.target.value } : item) }))} /><label className="flex items-center gap-2 whitespace-nowrap pb-3 text-xs text-slate-600"><input type="checkbox" checked={hour.is24Hours} disabled={hour.isClosed} onChange={(event) => setSettingsForm((current) => ({ ...current, operatingHours: current.operatingHours.map((item, itemIndex) => itemIndex === index ? { ...item, is24Hours: event.target.checked } : item) }))} />24 hours</label></div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {settingsFormError && <p className="text-sm text-danger-600">{settingsFormError}</p>}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setSettingsModalOpen(false)} disabled={settingsMutation.isPending}>Cancel</Button>
+            <Button type="button" loading={settingsMutation.isPending} onClick={() => { const error = validateFacilitySettingsForm(settingsForm); if (error) { setSettingsFormError(error); return; } setSettingsFormError(null); settingsMutation.mutate(settingsForm); }}><SaveIcon fontSize="small" />Save settings</Button>
+          </div>
+        </div>
+      </Modal>
 
       <Card
         title="Facility services"
