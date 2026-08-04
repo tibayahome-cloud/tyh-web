@@ -135,6 +135,12 @@ export type FacilityProviderUpdateInput = {
   compensation?: ProviderCompensationInput;
 };
 
+export type FacilityProviderLifecycleInput = {
+  status?: "pending" | "active" | "suspended";
+  verified?: boolean;
+  isAvailable?: boolean;
+};
+
 export type FacilityProviderApplicationReviewInput = {
   approved: boolean;
   notes?: string;
@@ -500,6 +506,26 @@ export const updateFacilityProvider = async (
   const provider = mapProvider(payloadData(response.data));
   if (!provider) {
     throw new Error("Failed to update provider");
+  }
+  return provider;
+};
+
+export const updateFacilityProviderLifecycle = async (
+  facilityId: string,
+  providerUserId: string,
+  input: FacilityProviderLifecycleInput
+): Promise<Provider> => {
+  const response = await api.patch(
+    `/facilities/${facilityId}/providers/${providerUserId}/lifecycle`,
+    {
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.verified !== undefined ? { verified: input.verified } : {}),
+      ...(input.isAvailable !== undefined ? { is_available: input.isAvailable } : {})
+    }
+  );
+  const provider = mapProvider(payloadData(response.data));
+  if (!provider) {
+    throw new Error("Failed to update provider lifecycle");
   }
   return provider;
 };
