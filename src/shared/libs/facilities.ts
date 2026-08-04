@@ -335,8 +335,8 @@ export const updateFacilityStatus = async (facilityId: string, status: FacilityS
   return facility;
 };
 
-export const assignFacilityAdmin = async (facilityId: string, userId: string): Promise<FacilityAdmin> => {
-  const response = await api.post(`/facilities/${facilityId}/admins`, { user_id: userId });
+export const assignFacilityAdmin = async (facilityId: string, email: string): Promise<FacilityAdmin> => {
+  const response = await api.post(`/facilities/${facilityId}/admins`, { email });
   const admin = mapFacilityAdmin(payloadData(response.data));
   if (!admin) {
     throw new Error("Failed to assign facility admin");
