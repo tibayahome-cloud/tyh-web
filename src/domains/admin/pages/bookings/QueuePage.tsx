@@ -31,6 +31,15 @@ const TABS = [
   { key: "escalations", label: "Escalations", statuses: ACTIVE_STATUSES }
 ] as const;
 
+export const formatFacilityResponseWindow = (dueAt: string | null, nowMs = Date.now()): string => {
+  if (!dueAt) return "-";
+  const dueMs = new Date(dueAt).getTime();
+  if (Number.isNaN(dueMs)) return "-";
+  const remainingSeconds = Math.max(0, Math.ceil((dueMs - nowMs) / 1000));
+  if (remainingSeconds === 0) return "Expired";
+  return `${Math.floor(remainingSeconds / 60)}m ${String(remainingSeconds % 60).padStart(2, "0")}s`;
+};
+
 const AdminBookingQueuePage = () => {
   const [tab, setTab] = useState<(typeof TABS)[number]>(TABS[0]);
   const [reassignOpen, setReassignOpen] = useState(false);
@@ -50,6 +59,7 @@ const AdminBookingQueuePage = () => {
     to: ""
   });
   const [draftFilters, setDraftFilters] = useState(appliedFilters);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const toast = useToast();
   const cancelMutation = useCancelBookingMutation("detail");
 
@@ -64,8 +74,13 @@ const AdminBookingQueuePage = () => {
       from: appliedFilters.from || undefined,
       to: appliedFilters.to || undefined
     },
-    { enabled: true }
+    { enabled: true, refetchInterval: 30_000 }
   );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const bookings = useMemo(() => {
     const rows = bookingQuery.data?.bookings ?? [];
@@ -302,6 +317,7 @@ const AdminBookingQueuePage = () => {
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Client</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Provider</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600">Facility response</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Last update</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
                 </tr>
@@ -327,6 +343,13 @@ const AdminBookingQueuePage = () => {
                       {booking.meta?.escalation_at && (
                         <p className="text-xs font-semibold text-rose-600">Escalation pending</p>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={booking.facilityStatus === "expired" ? "font-semibold text-rose-600" : "text-slate-600"}>
+                        {booking.facilityStatus === "expired"
+                          ? booking.requestMode === "selected_facility" ? "Reroute confirmation required" : "Rerouted or awaiting next facility"
+                          : formatFacilityResponseWindow(booking.facilityResponseDueAt, nowMs)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-500">
                       {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString() : "—"}
