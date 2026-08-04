@@ -11,6 +11,7 @@ import {
   mapFacilityService,
   type BookingRequestMode,
   type Facility,
+  type FacilityOverview,
   type FacilityAdmin,
   type FacilityBookingAssignmentInput,
   type FacilityCreateInput,
@@ -83,6 +84,61 @@ export type FacilityProviderListResult = {
 export type FacilityProviderBootstrapResult = {
   provider: Provider | null;
   application: unknown;
+};
+
+export type FacilityProviderOnboardingInput = {
+  fullName: string;
+  email?: string;
+  phone?: string;
+  serviceIds: string[];
+  invitationChannel?: "email" | "sms";
+  compensation: ProviderCompensationInput;
+  providerFinancialsVisible: boolean | null;
+};
+
+export type FacilityProviderOnboardingResult = FacilityProviderBootstrapResult & {
+  created: boolean;
+  invitationSent: boolean;
+};
+
+export type FacilityAdminInvitation = {
+  created: boolean;
+  facilityAdminId: string;
+  userId: string;
+  invitationSent: boolean;
+  invitationExpiresAt: string | null;
+};
+
+export type FacilityAdminInvitationStatus = {
+  status: "not_issued" | "pending" | "completed" | "expired" | "revoked";
+  resetId: string | null;
+  expiresAt: string | null;
+  redeemedAt: string | null;
+};
+
+export type FacilityAdminInvitationResendResult = {
+  invitationSent: boolean;
+  invitationExpiresAt: string | null;
+};
+
+export type FacilityCreateResult = {
+  facility: Facility;
+  adminInvitation: FacilityAdminInvitation | null;
+};
+
+export type FacilityProviderUpdateInput = {
+  fullName?: string;
+  email?: string | null;
+  phone?: string | null;
+  serviceIds?: string[];
+  providerFinancialsVisible?: boolean | null;
+  compensation?: ProviderCompensationInput;
+};
+
+export type FacilityProviderLifecycleInput = {
+  status?: "pending" | "active" | "suspended";
+  verified?: boolean;
+  isAvailable?: boolean;
 };
 
 export type FacilityProviderApplicationReviewInput = {
@@ -212,13 +268,53 @@ export const fetchFacility = async (facilityId: string): Promise<Facility> => {
   return facility;
 };
 
-export const createFacility = async (input: FacilityCreateInput): Promise<Facility> => {
+export const fetchFacilityOverview = async (facilityId: string): Promise<FacilityOverview> => {
+  const response = await api.get(`/facilities/${facilityId}/overview`);
+  const raw = payloadData(response.data) as Record<string, unknown>;
+  const facility = mapFacility(raw.facility);
+  const metrics = (raw.metrics ?? {}) as Record<string, unknown>;
+  const readiness = (raw.readiness ?? {}) as Record<string, unknown>;
+  if (!facility) {
+    throw new Error("Facility overview not found");
+  }
+  return {
+    facility,
+    metrics: {
+      openBookings: Number(metrics.open_bookings) || 0,
+      unassignedBookings: Number(metrics.unassigned_bookings) || 0,
+      providersTotal: Number(metrics.providers_total) || 0,
+      providersAvailable: Number(metrics.providers_available) || 0,
+      providersPendingVerification: Number(metrics.providers_pending_verification) || 0,
+      activeServices: Number(metrics.active_services) || 0
+    },
+    readiness: {
+      locationReady: Boolean(readiness.location_ready),
+      contactReady: Boolean(readiness.contact_ready),
+      operatingHoursConfigured: Boolean(readiness.operating_hours_configured)
+    }
+  };
+};
+
+export const createFacility = async (input: FacilityCreateInput): Promise<FacilityCreateResult> => {
   const response = await api.post("/facilities", facilityCreatePayload(input));
-  const facility = mapFacility(payloadData(response.data));
+  const data = payloadData(response.data) as Record<string, unknown>;
+  const facility = mapFacility(data?.facility ?? data);
   if (!facility) {
     throw new Error("Failed to create facility");
   }
-  return facility;
+  const invitation = data?.admin_invitation as Record<string, unknown> | undefined;
+  return {
+    facility,
+    adminInvitation: invitation
+      ? {
+          created: Boolean(invitation.created),
+          facilityAdminId: String(invitation.facility_admin_id ?? ""),
+          userId: String(invitation.user_id ?? ""),
+          invitationSent: Boolean(invitation.invitation_sent),
+          invitationExpiresAt: invitation.invitation_expires_at ? String(invitation.invitation_expires_at) : null
+        }
+      : null
+  };
 };
 
 export const updateFacility = async (facilityId: string, input: FacilityUpdateInput): Promise<Facility> => {
@@ -246,6 +342,32 @@ export const assignFacilityAdmin = async (facilityId: string, userId: string): P
     throw new Error("Failed to assign facility admin");
   }
   return admin;
+};
+
+export const fetchFacilityAdminInvitationStatus = async (
+  facilityId: string,
+  userId: string
+): Promise<FacilityAdminInvitationStatus> => {
+  const response = await api.get(`/facilities/${facilityId}/admins/${userId}/invitation`);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    status: String(data.status ?? "not_issued") as FacilityAdminInvitationStatus["status"],
+    resetId: data.reset_id ? String(data.reset_id) : null,
+    expiresAt: data.expires_at ? String(data.expires_at) : null,
+    redeemedAt: data.redeemed_at ? String(data.redeemed_at) : null
+  };
+};
+
+export const resendFacilityAdminInvitation = async (
+  facilityId: string,
+  userId: string
+): Promise<FacilityAdminInvitationResendResult> => {
+  const response = await api.post(`/facilities/${facilityId}/admins/${userId}/invitation/resend`);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    invitationSent: Boolean(data.invitation_sent),
+    invitationExpiresAt: data.invitation_expires_at ? String(data.invitation_expires_at) : null
+  };
 };
 
 export const discoverFacilities = async ({
@@ -366,6 +488,48 @@ export const updateFacilityProviderCompensation = async (
   return provider;
 };
 
+export const updateFacilityProvider = async (
+  facilityId: string,
+  providerUserId: string,
+  input: FacilityProviderUpdateInput
+): Promise<Provider> => {
+  const response = await api.patch(`/facilities/${facilityId}/providers/${providerUserId}`, {
+    ...(input.fullName !== undefined ? { full_name: input.fullName } : {}),
+    ...(input.email !== undefined ? { email: input.email } : {}),
+    ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    ...(input.serviceIds !== undefined ? { service_ids: input.serviceIds } : {}),
+    ...(input.providerFinancialsVisible !== undefined
+      ? { provider_financials_visible: input.providerFinancialsVisible }
+      : {}),
+    ...(input.compensation ? providerCompensationPayload(input.compensation) : {})
+  });
+  const provider = mapProvider(payloadData(response.data));
+  if (!provider) {
+    throw new Error("Failed to update provider");
+  }
+  return provider;
+};
+
+export const updateFacilityProviderLifecycle = async (
+  facilityId: string,
+  providerUserId: string,
+  input: FacilityProviderLifecycleInput
+): Promise<Provider> => {
+  const response = await api.patch(
+    `/facilities/${facilityId}/providers/${providerUserId}/lifecycle`,
+    {
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.verified !== undefined ? { verified: input.verified } : {}),
+      ...(input.isAvailable !== undefined ? { is_available: input.isAvailable } : {})
+    }
+  );
+  const provider = mapProvider(payloadData(response.data));
+  if (!provider) {
+    throw new Error("Failed to update provider lifecycle");
+  }
+  return provider;
+};
+
 export const fetchFacilityProviders = async (
   facilityId: string,
   { page = 1, pageSize = 25, search, verified }: FacilityProviderListParams = {}
@@ -399,6 +563,30 @@ export const bootstrapFacilityProvider = async (
   return {
     provider: mapProvider(data.provider),
     application: data.application
+  };
+};
+
+export const createFacilityProvider = async (
+  facilityId: string,
+  input: FacilityProviderOnboardingInput
+): Promise<FacilityProviderOnboardingResult> => {
+  const response = await api.post(`/facilities/${facilityId}/providers`, {
+    full_name: input.fullName,
+    email: input.email,
+    phone: input.phone,
+    service_ids: input.serviceIds,
+    invitation_channel: input.invitationChannel,
+    compensation_mode: input.compensation.mode,
+    fixed_payout_cents: input.compensation.fixedPayoutCents,
+    payout_percentage: input.compensation.payoutPercentage,
+    provider_financials_visible: input.providerFinancialsVisible
+  });
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    provider: mapProvider(data.provider),
+    application: data.application,
+    created: Boolean(data.created),
+    invitationSent: Boolean(data.invitation_sent)
   };
 };
 

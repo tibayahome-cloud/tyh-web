@@ -90,6 +90,23 @@ export const FacilitySchema = z.object({
 
 export type Facility = z.infer<typeof FacilitySchema>;
 
+export type FacilityOverview = {
+  facility: Facility;
+  metrics: {
+    openBookings: number;
+    unassignedBookings: number;
+    providersTotal: number;
+    providersAvailable: number;
+    providersPendingVerification: number;
+    activeServices: number;
+  };
+  readiness: {
+    locationReady: boolean;
+    contactReady: boolean;
+    operatingHoursConfigured: boolean;
+  };
+};
+
 export const FacilityDiscoveryItemSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -271,25 +288,27 @@ export const mapFacilityDiscoveryItem = (payload: unknown): FacilityDiscoveryIte
   const raw = toResourceRecord(payload);
   const id = coerceId(raw.id);
   const facilityType = coerceString(raw.facility_type ?? raw.facilityType);
-  // Discovery response: raw.service has { id: catalogServiceId, facility_service_id: fsId, price_cents, ... }
   const svcRaw = raw.service ? toResourceRecord(raw.service) : null;
-  // Build a FacilityService-compatible object from the flat discovery service block
-  const service: FacilityService | null = svcRaw
-    ? {
-        id: coerceId(svcRaw.facility_service_id ?? svcRaw.facilityServiceId ?? svcRaw.id) ?? "",
-        facilityId: id ?? undefined,
-        serviceId: coerceId(svcRaw.id) ?? undefined,
-        priceCents: coerceNumber(svcRaw.price_cents ?? svcRaw.priceCents) ?? 0,
-        currency: coerceString(svcRaw.currency) ?? "KES",
-        estimateDurationMinutes: coerceNumber(svcRaw.estimate_duration_minutes ?? svcRaw.estimateDurationMinutes),
-        active: true,
-        isEmergencyCapable: toBoolean(svcRaw.is_emergency_capable ?? svcRaw.isEmergencyCapable),
-        service: null
-      }
+  const facilityServiceId = svcRaw
+    ? coerceId(svcRaw.facility_service_id ?? svcRaw.facilityServiceId ?? svcRaw.id)
     : null;
-  if (!id || !isFacilityType(facilityType) || !service) {
+  const serviceId = svcRaw
+    ? coerceId(svcRaw.id ?? svcRaw.service_id ?? svcRaw.serviceId ?? toObject(svcRaw.service).id)
+    : null;
+  if (!id || !isFacilityType(facilityType) || !svcRaw || !facilityServiceId || !serviceId) {
     return null;
   }
+  const service: FacilityService = {
+    id: facilityServiceId,
+    facilityId: id,
+    serviceId,
+    priceCents: coerceNumber(svcRaw.price_cents ?? svcRaw.priceCents) ?? 0,
+    currency: coerceString(svcRaw.currency) ?? "KES",
+    estimateDurationMinutes: coerceNumber(svcRaw.estimate_duration_minutes ?? svcRaw.estimateDurationMinutes),
+    active: true,
+    isEmergencyCapable: toBoolean(svcRaw.is_emergency_capable ?? svcRaw.isEmergencyCapable),
+    service: mapFacilityServiceSummary(svcRaw.service ?? { ...svcRaw, id: serviceId })
+  };
   return {
     id,
     name: coerceString(raw.name) ?? "",

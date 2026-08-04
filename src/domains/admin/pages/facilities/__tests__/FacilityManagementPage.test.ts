@@ -7,8 +7,7 @@ const validForm = {
   facilityType: "clinic" as const,
   address: "Kilimani",
   county: "Nairobi",
-  phone: "+254700000000",
-  phoneLabel: "Reception",
+  phones: [{ phone: "+254700000000", label: "Reception", isPrimary: true }],
   email: "care@nairobi.test",
   initialAdminEmail: "ops@nairobi.test",
   lat: "-1.2921",
@@ -26,8 +25,7 @@ describe("FacilityManagementPage helpers", () => {
       name: " Nairobi Clinic ",
       address: " Kilimani ",
       county: " Nairobi ",
-      phone: " +254700000000 ",
-      phoneLabel: " Reception ",
+      phones: [{ phone: " +254700000000 ", label: " Reception ", isPrimary: true }],
       email: " care@nairobi.test ",
       initialAdminEmail: " ops@nairobi.test "
     });
@@ -66,7 +64,7 @@ describe("FacilityManagementPage helpers", () => {
     expect(validateCreateForm({ ...validForm, name: "" })).toBe(
       "Name, address, county, and facility email are required."
     );
-    expect(validateCreateForm({ ...validForm, phone: "" })).toBe("At least one facility phone number is required.");
+    expect(validateCreateForm({ ...validForm, phones: [{ phone: "", label: "Reception", isPrimary: true }] })).toBe("At least one facility phone number is required.");
     expect(validateCreateForm({ ...validForm, initialAdminEmail: "" })).toBe("Initial admin email is required.");
   });
 
@@ -74,8 +72,7 @@ describe("FacilityManagementPage helpers", () => {
     expect(validateCreateForm({ ...validForm, platformFeePercent: "101" })).toBe(
       "Platform fee must be between 0 and 100."
     );
-    expect(validateCreateForm({ ...validForm, lat: "invalid" })).toBe("Latitude must be a number between -90 and 90.");
-    expect(validateCreateForm({ ...validForm, lng: "181" })).toBe("Longitude must be a number between -180 and 180.");
+    expect(validateCreateForm({ ...validForm, lat: "" })).toBe("Select the facility location on the map.");
     expect(validateCreateForm({ ...validForm, is24Hours: false, openTime: "" })).toBe(
       "Opening and closing time are required unless the facility is 24/7."
     );

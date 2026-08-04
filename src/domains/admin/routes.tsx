@@ -17,6 +17,8 @@ const ProviderOnboardingWizardPage = lazy(() => import("./pages/providers/Onboar
 const ProviderZonesPage = lazy(() => import("./pages/providers/ProviderZonesPage"));
 const ServiceManagementPage = lazy(() => import("./pages/services/ServiceManagementPage"));
 const FacilityHomePage = lazy(() => import("./pages/facilities/FacilityHomePage"));
+const FacilityOverviewPage = lazy(() => import("./pages/facilities/FacilityOverviewPage"));
+const FacilityProvidersPage = lazy(() => import("./pages/facilities/FacilityProvidersPage"));
 const FacilityManagementPage = lazy(() => import("./pages/facilities/FacilityManagementPage"));
 const FacilityWorkspacePage = lazy(() => import("./pages/facilities/FacilityWorkspacePage"));
 const AdminNotificationsPage = lazy(() => import("./pages/notifications/AdminNotificationsPage"));
@@ -169,6 +171,22 @@ const buildRoutes = (): RouteObject[] => [
         )
       },
       {
+        path: "facility/overview",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <FacilityOverviewPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "facility/providers",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <FacilityProvidersPage />
+          </Suspense>
+        )
+      },
+      {
         path: "facility",
         element: (
           <Suspense fallback={<Loading fullHeight />}>
@@ -188,7 +206,7 @@ const buildRoutes = (): RouteObject[] => [
         path: "facilities/:facilityId",
         element: (
           <Suspense fallback={<Loading fullHeight />}>
-            <FacilityWorkspacePage />
+            <FacilityWorkspacePage showOperationalSections={false} />
           </Suspense>
         )
       },

@@ -24,6 +24,7 @@ export const ResetPassword = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialToken = useMemo(() => searchParams.get("token"), [searchParams]);
+  const isInvitation = searchParams.get("flow") === "invitation";
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +70,7 @@ export const ResetPassword = () => {
   return (
     <AuthLayout
       title={t("auth.resetPasswordTitle")}
-      subtitle={t("auth.resetPasswordDescription")}
+      subtitle={isInvitation ? "Create your password to activate your TYH account." : t("auth.resetPasswordDescription")}
       footer={
         <div className="flex flex-col items-center gap-3">
           <Link to="/login" className="type-caption font-semibold text-tiba-blue hover:underline">
@@ -135,7 +136,7 @@ export const ResetPassword = () => {
         {status === "success" && (
           <div className="rounded-xl border border-green-100 bg-green-50 p-3 text-center">
             <p className="type-caption text-green-700" role="status">
-              {t("auth.resetPasswordSuccess")}
+              {isInvitation ? "Password created. You can now sign in." : t("auth.resetPasswordSuccess")}
             </p>
           </div>
         )}

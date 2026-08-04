@@ -10,12 +10,14 @@ const navSummary = (roles: string[]) =>
   }));
 
 describe("AdminShell navigation", () => {
-  it("points admin ops to their facility workspace landing route", () => {
+  it("shows admin ops the tenant workflow in the agreed order", () => {
     expect(navSummary(["admin.ops"])).toEqual([
-      { label: "Queue", to: "/admin/bookings", badge: undefined },
-      { label: "Self Care", to: "/admin/selfcare", badge: undefined },
+      { label: "Overview", to: "/admin/facility/overview", badge: undefined },
       { label: "Facility", to: "/admin/facility", badge: undefined },
+      { label: "Providers", to: "/admin/facility/providers", badge: undefined },
+      { label: "Queue", to: "/admin/bookings", badge: undefined },
       { label: "Payments", to: "/admin/finance/payments", badge: undefined },
+      { label: "Self Care", to: "/admin/selfcare", badge: undefined },
       { label: "Inbox", to: "/admin/conversations", badge: 4 }
     ]);
   });

@@ -20,12 +20,18 @@ import {
   assignFacilityBookingProvider,
   createFacility,
   discoverFacilities,
+  fetchFacilityOverview,
   bootstrapFacilityProvider,
+  createFacilityProvider,
   fetchFacilityBookings,
   fetchFacilityProviders,
+  fetchFacilityAdminInvitationStatus,
+  resendFacilityAdminInvitation,
   facilityServiceUpdatePayload,
   updateFacilityStatus,
-  updateFacilityProviderCompensation
+  updateFacilityProviderCompensation,
+  updateFacilityProvider,
+  updateFacilityProviderLifecycle
 } from "../facilities";
 
 const facilityResponse = {
@@ -147,6 +153,33 @@ describe("facility API helpers", () => {
     });
   });
 
+  it("fetches facility admin invitation status without exposing a token", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { data: { status: "pending", reset_id: "reset-1", expires_at: "2026-08-04T10:00:00Z" } }
+    });
+
+    const result = await fetchFacilityAdminInvitationStatus("facility-1", "user-1");
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/admins/user-1/invitation");
+    expect(result).toEqual({
+      status: "pending",
+      resetId: "reset-1",
+      expiresAt: "2026-08-04T10:00:00Z",
+      redeemedAt: null
+    });
+  });
+
+  it("resends a facility admin invitation", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { data: { invitation_sent: true, invitation_expires_at: "2026-08-04T11:00:00Z" } }
+    });
+
+    const result = await resendFacilityAdminInvitation("facility-1", "user-1");
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins/user-1/invitation/resend");
+    expect(result).toEqual({ invitationSent: true, invitationExpiresAt: "2026-08-04T11:00:00Z" });
+  });
+
   it("keeps facility service partial update payloads partial", () => {
     expect(facilityServiceUpdatePayload({ active: false, priceCents: 120000 })).toEqual({
       active: false,
@@ -225,6 +258,111 @@ describe("facility API helpers", () => {
       })
     });
     expect(result.providers.map((provider) => provider.userId)).toEqual(["user-1"]);
+  });
+
+  it("maps the facility overview summary without exposing collections", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: {
+          facility: { ...facilityResponse, lat: -1.2, lng: 36.8 },
+          metrics: {
+            open_bookings: 4,
+            unassigned_bookings: 2,
+            providers_total: 8,
+            providers_available: 3,
+            providers_pending_verification: 1,
+            active_services: 5
+          },
+          readiness: { location_ready: true, contact_ready: true, operating_hours_configured: false }
+        }
+      }
+    });
+
+    await expect(fetchFacilityOverview("facility-1")).resolves.toMatchObject({
+      facility: { id: "facility-1" },
+      metrics: { openBookings: 4, unassignedBookings: 2, providersTotal: 8, activeServices: 5 },
+      readiness: { locationReady: true, operatingHoursConfigured: false }
+    });
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/overview");
+  });
+
+  it("creates a provider with facility services, compensation, and visibility settings", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { data: { provider: { id: "provider-1", user_id: "user-1", facility_id: "facility-1" }, created: true, invitation_sent: true } }
+    });
+
+    const result = await createFacilityProvider("facility-1", {
+      fullName: "Provider One",
+      email: "provider@example.com",
+      serviceIds: ["service-1"],
+      compensation: { mode: "percentage", fixedPayoutCents: null, payoutPercentage: 60 },
+      providerFinancialsVisible: false
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/providers", {
+      full_name: "Provider One",
+      email: "provider@example.com",
+      phone: undefined,
+      service_ids: ["service-1"],
+      invitation_channel: undefined,
+      compensation_mode: "percentage",
+      fixed_payout_cents: null,
+      payout_percentage: 60,
+      provider_financials_visible: false
+    });
+    expect(result).toMatchObject({ created: true, invitationSent: true, provider: { facilityId: "facility-1" } });
+  });
+
+  it("updates provider details, services, compensation, and visibility in one facility-scoped request", async () => {
+    mockPatch.mockResolvedValueOnce({
+      data: {
+        data: {
+          id: "provider-1",
+          user_id: "user-1",
+          facility_id: "facility-1",
+          provider_financials_visible: null
+        }
+      }
+    });
+
+    const result = await updateFacilityProvider("facility-1", "user-1", {
+      fullName: "Updated Provider",
+      email: "updated@example.com",
+      phone: "+254700000001",
+      serviceIds: ["service-2"],
+      providerFinancialsVisible: null,
+      compensation: { mode: "fixed", fixedPayoutCents: 150000, payoutPercentage: null }
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith("/facilities/facility-1/providers/user-1", {
+      full_name: "Updated Provider",
+      email: "updated@example.com",
+      phone: "+254700000001",
+      service_ids: ["service-2"],
+      provider_financials_visible: null,
+      mode: "fixed",
+      fixed_payout_cents: 150000,
+      payout_percentage: null
+    });
+    expect(result.facilityId).toBe("facility-1");
+  });
+
+  it("updates provider lifecycle through the facility-scoped endpoint", async () => {
+    mockPatch.mockResolvedValueOnce({
+      data: { data: { id: "provider-1", user_id: "user-1", facility_id: "facility-1", verified: true, is_available: true } }
+    });
+
+    const result = await updateFacilityProviderLifecycle("facility-1", "user-1", {
+      status: "active",
+      verified: true,
+      isAvailable: true
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      "/facilities/facility-1/providers/user-1/lifecycle",
+      { status: "active", verified: true, is_available: true }
+    );
+    expect(result).toMatchObject({ facilityId: "facility-1", verified: true, isAvailable: true });
   });
 
   it("fetches facility booking queues with facility status filters", async () => {
