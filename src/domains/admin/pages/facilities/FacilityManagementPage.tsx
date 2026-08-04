@@ -10,6 +10,8 @@ import BlockIcon from "@mui/icons-material/BlockOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -20,7 +22,9 @@ import { Modal } from "../../../../shared/components/Modal";
 import {
   assignFacilityAdmin,
   createFacility,
+  fetchFacilityAdminInvitationStatus,
   fetchFacilities,
+  resendFacilityAdminInvitation,
   updateFacilityStatus
 } from "../../../../shared/libs/facilities";
 import type { Facility, FacilityCreateInput, FacilityStatus } from "../../../../shared/schemas/facility";
@@ -263,6 +267,11 @@ const FacilityManagementPage = () => {
   const [adminDialog, setAdminDialog] = useState<AdminDialogState | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [invitationNotice, setInvitationNotice] = useState<{
+    facilityId: string;
+    userId: string;
+    email: string;
+  } | null>(null);
 
   const facilitiesQuery = useQuery({
     queryKey: ["admin", "facilities", { status, search }],
@@ -275,6 +284,11 @@ const FacilityManagementPage = () => {
   });
 
   const facilities = useMemo(() => facilitiesQuery.data?.facilities ?? [], [facilitiesQuery.data?.facilities]);
+  const invitationStatusQuery = useQuery({
+    queryKey: ["admin", "facility-admin-invitation", invitationNotice?.facilityId, invitationNotice?.userId],
+    queryFn: () => fetchFacilityAdminInvitationStatus(invitationNotice!.facilityId, invitationNotice!.userId),
+    enabled: Boolean(invitationNotice)
+  });
   const visibleFacilities = useMemo(() => {
     const term = search.trim().toLowerCase();
     return facilities.filter((facility) => {
@@ -311,6 +325,13 @@ const FacilityManagementPage = () => {
     mutationFn: createFacility,
     onSuccess: (result) => {
       invalidateFacilities();
+      if (result.adminInvitation?.userId) {
+        setInvitationNotice({
+          facilityId: result.facility.id,
+          userId: result.adminInvitation.userId,
+          email: form.initialAdminEmail.trim()
+        });
+      }
       setIsCreateOpen(false);
       setForm(initialFormState);
       setSuccessMessage(result.adminInvitation?.invitationSent
@@ -341,6 +362,22 @@ const FacilityManagementPage = () => {
       invalidateFacilities();
       setAdminDialog(null);
       setMutationError(null);
+    },
+    onError: (error) => {
+      setMutationError(extractErrorMessage(error));
+    }
+  });
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: () => {
+      if (!invitationNotice) {
+        throw new Error("Invitation context is missing");
+      }
+      return resendFacilityAdminInvitation(invitationNotice.facilityId, invitationNotice.userId);
+    },
+    onSuccess: () => {
+      setSuccessMessage("A new password setup invitation has been queued.");
+      invitationStatusQuery.refetch();
     },
     onError: (error) => {
       setMutationError(extractErrorMessage(error));
@@ -390,6 +427,42 @@ const FacilityManagementPage = () => {
       </div>
 
       {successMessage && <div className="rounded-xl border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">{successMessage}</div>}
+
+      {invitationNotice && (
+        <Card>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <EmailOutlinedIcon className="mt-0.5 text-tiba-blue" />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Initial admin invitation</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {invitationNotice.email} · {formatLabel(invitationStatusQuery.data?.status ?? "pending")}
+                </p>
+                {invitationStatusQuery.data?.expiresAt && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Expires {new Date(invitationStatusQuery.data.expiresAt).toLocaleString()}
+                  </p>
+                )}
+                {mutationError && <p className="mt-2 text-sm text-danger-600">{mutationError}</p>}
+              </div>
+            </div>
+            {invitationStatusQuery.data?.status !== "completed" && (
+              <Button
+                size="sm"
+                variant="outline"
+                loading={resendInvitationMutation.isPending}
+                onClick={() => {
+                  setMutationError(null);
+                  resendInvitationMutation.mutate();
+                }}
+              >
+                <RefreshOutlinedIcon fontSize="small" />
+                Resend invitation
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <FacilityMetric label="Total" value={String(metrics.total)} />

@@ -104,6 +104,19 @@ export type FacilityProviderOnboardingResult = FacilityProviderBootstrapResult &
 export type FacilityAdminInvitation = {
   created: boolean;
   facilityAdminId: string;
+  userId: string;
+  invitationSent: boolean;
+  invitationExpiresAt: string | null;
+};
+
+export type FacilityAdminInvitationStatus = {
+  status: "not_issued" | "pending" | "completed" | "expired" | "revoked";
+  resetId: string | null;
+  expiresAt: string | null;
+  redeemedAt: string | null;
+};
+
+export type FacilityAdminInvitationResendResult = {
   invitationSent: boolean;
   invitationExpiresAt: string | null;
 };
@@ -290,6 +303,7 @@ export const createFacility = async (input: FacilityCreateInput): Promise<Facili
       ? {
           created: Boolean(invitation.created),
           facilityAdminId: String(invitation.facility_admin_id ?? ""),
+          userId: String(invitation.user_id ?? ""),
           invitationSent: Boolean(invitation.invitation_sent),
           invitationExpiresAt: invitation.invitation_expires_at ? String(invitation.invitation_expires_at) : null
         }
@@ -322,6 +336,32 @@ export const assignFacilityAdmin = async (facilityId: string, userId: string): P
     throw new Error("Failed to assign facility admin");
   }
   return admin;
+};
+
+export const fetchFacilityAdminInvitationStatus = async (
+  facilityId: string,
+  userId: string
+): Promise<FacilityAdminInvitationStatus> => {
+  const response = await api.get(`/facilities/${facilityId}/admins/${userId}/invitation`);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    status: String(data.status ?? "not_issued") as FacilityAdminInvitationStatus["status"],
+    resetId: data.reset_id ? String(data.reset_id) : null,
+    expiresAt: data.expires_at ? String(data.expires_at) : null,
+    redeemedAt: data.redeemed_at ? String(data.redeemed_at) : null
+  };
+};
+
+export const resendFacilityAdminInvitation = async (
+  facilityId: string,
+  userId: string
+): Promise<FacilityAdminInvitationResendResult> => {
+  const response = await api.post(`/facilities/${facilityId}/admins/${userId}/invitation/resend`);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    invitationSent: Boolean(data.invitation_sent),
+    invitationExpiresAt: data.invitation_expires_at ? String(data.invitation_expires_at) : null
+  };
 };
 
 export const discoverFacilities = async ({

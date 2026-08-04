@@ -25,6 +25,8 @@ import {
   createFacilityProvider,
   fetchFacilityBookings,
   fetchFacilityProviders,
+  fetchFacilityAdminInvitationStatus,
+  resendFacilityAdminInvitation,
   facilityServiceUpdatePayload,
   updateFacilityStatus,
   updateFacilityProviderCompensation,
@@ -148,6 +150,33 @@ describe("facility API helpers", () => {
       roleKey: "admin.ops",
       active: true
     });
+  });
+
+  it("fetches facility admin invitation status without exposing a token", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { data: { status: "pending", reset_id: "reset-1", expires_at: "2026-08-04T10:00:00Z" } }
+    });
+
+    const result = await fetchFacilityAdminInvitationStatus("facility-1", "user-1");
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/admins/user-1/invitation");
+    expect(result).toEqual({
+      status: "pending",
+      resetId: "reset-1",
+      expiresAt: "2026-08-04T10:00:00Z",
+      redeemedAt: null
+    });
+  });
+
+  it("resends a facility admin invitation", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { data: { invitation_sent: true, invitation_expires_at: "2026-08-04T11:00:00Z" } }
+    });
+
+    const result = await resendFacilityAdminInvitation("facility-1", "user-1");
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins/user-1/invitation/resend");
+    expect(result).toEqual({ invitationSent: true, invitationExpiresAt: "2026-08-04T11:00:00Z" });
   });
 
   it("keeps facility service partial update payloads partial", () => {
