@@ -128,7 +128,7 @@ describe("facility API helpers", () => {
     });
   });
 
-  it("assigns facility admin ops by backend user id", async () => {
+  it("assigns facility admin ops by email", async () => {
     mockPost.mockResolvedValueOnce({
       data: {
         data: {
@@ -141,9 +141,9 @@ describe("facility API helpers", () => {
       }
     });
 
-    const result = await assignFacilityAdmin("facility-1", "user-1");
+    const result = await assignFacilityAdmin("facility-1", "admin@example.com");
 
-    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins", { user_id: "user-1" });
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins", { email: "admin@example.com" });
     expect(result).toEqual({
       id: "admin-link-1",
       facilityId: "facility-1",

@@ -42,6 +42,8 @@ type ServiceOption = {
   key: string;
 };
 
+type FacilityOption = { id: string; name: string };
+
 type ProviderPayload = {
   id: string;
   user_id: string;
@@ -74,11 +76,19 @@ const fetchUsers = async (search: string) => {
   const params: Record<string, string> = {
     ...buildFieldParams(userAdminList),
     "page[size]": "10",
+    "filter[role]": "provider",
   };
   if (search.trim()) {
     params["filter[search]"] = search.trim();
   }
   const response = await api.get<{ data: SearchUser[] }>("/users", { params });
+  return response.data.data;
+};
+
+const fetchFacilities = async (): Promise<FacilityOption[]> => {
+  const response = await api.get<{ data: FacilityOption[] }>("/facilities", {
+    params: { "page[size]": "50" },
+  });
   return response.data.data;
 };
 
@@ -106,6 +116,7 @@ const ProviderOnboardingWizardPage = () => {
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
+  const [facilityId, setFacilityId] = useState("");
   const [newUser, setNewUser] = useState({ fullName: "", email: "", phone: "", password: "" });
   const [dailyLimit, setDailyLimit] = useState<number>(0);
   const [canEmergency, setCanEmergency] = useState(false);
@@ -120,6 +131,19 @@ const ProviderOnboardingWizardPage = () => {
     queryFn: () => fetchUsers(searchTerm),
     enabled: mode === "existing" && Boolean(searchTerm.trim()),
   });
+
+  const facilitiesQuery = useQuery({
+    queryKey: ["admin", "providers", "wizard", "facilities"],
+    queryFn: fetchFacilities,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    const facilities = facilitiesQuery.data ?? [];
+    if (!facilityId && facilities.length === 1) {
+      setFacilityId(facilities[0].id);
+    }
+  }, [facilityId, facilitiesQuery.data]);
 
   const requirementsQuery = useQuery({
     queryKey: ["admin", "providers", "wizard", "requirements"],
@@ -186,7 +210,7 @@ const ProviderOnboardingWizardPage = () => {
       const payload: Record<string, unknown> = {
         full_name: newUser.fullName.trim(),
         password: newUser.password,
-        roles: ["provider"],
+        roles: [],
       };
       if (newUser.email.trim()) {
         payload.email = newUser.email.trim();
@@ -200,9 +224,10 @@ const ProviderOnboardingWizardPage = () => {
   });
 
   const bootstrapMutation = useMutation({
-    mutationFn: async (userId: string) => {
+    mutationFn: async ({ userId, facilityId: selectedFacilityId }: { userId: string; facilityId: string }) => {
       const response = await api.post<{ data: { provider: ProviderPayload; application: ApplicationPayload } }>(
         `/providers/${userId}/bootstrap`,
+        { facility_id: selectedFacilityId },
       );
       return response.data.data;
     },
@@ -256,9 +281,14 @@ const ProviderOnboardingWizardPage = () => {
     switch (step) {
       case 0:
         if (mode === "existing") {
-          return Boolean(selectedUser);
+          return Boolean(selectedUser && facilityId);
         }
-        return Boolean(newUser.fullName.trim() && newUser.password && (newUser.email.trim() || newUser.phone.trim()));
+        return Boolean(
+          newUser.fullName.trim() &&
+          newUser.password &&
+          (newUser.email.trim() || newUser.phone.trim()) &&
+          facilityId,
+        );
       case 1:
         return Boolean(provider && application);
       case 2:
@@ -302,7 +332,7 @@ const ProviderOnboardingWizardPage = () => {
         if (!userRecord) {
           throw new Error("Select a user before continuing.");
         }
-        const bootstrap = await bootstrapMutation.mutateAsync(userRecord.id);
+        const bootstrap = await bootstrapMutation.mutateAsync({ userId: userRecord.id, facilityId });
         setProvider(bootstrap.provider);
         setApplication(bootstrap.application);
         await updateProviderMutation.mutateAsync({
@@ -398,6 +428,20 @@ const ProviderOnboardingWizardPage = () => {
               Create new user
             </Button>
           </div>
+
+          <label className="mt-6 block text-sm font-medium text-slate-700">
+            Facility
+            <select
+              value={facilityId}
+              onChange={(event) => setFacilityId(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+            >
+              <option value="">Select a facility</option>
+              {(facilitiesQuery.data ?? []).map((facility) => (
+                <option key={facility.id} value={facility.id}>{facility.name}</option>
+              ))}
+            </select>
+          </label>
 
           {mode === "existing" ? (
             <div className="mt-6 space-y-4">
