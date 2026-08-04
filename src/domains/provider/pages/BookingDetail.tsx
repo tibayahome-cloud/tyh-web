@@ -1,84 +1,75 @@
 import { useCallback, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ChevronRight, Clock, MapPin, MessageCircle, Phone, Navigation, X, StarIcon, List } from "lucide-react";
+import { Clock, MapPin, MessageCircle, Phone, Navigation, X, List } from "lucide-react";
 import type { NavigationStep } from "../../../shared/components/BookingLiveMapCard";
 import classNames from "classnames";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { useBookingDetail, useMarkBookingMutation } from "../../../shared/hooks/useBookings";
+import { useAuth } from "../../../shared/hooks/useAuth";
 import { Loading } from "../../../shared/components/Loading";
 import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { BookingNotesPanel } from "../components/BookingNotesPanel";
 import type { Booking } from "../../../shared/schemas/booking";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 
 const ACTION_COPY: Record<
   string,
   { label: string; helper: string; action?: "en_route" | "nearby" | "arrived" | "start_service" | "complete" }
 > = {
   accepted: {
-    label: "Begin trip",
+    label: "Begin Trip",
     helper: "Signal that you are on the way to the client.",
     action: "en_route"
   },
   en_route: {
-    label: "Mark as nearby",
+    label: "Mark as Nearby",
     helper: "Let the client know you are minutes away.",
     action: "nearby"
   },
   nearby: {
-    label: "Confirm arrival",
+    label: "Confirm Arrival",
     helper: "Updates the booking to show that you are on site.",
     action: "arrived"
   },
   arrived: {
-    label: "Start service",
+    label: "Start Service",
     helper: "Kick off the service timer and begin work.",
     action: "start_service"
   },
   in_service: {
-    label: "Complete service",
+    label: "Complete Service",
     helper: "Finish the session. The client will confirm delivery.",
     action: "complete"
   },
   completed_by_provider: {
-    label: "Awaiting client confirmation",
+    label: "Awaiting Client Confirmation",
     helper: "We have notified the client to confirm and pay."
   },
   client_completed: {
-    label: "Job finished",
+    label: "Job Finished",
     helper: "Thanks! Keep an eye on new requests."
   },
   client_confirmed: {
-    label: "Job finished",
+    label: "Job Finished",
     helper: "Thanks! Keep an eye on new requests."
   },
   default: {
-    label: "Tracking in progress",
+    label: "Tracking in Progress",
     helper: "No manual action is required at this stage."
-  }
-};
-
-const formatCurrency = (amountCents?: number | null, currency = "KES") => {
-  if (amountCents == null) {
-    return "—";
-  }
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency
-    }).format(amountCents / 100);
-  } catch {
-    return `${currency} ${(amountCents / 100).toFixed(2)}`;
   }
 };
 
 const ProviderBookingDetailPage = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
+  const { user } = useAuth();
+  const profileQuery = useProviderProfile(user?.id);
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const booking = detailQuery.data;
+  const financialsVisible = !profileQuery.isLoading && providerFinancialsAreVisible(profileQuery.data);
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
@@ -110,11 +101,17 @@ const ProviderBookingDetailPage = () => {
     return (
       <AppLayout fullWidth showHeader={false}>
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
-          Booking not found.{" "}
-          <Link className="text-primary-600" to="/pro/home">
-            Return home
-          </Link>
-          .
+          <p className="font-semibold text-rose-600 mb-2">
+            Error: {detailQuery.error ? (detailQuery.error as any).message || String(detailQuery.error) : "Booking not found."}
+          </p>
+          <p>
+            bookingId: <code className="bg-slate-100 px-1 rounded">{bookingId}</code>
+          </p>
+          <p className="mt-4">
+            <Link className="text-primary-600 font-semibold underline" to="/pro/home">
+              Return home
+            </Link>
+          </p>
         </div>
       </AppLayout>
     );
@@ -204,7 +201,7 @@ const ProviderBookingDetailPage = () => {
                 <InfoRow
                   label="Duration"
                   value={booking.estimateDurationMinutes ? `Est. ${booking.estimateDurationMinutes} min` : "—"}
-                  helper="Earnings credited to wallet after completion"
+                  helper={financialsVisible ? "Earnings credited to wallet after completion" : "Facility manages payout details"}
                   icon={<Clock className="h-3.5 w-3.5 text-slate-400" />}
                 />
                 <InfoRow label="Protocol Status" value={booking.status.replace(/_/g, " ")} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
 
@@ -10,7 +10,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { useLocationAccess } from "../../../shared/hooks/useLocationAccess";
-import { useProviderProfile } from "../hooks/useProviderProfile";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { bookingKeys, useBookingList, useAcceptBookingMutation } from "../../../shared/hooks/useBookings";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
@@ -26,7 +26,6 @@ import { useUpdateProviderStatus } from "../hooks/useProviderProfile";
 import {
   Power,
   Activity,
-  TrendingUp,
   Rocket,
   MessageCircle,
   ArrowRight,
@@ -37,7 +36,7 @@ import {
   Settings
 } from "lucide-react";
 
-import { Booking } from "../../../shared/schemas/booking";
+import type { Booking } from "../../../shared/schemas/booking";
 
 const ACTIVE_BOOKING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider"] as const;
 const ACTIVE_STATUS_PRIORITY: Record<string, number> = {
@@ -104,15 +103,6 @@ const formatTimestamp = (iso?: string | null) => {
   });
 };
 
-const formatPrice = (amountCents?: number, currency = "KES") => {
-  const value = typeof amountCents === "number" ? amountCents / 100 : 0;
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value);
-  } catch {
-    return `${currency} ${value.toFixed(2)}`;
-  }
-};
-
 const ProviderHome = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -122,8 +112,31 @@ const ProviderHome = () => {
   const { queue: broadcastQueue, dismiss: dismissBroadcast } = useBroadcastQueueContext();
   const updateStatusMutation = useUpdateProviderStatus(user?.id);
   const acceptBookingMutation = useAcceptBookingMutation("detail");
-  const [isTracking, setIsTracking] = useState(true);
+  const location = useLocation();
+  const isOnHomePage = location.pathname === "/pro/home" || location.pathname === "/pro";
+  const [isTracking, setIsTracking] = useState(() => {
+    // Default to true if not explicitly closed in this session
+    return sessionStorage.getItem("pro_is_tracking") !== "false";
+  });
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; clientName: string } | null>(null);
+
+  // Sync session storage on change
+  const handleSetIsTracking = (value: boolean) => {
+    setIsTracking(value);
+    sessionStorage.setItem("pro_is_tracking", String(value));
+  };
+
+  // Auto-hide the immersive overlay when user navigates away from home
+  // The portal renders to document.body, so it would block all tab navigation
+  // if left mounted while on a different route.
+  useEffect(() => {
+    if (!isOnHomePage) {
+      setIsTracking(false);
+    } else if (isOnHomePage && sessionStorage.getItem("pro_is_tracking") !== "false") {
+      // Restore tracking state when returning to home
+      setIsTracking(true);
+    }
+  }, [isOnHomePage]);
 
   const { data: activeList } = useBookingList(
     {
@@ -147,6 +160,13 @@ const ProviderHome = () => {
       return (timeB ? new Date(timeB).getTime() : 0) - (timeA ? new Date(timeA).getTime() : 0);
     })[0] ?? null;
   }, [activeList?.bookings]);
+
+  useEffect(() => {
+    if (!activeBooking) {
+      sessionStorage.removeItem("pro_is_tracking");
+      setIsTracking(true); // Default next booking to expand
+    }
+  }, [activeBooking]);
 
   const { data: upcomingList, isFetching: upcomingFetching } = useBookingList(
     {
@@ -225,6 +245,7 @@ const ProviderHome = () => {
   }, [upcomingList?.bookings, activeBooking]);
 
   const historyBookings = historyList?.bookings ?? [];
+  const financialsVisible = providerFinancialsAreVisible(profile);
 
   if (loadingProfile) return <Loading fullHeight />;
 
@@ -236,10 +257,10 @@ const ProviderHome = () => {
 
   return (
     <>
-      {activeBooking && isTracking && (
+      {activeBooking && isTracking && isOnHomePage && (
         <ImmersiveProviderBookingView
           booking={activeBooking}
-          onClose={() => setIsTracking(false)}
+          onClose={() => handleSetIsTracking(false)}
           onOpenChat={() => dispatchChat(activeBooking.id)}
         />
       )}
@@ -249,7 +270,7 @@ const ProviderHome = () => {
         {/* Intelligence Layer */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-4">
-            <RevenueSnapshot />
+            <RevenueSnapshot financialsVisible={financialsVisible} />
           </div>
           <div className="lg:col-span-8">
             <PerformanceStats />
@@ -280,7 +301,7 @@ const ProviderHome = () => {
                     <Button
                       variant="primary"
                       className="h-9 rounded-lg px-4 text-xs"
-                      onClick={() => setIsTracking(true)}
+                      onClick={() => handleSetIsTracking(true)}
                     >
                       <Activity className="mr-1.5 h-3.5 w-3.5" />
                       Expand
@@ -297,8 +318,10 @@ const ProviderHome = () => {
                 <BookingLiveMapCard
                   bookingId={activeBooking.id}
                   role="provider"
+                  height={240}
+                  hideOverlays
                   onOpenChat={dispatchChat}
-                  className="rounded-xl border border-slate-100 overflow-hidden aspect-video"
+                  className="rounded-xl border border-slate-100 overflow-hidden"
                 />
               </Card>
             ) : (

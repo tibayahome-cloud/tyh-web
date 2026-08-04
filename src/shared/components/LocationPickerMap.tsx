@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useMemo } from "react";
 import classNames from "classnames";
-import { GoogleMap, useGoogleMap, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 import type { Libraries } from "@react-google-maps/api";
 
 import { MAP_LIBRARIES } from "../constants/maps";
@@ -52,35 +51,8 @@ export const LocationPickerMap = ({
     googleMapsApiKey: apiKey ?? "",
     libraries: MAP_LIBRARIES,
     id: "shared-map",
-    version: "beta"
+    version: "weekly"
   });
-  const [advancedReady, setAdvancedReady] = useState(false);
-  const mapId = import.meta.env.VITE_GOOGLE_MAP_ID;
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadAdvanced = async () => {
-      if (!isLoaded || typeof window === "undefined" || typeof google === "undefined" || !google.maps) {
-        return;
-      }
-      try {
-        if (!google.maps.marker?.AdvancedMarkerElement && google.maps.importLibrary) {
-          await google.maps.importLibrary("marker");
-        }
-        if (!cancelled && google.maps.marker?.AdvancedMarkerElement) {
-          setAdvancedReady(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setAdvancedReady(false);
-        }
-      }
-    };
-    loadAdvanced();
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded]);
 
   const center = useMemo<LatLngLiteral>(() => value ?? DEFAULT_CENTER, [value]);
 
@@ -151,15 +123,9 @@ export const LocationPickerMap = ({
               fullscreenControl: false,
               clickableIcons: false,
               draggableCursor: disabled ? undefined : "crosshair",
-              mapId
             }}
           >
-            {value && advancedReady && <AdvancedMarkerPin position={value} />}
-            {!advancedReady && (
-              <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white/90 px-4 py-1 text-xs font-semibold text-slate-600 shadow">
-                Warming up markers…
-              </div>
-            )}
+            {value && <Marker position={value} />}
           </GoogleMap>
           {!disabled && (
             <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white/90 px-4 py-1 text-xs font-semibold text-slate-600 shadow">
@@ -175,43 +141,3 @@ export const LocationPickerMap = ({
 };
 
 export default LocationPickerMap;
-
-const AdvancedMarkerPin = ({ position }: { position: LatLngLiteral }) => {
-  const map = useGoogleMap();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-
-  useEffect(() => {
-    if (!map || typeof google === "undefined" || !google.maps.marker?.AdvancedMarkerElement) {
-      return undefined;
-    }
-    containerRef.current = document.createElement("div");
-    markerRef.current = new google.maps.marker.AdvancedMarkerElement({
-      map,
-      position,
-      content: containerRef.current
-    });
-    return () => {
-      if (markerRef.current) {
-        markerRef.current.map = null;
-        markerRef.current = null;
-      }
-      containerRef.current = null;
-    };
-  }, [map, position]);
-
-  useEffect(() => {
-    if (markerRef.current) {
-      markerRef.current.position = position;
-    }
-  }, [position]);
-
-  if (!containerRef.current) {
-    return null;
-  }
-
-  return createPortal(
-    <span className="flex h-8 w-8 items-center justify-center rounded-full border-4 border-white bg-rose-500 shadow-lg" />,
-    containerRef.current
-  );
-};

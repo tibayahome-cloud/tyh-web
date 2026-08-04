@@ -1,5 +1,6 @@
 import { coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
 import { type UserResource, mapUserResource } from "./user";
+import { mapProviderCompensation, type ProviderCompensation } from "./facility";
 
 export interface ProviderService {
     id: string;
@@ -30,6 +31,7 @@ export interface ProviderBlackout {
 export interface Provider {
     id: string;
     userId: string;
+    facilityId: string;
     verified: boolean;
     verifiedAt: string | null;
     isAvailable: boolean;
@@ -45,6 +47,8 @@ export interface Provider {
     locationUpdatedAt: string | null;
     zoneId: string | null;
     priorityScore: number | null;
+    compensation: ProviderCompensation;
+    financialsVisible: boolean | null;
     user?: UserResource | null;
     services: ProviderService[];
     availability: ProviderAvailability[];
@@ -80,6 +84,7 @@ export const mapProvider = (payload: unknown): Provider | null => {
     return {
         id,
         userId: coerceId(raw.user_id),
+        facilityId: coerceId(raw.facility_id),
         verified: Boolean(raw.verified),
         verifiedAt: coerceDate(raw.verified_at),
         isAvailable: Boolean(raw.is_available),
@@ -95,23 +100,39 @@ export const mapProvider = (payload: unknown): Provider | null => {
         locationUpdatedAt: coerceDate(raw.location_updated_at),
         zoneId: coerceString(raw.zone_id),
         priorityScore: coerceNumber(raw.priority_score),
+        compensation: mapProviderCompensation(raw),
+        financialsVisible:
+            raw.provider_financials_visible === null || raw.provider_financials_visible === undefined
+                ? null
+                : Boolean(raw.provider_financials_visible),
         user: raw.user ? mapUserResource(raw.user) : null,
         services: servicesRaw
             .map((s) => mapProviderService(s))
             .filter((s): s is ProviderService => Boolean(s)),
-        availability: availabilityRaw.map((a: any) => ({
-            id: coerceId(a.id),
-            weekday: Number(a.weekday) || 0,
-            startTime: coerceString(a.start_time) || "00:00",
-            endTime: coerceString(a.end_time) || "00:00",
-            effectiveFrom: coerceDate(a.effective_from),
-            effectiveTo: coerceDate(a.effective_to)
-        })),
-        blackouts: blackoutsRaw.map((b: any) => ({
-            id: coerceId(b.id),
-            startAt: coerceDate(b.start_at) || "",
-            endAt: coerceDate(b.end_at) || "",
-            reason: coerceString(b.reason)
-        }))
+        availability: availabilityRaw.map((entry) => {
+            const availability = toObject(entry);
+            return {
+                id: coerceId(availability.id),
+                weekday: Number(availability.weekday) || 0,
+                startTime: coerceString(availability.start_time) || "00:00",
+                endTime: coerceString(availability.end_time) || "00:00",
+                effectiveFrom: coerceDate(availability.effective_from),
+                effectiveTo: coerceDate(availability.effective_to)
+            };
+        }),
+        blackouts: blackoutsRaw.map((entry) => {
+            const blackout = toObject(entry);
+            return {
+                id: coerceId(blackout.id),
+                startAt: coerceDate(blackout.start_at) || "",
+                endAt: coerceDate(blackout.end_at) || "",
+                reason: coerceString(blackout.reason)
+            };
+        })
     };
 };
+
+export const mapProviders = (payload: unknown): Provider[] =>
+    Array.isArray(payload)
+        ? payload.map((entry) => mapProvider(entry)).filter((provider): provider is Provider => Boolean(provider))
+        : [];

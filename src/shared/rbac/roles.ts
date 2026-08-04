@@ -10,5 +10,13 @@ export type PermissionKey = typeof PERMISSION_ADMIN_ACCESS | string;
 
 export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
   [ROLE_ADMIN]: [PERMISSION_ADMIN_ACCESS],
-  [ROLE_ADMIN_SUPER]: [PERMISSION_ADMIN_ACCESS]
+  [ROLE_ADMIN_SUPER]: [PERMISSION_ADMIN_ACCESS],
+  "admin.ops": [
+    PERMISSION_ADMIN_ACCESS,
+    "facility:read",
+    "facility:manage",
+    "facility:services.manage",
+    "provider:verify",
+    "booking:manage"
+  ]
 };

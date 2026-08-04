@@ -6,12 +6,21 @@ import { buildFieldParams, providerProfile } from "../../../shared/libs/fieldInc
 type ProviderProfile = {
   id: string;
   user_id: string;
+  facility_id?: string | null;
   verified: boolean;
   is_available: boolean;
   daily_request_limit: number;
   can_emergency: boolean;
+  compensation_mode?: "employee" | "fixed" | "percentage";
+  fixed_payout_cents?: number | null;
+  payout_percentage?: number | null;
   home_lat?: number | null;
   home_lng?: number | null;
+  facility?: {
+    id: string;
+    name?: string | null;
+    provider_financials_visible?: boolean | null;
+  } | null;
 };
 
 type Envelope<T> = {
@@ -37,6 +46,9 @@ export const useProviderProfile = (userId: string | undefined) => {
     }
   });
 };
+
+export const providerFinancialsAreVisible = (profile: ProviderProfile | null | undefined): boolean =>
+  profile?.facility?.provider_financials_visible !== false;
 
 export const useUpdateProviderHomeLocation = (userId: string | undefined) => {
   const queryClient = useQueryClient();
