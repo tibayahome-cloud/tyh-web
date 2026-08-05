@@ -65,7 +65,12 @@ const useServices = (filters: { category?: string; emergency?: boolean }) =>
     queryKey: ["client", "services", filters],
     queryFn: async () => {
       const params: Record<string, string> = {
-        ...buildFieldParams(svcCard)
+        ...buildFieldParams(svcCard),
+        // Only show services a facility can actually deliver right now, not every globally
+        // active catalog definition (e.g. a newly approved service request with no configured
+        // facility offering yet).
+        "filter[active]": "true",
+        "filter[has_active_offering]": "true"
       };
       if (filters.category && filters.category !== "all") {
         params["filter[category_id]"] = filters.category;
