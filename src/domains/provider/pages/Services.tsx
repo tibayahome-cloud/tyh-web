@@ -10,7 +10,6 @@ import { Input } from "../../../shared/components/Input";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { api } from "../../../shared/libs/api";
-import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import { useToast } from "../../../shared/components/ToastProvider";
 
 type Service = {
@@ -27,6 +26,12 @@ type Service = {
   };
 };
 
+type FacilityServiceOffering = {
+  id: string;
+  active: boolean;
+  service: Service | null;
+};
+
 type ProviderService = {
   id: string;
   service_id: string;
@@ -37,13 +42,24 @@ type Envelope<T> = {
   data: T;
 };
 
-const useServiceCatalog = () =>
+export const mapAvailableServices = (offerings: FacilityServiceOffering[]): Service[] =>
+  offerings
+    .filter((offering) => offering.active)
+    .map((offering) => offering.service)
+    .filter((service): service is Service => Boolean(service) && service.active);
+
+// Only the provider's own facility's active offerings are selectable, not the entire global
+// catalog: a service without an active offering at this facility cannot actually be assigned.
+const useServiceCatalog = (userId: string | undefined) =>
   useQuery({
-    queryKey: ["provider", "catalog"],
+    queryKey: ["provider", "available-services", userId],
+    enabled: Boolean(userId),
     queryFn: async () => {
-      const params = buildFieldParams(svcCard);
-      const response = await api.get<Envelope<Service[]>>("/services", { params });
-      return response.data.data.filter((service) => service.active);
+      if (!userId) {
+        return [] as Service[];
+      }
+      const response = await api.get<Envelope<FacilityServiceOffering[]>>(`/providers/${userId}/available-services`);
+      return mapAvailableServices(response.data.data);
     }
   });
 
@@ -67,7 +83,7 @@ const ServicesPage = () => {
   const financialsVisible = providerFinancialsAreVisible(profile);
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { data: catalog, isLoading: loadingCatalog } = useServiceCatalog();
+  const { data: catalog, isLoading: loadingCatalog } = useServiceCatalog(user?.id);
   const { data: membership, isLoading: loadingMembership } = useProviderServices(user?.id);
 
   const [selected, setSelected] = useState<string[]>([]);
@@ -203,6 +219,15 @@ const ServicesPage = () => {
           <p className="text-xs font-semibold text-amber-600">Verification required to change services.</p>
         )}
       </Card>
+
+      {groupedServices.length === 0 && (
+        <Card>
+          <p className="text-sm text-slate-600">
+            Your facility has not activated any services yet. Ask your facility admin to enable a service before you
+            can select it here.
+          </p>
+        </Card>
+      )}
 
       {groupedServices.map((group) => (
         <Card key={group.name} title={group.name} padding="default">
