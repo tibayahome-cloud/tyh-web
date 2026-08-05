@@ -10,6 +10,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOffOutlined";
+import PlaylistAddIcon from "@mui/icons-material/PlaylistAddOutlined";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -32,6 +33,11 @@ import {
   updateFacilityProviderCompensation,
   updateFacilityService
 } from "../../../../shared/libs/facilities";
+import {
+  cancelFacilityServiceRequest,
+  createFacilityServiceRequest,
+  fetchFacilityServiceRequests
+} from "../../../../shared/libs/serviceRequests";
 import type {
   Facility,
   FacilityService,
@@ -47,6 +53,8 @@ import {
 } from "../../../../shared/schemas/facility";
 import type { FacilityOperatingHour, FacilityPhone, Provider } from "../../../../shared/schemas/facility";
 import type { Booking } from "../../../../shared/schemas/booking";
+import type { ServiceRequest, ServiceRequestCreateInput } from "../../../../shared/schemas/serviceRequest";
+import { STATUS_LABELS } from "../../../../shared/schemas/serviceRequest";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 
 type Envelope<T> = {
@@ -68,6 +76,41 @@ type ServiceFormState = {
   estimateDurationMinutes: string;
   active: boolean;
   isEmergencyCapable: boolean;
+};
+
+type ServiceRequestFormState = {
+  proposedName: string;
+  rationale: string;
+  proposedCategoryName: string;
+};
+
+const initialServiceRequestForm: ServiceRequestFormState = {
+  proposedName: "",
+  rationale: "",
+  proposedCategoryName: ""
+};
+
+export const validateServiceRequestForm = (form: ServiceRequestFormState): string | null => {
+  if (!form.proposedName.trim()) {
+    return "Enter the service name you want added.";
+  }
+  if (!form.rationale.trim()) {
+    return "Explain why this service is needed.";
+  }
+  return null;
+};
+
+export const buildServiceRequestInput = (form: ServiceRequestFormState): ServiceRequestCreateInput => ({
+  proposedName: form.proposedName.trim(),
+  rationale: form.rationale.trim(),
+  proposedCategoryName: form.proposedCategoryName.trim() || null
+});
+
+const SERVICE_REQUEST_STATUS_BADGE: Record<ServiceRequest["status"], string> = {
+  pending: "bg-warning-50 text-warning-500",
+  approved: "bg-success-50 text-success-600",
+  rejected: "bg-danger-50 text-danger-600",
+  cancelled: "bg-slate-100 text-slate-600"
 };
 
 type ProviderCompensationFormState = {
@@ -487,6 +530,9 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [serviceForm, setServiceForm] = useState<ServiceFormState>(initialServiceForm);
   const [serviceFormError, setServiceFormError] = useState<string | null>(null);
   const [pendingDisable, setPendingDisable] = useState<FacilityService | null>(null);
+  const [serviceRequestModalOpen, setServiceRequestModalOpen] = useState(false);
+  const [serviceRequestForm, setServiceRequestForm] = useState<ServiceRequestFormState>(initialServiceRequestForm);
+  const [serviceRequestFormError, setServiceRequestFormError] = useState<string | null>(null);
   const [providerSearch, setProviderSearch] = useState("");
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
@@ -522,6 +568,12 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     queryKey: ["admin", "services", "catalog", "active"],
     queryFn: fetchCatalogServices,
     enabled: canManageServices && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
+  });
+
+  const serviceRequestsQuery = useQuery({
+    queryKey: ["admin", "facilities", facilityId, "service-requests"],
+    queryFn: () => fetchFacilityServiceRequests(String(facilityId)),
+    enabled: Boolean(facilityId) && canManageServices && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const providersQuery = useQuery({
@@ -643,6 +695,50 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       setMutationError(extractErrorMessage(error));
     }
   });
+
+  const invalidateServiceRequests = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "service-requests"] });
+  };
+
+  const serviceRequestMutation = useMutation({
+    mutationFn: (input: ServiceRequestCreateInput) => createFacilityServiceRequest(String(facilityId), input),
+    onSuccess: () => {
+      invalidateServiceRequests();
+      setServiceRequestModalOpen(false);
+      setServiceRequestForm(initialServiceRequestForm);
+      setServiceRequestFormError(null);
+    },
+    onError: (error) => {
+      setServiceRequestFormError(extractErrorMessage(error));
+    }
+  });
+
+  const cancelServiceRequestMutation = useMutation({
+    mutationFn: (request: ServiceRequest) => cancelFacilityServiceRequest(String(facilityId), request.id),
+    onSuccess: () => {
+      invalidateServiceRequests();
+      setMutationError(null);
+    },
+    onError: (error) => {
+      setMutationError(extractErrorMessage(error));
+    }
+  });
+
+  const openServiceRequestModal = () => {
+    setServiceRequestForm(initialServiceRequestForm);
+    setServiceRequestFormError(null);
+    setServiceRequestModalOpen(true);
+  };
+
+  const handleSaveServiceRequest = () => {
+    const validationMessage = validateServiceRequestForm(serviceRequestForm);
+    if (validationMessage) {
+      setServiceRequestFormError(validationMessage);
+      return;
+    }
+    setServiceRequestFormError(null);
+    serviceRequestMutation.mutate(buildServiceRequestInput(serviceRequestForm));
+  };
 
   const providerMutation = useMutation({
     mutationFn: async (form: ProviderCompensationFormState) => {
@@ -931,13 +1027,19 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-500">
-            Prices are facility rates shown to clients during service-first discovery.
+            Select an active catalog service to offer at this facility, with your own price and duration.
           </p>
           {canManageServices && (
-            <Button className="w-full sm:w-auto" onClick={() => openServiceModal()}>
-              <AddIcon fontSize="small" />
-              Add service
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button className="w-full sm:w-auto" variant="secondary" onClick={openServiceRequestModal}>
+                <PlaylistAddIcon fontSize="small" />
+                Request a service
+              </Button>
+              <Button className="w-full sm:w-auto" onClick={() => openServiceModal()}>
+                <AddIcon fontSize="small" />
+                Add from catalog
+              </Button>
+            </div>
           )}
         </div>
 
@@ -961,7 +1063,110 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             ))}
           </div>
         )}
+
+        {canManageServices && (
+          <div className="mt-6 border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-900">Service requests</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Requests to add a new service to the platform catalog, reviewed by a super admin.
+            </p>
+            {serviceRequestsQuery.isLoading ? (
+              <Loading />
+            ) : (serviceRequestsQuery.data ?? []).length === 0 ? (
+              <p className="mt-3 text-sm text-slate-600">No service requests yet.</p>
+            ) : (
+              <div className="mt-3 grid gap-2">
+                {(serviceRequestsQuery.data ?? []).map((request) => (
+                  <div
+                    key={request.id}
+                    className="flex flex-col gap-2 rounded-lg border border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{request.proposedName}</p>
+                      <p className="text-xs text-slate-500">{request.rationale}</p>
+                      {request.status !== "pending" && request.decisionNote && (
+                        <p className="mt-1 text-xs text-slate-500">Decision note: {request.decisionNote}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase ${SERVICE_REQUEST_STATUS_BADGE[request.status]}`}
+                      >
+                        {STATUS_LABELS[request.status]}
+                      </span>
+                      {request.status === "pending" && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={cancelServiceRequestMutation.isPending}
+                          onClick={() => cancelServiceRequestMutation.mutate(request)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                      {request.status === "approved" && !request.resultingFacilityServiceId && (
+                        <span className="text-xs text-warning-500">Awaiting configuration</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
+
+      <Modal
+        open={serviceRequestModalOpen}
+        title="Request a new catalog service"
+        onClose={() => setServiceRequestModalOpen(false)}
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Service name"
+            value={serviceRequestForm.proposedName}
+            onChange={(event) =>
+              setServiceRequestForm((current) => ({ ...current, proposedName: event.target.value }))
+            }
+            placeholder="e.g. IV Therapy at Home"
+          />
+          <Input
+            label="Suggested category (optional)"
+            value={serviceRequestForm.proposedCategoryName}
+            onChange={(event) =>
+              setServiceRequestForm((current) => ({ ...current, proposedCategoryName: event.target.value }))
+            }
+            placeholder="e.g. Diagnostics & Monitoring"
+          />
+          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Why is this service needed?</span>
+            <textarea
+              value={serviceRequestForm.rationale}
+              onChange={(event) =>
+                setServiceRequestForm((current) => ({ ...current, rationale: event.target.value }))
+              }
+              rows={3}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+              placeholder="Explain client demand or a gap in current offerings."
+            />
+          </label>
+          {serviceRequestFormError && <p className="text-sm text-danger-600">{serviceRequestFormError}</p>}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setServiceRequestModalOpen(false)}
+              disabled={serviceRequestMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="button" loading={serviceRequestMutation.isPending} onClick={handleSaveServiceRequest}>
+              Submit request
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {showOperationalSections && (
         <>
