@@ -99,7 +99,8 @@ const ServiceDetailPage = () => {
         <div className="space-y-3 text-sm text-slate-600">
           {service.description && <p>{service.description}</p>}
           <p>
-            <strong className="font-semibold text-slate-900">Price:</strong> {formatCurrency(service.base_price_cents)}
+            <strong className="font-semibold text-slate-900">Starting price:</strong> {formatCurrency(service.base_price_cents)}
+            <span className="ml-1 text-xs text-slate-400">(varies by facility)</span>
           </p>
           <p>
             <strong className="font-semibold text-slate-900">Typical duration:</strong> {service.default_estimate_minutes} minutes

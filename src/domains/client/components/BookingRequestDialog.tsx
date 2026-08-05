@@ -767,7 +767,9 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                           {service.description ?? "Professional healthcare"}
                         </p>
                         <div className="mt-2 flex items-center justify-between">
-                          <span className="text-xs font-bold text-tiba-blue">{formatCurrency(service.base_price_cents)}</span>
+                          <span className="text-xs font-bold text-tiba-blue">
+                            From {formatCurrency(service.base_price_cents)}
+                          </span>
                           <span className="text-[10px] text-slate-400">{service.default_estimate_minutes}m</span>
                         </div>
                       </button>

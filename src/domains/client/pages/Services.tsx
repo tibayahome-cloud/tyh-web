@@ -269,7 +269,7 @@ const ServicesPage = () => {
                       <div className="mt-auto pt-3 border-t border-slate-50">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-[8px] font-bold text-slate-300 uppercase">Rate</p>
+                            <p className="text-[8px] font-bold text-slate-300 uppercase">From</p>
                             <p className="text-sm font-bold text-brand-600">{formatCurrency(service.base_price_cents)}</p>
                           </div>
                           <div className="flex gap-2">
