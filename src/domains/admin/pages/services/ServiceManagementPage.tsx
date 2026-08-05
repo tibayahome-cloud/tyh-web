@@ -4,10 +4,12 @@ import { useState } from "react";
 import { ServiceCatalogPanel } from "./CatalogPage";
 import { ServiceListPanel } from "./ServiceListPage";
 import { ServiceLocalizationPanel } from "./LocalizationPage";
+import { ServiceRequestsPanel } from "./RequestsPage";
 
 const tabs = [
   { key: "categories", label: "Categories" },
   { key: "services", label: "Services" },
+  { key: "requests", label: "Requests" },
   { key: "localization", label: "Localization" }
 ] as const;
 
@@ -47,6 +49,7 @@ const ServiceManagementPage = () => {
 
       {activeTab === "categories" && <ServiceCatalogPanel />}
       {activeTab === "services" && <ServiceListPanel />}
+      {activeTab === "requests" && <ServiceRequestsPanel />}
       {activeTab === "localization" && <ServiceLocalizationPanel />}
     </div>
   );
