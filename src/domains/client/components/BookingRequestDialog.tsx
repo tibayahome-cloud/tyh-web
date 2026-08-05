@@ -142,7 +142,13 @@ const useServiceOptions = (enabled: boolean) =>
     queryKey: ["client", "services", "booking-form"],
     queryFn: async () => {
       const response = await api.get<{ data: ServiceOption[] }>("/services", {
-        params: buildFieldParams(svcCard)
+        params: {
+          ...buildFieldParams(svcCard),
+          // Match the client Services browser: only offer services a facility can actually
+          // deliver right now, not every globally active catalog definition.
+          "filter[active]": "true",
+          "filter[has_active_offering]": "true"
+        }
       });
       return response.data.data.filter((service) => service.active ?? true);
     },
