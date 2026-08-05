@@ -166,7 +166,7 @@ export const AdminCreateBookingDialog = ({
     queryKey: ["admin", "users", "search", userSearch],
     queryFn: async () => {
       const res = await api.get<{ data: UserSearchResult[] }>("/users", {
-        params: { "filter[search]": userSearch, "page[size]": 10 }
+        params: { "filter[search]": userSearch, "filter[role]": "client", "page[size]": 10 }
       });
       return res.data.data;
     },
@@ -339,7 +339,10 @@ export const AdminCreateBookingDialog = ({
                           key={user.id}
                           type="button"
                           onClick={() => handleUserSelect(user)}
-                          className="w-full px-4 py-2 text-left hover:bg-slate-50 border-b last:border-b-0"
+                          aria-selected={selectedUser?.id === user.id}
+                          className={selectedUser?.id === user.id
+                            ? "w-full px-4 py-2 text-left bg-blue-50 border-b last:border-b-0"
+                            : "w-full px-4 py-2 text-left hover:bg-slate-50 border-b last:border-b-0"}
                         >
                           <p className="font-medium text-slate-900">{user.full_name}</p>
                           <p className="text-sm text-slate-500">{user.phone || user.email}</p>

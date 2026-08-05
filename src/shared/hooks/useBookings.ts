@@ -35,14 +35,15 @@ export const bookingKeys = {
 
 export const useBookingList = (
   params: BookingListParams,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; refetchInterval?: number | false }
 ) => {
   const normalized = normalizeListParams(params);
   return useQuery({
     queryKey: bookingKeys.list(normalized),
     queryFn: () => fetchBookings(params),
     placeholderData: (previousData) => previousData,
-    enabled: options?.enabled ?? true
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval
   });
 };
 
