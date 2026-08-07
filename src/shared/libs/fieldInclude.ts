@@ -401,7 +401,9 @@ export const bookingCard: FieldPreset = {
     "escalation_at",
     "lat",
     "lng",
-    "meta_data"
+    "meta_data",
+    "is_telemedicine",
+    "scheduled_at"
   ],
   includes: {
     service: {
@@ -417,6 +419,9 @@ export const bookingCard: FieldPreset = {
     },
     provider: {
       fields: ["id", "full_name", "email", "phone", "avatar_url"]
+    },
+    telemedicine_session: {
+      fields: ["id", "room_name", "status", "provider_joined_at", "client_joined_at", "started_at", "ended_at"]
     }
   }
 };
@@ -442,7 +447,9 @@ export const bookingDetail: FieldPreset = {
     "cancel_reason",
     "escalation_at",
     "escalated_at",
-    "meta_data"
+    "meta_data",
+    "is_telemedicine",
+    "scheduled_at"
   ],
   includes: {
     service: {
@@ -471,12 +478,15 @@ export const bookingDetail: FieldPreset = {
       }
     },
     disputes: {
-      fields: ["id", "status", "reason", "resolution", "resolved_at"],
+      fields: ["id", "status", "dispute_type", "reason", "resolution", "resolved_at"],
       children: {
         opened_by: {
           fields: ["id", "full_name"]
         }
       }
+    },
+    telemedicine_session: {
+      fields: ["id", "room_name", "status", "provider_joined_at", "client_joined_at", "started_at", "ended_at"]
     },
     feedback: {
       fields: ["id", "score", "tags", "comment", "rated_at"],

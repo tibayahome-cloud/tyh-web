@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
+import { coerceBoolean, coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
 import { mapUserResource } from "./user";
+import { TelemedicineSessionSummarySchema, mapTelemedicineSessionSummary } from "./telemedicine";
 
 export const BookingPartySchema = z.object({
   id: z.string(),
@@ -84,7 +85,9 @@ export const BookingSchema = z.object({
   service: BookingServiceSummarySchema.nullable(),
   locations: z.array(BookingLocationPointSchema),
   events: z.array(BookingEventSchema),
-  feedback: z.array(z.any()) // Deep feedback schema opt.
+  feedback: z.array(z.any()), // Deep feedback schema opt.
+  isTelemedicine: z.boolean(),
+  telemedicineSession: TelemedicineSessionSummarySchema.nullable()
 });
 
 export type Booking = z.infer<typeof BookingSchema>;
@@ -270,7 +273,9 @@ export const mapBooking = (payload: unknown): Booking | null => {
     events: (Array.isArray(raw.events) ? raw.events : [])
       .map(e => mapBookingEvent(e))
       .filter(Boolean),
-    feedback: Array.isArray(raw.feedback) ? raw.feedback : []
+    feedback: Array.isArray(raw.feedback) ? raw.feedback : [],
+    isTelemedicine: coerceBoolean(raw.is_telemedicine) ?? false,
+    telemedicineSession: mapTelemedicineSessionSummary(raw.telemedicine_session)
   };
 
   const result = BookingSchema.safeParse(normalized);
