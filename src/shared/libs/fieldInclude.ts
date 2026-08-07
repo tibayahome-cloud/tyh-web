@@ -42,7 +42,7 @@ export const buildFieldParams = (preset: FieldPreset) => {
 
 export const userPublic: FieldPreset = {
   resource: "users",
-  fields: ["id", "full_name", "email", "phone", "avatar_url", "meta_data"],
+  fields: ["id", "full_name", "email", "phone", "avatar_url", "meta_data", "country_code"],
   includes: {
     roles: {
       fields: ["id", "key", "name"]

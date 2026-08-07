@@ -184,6 +184,7 @@ export const facilityCreatePayload = (input: FacilityCreateInput): Record<string
   facility_type: input.facilityType,
   address: input.address,
   county: input.county,
+  country_code: input.countryCode,
   phones: phonePayload(input.phones),
   email: input.email,
   lat: input.lat,
@@ -199,6 +200,7 @@ export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string
   if (input.facilityType !== undefined) payload.facility_type = input.facilityType;
   if (input.address !== undefined) payload.address = input.address;
   if (input.county !== undefined) payload.county = input.county;
+  if (input.countryCode !== undefined) payload.country_code = input.countryCode;
   if (input.phones !== undefined) payload.phones = phonePayload(input.phones);
   if (input.email !== undefined) payload.email = input.email;
   if (input.lat !== undefined) payload.lat = input.lat;

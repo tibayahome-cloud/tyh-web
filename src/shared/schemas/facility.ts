@@ -74,6 +74,7 @@ export const FacilitySchema = z.object({
   facilityType: z.enum(FACILITY_TYPES),
   address: z.string(),
   county: z.string(),
+  countryCode: z.string().nullable(),
   email: z.string(),
   status: z.enum(FACILITY_STATUSES),
   lat: z.number().nullable(),
@@ -256,6 +257,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     facilityType,
     address: coerceString(raw.address) ?? "",
     county: coerceString(raw.county) ?? "",
+    countryCode: coerceString(raw.country_code ?? raw.countryCode),
     email: coerceString(raw.email) ?? "",
     status,
     lat: coerceNumber(raw.lat),
@@ -405,6 +407,7 @@ export type FacilityCreateInput = {
   facilityType: FacilityType;
   address: string;
   county: string;
+  countryCode?: string | null;
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
   email: string;
   lat?: number | null;
@@ -419,6 +422,7 @@ export type FacilityUpdateInput = Partial<{
   facilityType: FacilityType;
   address: string;
   county: string;
+  countryCode: string | null;
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
   email: string;
   lat: number | null;
