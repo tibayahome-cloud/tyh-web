@@ -70,7 +70,8 @@ export const svcCard: FieldPreset = {
     "base_price_cents",
     "default_estimate_minutes",
     "is_emergency_capable",
-    "active"
+    "active",
+    "remote_capable"
   ],
   includes: {
     category: {
@@ -130,6 +131,7 @@ export const providerProfile: FieldPreset = {
     "facility_id",
     "verified",
     "is_available",
+    "telemedicine_enabled",
     "daily_request_limit",
     "can_emergency",
     "compensation_mode",
@@ -171,6 +173,7 @@ export const providerDetail: FieldPreset = {
     "verified",
     "verified_at",
     "is_available",
+    "telemedicine_enabled",
     "daily_request_limit",
     "can_emergency",
     "rating_avg",

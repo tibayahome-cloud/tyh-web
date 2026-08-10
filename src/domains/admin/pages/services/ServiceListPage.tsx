@@ -31,6 +31,7 @@ type Service = {
   default_estimate_minutes: number;
   is_emergency_capable: boolean;
   active: boolean;
+  remote_capable: boolean;
   category?: {
     id: string;
     name: string;
@@ -53,7 +54,8 @@ const serviceSchema = z.object({
     .int("Duration must be an integer")
     .min(1, "Duration must be at least 1 minute"),
   is_emergency_capable: z.boolean().default(false),
-  active: z.boolean().default(true)
+  active: z.boolean().default(true),
+  remote_capable: z.boolean().default(false)
 });
 
 type ServiceFormValues = z.infer<typeof serviceSchema>;
@@ -121,7 +123,8 @@ export const ServiceListPanel = () => {
       base_price: 0,
       default_estimate_minutes: 60,
       is_emergency_capable: false,
-      active: true
+      active: true,
+      remote_capable: false
     }
   });
 
@@ -134,7 +137,8 @@ export const ServiceListPanel = () => {
         base_price: editing.base_price_cents / 100,
         default_estimate_minutes: editing.default_estimate_minutes,
         is_emergency_capable: editing.is_emergency_capable,
-        active: Boolean(editing.active)
+        active: Boolean(editing.active),
+        remote_capable: Boolean(editing.remote_capable)
       });
     } else {
       reset({
@@ -144,7 +148,8 @@ export const ServiceListPanel = () => {
         base_price: 0,
         default_estimate_minutes: 60,
         is_emergency_capable: false,
-        active: true
+        active: true,
+        remote_capable: false
       });
     }
   }, [editing, reset]);
@@ -244,6 +249,7 @@ export const ServiceListPanel = () => {
       price: (service.base_price_cents / 100).toLocaleString(undefined, { style: "currency", currency: "KES" }),
       duration: `${service.default_estimate_minutes} min`,
       emergency: service.is_emergency_capable ? "Yes" : "No",
+      remote: service.remote_capable ? "Yes" : "No",
       activeStatus: service.active ? "Active" : "Inactive",
       categoryName: service.category?.name ?? "Unassigned"
     }));
@@ -258,6 +264,7 @@ export const ServiceListPanel = () => {
     { field: "price", headerName: "Base price", minWidth: 140 },
     { field: "duration", headerName: "Duration", minWidth: 130 },
     { field: "emergency", headerName: "Emergency", minWidth: 120 },
+    { field: "remote", headerName: "Remote", minWidth: 110 },
     { field: "activeStatus", headerName: "Status", minWidth: 120 },
     {
       field: "actions",
@@ -446,6 +453,21 @@ export const ServiceListPanel = () => {
                     onChange={(event) => field.onChange(event.target.checked)}
                   />
                   Active service
+                </label>
+              )}
+            />
+            <FormField
+              control={control}
+              name="remote_capable"
+              render={({ field }) => (
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    checked={Boolean(field.value)}
+                    onChange={(event) => field.onChange(event.target.checked)}
+                  />
+                  Remote (telemedicine) capable
                 </label>
               )}
             />
