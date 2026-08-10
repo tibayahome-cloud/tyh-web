@@ -134,6 +134,17 @@ export const joinSession = async (bookingId: string): Promise<TelemedicineSessio
   return join;
 };
 
+// Call only once Jitsi actually reports a successful connection (videoConferenceJoined) --
+// issuing a token above proves authorization, not that the participant ever reached the room.
+export const confirmSessionJoin = async (bookingId: string): Promise<{ sessionId: string; status: string }> => {
+  const response = await api.post(`/telemedicine/bookings/${bookingId}/session/confirm-join`);
+  const data = (response.data?.data ?? {}) as Record<string, unknown>;
+  return {
+    sessionId: typeof data.session_id === "string" ? data.session_id : "",
+    status: typeof data.status === "string" ? data.status : ""
+  };
+};
+
 export const endSession = async (
   bookingId: string
 ): Promise<{ sessionId: string; status: string; endedAt: string | null }> => {

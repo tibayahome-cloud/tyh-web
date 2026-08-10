@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { Button } from "./Button";
 import { Loading } from "./Loading";
 import { useAuth } from "../hooks/useAuth";
-import { useEndSessionMutation, useJoinSessionMutation } from "../hooks/useTelemedicine";
+import { useConfirmSessionJoinMutation, useEndSessionMutation, useJoinSessionMutation } from "../hooks/useTelemedicine";
 
 interface JitsiMeetExternalAPIInstance {
   dispose: () => void;
@@ -67,6 +67,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const joinMutation = useJoinSessionMutation();
+  const confirmJoinMutation = useConfirmSessionJoinMutation();
   const endSessionMutation = useEndSessionMutation();
 
   useEffect(() => {
@@ -94,8 +95,15 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
           endSessionMutation.mutate(bookingId);
           onLeave();
         };
+        // This is the real attendance signal: a token was issued above, but that only proves
+        // authorization, not that the browser actually reached the room (blocked WebRTC, the
+        // Jitsi deployment being down, etc. can all fail silently after the token is minted).
+        const handleJoined = () => {
+          confirmJoinMutation.mutate(bookingId);
+        };
         api.addEventListener("readyToClose", handleLeft);
         api.addEventListener("videoConferenceLeft", handleLeft);
+        api.addEventListener("videoConferenceJoined", handleJoined);
         setLoading(false);
       } catch (err) {
         if (!cancelled) {

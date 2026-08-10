@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   assignProvider,
+  confirmSessionJoin,
   createHold,
   discoverRemoteFacilities,
   endSession,
@@ -114,6 +115,12 @@ export const useInitiateHoldPaymentMutation = () => {
 export const useJoinSessionMutation = () => {
   return useMutation({
     mutationFn: (bookingId: string) => joinSession(bookingId)
+  });
+};
+
+export const useConfirmSessionJoinMutation = () => {
+  return useMutation({
+    mutationFn: (bookingId: string) => confirmSessionJoin(bookingId)
   });
 };
 
