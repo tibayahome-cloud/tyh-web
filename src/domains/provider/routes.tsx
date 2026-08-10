@@ -7,6 +7,7 @@ import { ProviderShell } from "./components/ProviderShell";
 
 const ProviderHome = lazy(() => import("./pages/Home"));
 const ProviderBookings = lazy(() => import("./pages/Bookings"));
+const ProviderTelemedicine = lazy(() => import("./pages/Telemedicine"));
 const ProviderOnboarding = lazy(() => import("./pages/Onboarding"));
 const ProviderServices = lazy(() => import("./pages/Services"));
 const ProviderAvailability = lazy(() => import("./pages/Availability"));
@@ -52,6 +53,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderBookings />
+          </Suspense>
+        )
+      },
+      {
+        path: "telemedicine",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <ProviderTelemedicine />
           </Suspense>
         )
       },

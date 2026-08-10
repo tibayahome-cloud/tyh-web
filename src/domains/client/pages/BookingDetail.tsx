@@ -10,7 +10,8 @@ import {
   ArrowRight,
   Info as InfoIcon,
   Star as StarIcon,
-  RefreshCw
+  RefreshCw,
+  Video
 } from "lucide-react";
 import classNames from "classnames";
 import Drawer from "@mui/material/Drawer";
@@ -21,8 +22,10 @@ import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation }
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
+import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
+import { isWithinJoinWindow } from "../../../shared/utils/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
 
@@ -37,6 +40,7 @@ const BookingDetailPage = () => {
   const rerouteMutation = useRerouteBookingMutation("detail");
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
@@ -286,6 +290,27 @@ const BookingDetailPage = () => {
         </div>
       )}
 
+      {/* Telemedicine join call */}
+      {booking.isTelemedicine && booking.status === "scheduled" && (
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Video consultation</h4>
+          {isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes) ? (
+            <Button
+              type="button"
+              className="w-full h-12 rounded-xl text-xs font-bold"
+              onClick={() => setCallOpen(true)}
+            >
+              <Video className="h-4 w-4" />
+              Join video call
+            </Button>
+          ) : (
+            <p className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500">
+              The call opens 10 minutes before your appointment time.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="pt-4 space-y-3">
         {rerouteEligible && (
@@ -486,6 +511,16 @@ const BookingDetailPage = () => {
           )}
         </Modal>
       </div>
+
+      {callOpen && (
+        <TelemedicineCallPanel
+          bookingId={booking.id}
+          onLeave={() => {
+            setCallOpen(false);
+            detailQuery.refetch();
+          }}
+        />
+      )}
     </AppLayout>
   );
 };

@@ -6,6 +6,7 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailableOutlined";
 import MiscServicesIcon from "@mui/icons-material/DesignServicesOutlined";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorderOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useProviderProfile } from "../hooks/useProviderProfile";
@@ -78,6 +79,7 @@ export const ProviderShell = () => {
   const navItems: NavItem[] = [
     { label: "Home", to: "/pro/home", icon: <HomeIcon /> },
     { label: "Bookings", to: "/pro/bookings", icon: <EventAvailableIcon />, badge: activeBookingCount },
+    { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Services", to: "/pro/services", icon: <MiscServicesIcon /> },
     { label: "Care", to: "/pro/selfcare", icon: <FavoriteBorderIcon /> },
     { label: "Inbox", to: "/pro/inbox", icon: <ForumIcon />, badge: conversationUnread }
