@@ -16,6 +16,7 @@ describe("AdminShell navigation", () => {
       { label: "Facility", to: "/admin/facility", badge: undefined },
       { label: "Providers", to: "/admin/facility/providers", badge: undefined },
       { label: "Queue", to: "/admin/bookings", badge: undefined },
+      { label: "Telemedicine", to: "/admin/telemedicine", badge: undefined },
       { label: "Payments", to: "/admin/finance/payments", badge: undefined },
       { label: "Self Care", to: "/admin/selfcare", badge: undefined },
       { label: "Inbox", to: "/admin/conversations", badge: 4 }
@@ -28,6 +29,7 @@ describe("AdminShell navigation", () => {
     expect(summary).toContainEqual({ label: "Facilities", to: "/admin/facilities", badge: undefined });
     expect(summary).toContainEqual({ label: "Users", to: "/admin/users", badge: undefined });
     expect(summary).toContainEqual({ label: "Settings", to: "/admin/system-settings", badge: undefined });
+    expect(summary).toContainEqual({ label: "Telemedicine", to: "/admin/telemedicine", badge: undefined });
     expect(summary).not.toContainEqual({ label: "Facility", to: "/admin/facility", badge: undefined });
   });
 });

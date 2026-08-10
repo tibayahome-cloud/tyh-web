@@ -26,6 +26,7 @@ const AdminNotificationPreferencesPage = lazy(() => import("./pages/notification
 const BookingMonitoringPage = lazy(() => import("./pages/bookings/MonitoringPage"));
 const AdminBookingDetailPage = lazy(() => import("./pages/bookings/BookingDetailPage"));
 const AdminBookingQueuePage = lazy(() => import("./pages/bookings/QueuePage"));
+const TelemedicineAssignmentQueuePage = lazy(() => import("./pages/telemedicine/AssignmentQueuePage"));
 const AdminConversationsPage = lazy(() => import("./pages/ConversationsPage"));
 const FinanceOverviewPage = lazy(() => import("./pages/finance/OverviewPage"));
 const FinancePaymentsPage = lazy(() => import("./pages/finance/PaymentsPage"));
@@ -55,6 +56,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <AdminBookingQueuePage />
+          </Suspense>
+        )
+      },
+      {
+        path: "telemedicine",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <TelemedicineAssignmentQueuePage />
           </Suspense>
         )
       },
