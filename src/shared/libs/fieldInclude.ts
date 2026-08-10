@@ -425,6 +425,14 @@ export const bookingCard: FieldPreset = {
     },
     telemedicine_session: {
       fields: ["id", "room_name", "status", "provider_joined_at", "client_joined_at", "started_at", "ended_at"]
+    },
+    disputes: {
+      fields: ["id", "status", "dispute_type", "reason", "resolution", "resolved_at"],
+      children: {
+        opened_by: {
+          fields: ["id", "full_name"]
+        }
+      }
     }
   }
 };

@@ -301,6 +301,13 @@ export const submitBookingFeedback = async (
   return feedback;
 };
 
+export const updateDispute = async (
+  disputeId: string,
+  input: { status: "under_review" | "resolved" | "rejected"; resolution?: string }
+): Promise<void> => {
+  await api.patch(`/disputes/${disputeId}`, { status: input.status, resolution: input.resolution });
+};
+
 // ============================================================================
 // BOOKING NOTES API
 // ============================================================================

@@ -7,12 +7,15 @@ import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
 import { Input } from "../../../../shared/components/Input";
 import { useBookingList, useCancelBookingMutation } from "../../../../shared/hooks/useBookings";
+import { updateDispute } from "../../../../shared/libs/bookings";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
 import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
 import { AdminCreateBookingDialog } from "../../components/AdminCreateBookingDialog";
 import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
+import type { BookingDispute } from "../../../../shared/schemas/booking";
 
 const ACTIVE_STATUSES = [
   "requested",
@@ -48,6 +51,9 @@ const AdminBookingQueuePage = () => {
   const [cancelReasonCode, setCancelReasonCode] = useState(ADMIN_CANCELLATION_REASONS[0].value);
   const [cancelNote, setCancelNote] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [reviewDispute, setReviewDispute] = useState<BookingDispute | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<"under_review" | "resolved" | "rejected">("under_review");
+  const [reviewNote, setReviewNote] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const isMobileFilters = useMediaQuery("(max-width: 640px)");
@@ -61,7 +67,15 @@ const AdminBookingQueuePage = () => {
   const [draftFilters, setDraftFilters] = useState(appliedFilters);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const toast = useToast();
+  const queryClient = useQueryClient();
   const cancelMutation = useCancelBookingMutation("detail");
+  const resolveDisputeMutation = useMutation({
+    mutationFn: ({ disputeId, status, resolution }: { disputeId: string; status: typeof reviewStatus; resolution?: string }) =>
+      updateDispute(disputeId, { status, resolution }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings", "list"], exact: false }).catch(() => undefined);
+    }
+  });
 
   const bookingQuery = useBookingList(
     {
@@ -100,6 +114,34 @@ const AdminBookingQueuePage = () => {
     setCancelReasonCode(ADMIN_CANCELLATION_REASONS[0].value);
     setCancelNote("");
     setCancelDialogOpen(true);
+  };
+
+  const openReviewDialog = (dispute: BookingDispute) => {
+    setReviewDispute(dispute);
+    setReviewStatus("under_review");
+    setReviewNote(dispute.resolution ?? "");
+  };
+
+  const handleResolveDispute = async () => {
+    if (!reviewDispute) {
+      return;
+    }
+    try {
+      await resolveDisputeMutation.mutateAsync({
+        disputeId: reviewDispute.id,
+        status: reviewStatus,
+        resolution: reviewNote.trim() || undefined
+      });
+      toast.showToast({ title: "Dispute updated", variant: "success" });
+      setReviewDispute(null);
+      bookingQuery.refetch();
+    } catch (error) {
+      toast.showToast({
+        title: "Unable to update dispute",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "error"
+      });
+    }
   };
 
   const handleCancelConfirm = async () => {
@@ -343,6 +385,25 @@ const AdminBookingQueuePage = () => {
                       {booking.meta?.escalation_at && (
                         <p className="text-xs font-semibold text-rose-600">Escalation pending</p>
                       )}
+                      {tab.key === "disputes" &&
+                        booking.disputes
+                          .filter((dispute) => dispute.status === "open" || dispute.status === "under_review")
+                          .map((dispute) => (
+                            <div key={dispute.id} className="mt-2 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">
+                              <p className="font-semibold uppercase tracking-wide">
+                                {(dispute.disputeType ?? "dispute").replace(/_/g, " ")}
+                              </p>
+                              {dispute.reason && <p className="mt-1">{dispute.reason}</p>}
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="mt-2 px-2 py-1 text-[11px]"
+                                onClick={() => openReviewDialog(dispute)}
+                              >
+                                Review
+                              </Button>
+                            </div>
+                          ))}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span className={booking.facilityStatus === "expired" ? "font-semibold text-rose-600" : "text-slate-600"}>
@@ -427,6 +488,43 @@ const AdminBookingQueuePage = () => {
         onClose={() => setCreateDialogOpen(false)}
         onSuccess={() => bookingQuery.refetch()}
       />
+
+      <ConfirmDialog
+        open={Boolean(reviewDispute)}
+        onClose={() => {
+          if (!resolveDisputeMutation.isPending) {
+            setReviewDispute(null);
+          }
+        }}
+        onConfirm={handleResolveDispute}
+        loading={resolveDisputeMutation.isPending}
+        title="Review dispute"
+        description={reviewDispute?.reason ?? undefined}
+        confirmLabel="Save"
+      >
+        <label className="mt-3 flex flex-col gap-1 text-sm text-slate-700">
+          <span>Outcome</span>
+          <select
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+            value={reviewStatus}
+            onChange={(event) => setReviewStatus(event.target.value as typeof reviewStatus)}
+          >
+            <option value="under_review">Under review</option>
+            <option value="resolved">Resolved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+        <textarea
+          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+          rows={3}
+          value={reviewNote}
+          onChange={(event) => setReviewNote(event.target.value)}
+          placeholder="Resolution notes (visible in the audit trail)"
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          This records a decision only -- refunds and payouts still happen through Payments.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 };
