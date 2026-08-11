@@ -53,6 +53,7 @@ export const FacilityServiceSchema = z.object({
   estimateDurationMinutes: z.number().nullable(),
   active: z.boolean(),
   isEmergencyCapable: z.boolean(),
+  deliveryMode: z.enum(["in_person", "remote", "both"]),
   service: FacilityServiceSummarySchema.nullable()
 });
 
@@ -74,6 +75,7 @@ export const FacilitySchema = z.object({
   facilityType: z.enum(FACILITY_TYPES),
   address: z.string(),
   county: z.string(),
+  countryCode: z.string().nullable(),
   email: z.string(),
   status: z.enum(FACILITY_STATUSES),
   lat: z.number().nullable(),
@@ -205,6 +207,10 @@ export const mapFacilityServiceSummary = (payload: unknown): FacilityServiceSumm
   };
 };
 
+const DELIVERY_MODES = ["in_person", "remote", "both"] as const;
+const isDeliveryMode = (value: string | null): value is (typeof DELIVERY_MODES)[number] =>
+  Boolean(value && DELIVERY_MODES.includes(value as (typeof DELIVERY_MODES)[number]));
+
 export const mapFacilityService = (payload: unknown): FacilityService | null => {
   const raw = toResourceRecord(payload);
   const serviceRaw = raw.service ? toResourceRecord(raw.service) : {};
@@ -213,6 +219,7 @@ export const mapFacilityService = (payload: unknown): FacilityService | null => 
   if (!id || !serviceId) {
     return null;
   }
+  const deliveryModeRaw = coerceString(raw.delivery_mode ?? raw.deliveryMode);
   return {
     id,
     facilityId: coerceId(raw.facility_id ?? raw.facilityId),
@@ -222,6 +229,7 @@ export const mapFacilityService = (payload: unknown): FacilityService | null => 
     estimateDurationMinutes: coerceNumber(raw.estimate_duration_minutes ?? raw.estimateDurationMinutes),
     active: toBoolean(raw.active, true),
     isEmergencyCapable: toBoolean(raw.is_emergency_capable ?? raw.isEmergencyCapable),
+    deliveryMode: isDeliveryMode(deliveryModeRaw) ? deliveryModeRaw : "in_person",
     service: mapFacilityServiceSummary(raw.service ?? { ...serviceRaw, id: serviceId })
   };
 };
@@ -256,6 +264,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     facilityType,
     address: coerceString(raw.address) ?? "",
     county: coerceString(raw.county) ?? "",
+    countryCode: coerceString(raw.country_code ?? raw.countryCode),
     email: coerceString(raw.email) ?? "",
     status,
     lat: coerceNumber(raw.lat),
@@ -405,6 +414,7 @@ export type FacilityCreateInput = {
   facilityType: FacilityType;
   address: string;
   county: string;
+  countryCode?: string | null;
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
   email: string;
   lat?: number | null;
@@ -419,6 +429,7 @@ export type FacilityUpdateInput = Partial<{
   facilityType: FacilityType;
   address: string;
   county: string;
+  countryCode: string | null;
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
   email: string;
   lat: number | null;
@@ -435,6 +446,7 @@ export type FacilityServiceInput = {
   estimateDurationMinutes?: number | null;
   active?: boolean;
   isEmergencyCapable?: boolean;
+  deliveryMode?: "in_person" | "remote" | "both";
 };
 
 export type FacilityBookingAssignmentInput = {

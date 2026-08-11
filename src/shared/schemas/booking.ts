@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
+import { coerceBoolean, coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
 import { mapUserResource } from "./user";
+import { TelemedicineSessionSummarySchema, mapTelemedicineSessionSummary } from "./telemedicine";
 
 export const BookingPartySchema = z.object({
   id: z.string(),
@@ -47,6 +48,18 @@ export const BookingEventSchema = z.object({
 
 export type BookingEvent = z.infer<typeof BookingEventSchema>;
 
+export const BookingDisputeSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  disputeType: z.string().nullable(),
+  reason: z.string().nullable(),
+  resolution: z.string().nullable(),
+  resolvedAt: z.string().nullable(),
+  openedBy: BookingPartySchema.nullable()
+});
+
+export type BookingDispute = z.infer<typeof BookingDisputeSchema>;
+
 export const BookingSchema = z.object({
   id: z.string(),
   status: z.string(),
@@ -84,7 +97,10 @@ export const BookingSchema = z.object({
   service: BookingServiceSummarySchema.nullable(),
   locations: z.array(BookingLocationPointSchema),
   events: z.array(BookingEventSchema),
-  feedback: z.array(z.any()) // Deep feedback schema opt.
+  feedback: z.array(z.any()), // Deep feedback schema opt.
+  disputes: z.array(BookingDisputeSchema),
+  isTelemedicine: z.boolean(),
+  telemedicineSession: TelemedicineSessionSummarySchema.nullable()
 });
 
 export type Booking = z.infer<typeof BookingSchema>;
@@ -222,6 +238,23 @@ export const mapFeedback = (payload: unknown): BookingFeedback | null => {
   };
 };
 
+export const mapBookingDispute = (payload: unknown): BookingDispute | null => {
+  const raw = toObject(payload);
+  const id = coerceId(raw.id);
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    status: coerceString(raw.status) ?? "open",
+    disputeType: coerceString(raw.dispute_type),
+    reason: coerceString(raw.reason),
+    resolution: coerceString(raw.resolution),
+    resolvedAt: coerceDate(raw.resolved_at),
+    openedBy: mapUserParty(raw.opened_by)
+  };
+};
+
 export const mapBooking = (payload: unknown): Booking | null => {
   if (!payload) return null;
   const raw = toObject(payload);
@@ -270,7 +303,12 @@ export const mapBooking = (payload: unknown): Booking | null => {
     events: (Array.isArray(raw.events) ? raw.events : [])
       .map(e => mapBookingEvent(e))
       .filter(Boolean),
-    feedback: Array.isArray(raw.feedback) ? raw.feedback : []
+    feedback: Array.isArray(raw.feedback) ? raw.feedback : [],
+    disputes: (Array.isArray(raw.disputes) ? raw.disputes : [])
+      .map((d) => mapBookingDispute(d))
+      .filter(Boolean),
+    isTelemedicine: coerceBoolean(raw.is_telemedicine) ?? false,
+    telemedicineSession: mapTelemedicineSessionSummary(raw.telemedicine_session)
   };
 
   const result = BookingSchema.safeParse(normalized);
@@ -356,11 +394,3 @@ export interface BookingFeedback {
   } | null;
 }
 
-export interface BookingDispute {
-  id: string;
-  status: string;
-  reason: string | null;
-  resolution: string | null;
-  resolvedAt: string | null;
-  openedBy: BookingParty | null;
-}

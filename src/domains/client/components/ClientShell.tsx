@@ -5,6 +5,7 @@ import MedicalServicesIcon from "@mui/icons-material/MedicalServicesOutlined";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonthOutlined";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorderOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
 import { AppLayout } from "../../../shared/components/AppLayout";
@@ -24,6 +25,7 @@ export const ClientShell = () => {
   const navItems: NavItem[] = [
     { label: "Home", to: "/app/home", icon: <HomeIcon /> },
     { label: "Services", to: "/app/services", icon: <MedicalServicesIcon /> },
+    { label: "Telemedicine", to: "/app/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Care", to: "/app/selfcare", icon: <FavoriteBorderIcon /> },
     { label: "Bookings", to: "/app/bookings", icon: <CalendarMonthIcon /> },
     { label: "Inbox", to: "/app/inbox", icon: <ForumIcon />, badge: conversationUnread }

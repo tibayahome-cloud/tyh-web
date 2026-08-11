@@ -181,14 +181,23 @@ const FacilityProvidersPage = () => {
   });
 
   const lifecycleMutation = useMutation({
-    mutationFn: ({ provider, action }: { provider: Provider; action: "verify" | "activate" | "suspend" | "available" | "unavailable" }) => {
-      const input = action === "verify"
-        ? { verified: true }
-        : action === "activate"
-          ? { status: "active" as const }
-          : action === "suspend"
-            ? { status: "suspended" as const }
-            : { isAvailable: action === "available" };
+    mutationFn: ({
+      provider,
+      action
+    }: {
+      provider: Provider;
+      action: "verify" | "activate" | "suspend" | "available" | "unavailable" | "telemedicine_on" | "telemedicine_off";
+    }) => {
+      const input =
+        action === "verify"
+          ? { verified: true }
+          : action === "activate"
+            ? { status: "active" as const }
+            : action === "suspend"
+              ? { status: "suspended" as const }
+              : action === "telemedicine_on" || action === "telemedicine_off"
+                ? { telemedicineEnabled: action === "telemedicine_on" }
+                : { isAvailable: action === "available" };
       return updateFacilityProviderLifecycle(facilityId as string, provider.userId, input);
     },
     onSuccess: () => invalidateProviders()
@@ -238,10 +247,12 @@ const FacilityProvidersPage = () => {
                 <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.user?.status ?? "pending"}</span>
                 <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.verified ? "Verified" : "Pending verification"}</span>
                 <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.isAvailable ? "Available" : "Unavailable"}</span>
+                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.telemedicineEnabled ? "Telemedicine on" : "Telemedicine off"}</span>
                 {!provider.verified && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
                 {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
                 {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
                 <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
+                <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
                 <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
               </div>
             </div>

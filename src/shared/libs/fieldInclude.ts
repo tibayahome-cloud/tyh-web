@@ -42,7 +42,7 @@ export const buildFieldParams = (preset: FieldPreset) => {
 
 export const userPublic: FieldPreset = {
   resource: "users",
-  fields: ["id", "full_name", "email", "phone", "avatar_url", "meta_data"],
+  fields: ["id", "full_name", "email", "phone", "avatar_url", "meta_data", "country_code"],
   includes: {
     roles: {
       fields: ["id", "key", "name"]
@@ -70,7 +70,8 @@ export const svcCard: FieldPreset = {
     "base_price_cents",
     "default_estimate_minutes",
     "is_emergency_capable",
-    "active"
+    "active",
+    "remote_capable"
   ],
   includes: {
     category: {
@@ -130,6 +131,7 @@ export const providerProfile: FieldPreset = {
     "facility_id",
     "verified",
     "is_available",
+    "telemedicine_enabled",
     "daily_request_limit",
     "can_emergency",
     "compensation_mode",
@@ -171,6 +173,7 @@ export const providerDetail: FieldPreset = {
     "verified",
     "verified_at",
     "is_available",
+    "telemedicine_enabled",
     "daily_request_limit",
     "can_emergency",
     "rating_avg",
@@ -401,7 +404,9 @@ export const bookingCard: FieldPreset = {
     "escalation_at",
     "lat",
     "lng",
-    "meta_data"
+    "meta_data",
+    "is_telemedicine",
+    "scheduled_at"
   ],
   includes: {
     service: {
@@ -417,6 +422,17 @@ export const bookingCard: FieldPreset = {
     },
     provider: {
       fields: ["id", "full_name", "email", "phone", "avatar_url"]
+    },
+    telemedicine_session: {
+      fields: ["id", "room_name", "status", "provider_joined_at", "client_joined_at", "started_at", "ended_at"]
+    },
+    disputes: {
+      fields: ["id", "status", "dispute_type", "reason", "resolution", "resolved_at"],
+      children: {
+        opened_by: {
+          fields: ["id", "full_name"]
+        }
+      }
     }
   }
 };
@@ -442,7 +458,9 @@ export const bookingDetail: FieldPreset = {
     "cancel_reason",
     "escalation_at",
     "escalated_at",
-    "meta_data"
+    "meta_data",
+    "is_telemedicine",
+    "scheduled_at"
   ],
   includes: {
     service: {
@@ -471,12 +489,15 @@ export const bookingDetail: FieldPreset = {
       }
     },
     disputes: {
-      fields: ["id", "status", "reason", "resolution", "resolved_at"],
+      fields: ["id", "status", "dispute_type", "reason", "resolution", "resolved_at"],
       children: {
         opened_by: {
           fields: ["id", "full_name"]
         }
       }
+    },
+    telemedicine_session: {
+      fields: ["id", "room_name", "status", "provider_joined_at", "client_joined_at", "started_at", "ended_at"]
     },
     feedback: {
       fields: ["id", "score", "tags", "comment", "rated_at"],

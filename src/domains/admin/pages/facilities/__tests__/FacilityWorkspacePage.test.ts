@@ -37,7 +37,8 @@ describe("FacilityWorkspacePage helpers", () => {
         price: "1500",
         estimateDurationMinutes: "45",
         active: true,
-        isEmergencyCapable: false
+        isEmergencyCapable: false,
+        deliveryMode: "in_person"
       })
     ).toEqual({
       serviceId: "service-1",
@@ -45,8 +46,20 @@ describe("FacilityWorkspacePage helpers", () => {
       currency: "KES",
       estimateDurationMinutes: 45,
       active: true,
-      isEmergencyCapable: false
+      isEmergencyCapable: false,
+      deliveryMode: "in_person"
     });
+
+    expect(
+      buildFacilityServiceInput({
+        serviceId: "service-1",
+        price: "1500",
+        estimateDurationMinutes: "45",
+        active: true,
+        isEmergencyCapable: false,
+        deliveryMode: "both"
+      })
+    ).toMatchObject({ deliveryMode: "both" });
   });
 
   it("validates facility service form requirements", () => {
@@ -56,7 +69,8 @@ describe("FacilityWorkspacePage helpers", () => {
         price: "1500",
         estimateDurationMinutes: "45",
         active: true,
-        isEmergencyCapable: false
+        isEmergencyCapable: false,
+        deliveryMode: "in_person"
       })
     ).toBe("Select a service.");
 
@@ -66,7 +80,8 @@ describe("FacilityWorkspacePage helpers", () => {
         price: "-1",
         estimateDurationMinutes: "45",
         active: true,
-        isEmergencyCapable: false
+        isEmergencyCapable: false,
+        deliveryMode: "in_person"
       })
     ).toBe("Price must be zero or greater.");
 
@@ -76,7 +91,8 @@ describe("FacilityWorkspacePage helpers", () => {
         price: "1500",
         estimateDurationMinutes: "0",
         active: true,
-        isEmergencyCapable: false
+        isEmergencyCapable: false,
+        deliveryMode: "in_person"
       })
     ).toBe("Duration must be at least 1 minute.");
   });
