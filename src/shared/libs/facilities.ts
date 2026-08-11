@@ -139,6 +139,7 @@ export type FacilityProviderLifecycleInput = {
   status?: "pending" | "active" | "suspended";
   verified?: boolean;
   isAvailable?: boolean;
+  telemedicineEnabled?: boolean;
 };
 
 export type FacilityProviderApplicationReviewInput = {
@@ -184,6 +185,7 @@ export const facilityCreatePayload = (input: FacilityCreateInput): Record<string
   facility_type: input.facilityType,
   address: input.address,
   county: input.county,
+  country_code: input.countryCode,
   phones: phonePayload(input.phones),
   email: input.email,
   lat: input.lat,
@@ -199,6 +201,7 @@ export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string
   if (input.facilityType !== undefined) payload.facility_type = input.facilityType;
   if (input.address !== undefined) payload.address = input.address;
   if (input.county !== undefined) payload.county = input.county;
+  if (input.countryCode !== undefined) payload.country_code = input.countryCode;
   if (input.phones !== undefined) payload.phones = phonePayload(input.phones);
   if (input.email !== undefined) payload.email = input.email;
   if (input.lat !== undefined) payload.lat = input.lat;
@@ -217,7 +220,8 @@ export const facilityServicePayload = (input: FacilityServiceInput): Record<stri
   currency: input.currency ?? "KES",
   estimate_duration_minutes: input.estimateDurationMinutes,
   active: input.active ?? true,
-  is_emergency_capable: input.isEmergencyCapable ?? false
+  is_emergency_capable: input.isEmergencyCapable ?? false,
+  delivery_mode: input.deliveryMode ?? "in_person"
 });
 
 export const facilityServiceUpdatePayload = (input: Partial<FacilityServiceInput>): Record<string, unknown> => {
@@ -228,6 +232,7 @@ export const facilityServiceUpdatePayload = (input: Partial<FacilityServiceInput
   if (input.estimateDurationMinutes !== undefined) payload.estimate_duration_minutes = input.estimateDurationMinutes;
   if (input.active !== undefined) payload.active = input.active;
   if (input.isEmergencyCapable !== undefined) payload.is_emergency_capable = input.isEmergencyCapable;
+  if (input.deliveryMode !== undefined) payload.delivery_mode = input.deliveryMode;
   return payload;
 };
 
@@ -520,7 +525,8 @@ export const updateFacilityProviderLifecycle = async (
     {
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.verified !== undefined ? { verified: input.verified } : {}),
-      ...(input.isAvailable !== undefined ? { is_available: input.isAvailable } : {})
+      ...(input.isAvailable !== undefined ? { is_available: input.isAvailable } : {}),
+      ...(input.telemedicineEnabled !== undefined ? { telemedicine_enabled: input.telemedicineEnabled } : {})
     }
   );
   const provider = mapProvider(payloadData(response.data));

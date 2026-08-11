@@ -19,6 +19,8 @@ describe("api client", () => {
   beforeEach(() => {
     vi.resetModules();
     create.mockClear();
+    client.interceptors.request.use.mockClear();
+    client.interceptors.response.use.mockClear();
   });
 
   it("limits API requests so a stopped backend cannot leave the UI pending forever", async () => {
@@ -31,5 +33,29 @@ describe("api client", () => {
     );
     expect(client.interceptors.request.use).toHaveBeenCalledOnce();
     expect(client.interceptors.response.use).toHaveBeenCalledOnce();
+  });
+
+  it("dispatches a legal consent event when the backend returns 428", async () => {
+    await import("../api");
+    const responseHandler = client.interceptors.response.use.mock.calls[0][1];
+    const listener = vi.fn();
+    window.addEventListener("tiba:legal-consent-required", listener);
+
+    await expect(
+      responseHandler({
+        response: {
+          status: 428,
+          data: {
+            error: {
+              message: "LEGAL_CONSENT_REQUIRED"
+            }
+          }
+        },
+        config: {}
+      })
+    ).rejects.toBeTruthy();
+
+    expect(listener).toHaveBeenCalledOnce();
+    window.removeEventListener("tiba:legal-consent-required", listener);
   });
 });

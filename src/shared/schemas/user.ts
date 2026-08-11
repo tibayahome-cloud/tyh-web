@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { coerceId, coerceString, toObject } from "./helpers";
+import type { LegalConsentSummary } from "./legal";
 
 export interface AuthUser {
     id: string;
@@ -8,9 +9,11 @@ export interface AuthUser {
     email: string | null;
     phone: string | null;
     phoneVerifiedAt: string | null;
+    countryCode: string | null;
     roles: string[];
     permissions: string[];
     meta?: Record<string, unknown> | null;
+    legalConsent?: LegalConsentSummary | null;
     status?: string;
 }
 
@@ -47,6 +50,7 @@ export const mapUserResource = (payload: unknown): AuthUser | null => {
         email: coerceString(raw.email),
         phone: coerceString(raw.phone),
         phoneVerifiedAt: coerceString(raw.phone_verified_at) || coerceString(raw.phoneVerifiedAt) || null,
+        countryCode: coerceString(raw.country_code) || coerceString(raw.countryCode),
         roles: roles.filter(Boolean),
         permissions: Array.isArray(raw.permissions) ? raw.permissions.filter((permission): permission is string => typeof permission === "string") : [],
         meta,

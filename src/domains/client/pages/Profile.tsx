@@ -7,17 +7,25 @@ import { Button } from "../../../shared/components/Button";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useToast } from "../../../shared/components/ToastProvider";
 import api from "../../../shared/libs/api";
+import { SUPPORTED_COUNTRIES } from "../../../shared/constants/region";
 
 type ProfileFormState = {
   fullName: string;
   email: string;
   phone: string;
+  countryCode: string;
 };
 
-const buildInitialForm = (user?: { fullName: string; email: string | null; phone: string | null }): ProfileFormState => ({
+const buildInitialForm = (user?: {
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  countryCode: string | null;
+}): ProfileFormState => ({
   fullName: user?.fullName ?? "",
   email: user?.email ?? "",
-  phone: user?.phone ?? ""
+  phone: user?.phone ?? "",
+  countryCode: user?.countryCode ?? ""
 });
 
 const ClientProfilePage = () => {
@@ -50,7 +58,8 @@ const ClientProfilePage = () => {
       await api.patch(`/users/${user.id}`, {
         full_name: payload.fullName,
         email: payload.email,
-        phone: payload.phone
+        phone: payload.phone,
+        country_code: payload.countryCode || null
       });
     },
     onSuccess: async () => {
@@ -229,6 +238,27 @@ const ClientProfilePage = () => {
                   placeholder="+254 700 000000"
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="country">
+                Country
+              </label>
+              <select
+                id="country"
+                value={formState.countryCode}
+                onChange={(event) => setFormState((prev) => ({ ...prev, countryCode: event.target.value }))}
+                className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
+                <option value="">Select your country</option>
+                {SUPPORTED_COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500">
+                Required to book remote (telemedicine) consultations.
+              </p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <Button type="submit" loading={profileMutation.isPending}>

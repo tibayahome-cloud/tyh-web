@@ -12,6 +12,7 @@ import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplicationsOu
 import ShieldOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import PaymentIcon from "@mui/icons-material/PaymentOutlined";
 import BusinessIcon from "@mui/icons-material/BusinessOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
@@ -37,9 +38,11 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
       { label: "Facility", to: "/admin/facility", icon: <BusinessIcon /> },
       { label: "Providers", to: "/admin/facility/providers", icon: <GroupIcon /> },
       { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
+      { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
       { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
       { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
-      { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread }
+      { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread },
+      { label: "Settings", to: "/admin/settings", icon: <SettingsApplicationsIcon /> }
     ];
   }
 
@@ -48,6 +51,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
     { label: "Users", to: "/admin/users", icon: <GroupIcon /> },
     { label: "Pro Apps", to: "/admin/providers/applications", icon: <AssignmentIcon /> },
     { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
+    { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
     { label: "Services", to: "/admin/services", icon: <ViewListIcon /> },
     { label: "Facilities", to: "/admin/facilities", icon: <BusinessIcon /> },

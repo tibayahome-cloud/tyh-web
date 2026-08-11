@@ -6,6 +6,7 @@ import { Loading } from "../../shared/components/Loading";
 import { ClientShell } from "./components/ClientShell";
 
 const ClientHome = lazy(() => import("./pages/Home"));
+const ClientTelemedicine = lazy(() => import("./pages/Telemedicine"));
 const ClientServices = lazy(() => import("./pages/Services"));
 const ClientServiceDetail = lazy(() => import("./pages/ServiceDetail"));
 const NotificationsPage = lazy(() => import("../../shared/pages/Notifications/NotificationsPage"));
@@ -34,6 +35,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <ClientServices />
+          </Suspense>
+        )
+      },
+      {
+        path: "telemedicine",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <ClientTelemedicine />
           </Suspense>
         )
       },

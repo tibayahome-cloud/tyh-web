@@ -31,12 +31,14 @@ import type { Facility, FacilityCreateInput, FacilityStatus } from "../../../../
 import { FACILITY_TYPES, WEEKDAYS, formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import LocationPickerMap from "../../../../shared/components/LocationPickerMap";
+import { SUPPORTED_COUNTRIES } from "../../../../shared/constants/region";
 
 type CreateFormState = {
   name: string;
   facilityType: FacilityCreateInput["facilityType"];
   address: string;
   county: string;
+  countryCode: string;
   phones: Array<{ phone: string; label: string; isPrimary: boolean }>;
   email: string;
   initialAdminEmail: string;
@@ -63,6 +65,7 @@ const initialFormState: CreateFormState = {
   facilityType: "hospital",
   address: "",
   county: "",
+  countryCode: "",
   phones: [{ phone: "", label: "Reception", isPrimary: true }],
   email: "",
   initialAdminEmail: "",
@@ -117,6 +120,7 @@ export const buildFacilityCreateInput = (form: CreateFormState): FacilityCreateI
   facilityType: form.facilityType,
   address: form.address.trim(),
   county: form.county.trim(),
+  countryCode: form.countryCode || null,
   phones: form.phones.map((phone) => ({ ...phone, phone: phone.phone.trim(), label: phone.label.trim() || null })),
   email: form.email.trim(),
   initialAdminEmail: form.initialAdminEmail.trim(),
@@ -554,6 +558,21 @@ const FacilityManagementPage = () => {
               </select>
             </label>
             <Input label="County" value={form.county} onChange={(event) => updateForm("county", event.target.value)} />
+            <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+              <span>Country</span>
+              <select
+                value={form.countryCode}
+                onChange={(event) => updateForm("countryCode", event.target.value)}
+                className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+              >
+                <option value="">Select country</option>
+                {SUPPORTED_COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Input label="Facility email" type="email" value={form.email} onChange={(event) => updateForm("email", event.target.value)} />
             <div className="md:col-span-2 rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between gap-3">

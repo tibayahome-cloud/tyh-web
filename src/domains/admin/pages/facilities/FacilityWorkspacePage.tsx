@@ -68,6 +68,7 @@ type CatalogService = {
   base_price_cents: number;
   default_estimate_minutes: number;
   active: boolean;
+  remote_capable: boolean;
 };
 
 type ServiceFormState = {
@@ -76,6 +77,7 @@ type ServiceFormState = {
   estimateDurationMinutes: string;
   active: boolean;
   isEmergencyCapable: boolean;
+  deliveryMode: "in_person" | "remote" | "both";
 };
 
 type ServiceRequestFormState = {
@@ -180,7 +182,8 @@ const initialServiceForm: ServiceFormState = {
   price: "",
   estimateDurationMinutes: "60",
   active: true,
-  isEmergencyCapable: false
+  isEmergencyCapable: false,
+  deliveryMode: "in_person"
 };
 
 const initialProviderForm: ProviderCompensationFormState = {
@@ -278,7 +281,8 @@ export const buildFacilityServiceInput = (form: ServiceFormState): FacilityServi
   currency: "KES",
   estimateDurationMinutes: Number(form.estimateDurationMinutes),
   active: form.active,
-  isEmergencyCapable: form.isEmergencyCapable
+  isEmergencyCapable: form.isEmergencyCapable,
+  deliveryMode: form.deliveryMode
 });
 
 export const buildProviderCompensationInput = (
@@ -298,7 +302,8 @@ const mapServiceForm = (service: FacilityService): ServiceFormState => ({
   price: centsToPrice(service.priceCents),
   estimateDurationMinutes: String(service.estimateDurationMinutes ?? 60),
   active: service.active,
-  isEmergencyCapable: service.isEmergencyCapable
+  isEmergencyCapable: service.isEmergencyCapable,
+  deliveryMode: service.deliveryMode
 });
 
 const mapProviderCompensationForm = (provider: Provider): ProviderCompensationFormState => ({
@@ -380,6 +385,11 @@ const ServiceRow = ({
         {service.isEmergencyCapable && (
           <span className="rounded-full bg-warning-50 px-2.5 py-1 text-xs font-semibold text-warning-500">
             Emergency
+          </span>
+        )}
+        {service.deliveryMode !== "in_person" && (
+          <span className="rounded-full bg-tiba-blue/10 px-2.5 py-1 text-xs font-semibold text-tiba-blue">
+            {service.deliveryMode === "both" ? "In-person & remote" : "Remote only"}
           </span>
         )}
       </div>
@@ -621,6 +631,11 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   }, [catalogQuery.data, editingService?.serviceId, facilityServices]);
 
   const activeServiceCount = facilityServices.filter((service) => service.active).length;
+
+  const selectedCatalogServiceIsRemoteCapable = useMemo(() => {
+    const selected = (catalogQuery.data ?? []).find((service) => service.id === serviceForm.serviceId);
+    return Boolean(selected?.remote_capable);
+  }, [catalogQuery.data, serviceForm.serviceId]);
 
   const invalidateWorkspace = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId] });
@@ -1258,6 +1273,9 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                   updateServiceForm("price", centsToPrice(nextService.base_price_cents));
                   updateServiceForm("estimateDurationMinutes", String(nextService.default_estimate_minutes));
                 }
+                if (!nextService?.remote_capable) {
+                  updateServiceForm("deliveryMode", "in_person");
+                }
               }}
               disabled={Boolean(editingService)}
               className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
@@ -1306,6 +1324,28 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
               Emergency capable
             </label>
           </div>
+          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Delivery mode</span>
+            <select
+              value={serviceForm.deliveryMode}
+              onChange={(event) => updateServiceForm("deliveryMode", event.target.value as ServiceFormState["deliveryMode"])}
+              disabled={!selectedCatalogServiceIsRemoteCapable}
+              className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20 disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="in_person">In-person only</option>
+              <option value="remote" disabled={!selectedCatalogServiceIsRemoteCapable}>
+                Remote only
+              </option>
+              <option value="both" disabled={!selectedCatalogServiceIsRemoteCapable}>
+                In-person and remote
+              </option>
+            </select>
+            {!selectedCatalogServiceIsRemoteCapable && (
+              <span className="text-xs text-slate-500">
+                This service isn&apos;t enabled for remote delivery in the global catalog.
+              </span>
+            )}
+          </label>
           {serviceFormError && <p className="text-sm text-danger-600">{serviceFormError}</p>}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={() => setServiceModalOpen(false)} disabled={serviceMutation.isPending}>

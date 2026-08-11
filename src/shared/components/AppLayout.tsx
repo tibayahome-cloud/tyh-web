@@ -15,6 +15,16 @@ interface AppLayoutProps {
   navItems?: NavItem[];
 }
 
+export const resolveSettingsPath = (pathname: string, roles: string[] = []) => {
+  if (pathname.startsWith("/admin")) {
+    const roleSet = new Set(roles);
+    const isFacilityAdmin = roleSet.has("admin.ops") && !roleSet.has("admin.super") && !roleSet.has("admin");
+    return isFacilityAdmin ? "/admin/settings" : "/admin/system-settings";
+  }
+  if (pathname.startsWith("/pro")) return "/pro/settings";
+  return "/app/settings";
+};
+
 export const AppLayout = ({
   fullWidth = false,
   showHeader = true,
@@ -49,6 +59,10 @@ export const AppLayout = ({
     return "/app/settings";
   };
 
+  const getSettingsPath = () => {
+    return resolveSettingsPath(location.pathname, user?.roles ?? []);
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50">
       {/* Sidebar for Desktop */}
@@ -69,6 +83,7 @@ export const AppLayout = ({
             onLogout={handleLogout}
             onNavigateProfile={() => navigate(getProfilePath())}
             onNavigatePayments={() => navigate(getPaymentsPath())}
+            onNavigateSettings={() => navigate(getSettingsPath())}
           />
         )}
 

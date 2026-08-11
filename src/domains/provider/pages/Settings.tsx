@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
+import { LegalDocumentsPanel } from "../../../shared/components/LegalDocumentsPanel";
 import { Loading } from "../../../shared/components/Loading";
 import { useProviderProfile } from "../hooks/useProviderProfile";
 import { useProviderApplication } from "../hooks/useProviderApplication";
@@ -46,6 +47,8 @@ const ProviderSettings = () => {
       </header>
 
       <div className="grid gap-4">
+        <LegalDocumentsPanel />
+
         <Card title="Onboarding">
           <div className="flex flex-wrap items-center gap-3">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
