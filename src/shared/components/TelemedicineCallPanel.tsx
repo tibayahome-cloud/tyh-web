@@ -133,7 +133,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex flex-col bg-slate-950">
+    <div className="fixed left-0 right-0 top-[var(--app-header-height,0px)] bottom-[var(--app-bottom-nav-height,0px)] z-[2000] flex min-h-0 flex-col overflow-hidden bg-slate-950 lg:left-[var(--app-sidebar-width,0px)] lg:bottom-0">
       <div className="flex items-center justify-between bg-slate-900 px-4 py-2 text-white">
         <span className="text-sm font-semibold">Consultation call</span>
         <button
@@ -158,7 +158,11 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
           </Button>
         </div>
       )}
-      <div ref={containerRef} className="flex-1" style={{ display: loading || error ? "none" : "block" }} />
+      <div
+        ref={containerRef}
+        className="min-h-0 flex-1 overflow-hidden"
+        style={{ display: loading || error ? "none" : "block" }}
+      />
     </div>
   );
 };
