@@ -35,6 +35,7 @@ export interface Provider {
     verified: boolean;
     verifiedAt: string | null;
     isAvailable: boolean;
+    telemedicineEnabled: boolean;
     dailyRequestLimit: number;
     canEmergency: boolean;
     ratingAvg: number;
@@ -88,6 +89,7 @@ export const mapProvider = (payload: unknown): Provider | null => {
         verified: Boolean(raw.verified),
         verifiedAt: coerceDate(raw.verified_at),
         isAvailable: Boolean(raw.is_available),
+        telemedicineEnabled: Boolean(raw.telemedicine_enabled),
         dailyRequestLimit: Number(raw.daily_request_limit) || 0,
         canEmergency: Boolean(raw.can_emergency),
         ratingAvg: Number(raw.rating_avg) || 0,

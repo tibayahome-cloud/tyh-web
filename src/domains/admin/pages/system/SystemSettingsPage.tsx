@@ -5,6 +5,7 @@ import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
 import { Input } from "../../../../shared/components/Input";
+import { LegalDocumentsPanel } from "../../../../shared/components/LegalDocumentsPanel";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import {
   fetchBroadcastRadiusSetting,
@@ -64,6 +65,8 @@ export const SystemSettingsPage = () => {
 
   return (
     <div className="space-y-6">
+      <LegalDocumentsPanel />
+
       <Card
         title="Provider broadcast radius"
         description="Control the default radius (in meters) used when matching new bookings to available providers."

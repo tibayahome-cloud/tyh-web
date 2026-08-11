@@ -10,7 +10,8 @@ import {
   ArrowRight,
   Info as InfoIcon,
   Star as StarIcon,
-  RefreshCw
+  RefreshCw,
+  Video
 } from "lucide-react";
 import classNames from "classnames";
 import Drawer from "@mui/material/Drawer";
@@ -18,13 +19,19 @@ import Drawer from "@mui/material/Drawer";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
+import { useReportNoShowMutation } from "../../../shared/hooks/useTelemedicine";
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
+import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
+import { isWithinJoinWindow } from "../../../shared/utils/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
+
+const NOT_REPORTABLE_STATUSES = ["cancelled_by_client", "cancelled_by_admin", "fully_completed"];
 
 const TRACKING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service"];
 
@@ -35,8 +42,12 @@ const BookingDetailPage = () => {
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const cancelMutation = useCancelBookingMutation("detail");
   const rerouteMutation = useRerouteBookingMutation("detail");
+  const reportNoShowMutation = useReportNoShowMutation();
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
+  const [noShowDialogOpen, setNoShowDialogOpen] = useState(false);
+  const [noShowError, setNoShowError] = useState<string | null>(null);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
@@ -122,6 +133,21 @@ const BookingDetailPage = () => {
     }
   };
 
+  const handleReportNoShow = async () => {
+    setNoShowError(null);
+    try {
+      await reportNoShowMutation.mutateAsync(booking.id);
+      setNoShowDialogOpen(false);
+      toast.showToast({
+        title: "Reported",
+        description: "Admin.ops will review this appointment.",
+        variant: "info"
+      });
+    } catch (error) {
+      setNoShowError(error instanceof Error ? error.message : "Please try again.");
+    }
+  };
+
   const handleOpenReroute = () => {
     setSelectedRerouteFacilityId(alternativeFacilities[0]?.id ?? null);
     setRerouteOpen(true);
@@ -143,6 +169,8 @@ const BookingDetailPage = () => {
       });
     }
   };
+
+  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === "telemedicine_no_show");
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
@@ -283,6 +311,43 @@ const BookingDetailPage = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Telemedicine join call */}
+      {booking.isTelemedicine && booking.status === "scheduled" && (
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Video consultation</h4>
+          {isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes) ? (
+            <Button
+              type="button"
+              className="w-full h-12 rounded-xl text-xs font-bold"
+              onClick={() => setCallOpen(true)}
+            >
+              <Video className="h-4 w-4" />
+              Join video call
+            </Button>
+          ) : (
+            <p className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500">
+              The call opens 10 minutes before your appointment time.
+            </p>
+          )}
+          {existingNoShowDispute ? (
+            <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
+              You reported a problem with this appointment. Admin.ops is reviewing it.
+            </p>
+          ) : (
+            !NOT_REPORTABLE_STATUSES.includes(booking.status) && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
+                onClick={() => setNoShowDialogOpen(true)}
+              >
+                Report a problem with this appointment
+              </Button>
+            )
+          )}
         </div>
       )}
 
@@ -485,7 +550,34 @@ const BookingDetailPage = () => {
             </div>
           )}
         </Modal>
+
+        <ConfirmDialog
+          open={noShowDialogOpen}
+          onClose={() => {
+            if (!reportNoShowMutation.isPending) {
+              setNoShowDialogOpen(false);
+              setNoShowError(null);
+            }
+          }}
+          onConfirm={handleReportNoShow}
+          loading={reportNoShowMutation.isPending}
+          title="Report a problem"
+          description="Let admin.ops know if the provider didn't join, or you had a technical issue. This flags the appointment for review -- it doesn't request a refund by itself."
+          confirmLabel="Report"
+          confirmVariant="secondary"
+          error={noShowError ?? undefined}
+        />
       </div>
+
+      {callOpen && (
+        <TelemedicineCallPanel
+          bookingId={booking.id}
+          onLeave={() => {
+            setCallOpen(false);
+            detailQuery.refetch();
+          }}
+        />
+      )}
     </AppLayout>
   );
 };

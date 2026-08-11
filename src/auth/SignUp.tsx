@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
-import { Phone, CheckCircle2, Loader2 } from "lucide-react";
+import { Phone, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
@@ -15,13 +15,16 @@ import type { RegisterSchema } from "../shared/schemas/auth";
 import { registerSchema } from "../shared/schemas/auth";
 import api from "../shared/libs/api";
 import { PHONE_PLACEHOLDER } from "../shared/constants/contact";
+import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
 
 const defaultValues: RegisterSchema = {
   fullName: "",
   email: "",
   phone: "",
   password: "",
-  confirmPassword: ""
+  confirmPassword: "",
+  acceptedTerms: false,
+  acknowledgedPrivacy: false
 };
 
 type Step = "register" | "verify" | "success";
@@ -53,7 +56,8 @@ export const SignUp = () => {
         full_name: values.fullName.trim(),
         email: values.email?.trim() || undefined,
         phone: values.phone?.trim() || undefined,
-        password: values.password
+        password: values.password,
+        legal_documents: currentLegalDocumentPayload()
       });
 
       const meta = response.data?.meta;
@@ -81,7 +85,8 @@ export const SignUp = () => {
       }
     } catch (err) {
       if (err instanceof AxiosError) {
-        const message = (err.response?.data as { message?: string })?.message;
+        const payload = err.response?.data as { error?: { message?: string }; message?: string } | undefined;
+        const message = payload?.error?.message ?? payload?.message;
         setError(message ?? t("auth.signUpError"));
       } else {
         setError(t("auth.signUpError"));
@@ -303,6 +308,49 @@ export const SignUp = () => {
             />
           )}
         />
+
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          {CURRENT_LEGAL_DOCUMENTS.map((document) => {
+            const fieldName = document.type === "terms" ? "acceptedTerms" : "acknowledgedPrivacy";
+            return (
+              <FormField
+                key={document.type}
+                control={control}
+                name={fieldName}
+                render={({ field, fieldState }) => (
+                  <div>
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-5 w-5 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                        checked={Boolean(field.value)}
+                        onChange={(event) => field.onChange(event.target.checked)}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        {document.actionLabel}{" "}
+                        <a
+                          href={document.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-tiba-blue hover:underline"
+                        >
+                          View {document.title} {document.version}
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </span>
+                    </label>
+                    {fieldState.error?.message && (
+                      <p className="mt-1 text-xs font-medium text-red-600">{fieldState.error.message}</p>
+                    )}
+                  </div>
+                )}
+              />
+            );
+          })}
+        </div>
 
         {error && (
           <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
