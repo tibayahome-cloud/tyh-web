@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from "react";
+import type { CSSProperties, PropsWithChildren } from "react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -14,6 +14,35 @@ interface AppLayoutProps {
   disablePadding?: boolean;
   navItems?: NavItem[];
 }
+
+type AppLayoutStyle = CSSProperties & {
+  "--app-sidebar-width"?: string;
+  "--app-sidebar-expanded-width": string;
+  "--app-sidebar-collapsed-width": string;
+  "--app-header-height"?: string;
+  "--app-bottom-nav-height"?: string;
+};
+
+export const resolveSidebarLayoutVars = (
+  hasSidebar: boolean,
+  collapsed: boolean,
+  showHeader = false
+): AppLayoutStyle => {
+  const expandedWidth = "16rem";
+  const collapsedWidth = "5rem";
+  const style: AppLayoutStyle = {
+    "--app-sidebar-expanded-width": expandedWidth,
+    "--app-sidebar-collapsed-width": collapsedWidth
+  };
+  if (hasSidebar) {
+    style["--app-sidebar-width"] = collapsed ? collapsedWidth : expandedWidth;
+    style["--app-bottom-nav-height"] = "72px";
+  }
+  if (showHeader) {
+    style["--app-header-height"] = "4rem";
+  }
+  return style;
+};
 
 export const resolveSettingsPath = (pathname: string, roles: string[] = []) => {
   if (pathname.startsWith("/admin")) {
@@ -46,6 +75,8 @@ export const AppLayout = ({
   };
 
   const containerMaxWidth = fullWidth ? "max-w-7xl" : "max-w-6xl";
+  const hasSidebar = isAuthenticated && navItems.length > 0;
+  const layoutStyle = resolveSidebarLayoutVars(hasSidebar, sidebarCollapsed, showHeader);
 
   const getProfilePath = () => {
     if (location.pathname.startsWith("/admin")) return "/admin/users";
@@ -64,9 +95,9 @@ export const AppLayout = ({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50" style={layoutStyle}>
       {/* Sidebar for Desktop */}
-      {isAuthenticated && navItems.length > 0 && (
+      {hasSidebar && (
         <AppSidebar
           items={navItems}
           collapsed={sidebarCollapsed}
@@ -100,7 +131,7 @@ export const AppLayout = ({
         </div>
 
         {/* Bottom Navigation for Mobile */}
-        {isAuthenticated && navItems.length > 0 && (
+        {hasSidebar && (
           <>
             <div className="h-[72px] lg:hidden" /> {/* Spacer for sticky nav */}
             <AppBottomNav items={navItems} />
