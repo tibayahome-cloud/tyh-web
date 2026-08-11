@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import classNames from "classnames";
-import { ChevronDown, MapPin, Settings2, Sparkles } from "lucide-react";
+import { ChevronDown, FileText, MapPin, Settings2, Sparkles } from "lucide-react";
 
 import { NotificationPreferencesPanel } from "../../../shared/components/NotificationPreferencesPanel";
 import { Button } from "../../../shared/components/Button";
+import { LegalDocumentLinks } from "../../../shared/components/LegalDocumentsPanel";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import api from "../../../shared/libs/api";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -302,6 +303,17 @@ const ClientSettingsPage = () => {
 
   return (
     <div className="space-y-6">
+      <SettingsAccordionSection
+        id="legal"
+        title="Legal documents"
+        description="Review the current Terms of Service and Privacy Policy."
+        icon={<FileText className="h-5 w-5" />}
+        isOpen={Boolean(openSections.legal)}
+        onToggle={toggleSection}
+      >
+        <LegalDocumentLinks />
+      </SettingsAccordionSection>
+
       <SettingsAccordionSection
         id="notifications"
         title="Notification preferences"
