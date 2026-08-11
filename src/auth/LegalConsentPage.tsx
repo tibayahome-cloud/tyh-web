@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, FileText, LogOut, ShieldCheck } from "lucide-react";
+import { FileText, LogOut, Maximize2, ShieldCheck } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
 import { Button } from "../shared/components/Button";
 import { Loading } from "../shared/components/Loading";
+import { Modal } from "../shared/components/Modal";
 import api from "../shared/libs/api";
 import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
 import { useAuth } from "../shared/hooks/useAuth";
 import { legalConsentIsComplete } from "../shared/schemas/legal";
-import type { LegalDocumentType } from "../shared/constants/legal";
+import type { LegalDocumentManifestEntry, LegalDocumentType } from "../shared/constants/legal";
 
 const resolveReturnPath = (state: unknown) => {
   if (!state || typeof state !== "object") {
@@ -50,6 +51,7 @@ export const LegalConsentPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<LegalDocumentManifestEntry | null>(null);
 
   const returnPath = useMemo(() => resolveReturnPath(location.state), [location.state]);
   const missingTypes = useMemo(() => {
@@ -156,15 +158,13 @@ export const LegalConsentPage = () => {
                       </p>
                     </div>
                   </div>
-                  <a
-                    href={document.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-tiba-blue hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDocument(document)}
+                    className="text-sm font-semibold text-tiba-blue hover:underline"
                   >
                     Open PDF
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                  </button>
                 </div>
 
                 <label className="mt-4 flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
@@ -199,6 +199,35 @@ export const LegalConsentPage = () => {
           Continue
         </Button>
       </div>
+
+      <Modal
+        open={Boolean(previewDocument)}
+        onClose={() => setPreviewDocument(null)}
+        title={previewDocument?.title}
+        maxWidth="lg"
+      >
+        {previewDocument && (
+          <div className="space-y-3">
+            <iframe
+              key={previewDocument.url}
+              src={previewDocument.url}
+              title={previewDocument.title}
+              className="h-[70vh] w-full rounded-lg border border-slate-200"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(previewDocument.url, "_blank", "noopener,noreferrer")}
+              >
+                <Maximize2 className="h-4 w-4" />
+                Enlarge
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </AuthLayout>
   );
 };
