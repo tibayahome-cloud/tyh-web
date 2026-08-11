@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { PhoneOff, X } from "lucide-react";
 
 import { Button } from "./Button";
 import { Loading } from "./Loading";
 import { useAuth } from "../hooks/useAuth";
 import { useConfirmSessionJoinMutation, useEndSessionMutation, useJoinSessionMutation } from "../hooks/useTelemedicine";
+import type { TelemedicineSessionJoin } from "../schemas/telemedicine";
 
 interface JitsiMeetExternalAPIInstance {
   dispose: () => void;
@@ -25,7 +26,8 @@ declare global {
 const loadedDomains = new Set<string>();
 
 const loadJitsiScript = (domain: string): Promise<void> => {
-  if (window.JitsiMeetExternalAPI && loadedDomains.has(domain)) {
+  if (window.JitsiMeetExternalAPI) {
+    loadedDomains.add(domain);
     return Promise.resolve();
   }
   return new Promise((resolve, reject) => {
@@ -64,19 +66,35 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<JitsiMeetExternalAPIInstance | null>(null);
+  const hasLeftRef = useRef(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [endError, setEndError] = useState<string | null>(null);
+  const [joinDetails, setJoinDetails] = useState<TelemedicineSessionJoin | null>(null);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   const joinMutation = useJoinSessionMutation();
   const confirmJoinMutation = useConfirmSessionJoinMutation();
   const endSessionMutation = useEndSessionMutation();
 
+  const leaveLocalCall = () => {
+    if (hasLeftRef.current) {
+      return;
+    }
+    hasLeftRef.current = true;
+    apiRef.current?.dispose();
+    apiRef.current = null;
+    onLeave();
+  };
+
   useEffect(() => {
     let cancelled = false;
+    hasLeftRef.current = false;
 
     const setup = async () => {
       try {
         const join = await joinMutation.mutateAsync(bookingId);
         if (cancelled) return;
+        setJoinDetails(join);
         await loadJitsiScript(join.domain);
         if (cancelled || !containerRef.current || !window.JitsiMeetExternalAPI) {
           return;
@@ -88,26 +106,31 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
           width: "100%",
           height: "100%",
           userInfo: { displayName: user?.fullName ?? "Participant" },
-          configOverwrite: { prejoinPageEnabled: false }
+          configOverwrite: { prejoinPageEnabled: false },
+          interfaceConfigOverwrite: {
+            APP_NAME: "Tiba Ya Home",
+            NATIVE_APP_NAME: "Tiba Ya Home",
+            PROVIDER_NAME: "Tiba Ya Home",
+            SHOW_BRAND_WATERMARK: false,
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_POWERED_BY: false,
+            SHOW_WATERMARK_FOR_GUESTS: false
+          }
         });
         apiRef.current = api;
-        const handleLeft = () => {
-          endSessionMutation.mutate(bookingId);
-          onLeave();
-        };
         // This is the real attendance signal: a token was issued above, but that only proves
         // authorization, not that the browser actually reached the room (blocked WebRTC, the
         // Jitsi deployment being down, etc. can all fail silently after the token is minted).
         const handleJoined = () => {
           confirmJoinMutation.mutate(bookingId);
         };
-        api.addEventListener("readyToClose", handleLeft);
-        api.addEventListener("videoConferenceLeft", handleLeft);
+        api.addEventListener("readyToClose", leaveLocalCall);
+        api.addEventListener("videoConferenceLeft", leaveLocalCall);
         api.addEventListener("videoConferenceJoined", handleJoined);
         setLoading(false);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to join the call.");
+          setConnectionError(err instanceof Error ? err.message : "Unable to join the call.");
           setLoading(false);
         }
       }
@@ -126,33 +149,59 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   }, [bookingId]);
 
   const handleManualLeave = () => {
-    apiRef.current?.dispose();
-    apiRef.current = null;
-    endSessionMutation.mutate(bookingId);
-    onLeave();
+    leaveLocalCall();
   };
+
+  const handleEndConsultation = async () => {
+    setEndError(null);
+    setIsEndingSession(true);
+    try {
+      await endSessionMutation.mutateAsync(bookingId);
+      leaveLocalCall();
+    } catch (err) {
+      setEndError(err instanceof Error ? err.message : "Unable to end the consultation.");
+      setIsEndingSession(false);
+    }
+  };
+  const canEndConsultation = joinDetails?.role === "provider";
 
   return (
     <div className="fixed left-0 right-0 top-[var(--app-header-height,0px)] bottom-[var(--app-bottom-nav-height,0px)] z-[2000] flex min-h-0 flex-col overflow-hidden bg-slate-950 lg:left-[var(--app-sidebar-width,0px)] lg:bottom-0">
       <div className="flex items-center justify-between bg-slate-900 px-4 py-2 text-white">
         <span className="text-sm font-semibold">Consultation call</span>
-        <button
-          type="button"
-          onClick={handleManualLeave}
-          className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
-        >
-          <X size={14} />
-          Leave
-        </button>
+        <div className="flex items-center gap-2">
+          {canEndConsultation && (
+            <button
+              type="button"
+              onClick={handleEndConsultation}
+              disabled={isEndingSession}
+              title="End consultation for both participants"
+              className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <PhoneOff size={14} />
+              {isEndingSession ? "Ending..." : "End consultation"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleManualLeave}
+            title="Leave this call screen"
+            className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
+          >
+            <X size={14} />
+            Leave
+          </button>
+        </div>
       </div>
+      {endError && <div className="bg-red-950 px-4 py-2 text-sm font-medium text-red-100">{endError}</div>}
       {loading && (
         <div className="flex flex-1 items-center justify-center text-white">
           <Loading label="Connecting to your consultation…" />
         </div>
       )}
-      {error && (
+      {connectionError && (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-white">
-          <p className="text-sm">{error}</p>
+          <p className="text-sm">{connectionError}</p>
           <Button type="button" variant="secondary" onClick={onLeave}>
             Close
           </Button>
@@ -161,7 +210,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
       <div
         ref={containerRef}
         className="min-h-0 flex-1 overflow-hidden"
-        style={{ display: loading || error ? "none" : "block" }}
+        style={{ display: loading || connectionError ? "none" : "block" }}
       />
     </div>
   );
