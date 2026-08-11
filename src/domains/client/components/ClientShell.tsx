@@ -6,6 +6,7 @@ import ForumIcon from "@mui/icons-material/ForumOutlined";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonthOutlined";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorderOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
 import { AppLayout } from "../../../shared/components/AppLayout";
@@ -28,7 +29,8 @@ export const ClientShell = () => {
     { label: "Telemedicine", to: "/app/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Care", to: "/app/selfcare", icon: <FavoriteBorderIcon /> },
     { label: "Bookings", to: "/app/bookings", icon: <CalendarMonthIcon /> },
-    { label: "Inbox", to: "/app/inbox", icon: <ForumIcon />, badge: conversationUnread }
+    { label: "Inbox", to: "/app/inbox", icon: <ForumIcon />, badge: conversationUnread },
+    { label: "Settings", to: "/app/settings", icon: <SettingsIcon /> }
   ];
 
   return (

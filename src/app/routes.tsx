@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 
 import { LogoutGate } from "../auth/LogoutGate";
+import { LegalConsentGate } from "../auth/LegalConsentGate";
 import { PhoneVerificationGate } from "../auth/PhoneVerificationGate";
 import { RequirePerm, RequireRole } from "../shared/rbac/Can";
 import { Loading } from "../shared/components/Loading";
@@ -51,6 +52,7 @@ const TwoFactorPage = lazyWithRetry(() => import("../auth/TwoFactorPage"));
 const ForgotPasswordPage = lazyWithRetry(() => import("../auth/ForgotPassword"));
 const SignUpPage = lazyWithRetry(() => import("../auth/SignUp"));
 const ResetPasswordPage = lazyWithRetry(() => import("../auth/ResetPassword"));
+const LegalConsentPage = lazyWithRetry(() => import("../auth/LegalConsentPage"));
 
 const SuspenseWrapper = ({ children }: { children: JSX.Element }) => (
   <Suspense fallback={<Loading fullHeight />}>{children}</Suspense>
@@ -129,6 +131,16 @@ export const router = createBrowserRouter(
               <ResetPasswordPage />
             </SuspenseWrapper>
           )
+        },
+        {
+          path: "legal/consent",
+          element: (
+            <LogoutGate redirectTo="/login">
+              <SuspenseWrapper>
+                <LegalConsentPage />
+              </SuspenseWrapper>
+            </LogoutGate>
+          )
         }
       ]
     },
@@ -136,13 +148,15 @@ export const router = createBrowserRouter(
       path: "/app/*",
       element: (
         <LogoutGate redirectTo="/login">
-          <PhoneVerificationGate>
-            <RequireRole role={ROLE_CLIENT}>
-              <SuspenseWrapper>
-                <ClientRoutes />
-              </SuspenseWrapper>
-            </RequireRole>
-          </PhoneVerificationGate>
+          <LegalConsentGate>
+            <PhoneVerificationGate>
+              <RequireRole role={ROLE_CLIENT}>
+                <SuspenseWrapper>
+                  <ClientRoutes />
+                </SuspenseWrapper>
+              </RequireRole>
+            </PhoneVerificationGate>
+          </LegalConsentGate>
         </LogoutGate>
       )
     },
@@ -150,13 +164,15 @@ export const router = createBrowserRouter(
       path: "/pro/*",
       element: (
         <LogoutGate redirectTo="/login">
-          <PhoneVerificationGate>
-            <RequireRole role={ROLE_PROVIDER}>
-              <SuspenseWrapper>
-                <ProviderRoutes />
-              </SuspenseWrapper>
-            </RequireRole>
-          </PhoneVerificationGate>
+          <LegalConsentGate>
+            <PhoneVerificationGate>
+              <RequireRole role={ROLE_PROVIDER}>
+                <SuspenseWrapper>
+                  <ProviderRoutes />
+                </SuspenseWrapper>
+              </RequireRole>
+            </PhoneVerificationGate>
+          </LegalConsentGate>
         </LogoutGate>
       )
     },
@@ -164,11 +180,13 @@ export const router = createBrowserRouter(
       path: "/admin/*",
       element: (
         <LogoutGate redirectTo="/admin/login">
-          <RequirePerm perm={PERMISSION_ADMIN_ACCESS}>
-            <SuspenseWrapper>
-              <AdminRoutes />
-            </SuspenseWrapper>
-          </RequirePerm>
+          <LegalConsentGate>
+            <RequirePerm perm={PERMISSION_ADMIN_ACCESS}>
+              <SuspenseWrapper>
+                <AdminRoutes />
+              </SuspenseWrapper>
+            </RequirePerm>
+          </LegalConsentGate>
         </LogoutGate>
       )
     },

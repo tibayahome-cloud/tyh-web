@@ -41,7 +41,8 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
       { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
       { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
       { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
-      { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread }
+      { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread },
+      { label: "Settings", to: "/admin/settings", icon: <SettingsApplicationsIcon /> }
     ];
   }
 

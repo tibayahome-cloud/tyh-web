@@ -19,7 +19,8 @@ describe("AdminShell navigation", () => {
       { label: "Telemedicine", to: "/admin/telemedicine", badge: undefined },
       { label: "Payments", to: "/admin/finance/payments", badge: undefined },
       { label: "Self Care", to: "/admin/selfcare", badge: undefined },
-      { label: "Inbox", to: "/admin/conversations", badge: 4 }
+      { label: "Inbox", to: "/admin/conversations", badge: 4 },
+      { label: "Settings", to: "/admin/settings", badge: undefined }
     ]);
   });
 
