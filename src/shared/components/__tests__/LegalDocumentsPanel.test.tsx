@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -7,18 +8,28 @@ import { LegalDocumentLinks } from "../LegalDocumentsPanel";
 const renderWithRouter = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("LegalDocumentLinks", () => {
-  it("renders current Terms and Privacy document links", () => {
+  it("renders current Terms and Privacy documents with a view action, not a raw PDF link", () => {
     renderWithRouter(<LegalDocumentLinks />);
 
     expect(screen.getByText("Terms of Service")).toBeInTheDocument();
     expect(screen.getByText("Privacy Policy")).toBeInTheDocument();
-    const viewLinks = screen.getAllByRole("link", { name: /View document/i });
-    expect(viewLinks.map((link) => link.getAttribute("href"))).toEqual([
-      "/legal/terms-of-service-v1.0.pdf",
-      "/legal/privacy-policy-v1.0.pdf"
-    ]);
+    expect(screen.getAllByRole("button", { name: /View document/i })).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: /View document/i })).not.toBeInTheDocument();
     expect(screen.getAllByText(/v1.0 effective 2026-08-11/i)).toHaveLength(2);
     expect(screen.getAllByText("Status unavailable")).toHaveLength(2);
+  });
+
+  it("opens a document in an in-page preview instead of navigating away", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<LegalDocumentLinks />);
+
+    expect(screen.queryByTitle("Terms of Service")).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: /View document/i })[0]);
+
+    const preview = await screen.findByTitle("Terms of Service");
+    expect(preview.tagName).toBe("IFRAME");
+    expect(preview).toHaveAttribute("src", "/legal/terms-of-service-v1.0.pdf");
   });
 
   it("renders accepted legal document status from the consent summary", () => {

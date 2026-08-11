@@ -1,10 +1,13 @@
-import { AlertCircle, CheckCircle2, ExternalLink, FileText } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText } from "lucide-react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { CURRENT_LEGAL_DOCUMENTS } from "../constants/legal";
+import type { LegalDocumentManifestEntry } from "../constants/legal";
 import { useAuth } from "../hooks/useAuth";
 import type { LegalConsentDocument } from "../schemas/legal";
 import { Card } from "./Card";
+import { Modal } from "./Modal";
 
 type LegalDocumentLinksProps = {
   className?: string;
@@ -35,9 +38,26 @@ export const LegalDocumentLinks = ({
   consentDocuments
 }: LegalDocumentLinksProps) => {
   const location = useLocation();
+  const [previewDocument, setPreviewDocument] = useState<LegalDocumentManifestEntry | null>(null);
 
   return (
     <div className={`space-y-3 ${className}`}>
+      <Modal
+        open={Boolean(previewDocument)}
+        onClose={() => setPreviewDocument(null)}
+        title={previewDocument?.title}
+        maxWidth="lg"
+      >
+        {previewDocument && (
+          <iframe
+            key={previewDocument.url}
+            src={previewDocument.url}
+            title={previewDocument.title}
+            className="h-[70vh] w-full rounded-lg border border-slate-200"
+          />
+        )}
+      </Modal>
+
       {CURRENT_LEGAL_DOCUMENTS.map((document) => {
         const consent = consentDocuments?.find(
           (item) => item.type === document.type && item.version === document.version
@@ -91,15 +111,13 @@ export const LegalDocumentLinks = ({
                     Review &amp; accept
                   </Link>
                 )}
-                <a
-                  href={document.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-tiba-blue"
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocument(document)}
+                  className="text-sm font-semibold text-slate-500 hover:text-tiba-blue"
                 >
                   View document
-                  <ExternalLink className="h-4 w-4" />
-                </a>
+                </button>
               </span>
             </span>
           </div>
