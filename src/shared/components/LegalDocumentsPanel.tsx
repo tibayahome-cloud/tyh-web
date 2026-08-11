@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, FileText } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { CURRENT_LEGAL_DOCUMENTS } from "../constants/legal";
 import type { LegalDocumentManifestEntry } from "../constants/legal";
 import { useAuth } from "../hooks/useAuth";
 import type { LegalConsentDocument } from "../schemas/legal";
+import { Button } from "./Button";
 import { Card } from "./Card";
 import { Modal } from "./Modal";
 
@@ -49,12 +50,25 @@ export const LegalDocumentLinks = ({
         maxWidth="lg"
       >
         {previewDocument && (
-          <iframe
-            key={previewDocument.url}
-            src={previewDocument.url}
-            title={previewDocument.title}
-            className="h-[70vh] w-full rounded-lg border border-slate-200"
-          />
+          <div className="space-y-3">
+            <iframe
+              key={previewDocument.url}
+              src={previewDocument.url}
+              title={previewDocument.title}
+              className="h-[70vh] w-full rounded-lg border border-slate-200"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(previewDocument.url, "_blank", "noopener,noreferrer")}
+              >
+                <Maximize2 className="h-4 w-4" />
+                Enlarge
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 

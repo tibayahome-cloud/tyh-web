@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, LogOut, ShieldCheck } from "lucide-react";
+import { FileText, LogOut, Maximize2, ShieldCheck } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 
@@ -207,12 +207,25 @@ export const LegalConsentPage = () => {
         maxWidth="lg"
       >
         {previewDocument && (
-          <iframe
-            key={previewDocument.url}
-            src={previewDocument.url}
-            title={previewDocument.title}
-            className="h-[70vh] w-full rounded-lg border border-slate-200"
-          />
+          <div className="space-y-3">
+            <iframe
+              key={previewDocument.url}
+              src={previewDocument.url}
+              title={previewDocument.title}
+              className="h-[70vh] w-full rounded-lg border border-slate-200"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(previewDocument.url, "_blank", "noopener,noreferrer")}
+              >
+                <Maximize2 className="h-4 w-4" />
+                Enlarge
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
     </AuthLayout>

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { LegalDocumentLinks } from "../LegalDocumentsPanel";
 
@@ -30,6 +30,20 @@ describe("LegalDocumentLinks", () => {
     const preview = await screen.findByTitle("Terms of Service");
     expect(preview.tagName).toBe("IFRAME");
     expect(preview).toHaveAttribute("src", "/legal/terms-of-service-v1.0.pdf");
+  });
+
+  it("enlarges a previewed document into a new tab without closing the preview", async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderWithRouter(<LegalDocumentLinks />);
+
+    await user.click(screen.getAllByRole("button", { name: /View document/i })[0]);
+    await screen.findByTitle("Terms of Service");
+
+    await user.click(screen.getByRole("button", { name: /Enlarge/i }));
+
+    expect(openSpy).toHaveBeenCalledWith("/legal/terms-of-service-v1.0.pdf", "_blank", "noopener,noreferrer");
+    openSpy.mockRestore();
   });
 
   it("renders accepted legal document status from the consent summary", () => {
