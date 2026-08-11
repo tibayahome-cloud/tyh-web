@@ -311,7 +311,10 @@ const ClientSettingsPage = () => {
         isOpen={Boolean(openSections.legal)}
         onToggle={toggleSection}
       >
-        <LegalDocumentLinks />
+        <LegalDocumentLinks
+          acceptedBy={user?.fullName}
+          consentDocuments={user?.legalConsent?.documents ?? null}
+        />
       </SettingsAccordionSection>
 
       <SettingsAccordionSection

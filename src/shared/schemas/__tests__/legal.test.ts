@@ -22,7 +22,12 @@ describe("legal consent contracts", () => {
       required: true,
       complete: false,
       documents: [
-        { type: "terms", version: "v1.0", accepted: true },
+        {
+          type: "terms",
+          version: "v1.0",
+          accepted: true,
+          accepted_at: "2026-08-11T10:00:00+00:00"
+        },
         { type: "privacy", version: "v1.0", accepted: false }
       ]
     });
@@ -30,6 +35,11 @@ describe("legal consent contracts", () => {
     expect(summary?.required).toBe(true);
     expect(summary?.complete).toBe(false);
     expect(summary?.documents).toHaveLength(2);
+    expect(summary?.documents[0]).toMatchObject({
+      type: "terms",
+      accepted: true,
+      accepted_at: "2026-08-11T10:00:00+00:00"
+    });
     expect(summary?.documents[1]).toMatchObject({ type: "privacy", accepted: false });
   });
 });

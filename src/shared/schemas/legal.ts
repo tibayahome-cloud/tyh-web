@@ -7,6 +7,7 @@ export type LegalConsentDocument = {
   public_url?: string;
   content_sha256?: string;
   accepted: boolean;
+  accepted_at?: string | null;
 };
 
 export type LegalConsentSummary = {
@@ -40,7 +41,8 @@ export const mapLegalConsentSummary = (input: unknown): LegalConsentSummary | nu
         effective_at: typeof raw.effective_at === "string" ? raw.effective_at : undefined,
         public_url: typeof raw.public_url === "string" ? raw.public_url : undefined,
         content_sha256: typeof raw.content_sha256 === "string" ? raw.content_sha256 : undefined,
-        accepted: Boolean(raw.accepted)
+        accepted: Boolean(raw.accepted),
+        accepted_at: typeof raw.accepted_at === "string" ? raw.accepted_at : null
       };
     })
     .filter((item): item is LegalConsentDocument => item !== null);
