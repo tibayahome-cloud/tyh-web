@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { coerceId, coerceString, toObject } from "./helpers";
+import type { LegalConsentSummary } from "./legal";
 
 export interface AuthUser {
     id: string;
@@ -12,6 +13,7 @@ export interface AuthUser {
     roles: string[];
     permissions: string[];
     meta?: Record<string, unknown> | null;
+    legalConsent?: LegalConsentSummary | null;
     status?: string;
 }
 

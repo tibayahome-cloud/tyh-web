@@ -45,6 +45,17 @@ const isAuthEndpoint = (url?: string | null) => {
   return AUTH_ENDPOINTS.some((endpoint) => url.includes(endpoint));
 };
 
+const isLegalConsentRequired = (payload: unknown) => {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+  const error = (payload as { error?: unknown }).error;
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  return (error as { message?: unknown }).message === "LEGAL_CONSENT_REQUIRED";
+};
+
 api.interceptors.request.use((config) => {
   const token = handlers.getAccessToken();
   if (token) {
@@ -59,6 +70,10 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const { response, config } = error;
     const retryConfig = config as RetryConfig | undefined;
+
+    if (response?.status === 428 && isLegalConsentRequired(response.data) && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tiba:legal-consent-required"));
+    }
 
     if (
       response?.status === 401 &&

@@ -10,6 +10,7 @@ import { Input } from "../../../shared/components/Input";
 import { FormField } from "../../../shared/components/FormField";
 import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
+import { currentLegalDocumentPayload } from "../../../shared/constants/legal";
 
 type GuestBookingDialogProps = {
   open: boolean;
@@ -81,6 +82,7 @@ export const GuestBookingDialog = ({
         address_text: values.addressText,
         lat: values.lat,
         lng: values.lng,
+        legal_documents: currentLegalDocumentPayload(),
       });
       return response.data;
     },

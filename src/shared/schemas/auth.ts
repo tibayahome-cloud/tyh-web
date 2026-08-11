@@ -35,7 +35,9 @@ export const registerSchema = z
     email: optionalEmail,
     phone: optionalPhone,
     password: z.string().min(10, "Password must be at least 10 characters"),
-    confirmPassword: z.string().min(10, "Confirm your password")
+    confirmPassword: z.string().min(10, "Confirm your password"),
+    acceptedTerms: z.boolean(),
+    acknowledgedPrivacy: z.boolean()
   })
   .superRefine((data, ctx) => {
     if (!data.email && !data.phone) {
@@ -51,6 +53,22 @@ export const registerSchema = z
         code: z.ZodIssueCode.custom,
         path: ["confirmPassword"],
         message: "Passwords must match"
+      });
+    }
+
+    if (!data.acceptedTerms) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["acceptedTerms"],
+        message: "You must agree to the Terms of Service"
+      });
+    }
+
+    if (!data.acknowledgedPrivacy) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["acknowledgedPrivacy"],
+        message: "You must acknowledge the Privacy Policy"
       });
     }
   });

@@ -17,6 +17,8 @@ import api, { configureApiAuth } from "../libs/api";
 import { buildFieldParams, userPublic } from "../libs/fieldInclude";
 import type { AuthUser} from "../schemas/user";
 import { mapUserResource } from "../schemas/user";
+import { mapLegalConsentSummary } from "../schemas/legal";
+import type { LegalConsentSummary } from "../schemas/legal";
 
 const STORAGE_KEY = "tiba.auth.tokens";
 const USER_STORAGE_KEY = "tiba.auth.user";
@@ -149,7 +151,12 @@ const readStoredUser = (): AuthUser | null => {
       phoneVerifiedAt: parsed.phoneVerifiedAt ?? null,
       roles,
       permissions,
-      meta: metaValue
+      meta: metaValue,
+      countryCode: typeof parsed.countryCode === "string" ? parsed.countryCode : null,
+      legalConsent:
+        parsed.legalConsent && typeof parsed.legalConsent === "object"
+          ? (parsed.legalConsent as LegalConsentSummary)
+          : null
     };
   } catch {
     return null;
@@ -175,7 +182,9 @@ const writeStoredUser = (user: AuthUser | null) => {
       permissions: user.permissions,
       phone: user.phone,
       phoneVerifiedAt: user.phoneVerifiedAt,
-      meta: user.meta
+      countryCode: user.countryCode,
+      meta: user.meta,
+      legalConsent: user.legalConsent ?? null
     })
   );
 };
@@ -185,6 +194,14 @@ const extractData = <T,>(payload: unknown): T => {
     return (payload as { data: T }).data;
   }
   return payload as T;
+};
+
+const extractMeta = (payload: unknown): Record<string, unknown> | null => {
+  if (payload && typeof payload === "object" && "meta" in (payload as Record<string, unknown>)) {
+    const meta = (payload as { meta?: unknown }).meta;
+    return meta && typeof meta === "object" && !Array.isArray(meta) ? (meta as Record<string, unknown>) : null;
+  }
+  return null;
 };
 
 const extractTokens = (payload: unknown): { accessToken: Nullable<string>; refreshToken: Nullable<string> } => {
@@ -496,8 +513,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         params: buildFieldParams(userPublic)
       });
 
+      const meta = extractMeta(response.data);
       const payload = extractData<unknown>(response.data);
       const normalized = mapUserResource(payload);
+      if (normalized) {
+        normalized.legalConsent = mapLegalConsentSummary(meta?.legal_consent);
+      }
       setUserState(normalized);
       queryClient.setQueryData(["me"], normalized);
       setSessionExpired(false);
