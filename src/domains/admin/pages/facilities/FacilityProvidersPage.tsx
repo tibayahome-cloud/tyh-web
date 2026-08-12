@@ -8,6 +8,7 @@ import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
+import { getApiError } from "../../../../shared/utils/errors";
 import {
   createFacilityProvider,
   fetchFacilities,
@@ -227,7 +228,11 @@ const FacilityProvidersPage = () => {
       {(showForm || editingProvider) && (
         <Card title={editingProvider ? "Edit provider" : "Add provider"} subtitle={editingProvider ? "Changes apply only to this facility provider." : "The provider will receive an invitation when an email is supplied."}>
           <ProviderFormFields form={form} services={services} onChange={setForm} />
-          {(createMutation.error || updateMutation.error) && <p className="mt-4 text-sm text-danger-600">{(createMutation.error || updateMutation.error) instanceof Error ? (createMutation.error || updateMutation.error)?.message : "Request failed"}</p>}
+          {(createMutation.error || updateMutation.error) && (
+            <p className="mt-4 text-sm text-danger-600">
+              {getApiError(createMutation.error || updateMutation.error, "Unable to save provider")}
+            </p>
+          )}
           <div className="mt-5 flex flex-wrap gap-3">
             <Button variant="secondary" onClick={() => { setShowForm(false); setEditingProvider(null); }}>Cancel</Button>
             <Button loading={createMutation.isPending || updateMutation.isPending} disabled={!form.fullName.trim() || (!form.email.trim() && !form.phone.trim())} onClick={() => editingProvider ? updateMutation.mutate() : createMutation.mutate()}>
@@ -258,7 +263,11 @@ const FacilityProvidersPage = () => {
             </div>
           ))}
         </div>
-        {lifecycleMutation.error && <p className="mt-3 text-sm text-danger-600">{lifecycleMutation.error instanceof Error ? lifecycleMutation.error.message : "Provider lifecycle update failed."}</p>}
+        {lifecycleMutation.error && (
+          <p className="mt-3 text-sm text-danger-600">
+            {getApiError(lifecycleMutation.error, "Provider lifecycle update failed.")}
+          </p>
+        )}
       </Card>
     </div>
   );

@@ -136,8 +136,8 @@ export const LegalConsentPage = () => {
           <div className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-tiba-blue" />
             <p>
-              These documents apply to clients, providers, facility admins, and platform admins.
-              Your acceptance is recorded against the published version shown below.
+              Please review the current documents. Your acceptance is recorded against the
+              published version shown below.
             </p>
           </div>
         </div>
