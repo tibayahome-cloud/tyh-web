@@ -48,6 +48,7 @@ const AssignmentCard = ({ booking, timezone }: { booking: TelemedicineAssignment
               <select
                 value={providerUserId}
                 onChange={(event) => setProviderUserId(event.target.value)}
+                aria-label={`Select provider for ${booking.serviceName ?? "consultation"} with ${booking.clientFullName ?? "client"}`}
                 className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
               >
                 <option value="">Select provider</option>
