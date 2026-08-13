@@ -5,17 +5,12 @@ import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
 import { ApiErrorBanner } from "../../../../shared/components/ApiErrorBanner";
+import { TechnicalIssueReviewList } from "../../../../shared/components/TechnicalIssueReviewList";
 import { useToast } from "../../../../shared/components/ToastProvider";
-import {
-  useAssignProviderMutation,
-  useAssignmentQueue,
-  useReviewTechnicalIssueMutation,
-  useTechnicalIssues,
-  useTelemedicinePolicy
-} from "../../../../shared/hooks/useTelemedicine";
+import { useAssignProviderMutation, useAssignmentQueue, useTechnicalIssues, useTelemedicinePolicy } from "../../../../shared/hooks/useTelemedicine";
 import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../../shared/utils/errors";
-import type { TelemedicineAssignmentBooking, TelemedicineTechnicalIssue } from "../../../../shared/schemas/telemedicine";
+import type { TelemedicineAssignmentBooking } from "../../../../shared/schemas/telemedicine";
 
 const AssignmentCard = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
   const toast = useToast();
@@ -78,70 +73,12 @@ const AssignmentCard = ({ booking, timezone }: { booking: TelemedicineAssignment
   );
 };
 
-const TECHNICAL_ISSUE_STATUS_LABEL: Record<string, string> = {
-  open: "Open",
-  under_review: "Under review",
-  resolved: "Resolved"
-};
-
-const ReviewFlagRow = ({ issue }: { issue: TelemedicineTechnicalIssue }) => {
-  const toast = useToast();
-  const [reviewError, setReviewError] = useState<ClassifiedApiError | null>(null);
-  const reviewMutation = useReviewTechnicalIssueMutation();
-
-  const handleReview = async (status: "under_review" | "resolved") => {
-    setReviewError(null);
-    try {
-      await reviewMutation.mutateAsync({ issueId: issue.id, status });
-      toast.showToast({ title: status === "resolved" ? "Marked resolved" : "Marked under review", variant: "success" });
-    } catch (error) {
-      setReviewError(classifyApiError(error, "Unable to update this report."));
-    }
-  };
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{issue.category ?? "Technical issue"}</p>
-          <p className="text-xs text-slate-500">Reported by {issue.reporterRole} · Booking {issue.bookingId}</p>
-          {issue.description && <p className="mt-1 text-sm text-slate-600">{issue.description}</p>}
-        </div>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-            {TECHNICAL_ISSUE_STATUS_LABEL[issue.status] ?? issue.status}
-          </span>
-          {issue.status !== "resolved" && (
-            <div className="flex flex-wrap gap-2">
-              {issue.status === "open" && (
-                <Button size="sm" variant="ghost" loading={reviewMutation.isPending} onClick={() => handleReview("under_review")}>
-                  Start review
-                </Button>
-              )}
-              <Button size="sm" variant="secondary" loading={reviewMutation.isPending} onClick={() => handleReview("resolved")}>
-                Mark resolved
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-      {reviewError && (
-        <div className="mt-3">
-          <ApiErrorBanner category={reviewError.category} message={reviewError.message} />
-        </div>
-      )}
-    </div>
-  );
-};
-
 const AssignmentQueuePage = () => {
   const toast = useToast();
   const queueQuery = useAssignmentQueue({ refetchInterval: 30_000 });
   const policyQuery = useTelemedicinePolicy();
   const issuesQuery = useTechnicalIssues({ refetchInterval: 60_000 });
   const bookings = queueQuery.data ?? [];
-  const issues = issuesQuery.data ?? [];
-  const openIssues = issues.filter((issue) => issue.status !== "resolved");
 
   // Client-side alert for a fast-moving queue: no backend notification producer exists yet
   // (see Backend V1.2 Phase 6), so this catches "a new paid booking is waiting" as soon as the
@@ -206,19 +143,7 @@ const AssignmentQueuePage = () => {
         <p className="text-sm text-slate-500">No-show and technical-issue reports for this facility.</p>
       </div>
       <Card padding="none" className="p-4 sm:p-6">
-        {issuesQuery.isLoading ? (
-          <div className="py-12 text-center">
-            <Loading label="Loading review flags…" />
-          </div>
-        ) : openIssues.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500">No open reports.</p>
-        ) : (
-          <div className="space-y-3">
-            {openIssues.map((issue) => (
-              <ReviewFlagRow key={issue.id} issue={issue} />
-            ))}
-          </div>
-        )}
+        <TechnicalIssueReviewList issues={issuesQuery.data ?? []} isLoading={issuesQuery.isLoading} />
       </Card>
     </div>
   );
