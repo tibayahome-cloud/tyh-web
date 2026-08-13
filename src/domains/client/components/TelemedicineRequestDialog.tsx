@@ -16,6 +16,7 @@ import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { RemoteFacility } from "../../../shared/libs/telemedicine";
 import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
+import { mpesaPhoneValidationError } from "../../../shared/utils/mpesaPhone";
 import {
   useAvailableSlots,
   useCreateHoldMutation,
@@ -95,6 +96,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -194,7 +196,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   const handlePay = async () => {
     if (!holdId) return;
+    setPhoneTouched(true);
     setSubmitError(null);
+    // Catch an unusable number here, before the STK push is even requested, rather than letting
+    // the client find out only after the backend rejects it.
+    if (mpesaPhoneValidationError(phone)) {
+      return;
+    }
     try {
       await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
       toast.showToast({
@@ -206,6 +214,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     }
   };
 
+  const phoneError = phoneTouched ? mpesaPhoneValidationError(phone) : null;
   const paymentInitiated = Boolean(hold?.bookingId) && initiatePaymentMutation.isSuccess;
   const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
 
@@ -353,7 +362,10 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   type="tel"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
+                  onBlur={() => setPhoneTouched(true)}
                   placeholder="+254 700 000000"
+                  error={phoneError ?? undefined}
+                  hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
                 {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
                 {!paymentInitiated ? (
