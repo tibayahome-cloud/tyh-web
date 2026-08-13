@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AxiosError } from "axios";
 
 import { Modal } from "../../../shared/components/Modal";
 import { Button } from "../../../shared/components/Button";
@@ -9,12 +8,14 @@ import { Stepper } from "../../../shared/components/Stepper";
 import { Loading } from "../../../shared/components/Loading";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
+import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { RemoteFacility } from "../../../shared/libs/telemedicine";
 import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
+import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import {
   useAvailableSlots,
   useCreateHoldMutation,
@@ -90,7 +91,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const servicesQuery = useRemoteServiceOptions(open);
@@ -181,8 +182,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       setHoldId(newHold.id);
       setStep(TM_STEP_INDEX.confirm);
     } catch (error) {
-      const message = error instanceof AxiosError ? error.response?.data?.meta?.message ?? error.message : "Please try a different slot.";
-      setSubmitError(message);
+      setSubmitError(classifyApiError(error, "Please try a different slot."));
       setSelectedSlot(null);
     }
   };
@@ -197,9 +197,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         description: "Check your phone to approve the M-Pesa prompt."
       });
     } catch (error) {
-      const message =
-        error instanceof AxiosError ? error.response?.data?.meta?.message ?? error.message : "Unable to start payment.";
-      setSubmitError(message);
+      setSubmitError(classifyApiError(error, "Unable to start payment."));
     }
   };
 
@@ -287,7 +285,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               onChange={(event) => setSelectedDate(event.target.value)}
             />
             {slotsQuery.isLoading && <Loading />}
-            {submitError && <p className="text-sm text-danger-600">{submitError}</p>}
+            {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
             {!slotsQuery.isLoading && (slotsQuery.data ?? []).length === 0 && (
               <p className="text-sm text-slate-500">No open slots on this date. Try another day.</p>
             )}
@@ -351,7 +349,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   onChange={(event) => setPhone(event.target.value)}
                   placeholder="+254 700 000000"
                 />
-                {submitError && <p className="text-sm text-danger-600">{submitError}</p>}
+                {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
                 {!paymentInitiated ? (
                   <Button type="button" loading={initiatePaymentMutation.isPending} onClick={handlePay}>
                     Confirm & pay
