@@ -29,6 +29,7 @@ import {
   fetchFacilityProviders,
   fetchFacilityServices,
   bootstrapFacilityProvider,
+  replaceFacilityServices,
   updateFacility,
   updateFacilityProviderCompensation,
   updateFacilityService
@@ -78,6 +79,11 @@ type ServiceFormState = {
   active: boolean;
   isEmergencyCapable: boolean;
   deliveryMode: "in_person" | "remote" | "both";
+};
+
+type BulkServiceRow = ServiceFormState & {
+  name: string;
+  remoteCapable: boolean;
 };
 
 type ServiceRequestFormState = {
@@ -283,6 +289,35 @@ export const buildFacilityServiceInput = (form: ServiceFormState): FacilityServi
   active: form.active,
   isEmergencyCapable: form.isEmergencyCapable,
   deliveryMode: form.deliveryMode
+});
+
+export const validateBulkServiceRows = (rows: BulkServiceRow[]): string | null => {
+  if (rows.length === 0) {
+    return "Select at least one service.";
+  }
+  for (const row of rows) {
+    const message = validateServiceForm(row);
+    if (message) {
+      return `${row.name}: ${message}`;
+    }
+    if (!row.remoteCapable && row.deliveryMode !== "in_person") {
+      return `${row.name}: remote delivery is not available for this service.`;
+    }
+  }
+  return null;
+};
+
+export const buildBulkFacilityServiceInputs = (rows: BulkServiceRow[]): FacilityServiceInput[] =>
+  rows.map((row) => buildFacilityServiceInput(row));
+
+const mapExistingFacilityServiceInput = (service: FacilityService): FacilityServiceInput => ({
+  serviceId: service.serviceId,
+  priceCents: service.priceCents,
+  currency: service.currency,
+  estimateDurationMinutes: service.estimateDurationMinutes,
+  active: service.active,
+  isEmergencyCapable: service.isEmergencyCapable,
+  deliveryMode: service.deliveryMode
 });
 
 export const buildProviderCompensationInput = (
@@ -538,6 +573,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<FacilityService | null>(null);
   const [serviceForm, setServiceForm] = useState<ServiceFormState>(initialServiceForm);
+  const [bulkServiceRows, setBulkServiceRows] = useState<BulkServiceRow[]>([]);
   const [serviceFormError, setServiceFormError] = useState<string | null>(null);
   const [pendingDisable, setPendingDisable] = useState<FacilityService | null>(null);
   const [serviceRequestModalOpen, setServiceRequestModalOpen] = useState(false);
@@ -630,6 +666,17 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     return (catalogQuery.data ?? []).filter((service) => editingService?.serviceId === service.id || !used.has(service.id));
   }, [catalogQuery.data, editingService?.serviceId, facilityServices]);
 
+  const createBulkServiceRow = (service: CatalogService): BulkServiceRow => ({
+    serviceId: service.id,
+    name: service.name,
+    price: centsToPrice(service.base_price_cents),
+    estimateDurationMinutes: String(service.default_estimate_minutes),
+    active: true,
+    isEmergencyCapable: false,
+    deliveryMode: "in_person",
+    remoteCapable: service.remote_capable
+  });
+
   const activeServiceCount = facilityServices.filter((service) => service.active).length;
 
   const selectedCatalogServiceIsRemoteCapable = useMemo(() => {
@@ -692,6 +739,26 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       setServiceModalOpen(false);
       setEditingService(null);
       setServiceForm(initialServiceForm);
+      setServiceFormError(null);
+    },
+    onError: (error) => {
+      setServiceFormError(extractErrorMessage(error));
+    }
+  });
+
+  const bulkServiceMutation = useMutation({
+    mutationFn: () => {
+      const existing = facilityServices.map(mapExistingFacilityServiceInput);
+      const additions = buildBulkFacilityServiceInputs(bulkServiceRows);
+      const merged = new Map(existing.map((service) => [service.serviceId, service]));
+      additions.forEach((service) => merged.set(service.serviceId, service));
+      return replaceFacilityServices(String(facilityId), [...merged.values()]);
+    },
+    onSuccess: () => {
+      invalidateWorkspace();
+      setServiceModalOpen(false);
+      setEditingService(null);
+      setBulkServiceRows([]);
       setServiceFormError(null);
     },
     onError: (error) => {
@@ -796,6 +863,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const openServiceModal = (service?: FacilityService) => {
     setEditingService(service ?? null);
     setServiceForm(service ? mapServiceForm(service) : initialServiceForm);
+    setBulkServiceRows([]);
     setServiceFormError(null);
     setServiceModalOpen(true);
   };
@@ -805,6 +873,16 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   };
 
   const handleSaveService = () => {
+    if (!editingService) {
+      const validationMessage = validateBulkServiceRows(bulkServiceRows);
+      if (validationMessage) {
+        setServiceFormError(validationMessage);
+        return;
+      }
+      setServiceFormError(null);
+      bulkServiceMutation.mutate();
+      return;
+    }
     const validationMessage = validateServiceForm(serviceForm);
     if (validationMessage) {
       setServiceFormError(validationMessage);
@@ -1262,97 +1340,143 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         maxWidth="sm"
       >
         <div className="space-y-4">
-          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
-            <span>Service</span>
-            <select
-              value={serviceForm.serviceId}
-              onChange={(event) => {
-                const nextService = availableCatalogServices.find((service) => service.id === event.target.value);
-                updateServiceForm("serviceId", event.target.value);
-                if (!editingService && nextService) {
-                  updateServiceForm("price", centsToPrice(nextService.base_price_cents));
-                  updateServiceForm("estimateDurationMinutes", String(nextService.default_estimate_minutes));
-                }
-                if (!nextService?.remote_capable) {
-                  updateServiceForm("deliveryMode", "in_person");
-                }
-              }}
-              disabled={Boolean(editingService)}
-              className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
-            >
-              <option value="">Select service</option>
-              {availableCatalogServices.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Input
-            label="Facility price"
-            type="number"
-            min="0"
-            step="1"
-            value={serviceForm.price}
-            onChange={(event) => updateServiceForm("price", event.target.value)}
-          />
-          <Input
-            label="Estimate duration minutes"
-            type="number"
-            min="1"
-            step="1"
-            value={serviceForm.estimateDurationMinutes}
-            onChange={(event) => updateServiceForm("estimateDurationMinutes", event.target.value)}
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
-              <input
-                type="checkbox"
-                checked={serviceForm.active}
-                onChange={(event) => updateServiceForm("active", event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+          {editingService ? (
+            <>
+              <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+                <span>Service</span>
+                <select
+                  value={serviceForm.serviceId}
+                  disabled
+                  className="h-[50px] rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-900 shadow-sm"
+                >
+                  <option value={serviceForm.serviceId}>{editingService.service?.name ?? "Service"}</option>
+                </select>
+              </label>
+              <Input
+                label="Facility price"
+                type="number"
+                min="0"
+                step="1"
+                value={serviceForm.price}
+                onChange={(event) => updateServiceForm("price", event.target.value)}
               />
-              Active
-            </label>
-            <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
-              <input
-                type="checkbox"
-                checked={serviceForm.isEmergencyCapable}
-                onChange={(event) => updateServiceForm("isEmergencyCapable", event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+              <Input
+                label="Estimate duration minutes"
+                type="number"
+                min="1"
+                step="1"
+                value={serviceForm.estimateDurationMinutes}
+                onChange={(event) => updateServiceForm("estimateDurationMinutes", event.target.value)}
               />
-              Emergency capable
-            </label>
-          </div>
-          <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
-            <span>Delivery mode</span>
-            <select
-              value={serviceForm.deliveryMode}
-              onChange={(event) => updateServiceForm("deliveryMode", event.target.value as ServiceFormState["deliveryMode"])}
-              disabled={!selectedCatalogServiceIsRemoteCapable}
-              className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20 disabled:bg-slate-50 disabled:text-slate-400"
-            >
-              <option value="in_person">In-person only</option>
-              <option value="remote" disabled={!selectedCatalogServiceIsRemoteCapable}>
-                Remote only
-              </option>
-              <option value="both" disabled={!selectedCatalogServiceIsRemoteCapable}>
-                In-person and remote
-              </option>
-            </select>
-            {!selectedCatalogServiceIsRemoteCapable && (
-              <span className="text-xs text-slate-500">
-                This service isn&apos;t enabled for remote delivery in the global catalog.
-              </span>
-            )}
-          </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={serviceForm.active}
+                    onChange={(event) => updateServiceForm("active", event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                  />
+                  Active
+                </label>
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={serviceForm.isEmergencyCapable}
+                    onChange={(event) => updateServiceForm("isEmergencyCapable", event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                  />
+                  Emergency capable
+                </label>
+              </div>
+              <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+                <span>Delivery mode</span>
+                <select
+                  value={serviceForm.deliveryMode}
+                  onChange={(event) => updateServiceForm("deliveryMode", event.target.value as ServiceFormState["deliveryMode"])}
+                  disabled={!selectedCatalogServiceIsRemoteCapable}
+                  className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20 disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="in_person">In-person only</option>
+                  <option value="remote" disabled={!selectedCatalogServiceIsRemoteCapable}>Remote only</option>
+                  <option value="both" disabled={!selectedCatalogServiceIsRemoteCapable}>In-person and remote</option>
+                </select>
+                {!selectedCatalogServiceIsRemoteCapable && (
+                  <span className="text-xs text-slate-500">This service isn&apos;t enabled for remote delivery in the global catalog.</span>
+                )}
+              </label>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Choose services to add</p>
+                <p className="mt-1 text-xs text-slate-500">You can configure each selected service before saving.</p>
+              </div>
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                {availableCatalogServices.map((service) => {
+                  const selected = bulkServiceRows.some((row) => row.serviceId === service.id);
+                  return (
+                    <label key={service.id} className="flex cursor-pointer items-center gap-3 rounded-lg border border-transparent p-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => {
+                          setBulkServiceRows((rows) => event.target.checked
+                            ? [...rows, createBulkServiceRow(service)]
+                            : rows.filter((row) => row.serviceId !== service.id));
+                        }}
+                        className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                      />
+                      <span>{service.name}</span>
+                      {service.remote_capable && <span className="ml-auto text-xs font-medium text-tiba-blue">Remote capable</span>}
+                    </label>
+                  );
+                })}
+                {availableCatalogServices.length === 0 && <p className="p-3 text-sm text-slate-500">All catalog services are already configured.</p>}
+              </div>
+              {bulkServiceRows.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-800">Service settings</p>
+                  {bulkServiceRows.map((row) => (
+                    <div key={row.serviceId} className="rounded-xl border border-slate-200 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                        <button type="button" className="text-xs font-semibold text-danger-600" onClick={() => setBulkServiceRows((rows) => rows.filter((item) => item.serviceId !== row.serviceId))}>Remove</button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Input label="Price" type="number" min="0" step="1" value={row.price} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, price: event.target.value } : item))} />
+                        <Input label="Duration (minutes)" type="number" min="1" step="1" value={row.estimateDurationMinutes} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, estimateDurationMinutes: event.target.value } : item))} />
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
+                          <input type="checkbox" checked={row.isEmergencyCapable} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, isEmergencyCapable: event.target.checked } : item))} className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue" />
+                          Emergency capable
+                        </label>
+                        <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
+                          <input type="checkbox" checked={row.active} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, active: event.target.checked } : item))} className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue" />
+                          Active
+                        </label>
+                      </div>
+                      <label className="mt-3 flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+                        <span>Delivery mode</span>
+                        <select value={row.deliveryMode} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, deliveryMode: event.target.value as BulkServiceRow["deliveryMode"] } : item))} disabled={!row.remoteCapable} className="h-[46px] rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-50 disabled:text-slate-400">
+                          <option value="in_person">In-person only</option>
+                          <option value="remote">Remote only</option>
+                          <option value="both">In-person and remote</option>
+                        </select>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
           {serviceFormError && <p className="text-sm text-danger-600">{serviceFormError}</p>}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setServiceModalOpen(false)} disabled={serviceMutation.isPending}>
+            <Button type="button" variant="secondary" onClick={() => setServiceModalOpen(false)} disabled={serviceMutation.isPending || bulkServiceMutation.isPending}>
               Cancel
             </Button>
-            <Button type="button" loading={serviceMutation.isPending} onClick={handleSaveService}>
-              Save service
+            <Button type="button" loading={serviceMutation.isPending || bulkServiceMutation.isPending} onClick={handleSaveService}>
+              {editingService ? "Save service" : `Add ${bulkServiceRows.length || "selected"} services`}
             </Button>
           </div>
         </div>
