@@ -25,6 +25,7 @@ import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
 import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
+import { TechnicalIssueDialog } from "../../../shared/components/TechnicalIssueDialog";
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
@@ -54,6 +55,7 @@ const BookingDetailPage = () => {
   const [noShowError, setNoShowError] = useState<string | null>(null);
   const [cancelAppointmentDialogOpen, setCancelAppointmentDialogOpen] = useState(false);
   const [cancelAppointmentError, setCancelAppointmentError] = useState<ClassifiedApiError | null>(null);
+  const [technicalIssueDialogOpen, setTechnicalIssueDialogOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
@@ -204,6 +206,12 @@ const BookingDetailPage = () => {
     Boolean(booking.scheduledAt) &&
     Boolean(policyQuery.data) &&
     Date.now() < new Date(booking.scheduledAt as string).getTime() - (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000;
+
+  // Technical-issue reporting is allowed for the same join/session-plus-buffer window the
+  // "Join call" button already uses, rather than a separately invented cutoff.
+  const canReportTechnicalIssue =
+    booking.isTelemedicine &&
+    isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), policyQuery.data?.joinWindowBeforeMinutes);
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
@@ -393,9 +401,19 @@ const BookingDetailPage = () => {
                 className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
                 onClick={() => setNoShowDialogOpen(true)}
               >
-                Report a problem with this appointment
+                The provider didn't show up
               </Button>
             )
+          )}
+          {canReportTechnicalIssue && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
+              onClick={() => setTechnicalIssueDialogOpen(true)}
+            >
+              Report a technical issue
+            </Button>
           )}
           {canCancelAppointment && (
             <Button
@@ -621,7 +639,7 @@ const BookingDetailPage = () => {
           onConfirm={handleReportNoShow}
           loading={reportNoShowMutation.isPending}
           title="Report a problem"
-          description="Let admin.ops know if the provider didn't join, or you had a technical issue. This flags the appointment for review -- it doesn't request a refund by itself."
+          description="Let admin.ops know if the provider didn't join for this appointment. This flags the appointment for review -- it doesn't request a refund by itself."
           confirmLabel="Report"
           confirmVariant="secondary"
           error={noShowError ?? undefined}
@@ -646,6 +664,19 @@ const BookingDetailPage = () => {
             <ApiErrorBanner category={cancelAppointmentError.category} message={cancelAppointmentError.message} />
           )}
         </ConfirmDialog>
+
+        <TechnicalIssueDialog
+          open={technicalIssueDialogOpen}
+          bookingId={booking.id}
+          onClose={() => setTechnicalIssueDialogOpen(false)}
+          onReported={() =>
+            toast.showToast({
+              title: "Reported",
+              description: "Admin.ops will review this technical issue.",
+              variant: "info"
+            })
+          }
+        />
       </div>
 
       {callOpen && (
