@@ -4,20 +4,11 @@ import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
 import { useToast } from "../../../../shared/components/ToastProvider";
-import { useAssignProviderMutation, useAssignmentQueue } from "../../../../shared/hooks/useTelemedicine";
+import { useAssignProviderMutation, useAssignmentQueue, useTelemedicinePolicy } from "../../../../shared/hooks/useTelemedicine";
+import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
 import type { TelemedicineAssignmentBooking } from "../../../../shared/schemas/telemedicine";
 
-const formatScheduledAt = (iso: string | null) => {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-};
-
-const AssignmentRow = ({ booking }: { booking: TelemedicineAssignmentBooking }) => {
+const AssignmentRow = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
   const toast = useToast();
   const [providerUserId, setProviderUserId] = useState("");
   const assignMutation = useAssignProviderMutation();
@@ -43,7 +34,7 @@ const AssignmentRow = ({ booking }: { booking: TelemedicineAssignmentBooking }) 
         <div className="text-xs text-slate-500">{booking.id}</div>
       </td>
       <td className="px-4 py-3 text-sm text-slate-900">{booking.clientFullName ?? booking.clientUserId}</td>
-      <td className="px-4 py-3 text-sm text-slate-600">{formatScheduledAt(booking.scheduledAt)}</td>
+      <td className="px-4 py-3 text-sm text-slate-600">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</td>
       <td className="px-4 py-3">
         {booking.assignableProviders.length === 0 ? (
           <span className="text-xs font-semibold text-danger-600">No eligible providers free</span>
@@ -78,6 +69,7 @@ const AssignmentRow = ({ booking }: { booking: TelemedicineAssignmentBooking }) 
 
 const AssignmentQueuePage = () => {
   const queueQuery = useAssignmentQueue({ refetchInterval: 30_000 });
+  const policyQuery = useTelemedicinePolicy();
   const bookings = queueQuery.data ?? [];
 
   return (
@@ -109,7 +101,7 @@ const AssignmentQueuePage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {bookings.map((booking) => (
-                  <AssignmentRow key={booking.id} booking={booking} />
+                  <AssignmentRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
                 ))}
               </tbody>
             </table>

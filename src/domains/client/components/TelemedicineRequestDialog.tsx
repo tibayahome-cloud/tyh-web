@@ -22,9 +22,11 @@ import {
   useHoldQuery,
   useInitiateHoldPaymentMutation,
   useReleaseHoldMutation,
-  useRemoteFacilities
+  useRemoteFacilities,
+  useTelemedicinePolicy
 } from "../../../shared/hooks/useTelemedicine";
 import { bookingKeys } from "../../../shared/hooks/useBookings";
+import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 
 type TelemedicineRequestDialogProps = {
   open: boolean;
@@ -55,11 +57,13 @@ const TM_STEPS = [
 const formatCurrency = (cents: number, currency = "KES") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
 
-const formatSlotTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+// A slot is a real appointment at the facility's location, not wherever the client's device
+// happens to be set to -- these must show the same instant the backend actually reserved.
+const formatSlotTime = (iso: string, timezone: string | undefined) =>
+  formatTelemedicineDateTime(iso, timezone, { hour: "2-digit", minute: "2-digit" });
 
-const formatSlotDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+const formatSlotDate = (iso: string, timezone: string | undefined) =>
+  formatTelemedicineDateTime(iso, timezone, { weekday: "short", month: "short", day: "numeric" });
 
 const todayISODate = () => new Date().toISOString().slice(0, 10);
 
@@ -94,6 +98,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  const policyQuery = useTelemedicinePolicy();
   const servicesQuery = useRemoteServiceOptions(open);
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
@@ -298,8 +303,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   onClick={() => handleSelectSlot(slot)}
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
-                  <span className="block text-xs text-slate-400">{formatSlotDate(slot.startAt)}</span>
-                  {formatSlotTime(slot.startAt)}
+                  <span className="block text-xs text-slate-400">{formatSlotDate(slot.startAt, policyQuery.data?.defaultTimezone)}</span>
+                  {formatSlotTime(slot.startAt, policyQuery.data?.defaultTimezone)}
                 </button>
               ))}
             </div>
@@ -317,7 +322,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
               <p className="text-sm text-slate-500">{selectedFacility.name}</p>
               <p className="mt-1 text-sm text-slate-700">
-                {formatSlotDate(selectedSlot.startAt)} at {formatSlotTime(selectedSlot.startAt)}
+                {formatSlotDate(selectedSlot.startAt, policyQuery.data?.defaultTimezone)} at{" "}
+                {formatSlotTime(selectedSlot.startAt, policyQuery.data?.defaultTimezone)}
               </p>
               <p className="mt-2 text-lg font-semibold text-tiba-blue">
                 {formatCurrency(selectedFacility.priceCents, selectedFacility.currency)}

@@ -153,8 +153,8 @@ export const useCancelBookingMutation = (preset: BookingPresetName = "detail") =
   const storeBooking = useStoreBookingDetail();
   const invalidateLists = useInvalidateBookingLists();
   return useMutation({
-    mutationFn: ({ bookingId, reason }: { bookingId: string; reason?: string }) =>
-      cancelBooking(bookingId, reason, preset),
+    mutationFn: ({ bookingId, reason, adminOverride }: { bookingId: string; reason?: string; adminOverride?: boolean }) =>
+      cancelBooking(bookingId, reason, preset, adminOverride),
     onSuccess: (booking) => {
       storeBooking(booking);
       invalidateLists();

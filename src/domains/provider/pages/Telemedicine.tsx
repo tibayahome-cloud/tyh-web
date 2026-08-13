@@ -10,31 +10,33 @@ import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCa
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { bookingKeys, useBookingList } from "../../../shared/hooks/useBookings";
-import { useReportNoShowMutation } from "../../../shared/hooks/useTelemedicine";
+import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../shared/utils/bookingStatus";
-import { isWithinJoinWindow } from "../../../shared/utils/telemedicine";
+import { formatTelemedicineDateTime, isWithinJoinWindow } from "../../../shared/utils/telemedicine";
 import type { Booking } from "../../../shared/schemas/booking";
+import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
 
 const NOT_REPORTABLE_STATUSES = ["cancelled_by_client", "cancelled_by_admin", "fully_completed"];
 
-const formatDateTime = (iso?: string | null) => {
-  if (!iso) return "Not scheduled";
-  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-};
-
 const ConsultationRow = ({
   booking,
+  timezone,
+  joinWindowBeforeMinutes,
   onJoin,
   onReport
 }: {
   booking: Booking;
+  timezone: string | undefined;
+  joinWindowBeforeMinutes: number | undefined;
   onJoin: () => void;
   onReport: () => void;
 }) => {
   const statusTheme = getBookingStatusTheme(booking.status);
   const sessionTheme = booking.telemedicineSession ? getSessionStatusTheme(booking.telemedicineSession.status) : null;
-  const canJoin = booking.status === "scheduled" && isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes);
-  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === "telemedicine_no_show");
+  const canJoin =
+    booking.status === "scheduled" &&
+    isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), joinWindowBeforeMinutes);
+  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
   const canReport = !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status);
 
   return (
@@ -44,7 +46,7 @@ const ConsultationRow = ({
         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
           <span className="flex items-center gap-1">
             <CalendarIcon size={12} />
-            {formatDateTime(booking.scheduledAt)}
+            {formatTelemedicineDateTime(booking.scheduledAt, timezone)}
           </span>
           <span>{booking.client?.fullName ?? "Client"}</span>
         </div>
@@ -83,6 +85,7 @@ const ProviderTelemedicinePage = () => {
   const [reportBookingId, setReportBookingId] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const reportNoShowMutation = useReportNoShowMutation();
+  const policyQuery = useTelemedicinePolicy();
 
   const { data, isLoading } = useBookingList(
     { providerId: user?.id ?? undefined, pageSize: 50, preset: "card" },
@@ -127,6 +130,8 @@ const ProviderTelemedicinePage = () => {
             <ConsultationRow
               key={booking.id}
               booking={booking}
+              timezone={policyQuery.data?.defaultTimezone}
+              joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
               onJoin={() => setActiveCallBookingId(booking.id)}
               onReport={() => {
                 setReportError(null);

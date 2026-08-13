@@ -2,14 +2,21 @@ import api from "./api";
 import type {
   TelemedicineAssignmentBooking,
   TelemedicineHold,
+  TelemedicineJitsiHealth,
+  TelemedicinePolicy,
   TelemedicineSessionJoin,
-  TelemedicineSlot
+  TelemedicineSlot,
+  TelemedicineTechnicalIssue
 } from "../schemas/telemedicine";
 import {
   mapTelemedicineAssignmentBookings,
   mapTelemedicineHold,
+  mapTelemedicineJitsiHealth,
+  mapTelemedicinePolicy,
   mapTelemedicineSessionJoin,
-  mapTelemedicineSlots
+  mapTelemedicineSlots,
+  mapTelemedicineTechnicalIssue,
+  mapTelemedicineTechnicalIssues
 } from "../schemas/telemedicine";
 
 export type RemoteFacility = {
@@ -187,5 +194,67 @@ export const assignProvider = async (
     id: typeof data.id === "string" ? data.id : bookingId,
     status: typeof data.status === "string" ? data.status : "",
     providerUserId: typeof data.provider_user_id === "string" ? data.provider_user_id : null
+  };
+};
+
+export const fetchTelemedicinePolicy = async (): Promise<TelemedicinePolicy> => {
+  const response = await api.get("/telemedicine/policy");
+  const policy = mapTelemedicinePolicy(response.data?.data);
+  if (!policy) {
+    throw new Error("Failed to load telemedicine policy");
+  }
+  return policy;
+};
+
+export const fetchJitsiHealth = async (): Promise<TelemedicineJitsiHealth> => {
+  const response = await api.get("/admin/telemedicine/jitsi-health");
+  const health = mapTelemedicineJitsiHealth(response.data?.data);
+  if (!health) {
+    throw new Error("Failed to load Jitsi health status");
+  }
+  return health;
+};
+
+export const reportTechnicalIssue = async (
+  bookingId: string,
+  input: { category?: string; description?: string }
+): Promise<TelemedicineTechnicalIssue> => {
+  const response = await api.post(`/telemedicine/bookings/${bookingId}/technical-issues`, {
+    category: input.category,
+    description: input.description
+  });
+  const issue = mapTelemedicineTechnicalIssue(response.data?.data);
+  if (!issue) {
+    throw new Error("Failed to report the technical issue");
+  }
+  return issue;
+};
+
+export const fetchTechnicalIssues = async (): Promise<TelemedicineTechnicalIssue[]> => {
+  const response = await api.get("/telemedicine/technical-issues");
+  return mapTelemedicineTechnicalIssues(response.data?.data);
+};
+
+export const reviewTechnicalIssue = async (
+  issueId: string,
+  input: { status: "under_review" | "resolved"; adminNote?: string }
+): Promise<TelemedicineTechnicalIssue> => {
+  const response = await api.patch(`/telemedicine/technical-issues/${issueId}`, {
+    status: input.status,
+    admin_note: input.adminNote
+  });
+  const issue = mapTelemedicineTechnicalIssue(response.data?.data);
+  if (!issue) {
+    throw new Error("Failed to update the technical issue");
+  }
+  return issue;
+};
+
+export const leaveSession = async (bookingId: string): Promise<{ sessionId: string; status: string }> => {
+  const response = await api.post(`/telemedicine/bookings/${bookingId}/session/leave`);
+  const data = (response.data?.data ?? {}) as Record<string, unknown>;
+  return {
+    sessionId: typeof data.session_id === "string" ? data.session_id : "",
+    status: typeof data.status === "string" ? data.status : ""
   };
 };
