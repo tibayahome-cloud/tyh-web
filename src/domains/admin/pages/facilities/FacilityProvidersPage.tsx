@@ -33,6 +33,15 @@ type ProviderForm = {
   visibility: VisibilityChoice;
 };
 
+type ProviderLifecycleAction =
+  | "verify"
+  | "activate"
+  | "suspend"
+  | "available"
+  | "unavailable"
+  | "telemedicine_on"
+  | "telemedicine_off";
+
 const emptyForm: ProviderForm = {
   fullName: "",
   email: "",
@@ -121,6 +130,7 @@ const FacilityProvidersPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ProviderForm>(emptyForm);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+  const [lifecyclePendingKey, setLifecyclePendingKey] = useState<string | null>(null);
 
   const facilitiesQuery = useQuery({ queryKey: ["admin", "facility-scope"], queryFn: () => fetchFacilities({ pageSize: 5 }) });
   const facilityId = facilitiesQuery.data?.facilities.length === 1 ? facilitiesQuery.data.facilities[0].id : undefined;
@@ -187,7 +197,7 @@ const FacilityProvidersPage = () => {
       action
     }: {
       provider: Provider;
-      action: "verify" | "activate" | "suspend" | "available" | "unavailable" | "telemedicine_on" | "telemedicine_off";
+      action: ProviderLifecycleAction;
     }) => {
       const input =
         action === "verify"
@@ -201,8 +211,15 @@ const FacilityProvidersPage = () => {
                 : { isAvailable: action === "available" };
       return updateFacilityProviderLifecycle(facilityId as string, provider.userId, input);
     },
-    onSuccess: () => invalidateProviders()
+    onMutate: ({ provider, action }) => {
+      setLifecyclePendingKey(`${provider.userId}:${action}`);
+    },
+    onSuccess: () => invalidateProviders(),
+    onSettled: () => setLifecyclePendingKey(null)
   });
+
+  const isLifecyclePending = (provider: Provider, action: ProviderLifecycleAction) =>
+    lifecyclePendingKey === `${provider.userId}:${action}`;
 
   if (facilitiesQuery.isLoading || providersQuery.isLoading) return <Loading fullHeight />;
   if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
@@ -253,11 +270,11 @@ const FacilityProvidersPage = () => {
                 <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.verified ? "Verified" : "Pending verification"}</span>
                 <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.isAvailable ? "Available" : "Unavailable"}</span>
                 <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.telemedicineEnabled ? "Telemedicine on" : "Telemedicine off"}</span>
-                {!provider.verified && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
-                {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
-                {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
-                <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
-                <Button size="sm" variant="outline" loading={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
+                {!provider.verified && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "verify")} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
+                {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "activate")} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
+                {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "suspend")} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
+                <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.isAvailable ? "unavailable" : "available")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
+                <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
                 <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
               </div>
             </div>
