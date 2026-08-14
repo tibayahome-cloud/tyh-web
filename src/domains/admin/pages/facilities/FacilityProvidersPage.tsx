@@ -42,6 +42,27 @@ type ProviderLifecycleAction =
   | "telemedicine_on"
   | "telemedicine_off";
 
+// State chips previously all rendered bg-slate-100, so "pending" looked identical to
+// "Verified" and there was no way to read a provider's state at a glance. Tones follow the
+// palette already used by getBookingStatusTheme: green = on, amber = needs action,
+// slate = deliberately off, rose = blocked. The label always states the value too, so the
+// meaning never depends on colour alone.
+const CHIP_TONES = {
+  on: "bg-green-100 text-green-700",
+  off: "bg-slate-100 text-slate-500",
+  pending: "bg-amber-100 text-amber-700",
+  suspended: "bg-rose-100 text-rose-700"
+} as const;
+
+type ChipTone = keyof typeof CHIP_TONES;
+
+export const accountStatusTone = (status?: string | null): ChipTone =>
+  status === "active" ? "on" : status === "suspended" ? "suspended" : "pending";
+
+const StatusChip = ({ tone, label }: { tone: ChipTone; label: string }) => (
+  <span className={`rounded-lg px-2 py-1 ${CHIP_TONES[tone]}`}>{label}</span>
+);
+
 const emptyForm: ProviderForm = {
   fullName: "",
   email: "",
@@ -263,19 +284,24 @@ const FacilityProvidersPage = () => {
         <div className="relative mb-4"><SearchIcon className="absolute left-3 top-3 text-slate-400" fontSize="small" /><Input aria-label="Search providers" className="pl-10" placeholder="Search by name or contact" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
         <div className="divide-y divide-slate-100">
           {providersQuery.data?.providers.map((provider) => (
-            <div key={provider.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div key={provider.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p></div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.user?.status ?? "pending"}</span>
-                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.verified ? "Verified" : "Pending verification"}</span>
-                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.isAvailable ? "Available" : "Unavailable"}</span>
-                <span className="rounded-lg bg-slate-100 px-2 py-1">{provider.telemedicineEnabled ? "Telemedicine on" : "Telemedicine off"}</span>
-                {!provider.verified && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "verify")} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
-                {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "activate")} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
-                {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "suspend")} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
-                <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.isAvailable ? "unavailable" : "available")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
-                <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
-                <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
+              <div className="flex flex-col gap-2 sm:items-end">
+                {/* State first, on its own line -- actions below, so the two never mix into one wrapped blob. */}
+                <div className="flex flex-wrap gap-1.5 text-xs font-semibold sm:justify-end">
+                  <StatusChip tone={accountStatusTone(provider.user?.status)} label={`Account ${provider.user?.status ?? "pending"}`} />
+                  <StatusChip tone={provider.verified ? "on" : "pending"} label={provider.verified ? "Verified" : "Not verified"} />
+                  <StatusChip tone={provider.isAvailable ? "on" : "off"} label={provider.isAvailable ? "Available" : "Unavailable"} />
+                  <StatusChip tone={provider.telemedicineEnabled ? "on" : "off"} label={provider.telemedicineEnabled ? "Telemedicine on" : "Telemedicine off"} />
+                </div>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  {!provider.verified && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "verify")} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
+                  {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "activate")} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
+                  {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "suspend")} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
+                  <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.isAvailable ? "unavailable" : "available")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
+                  <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
+                  <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
+                </div>
               </div>
             </div>
           ))}

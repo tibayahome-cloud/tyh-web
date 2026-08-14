@@ -234,12 +234,13 @@ export const confirmBooking = async (
 export const cancelBooking = async (
   bookingId: string,
   reason?: string,
-  preset: BookingPresetName = "detail"
+  preset: BookingPresetName = "detail",
+  adminOverride?: boolean
 ): Promise<Booking> => {
   const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.detail;
   const response = await api.post(
     `/bookings/${bookingId}/cancel`,
-    { reason },
+    { reason, ...(adminOverride ? { admin_override: true } : {}) },
     { params: buildFieldParams(presetConfig) }
   );
   const booking = mapBooking(response.data?.data);

@@ -52,6 +52,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
     { label: "Pro Apps", to: "/admin/providers/applications", icon: <AssignmentIcon /> },
     { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
     { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
+    { label: "Telemedicine Health", to: "/admin/telemedicine/platform", icon: <VideocamOutlinedIcon /> },
     { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
     { label: "Services", to: "/admin/services", icon: <ViewListIcon /> },
     { label: "Facilities", to: "/admin/facilities", icon: <BusinessIcon /> },
