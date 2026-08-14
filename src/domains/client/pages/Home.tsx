@@ -38,8 +38,10 @@ import {
   ChevronUp,
   TrendingUp,
   Minus,
-  Calendar
+  Calendar,
+  Video
 } from "lucide-react";
+import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 
 const ACTIVE_STATUSES = [
   "accepted",
@@ -48,6 +50,19 @@ const ACTIVE_STATUSES = [
   "arrived",
   "in_service",
   "completed_by_provider"
+];
+
+// A remote consultation never passes through the in-person dispatch states above. It goes
+// telemedicine_payment_pending -> telemedicine_paid_pending_assignment -> scheduled, so a
+// list of dispatch states alone told a client holding a confirmed consultation that they
+// had "No upcoming care scheduled".
+const UPCOMING_STATUSES = [
+  "requested",
+  "accepted",
+  "broadcasting",
+  "scheduled",
+  "telemedicine_payment_pending",
+  "telemedicine_paid_pending_assignment"
 ];
 
 const HISTORY_STATUSES = [
@@ -127,7 +142,7 @@ const ClientHome = () => {
     const now = new Date();
     now.setSeconds(0, 0);
     return {
-      statuses: ["requested", "accepted", "broadcasting"],
+      statuses: UPCOMING_STATUSES,
       clientId: user?.id ?? undefined,
       pageSize: 3,
       preset: "card" as const,
@@ -685,6 +700,17 @@ const BookingCompactCard = ({
 }) => {
   const theme = getBookingStatusTheme(booking.status);
   const showRateButton = onRate && !booking.feedback?.length && (booking.status === "fully_completed" || booking.status === "paid" || booking.status === "client_completed");
+  // Show when the appointment happens, not when it was requested -- on an upcoming list the
+  // booking's creation date is the one date the client does not need. A remote consultation
+  // is anchored to the facility's timezone; an in-person visit stays in the client's own,
+  // since that is where they physically are.
+  const when = booking.scheduledAt
+    ? booking.isTelemedicine
+      ? formatTelemedicineDateTime(booking.scheduledAt)
+      : new Date(booking.scheduledAt).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : booking.createdAt
+      ? new Date(booking.createdAt).toLocaleDateString()
+      : "—";
 
   return (
     <div
@@ -693,7 +719,7 @@ const BookingCompactCard = ({
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-          <Calendar size={16} />
+          {booking.isTelemedicine ? <Video size={16} /> : <Calendar size={16} />}
         </div>
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-slate-900 truncate">
@@ -704,9 +730,7 @@ const BookingCompactCard = ({
               {formatBookingStatus(booking.status)}
             </span>
             <span className="text-slate-300 text-[10px]">•</span>
-            <p className="text-[11px] text-slate-400">
-              {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '—'}
-            </p>
+            <p className="text-[11px] text-slate-400">{when}</p>
           </div>
         </div>
       </div>
