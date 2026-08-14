@@ -8,20 +8,15 @@ import {
   Trash2,
   Clock,
   Calendar as CalendarIcon,
-  Zap,
   AlertCircle,
   HelpCircle,
   Activity,
-  CalendarCheck2,
   History,
-  ShieldCheck,
-  ArrowRight,
-  Rocket
+  ShieldCheck
 } from "lucide-react";
 
 import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
-import { Loading } from "../../../shared/components/Loading";
 import ConfirmDialog from "../../../shared/components/ConfirmDialog";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { api } from "../../../shared/libs/api";
@@ -537,43 +532,24 @@ const AvailabilityPage = () => {
 
   return (
     <div className="relative min-h-screen pb-20">
-      {/* Immersive Header */}
-      <header className="relative mb-12 overflow-hidden rounded-[48px] bg-slate-900 p-8 text-white shadow-2xl md:p-12">
-        <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-brand-500/20 blur-[100px]" />
-        <div className="absolute -left-20 -bottom-20 h-96 w-96 rounded-full bg-emerald-500/10 blur-[100px]" />
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-tiba-blue">Your schedule</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-950">Working hours</h1>
+          <p className="mt-1 max-w-lg text-sm text-slate-500">
+            Set the hours you work each week, block off time you are away, and see your upcoming
+            appointments.
+          </p>
+        </div>
 
-        <div className="relative flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30">
-                <CalendarCheck2 className="h-4 w-4" />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-400">Your schedule</span>
-            </div>
-            <h1 className="text-4xl font-black tracking-tight md:text-5xl">
-              Working <span className="text-brand-400">hours.</span>
-            </h1>
-            <p className="mt-4 max-w-lg text-lg font-medium text-slate-400 leading-relaxed">
-              Set the hours you work each week, block off time you are away, and see
-              your upcoming appointments.
-            </p>
+        <div className="flex gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-card">
+            <p className="text-xs text-slate-500">Weekly hours</p>
+            <p className="mt-0.5 text-xl font-bold text-slate-900">{availability?.length ?? 0}</p>
           </div>
-
-          <div className="grid w-full grid-cols-2 gap-4 md:w-auto">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-md">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Weekly hours</p>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-black">{availability?.length ?? 0}</span>
-                <span className="text-xs font-bold text-emerald-400">set</span>
-              </div>
-            </div>
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-md">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Upcoming appointments</p>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-black">{(bookingsQuery.data?.bookings ?? []).length}</span>
-                <span className="text-xs font-bold text-brand-400">booked</span>
-              </div>
-            </div>
+          <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-card">
+            <p className="text-xs text-slate-500">Upcoming</p>
+            <p className="mt-0.5 text-xl font-bold text-slate-900">{(bookingsQuery.data?.bookings ?? []).length}</p>
           </div>
         </div>
       </header>
@@ -582,31 +558,30 @@ const AvailabilityPage = () => {
         <div className="space-y-8">
           {/* Calendar Card */}
           <Card
-            className="relative overflow-hidden border-none bg-white p-8 shadow-xl ring-1 ring-black/5"
-            title={<span className="text-2xl font-black text-slate-900">Calendar</span>}
+            title="Calendar"
             description="Pick a day to change your hours or block time off."
           >
-            <div className="mt-8 flex items-center justify-between rounded-[24px] bg-slate-50 p-4 ring-1 ring-black/5">
+            <div className="mt-8 flex items-center justify-between rounded-xl bg-slate-50 p-4 ring-1 ring-black/5">
               <button
                 type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-brand-600"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-tiba-blue"
                 onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <h3 className="text-lg font-black text-slate-900">
+              <h3 className="text-lg font-semibold text-slate-900">
                 {calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
               </h3>
               <button
                 type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-brand-600"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-tiba-blue"
                 onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="mt-8 grid grid-cols-7 gap-3 text-center text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+            <div className="mt-8 grid grid-cols-7 gap-3 text-center text-xs font-semibold text-slate-500">
               {CALENDAR_DAY_NAMES.map((name) => (
                 <span key={name}>{name}</span>
               ))}
@@ -625,18 +600,18 @@ const AvailabilityPage = () => {
                     }
                   }}
                   className={classNames(
-                    "group relative flex min-h-[100px] flex-col rounded-[24px] border border-transparent p-4 text-left transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500",
+                    "group relative flex min-h-[100px] flex-col rounded-xl border border-transparent p-4 text-left transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-tiba-blue",
                     day.isCurrentMonth
                       ? "bg-slate-50/50 hover:bg-white hover:shadow-xl hover:ring-1 hover:ring-black/5"
                       : "bg-slate-50/20 text-slate-300 opacity-50",
                     day.blackoutCount > 0 && "bg-amber-50/50 ring-1 ring-amber-500/20",
-                    day.isToday && "ring-2 ring-brand-500 bg-white shadow-lg",
-                    day.isSelected && "ring-2 ring-brand-500 bg-brand-50 shadow-brand-100"
+                    day.isToday && "ring-2 ring-tiba-blue bg-white shadow-lg",
+                    day.isSelected && "ring-2 ring-tiba-blue bg-slate-50 shadow-sm"
                   )}
                 >
                   <span className={classNames(
-                    "text-lg font-black",
-                    day.isCurrentMonth ? (day.isToday ? "text-brand-600" : "text-slate-900") : "text-slate-300"
+                    "text-lg font-semibold",
+                    day.isCurrentMonth ? (day.isToday ? "text-tiba-blue" : "text-slate-900") : "text-slate-300"
                   )}>
                     {day.date.getDate()}
                   </span>
@@ -649,12 +624,12 @@ const AvailabilityPage = () => {
                       <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                     )}
                     {day.bookings.length > 0 && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-slate-500" />
                     )}
                   </div>
 
                   {day.bookings.length > 0 && (
-                    <div className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-lg bg-brand-50 text-[10px] font-black text-brand-600 ring-1 ring-brand-500/20">
+                    <div className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-lg bg-slate-50 text-[10px] font-semibold text-tiba-blue ring-1 ring-tiba-blue/20">
                       {day.bookings.length}
                     </div>
                   )}
@@ -665,22 +640,21 @@ const AvailabilityPage = () => {
 
           {/* Recurring Availability Setup */}
           <Card
-            className="relative border-none bg-white p-8 shadow-xl ring-1 ring-black/5"
-            title={<span className="text-2xl font-black text-slate-900">Weekly hours</span>}
+            title="Weekly hours"
             description="The hours you are normally available, day by day."
           >
             <div className="mt-8 space-y-6">
               {WEEKDAYS.map((weekday) => {
                 const slots = weeklyByWeekday[weekday] ?? [];
                 return (
-                  <div key={weekday} className="rounded-[32px] bg-slate-50/50 p-6 ring-1 ring-black/5">
+                  <div key={weekday} className="rounded-2xl bg-slate-50/50 p-6 ring-1 ring-black/5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm ring-1 ring-black/5">
                           <Clock className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="text-base font-black text-slate-900">{WEEKDAY_LABELS[weekday]}</p>
+                          <p className="text-base font-semibold text-slate-900">{WEEKDAY_LABELS[weekday]}</p>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                             {slots.length === 1 ? "1 time slot" : `${slots.length} time slots`}
                           </p>
@@ -689,7 +663,7 @@ const AvailabilityPage = () => {
                       <button
                         type="button"
                         onClick={() => addRowForWeekday(weekday)}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand-600 shadow-sm ring-1 ring-black/10 transition-all hover:bg-brand-50 hover:shadow-md"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-tiba-blue shadow-sm ring-1 ring-black/10 transition-all hover:bg-slate-100 hover:shadow-md"
                       >
                         <Plus className="h-5 w-5" />
                       </button>
@@ -704,14 +678,14 @@ const AvailabilityPage = () => {
                                 type="time"
                                 value={slot.start_time}
                                 onChange={(e) => updateRow(slot.id, { start_time: e.target.value })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                               />
-                              <span className="text-[10px] font-black uppercase text-slate-300">to</span>
+                              <span className="text-[10px] font-semibold uppercase text-slate-300">to</span>
                               <input
                                 type="time"
                                 value={slot.end_time}
                                 onChange={(e) => updateRow(slot.id, { end_time: e.target.value })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                               />
                             </div>
 
@@ -721,14 +695,14 @@ const AvailabilityPage = () => {
                                 type="date"
                                 value={slot.effective_from ?? ""}
                                 onChange={(e) => updateRow(slot.id, { effective_from: e.target.value || undefined })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                               />
                               <span className="text-slate-300">→</span>
                               <input
                                 type="date"
                                 value={slot.effective_to ?? ""}
                                 onChange={(e) => updateRow(slot.id, { effective_to: e.target.value || undefined })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                               />
                             </div>
 
@@ -757,7 +731,6 @@ const AvailabilityPage = () => {
 
             <div className="mt-10 flex justify-end">
               <Button
-                className="h-14 rounded-2xl px-12 text-sm font-black uppercase tracking-widest shadow-xl shadow-brand-100"
                 onClick={() => setConfirmAction({
                   type: "save_availability",
                   message: "Save these weekly hours?",
@@ -766,7 +739,6 @@ const AvailabilityPage = () => {
                 disabled={!hasChanges || updateAvailabilityMutation.isPending}
                 loading={updateAvailabilityMutation.isPending}
               >
-                <Zap className="mr-2 h-5 w-5" />
                 Save weekly hours
               </Button>
             </div>
@@ -776,12 +748,11 @@ const AvailabilityPage = () => {
         <div className="space-y-8">
           {/* Blackouts Summary */}
           <Card
-            className="border-none bg-white p-8 shadow-xl ring-1 ring-black/5"
-            title={<span className="text-xl font-black text-slate-900">Time off</span>}
+            title="Time off"
             description="Days and times you have blocked out."
           >
             {sortedBlackouts.length === 0 ? (
-              <div className="mt-6 flex flex-col items-center justify-center rounded-[32px] bg-slate-50 p-8 text-center ring-1 ring-black/5">
+              <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-slate-50 p-8 text-center ring-1 ring-black/5">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm ring-1 ring-black/5">
                   <ShieldCheck className="h-6 w-6" />
                 </div>
@@ -790,7 +761,7 @@ const AvailabilityPage = () => {
             ) : (
               <div className="mt-6 space-y-4">
                 {sortedBlackouts.map((entry) => (
-                  <div key={entry.id} className="group relative flex flex-col gap-3 rounded-[24px] bg-slate-50/50 p-5 ring-1 ring-black/5 transition-all hover:bg-white hover:shadow-lg">
+                  <div key={entry.id} className="group relative flex flex-col gap-3 rounded-xl bg-slate-50/50 p-5 ring-1 ring-black/5 transition-all hover:bg-white hover:shadow-lg">
                     <div className="flex items-start justify-between">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 shadow-sm ring-1 ring-amber-200">
                         <History className="h-4 w-4" />
@@ -809,7 +780,7 @@ const AvailabilityPage = () => {
                       </button>
                     </div>
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Time off</p>
+                      <p className="text-xs font-semibold text-slate-500">Time off</p>
                       <p className="mt-1 text-xs font-bold text-slate-900">
                         {new Date(entry.start_at).toLocaleDateString()}
                       </p>
@@ -829,25 +800,25 @@ const AvailabilityPage = () => {
           </Card>
 
           {/* Quick Guide */}
-          <div className="rounded-[32px] bg-slate-900 p-8 text-white shadow-xl">
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-[20px] bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30">
-              <HelpCircle className="h-6 w-6" />
+          <Card tone="muted">
+            <div className="mb-4 flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-tiba-blue" />
+              <h4 className="text-base font-bold text-slate-900">How this works</h4>
             </div>
-            <h4 className="text-lg font-black tracking-tight">How this works</h4>
-            <ul className="mt-6 space-y-4">
+            <ul className="space-y-3">
               {[
                 "Your weekly hours decide when clients can book you.",
                 "Time off always overrides your weekly hours.",
                 "Appointments you have accepted show up here.",
                 "Changes take effect as soon as you save."
               ].map((text, i) => (
-                <li key={i} className="flex gap-3 text-xs font-medium text-slate-400 leading-relaxed">
-                  <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-500" />
+                <li key={i} className="flex gap-2 text-sm leading-relaxed text-slate-600">
+                  <div className="mt-2 h-1 w-1 shrink-0 rounded-full bg-tiba-blue" />
                   {text}
                 </li>
               ))}
             </ul>
-          </div>
+          </Card>
         </div>
       </div>
 
@@ -855,11 +826,11 @@ const AvailabilityPage = () => {
         open={dialogOpen}
         title={
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-brand-50 text-brand-600 ring-1 ring-brand-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-tiba-blue ring-1 ring-tiba-blue/20">
               <CalendarIcon className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-black text-slate-900 leading-none">
+              <p className="text-sm font-semibold text-slate-900 leading-none">
                 {dialogDate ? dialogDate.toLocaleDateString(undefined, { weekday: "long" }) : "Edit Day"}
               </p>
               <p className="mt-1 text-[11px] font-bold text-slate-400 leading-none">
@@ -876,18 +847,18 @@ const AvailabilityPage = () => {
       >
         {!isBatch && selectedWeekdayKey && (
           <div className="space-y-3">
-            <div className="rounded-[28px] bg-slate-50/50 p-6 ring-1 ring-black/5">
+            <div className="rounded-2xl bg-slate-50/50 p-6 ring-1 ring-black/5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-emerald-500" />
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-900">
+                  <p className="text-sm font-bold text-slate-900">
                     Usual hours
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => addRowForWeekday(selectedWeekdayKey)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-brand-600 shadow-sm ring-1 ring-black/10 transition-all hover:bg-brand-50"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-tiba-blue shadow-sm ring-1 ring-black/10 transition-all hover:bg-slate-100"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -942,8 +913,7 @@ const AvailabilityPage = () => {
               </div>
               <div className="mt-3 text-right">
                 <Button
-                  className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-100"
-                  onClick={() =>
+                                    onClick={() =>
                     setConfirmAction({
                       type: "save_availability",
                       message: "Save these weekly hours?",
@@ -958,53 +928,53 @@ const AvailabilityPage = () => {
               </div>
             </div>
 
-            <div className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-black/5">
+            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-brand-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Block time off</p>
+                <p className="text-sm font-bold text-slate-900">Block time off</p>
               </div>
               <p className="mt-1 text-[11px] font-bold text-slate-400">Block a one-off time on this day.</p>
 
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <label className="flex flex-col gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <span className="text-xs font-semibold text-slate-500">
                     {isBatch ? "Start time" : "From"}
                   </span>
                   <input
                     type={isBatch ? "time" : "datetime-local"}
                     value={dialogStart}
                     onChange={(event) => setDialogStart(event.target.value)}
-                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                   />
                 </label>
                 <label className="flex flex-col gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <span className="text-xs font-semibold text-slate-500">
                     {isBatch ? "End time" : "To"}
                   </span>
                   <input
                     type={isBatch ? "time" : "datetime-local"}
                     value={dialogEnd}
                     onChange={(event) => setDialogEnd(event.target.value)}
-                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                   />
                 </label>
               </div>
               <label className="mt-4 flex flex-col gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reason (optional)</span>
+                <span className="text-xs font-semibold text-slate-500">Reason (optional)</span>
                 <textarea
                   rows={2}
                   value={dialogReason}
                   placeholder="Why are you unavailable?"
                   onChange={(event) => setDialogReason(event.target.value)}
-                  className="rounded-xl border-none bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                  className="rounded-xl border-none bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                 />
               </label>
             </div>
 
-            <div className="rounded-[28px] bg-slate-50/50 p-6 ring-1 ring-black/5">
+            <div className="rounded-2xl bg-slate-50/50 p-6 ring-1 ring-black/5">
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-amber-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Time off on this day</p>
+                <p className="text-sm font-bold text-slate-900">Time off on this day</p>
               </div>
               {dayBlackouts.length === 0 ? (
                 <p className="mt-2 text-[11px] font-bold text-slate-400 italic">No time off on this day.</p>
@@ -1040,13 +1010,13 @@ const AvailabilityPage = () => {
               )}
             </div>
 
-            <div className="rounded-[28px] bg-slate-900 p-6 text-white shadow-xl">
+            <div className="rounded-2xl border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-brand-400" />
-                <p className="text-xs font-black uppercase tracking-widest text-brand-400">Appointments</p>
+                <CalendarIcon className="h-4 w-4 text-tiba-blue" />
+                <p className="text-sm font-bold text-slate-900">Appointments</p>
               </div>
               {dayBookings.length === 0 ? (
-                <p className="mt-2 text-[11px] font-bold text-slate-500 italic">No appointments this day.</p>
+                <p className="mt-2 text-sm text-slate-500">No appointments this day.</p>
               ) : (
                 <ul className="mt-4 space-y-3">
                   {dayBookings.map((booking) => {
@@ -1055,14 +1025,14 @@ const AvailabilityPage = () => {
                       booking.acceptedAt ||
                       booking.createdAt;
                     return (
-                      <li key={booking.id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 backdrop-blur-md">
+                      <li key={booking.id} className="rounded-xl bg-slate-50 p-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs font-black text-white">{booking.service?.name ?? "Service"}</p>
-                          <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-brand-400 ring-1 ring-brand-500/30">
+                          <p className="text-sm font-semibold text-slate-900">{booking.service?.name ?? "Service"}</p>
+                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
                             {booking.status}
                           </span>
                         </div>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
+                        <p className="mt-1 text-xs text-slate-500">
                           {booking.client?.fullName ?? "Client"} •{" "}
                           {scheduled ? new Date(scheduled).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
                         </p>
@@ -1076,47 +1046,47 @@ const AvailabilityPage = () => {
         )}
         {isBatch && (
           <div className="space-y-4">
-            <div className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-black/5">
+            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-brand-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Block several days</p>
+                <p className="text-sm font-bold text-slate-900">Block several days</p>
               </div>
               <p className="mt-1 text-[11px] font-bold text-slate-400">This blocks the same times on every day you selected.</p>
 
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <label className="flex flex-col gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Start Time</span>
+                  <span className="text-xs font-semibold text-slate-500">Start Time</span>
                   <input
                     type="time"
                     value={dialogStart.includes("T") ? dialogStart.split("T")[1].substring(0, 5) : dialogStart}
                     onChange={(event) => setDialogStart(event.target.value)}
-                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                   />
                 </label>
                 <label className="flex flex-col gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">End Time</span>
+                  <span className="text-xs font-semibold text-slate-500">End Time</span>
                   <input
                     type="time"
                     value={dialogEnd.includes("T") ? dialogEnd.split("T")[1].substring(0, 5) : dialogEnd}
                     onChange={(event) => setDialogEnd(event.target.value)}
-                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                    className="h-11 rounded-xl border-none bg-slate-50 px-4 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                   />
                 </label>
               </div>
               <label className="mt-4 flex flex-col gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reason (optional)</span>
+                <span className="text-xs font-semibold text-slate-500">Reason (optional)</span>
                 <textarea
                   rows={2}
                   value={dialogReason}
                   placeholder="Shared reason for this batch..."
                   onChange={(event) => setDialogReason(event.target.value)}
-                  className="rounded-xl border-none bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
+                  className="rounded-xl border-none bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
                 />
               </label>
             </div>
 
-            <div className="rounded-[28px] bg-slate-50/50 p-6 ring-1 ring-black/5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Selected days</p>
+            <div className="rounded-2xl bg-slate-50/50 p-6 ring-1 ring-black/5">
+              <p className="text-xs font-semibold text-slate-500 mb-3">Selected days</p>
               <div className="flex flex-wrap gap-2">
                 {selectedDatesList.map(date => (
                   <span key={date.toISOString()} className="rounded-lg bg-white px-3 py-1.5 text-[10px] font-bold text-slate-900 ring-1 ring-black/5 shadow-sm">
@@ -1133,10 +1103,10 @@ const AvailabilityPage = () => {
         open={Boolean(confirmAction)}
         title={
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-amber-50 text-amber-600 ring-1 ring-amber-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-500/20">
               <AlertCircle className="h-5 w-5" />
             </div>
-            <p className="text-sm font-black text-slate-900">Please confirm</p>
+            <p className="text-sm font-semibold text-slate-900">Please confirm</p>
           </div>
         }
         description={confirmAction?.message}
@@ -1163,31 +1133,22 @@ const AvailabilityPage = () => {
 
       {/* Batch Action Bar */}
       {selectedDates.size > 1 && (
-        <div className="fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 items-center gap-6 rounded-[32px] bg-slate-900 px-8 py-5 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl transition-all animate-in fade-in slide-in-from-bottom-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30">
-              <CalendarIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-black">{selectedDates.size} Days Selected</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Multi-Day Context</p>
-            </div>
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-2xl border border-slate-100 bg-white px-5 py-3 shadow-elevated">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5 text-tiba-blue" />
+            <p className="text-sm font-semibold text-slate-900">
+              {selectedDates.size} days selected
+            </p>
           </div>
 
-          <div className="h-8 w-[1px] bg-white/10" />
+          <div className="h-6 w-px bg-slate-200" />
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSelectedDates(new Set())}
-              className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors"
-            >
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setSelectedDates(new Set())}>
               Clear
-            </button>
-            <Button
-              className="h-11 rounded-xl px-6 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-500/20"
-              onClick={openDialogForSelected}
-            >
-              Apply Override
+            </Button>
+            <Button size="sm" onClick={openDialogForSelected}>
+              Block time off
             </Button>
           </div>
         </div>
