@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildFacilityServiceInput,
+  buildBulkFacilityServiceInputs,
   buildProviderCompensationInput,
   canAdminOpsAccessFacility,
   facilityResponseCountdownTone,
@@ -9,6 +10,7 @@ import {
   formatFacilityResponseCountdown,
   priceToCents,
   validateProviderForm,
+  validateBulkServiceRows,
   validateServiceForm
 } from "../FacilityWorkspacePage";
 import type { Booking } from "../../../../../shared/schemas/booking";
@@ -95,6 +97,41 @@ describe("FacilityWorkspacePage helpers", () => {
         deliveryMode: "in_person"
       })
     ).toBe("Duration must be at least 1 minute.");
+  });
+
+  it("builds and validates multiple facility service rows", () => {
+    const rows = [
+      {
+        serviceId: "service-1",
+        name: "Nurse visit",
+        price: "1500",
+        estimateDurationMinutes: "45",
+        active: true,
+        isEmergencyCapable: false,
+        deliveryMode: "in_person" as const,
+        remoteCapable: false
+      },
+      {
+        serviceId: "service-2",
+        name: "Remote consultation",
+        price: "2500",
+        estimateDurationMinutes: "30",
+        active: true,
+        isEmergencyCapable: false,
+        deliveryMode: "remote" as const,
+        remoteCapable: true
+      }
+    ];
+
+    expect(validateBulkServiceRows(rows)).toBeNull();
+    expect(buildBulkFacilityServiceInputs(rows)).toEqual([
+      expect.objectContaining({ serviceId: "service-1", priceCents: 150000 }),
+      expect.objectContaining({ serviceId: "service-2", priceCents: 250000, deliveryMode: "remote" })
+    ]);
+    expect(validateBulkServiceRows([])).toBe("Select at least one service.");
+    expect(validateBulkServiceRows([{ ...rows[0], deliveryMode: "remote", remoteCapable: false }])).toContain(
+      "remote delivery is not available"
+    );
   });
 
   it("builds provider compensation payloads by mode", () => {
