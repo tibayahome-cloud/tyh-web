@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Video, Calendar as CalendarIcon } from "lucide-react";
+import { RefreshCw, Video, Calendar as CalendarIcon, Clock } from "lucide-react";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { Button } from "../../../shared/components/Button";
@@ -103,6 +104,7 @@ const ConsultationRow = ({
 const ProviderTelemedicinePage = () => {
   const { user } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeCallBookingId, setActiveCallBookingId] = useState<string | null>(null);
   const [reportBookingId, setReportBookingId] = useState<string | null>(null);
@@ -140,10 +142,18 @@ const ProviderTelemedicinePage = () => {
             <p className="text-sm text-slate-500">Your upcoming and past remote consultations.</p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <Button type="button" size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw size={14} className={isFetching ? "animate-spin motion-reduce:animate-none" : undefined} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Clients can only book a remote consultation inside these hours, so keep the
+                  schedule reachable from here rather than only from Settings. */}
+              <Button type="button" size="sm" variant="outline" onClick={() => navigate("/pro/availability")}>
+                <Clock size={14} />
+                Set your hours
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshCw size={14} className={isFetching ? "animate-spin motion-reduce:animate-none" : undefined} />
+                Refresh
+              </Button>
+            </div>
             {dataUpdatedAt > 0 && (
               <span className="text-[10px] text-slate-400">
                 Updated {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -159,7 +169,12 @@ const ProviderTelemedicinePage = () => {
             <p className="text-sm font-semibold text-slate-900">No consultations assigned yet</p>
             <p className="mt-1 max-w-xs text-xs text-slate-500">
               Assigned remote consultations will show up here once admin.ops assigns them to you.
+              Clients can only book you during the hours you set.
             </p>
+            <Button type="button" size="sm" variant="outline" className="mt-4" onClick={() => navigate("/pro/availability")}>
+              <Clock size={14} />
+              Set your hours
+            </Button>
           </div>
         )}
         <div className="grid gap-3">

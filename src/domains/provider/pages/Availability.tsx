@@ -294,14 +294,14 @@ const AvailabilityPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["provider", "blackouts", user?.id] });
       toast.showToast({
-        title: "Blackout removed",
-        description: "Availability restored for that window.",
+        title: "Time off removed",
+        description: "You are available again during that time.",
         variant: "success"
       });
     },
     onError: (error: unknown) => {
       toast.showToast({
-        title: "Unable to delete blackout",
+        title: "Could not remove time off",
         description: error instanceof Error ? error.message : "Please retry shortly.",
         variant: "error"
       });
@@ -475,7 +475,7 @@ const AvailabilityPage = () => {
     if (!dialogStart || !dialogEnd) {
       toast.showToast({
         title: "Select times",
-        description: "Pick a start and end time for the blackout.",
+        description: "Pick a start and end time.",
         variant: "error"
       });
       return;
@@ -499,8 +499,8 @@ const AvailabilityPage = () => {
       );
 
       toast.showToast({
-        title: "Tactical Overrides Committed",
-        description: `${targets.length} blackout windows have been deployed.`,
+        title: "Time off saved",
+        description: `You blocked ${targets.length} day${targets.length === 1 ? "" : "s"}.`,
         variant: "success"
       });
 
@@ -510,8 +510,8 @@ const AvailabilityPage = () => {
       queryClient.invalidateQueries({ queryKey: ["provider", "blackouts", user?.id] });
     } catch (error: any) {
       toast.showToast({
-        title: "Batch Operation Failed",
-        description: error.message || "Some overrides could not be deployed.",
+        title: "Could not save",
+        description: error.message || "Some of the time off could not be saved.",
         variant: "error"
       });
     }
@@ -548,30 +548,30 @@ const AvailabilityPage = () => {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30">
                 <CalendarCheck2 className="h-4 w-4" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-400">Mission Control</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-400">Your schedule</span>
             </div>
             <h1 className="text-4xl font-black tracking-tight md:text-5xl">
-              Professional <span className="text-brand-400">Schedule.</span>
+              Working <span className="text-brand-400">hours.</span>
             </h1>
             <p className="mt-4 max-w-lg text-lg font-medium text-slate-400 leading-relaxed">
-              Precision timing is mission-critical. Coordinate your recurring availability,
-              manage tactical blackouts, and monitor deployment windows.
+              Set the hours you work each week, block off time you are away, and see
+              your upcoming appointments.
             </p>
           </div>
 
           <div className="grid w-full grid-cols-2 gap-4 md:w-auto">
             <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-md">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Active Windows</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Weekly hours</p>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-3xl font-black">{availability?.length ?? 0}</span>
-                <span className="text-xs font-bold text-emerald-400">Online</span>
+                <span className="text-xs font-bold text-emerald-400">set</span>
               </div>
             </div>
             <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-md">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Upcoming Shifts</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Upcoming appointments</p>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-3xl font-black">{(bookingsQuery.data?.bookings ?? []).length}</span>
-                <span className="text-xs font-bold text-brand-400">Deployed</span>
+                <span className="text-xs font-bold text-brand-400">booked</span>
               </div>
             </div>
           </div>
@@ -583,8 +583,8 @@ const AvailabilityPage = () => {
           {/* Calendar Card */}
           <Card
             className="relative overflow-hidden border-none bg-white p-8 shadow-xl ring-1 ring-black/5"
-            title={<span className="text-2xl font-black text-slate-900">Deployment Calendar</span>}
-            description="Manage tactical availability and monitor scheduled deployments."
+            title={<span className="text-2xl font-black text-slate-900">Calendar</span>}
+            description="Pick a day to change your hours or block time off."
           >
             <div className="mt-8 flex items-center justify-between rounded-[24px] bg-slate-50 p-4 ring-1 ring-black/5">
               <button
@@ -666,8 +666,8 @@ const AvailabilityPage = () => {
           {/* Recurring Availability Setup */}
           <Card
             className="relative border-none bg-white p-8 shadow-xl ring-1 ring-black/5"
-            title={<span className="text-2xl font-black text-slate-900">Combat Schedule</span>}
-            description="Configure your baseline recurring operations per weekday."
+            title={<span className="text-2xl font-black text-slate-900">Weekly hours</span>}
+            description="The hours you are normally available, day by day."
           >
             <div className="mt-8 space-y-6">
               {WEEKDAYS.map((weekday) => {
@@ -682,7 +682,7 @@ const AvailabilityPage = () => {
                         <div>
                           <p className="text-base font-black text-slate-900">{WEEKDAY_LABELS[weekday]}</p>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                            {slots.length} Active Slots
+                            {slots.length === 1 ? "1 time slot" : `${slots.length} time slots`}
                           </p>
                         </div>
                       </div>
@@ -738,7 +738,7 @@ const AvailabilityPage = () => {
                                 type: "delete_window",
                                 payload: slot.id,
                                 message: `Remove this window from ${WEEKDAY_LABELS[weekday]}?`,
-                                confirmLabel: "Remove Slot"
+                                confirmLabel: "Remove"
                               })}
                               className="ml-auto flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600"
                             >
@@ -748,7 +748,7 @@ const AvailabilityPage = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-4 text-[11px] font-medium italic text-slate-400">Offline - No deployments scheduled.</p>
+                      <p className="mt-4 text-[11px] font-medium italic text-slate-400">Not available this day.</p>
                     )}
                   </div>
                 );
@@ -760,14 +760,14 @@ const AvailabilityPage = () => {
                 className="h-14 rounded-2xl px-12 text-sm font-black uppercase tracking-widest shadow-xl shadow-brand-100"
                 onClick={() => setConfirmAction({
                   type: "save_availability",
-                  message: "Update your permanent recurring operations profile?",
-                  confirmLabel: "Sync Schedule"
+                  message: "Save these weekly hours?",
+                  confirmLabel: "Save hours"
                 })}
                 disabled={!hasChanges || updateAvailabilityMutation.isPending}
                 loading={updateAvailabilityMutation.isPending}
               >
                 <Zap className="mr-2 h-5 w-5" />
-                Commit Baseline
+                Save weekly hours
               </Button>
             </div>
           </Card>
@@ -777,15 +777,15 @@ const AvailabilityPage = () => {
           {/* Blackouts Summary */}
           <Card
             className="border-none bg-white p-8 shadow-xl ring-1 ring-black/5"
-            title={<span className="text-xl font-black text-slate-900">Tactical Blackouts</span>}
-            description="Active overrides and maneuvers."
+            title={<span className="text-xl font-black text-slate-900">Time off</span>}
+            description="Days and times you have blocked out."
           >
             {sortedBlackouts.length === 0 ? (
               <div className="mt-6 flex flex-col items-center justify-center rounded-[32px] bg-slate-50 p-8 text-center ring-1 ring-black/5">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm ring-1 ring-black/5">
                   <ShieldCheck className="h-6 w-6" />
                 </div>
-                <p className="text-xs font-bold text-slate-400">No blackout windows active.</p>
+                <p className="text-xs font-bold text-slate-400">You have not blocked any time off.</p>
               </div>
             ) : (
               <div className="mt-6 space-y-4">
@@ -800,8 +800,8 @@ const AvailabilityPage = () => {
                         onClick={() => setConfirmAction({
                           type: "delete_blackout",
                           payload: entry.id,
-                          message: "Restore availability for this tactical window?",
-                          confirmLabel: "Abort Blackout"
+                          message: "Remove this time off and make yourself available again?",
+                          confirmLabel: "Remove time off"
                         })}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-black/5 transition-all hover:text-rose-600"
                       >
@@ -809,7 +809,7 @@ const AvailabilityPage = () => {
                       </button>
                     </div>
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Mission Blackout</p>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Time off</p>
                       <p className="mt-1 text-xs font-bold text-slate-900">
                         {new Date(entry.start_at).toLocaleDateString()}
                       </p>
@@ -833,13 +833,13 @@ const AvailabilityPage = () => {
             <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-[20px] bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30">
               <HelpCircle className="h-6 w-6" />
             </div>
-            <h4 className="text-lg font-black tracking-tight">System Intel</h4>
+            <h4 className="text-lg font-black tracking-tight">How this works</h4>
             <ul className="mt-6 space-y-4">
               {[
-                "Recurring hours set your baseline deployment slots.",
-                "Blackouts override any baseline availability.",
-                "Accepted bookings are prioritized and visible here.",
-                "Mission status is auto-synced with Dispatch."
+                "Your weekly hours decide when clients can book you.",
+                "Time off always overrides your weekly hours.",
+                "Appointments you have accepted show up here.",
+                "Changes take effect as soon as you save."
               ].map((text, i) => (
                 <li key={i} className="flex gap-3 text-xs font-medium text-slate-400 leading-relaxed">
                   <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-500" />
@@ -863,13 +863,13 @@ const AvailabilityPage = () => {
                 {dialogDate ? dialogDate.toLocaleDateString(undefined, { weekday: "long" }) : "Edit Day"}
               </p>
               <p className="mt-1 text-[11px] font-bold text-slate-400 leading-none">
-                {dialogDate ? dialogDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "Schedule Overrides"}
+                {dialogDate ? dialogDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "Edit this day"}
               </p>
             </div>
           </div>
         }
-        description="Synchronize your recurring baseline or execute a tactical blackout for this deployment window."
-        confirmLabel="Execute Blackout"
+        description="Change your usual hours for this day, or block time off."
+        confirmLabel="Block this time"
         onConfirm={handleConfirmBlackout}
         onClose={() => setDialogOpen(false)}
         loading={createBlackoutMutation.isPending}
@@ -881,7 +881,7 @@ const AvailabilityPage = () => {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-emerald-500" />
                   <p className="text-xs font-black uppercase tracking-widest text-slate-900">
-                    Recurring Baseline
+                    Usual hours
                   </p>
                 </div>
                 <button
@@ -892,7 +892,7 @@ const AvailabilityPage = () => {
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-              {daySlots.length === 0 && <p className="mt-2 text-xs text-slate-500">No recurring hours for this weekday yet.</p>}
+              {daySlots.length === 0 && <p className="mt-2 text-xs text-slate-500">No hours set for this day yet.</p>}
               <div className="mt-3 space-y-3">
                 {daySlots.map((slot) => (
                   <div key={slot.id} className="flex flex-wrap items-center gap-2">
@@ -929,7 +929,7 @@ const AvailabilityPage = () => {
                           type: "delete_window",
                           payload: slot.id,
                           message: `Remove ${slot.start_time} – ${slot.end_time} from ${WEEKDAY_LABELS[selectedWeekdayKey]}?`,
-                          confirmLabel: "Remove Slot"
+                          confirmLabel: "Remove"
                         })
                       }
                       className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600"
@@ -946,14 +946,14 @@ const AvailabilityPage = () => {
                   onClick={() =>
                     setConfirmAction({
                       type: "save_availability",
-                      message: "Sync your recurring baseline changes with Mission Control?",
-                      confirmLabel: "Sync Profile"
+                      message: "Save these weekly hours?",
+                      confirmLabel: "Save hours"
                     })
                   }
                   disabled={!hasChanges || updateAvailabilityMutation.isPending}
                   loading={updateAvailabilityMutation.isPending}
                 >
-                  Sync Baseline
+                  Save hours
                 </Button>
               </div>
             </div>
@@ -961,14 +961,14 @@ const AvailabilityPage = () => {
             <div className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-black/5">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-brand-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Tactical Override</p>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Block time off</p>
               </div>
-              <p className="mt-1 text-[11px] font-bold text-slate-400">Block one-off deployment windows.</p>
+              <p className="mt-1 text-[11px] font-bold text-slate-400">Block a one-off time on this day.</p>
 
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <label className="flex flex-col gap-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {isBatch ? "Operational Start Time" : "Intelligence Start"}
+                    {isBatch ? "Start time" : "From"}
                   </span>
                   <input
                     type={isBatch ? "time" : "datetime-local"}
@@ -979,7 +979,7 @@ const AvailabilityPage = () => {
                 </label>
                 <label className="flex flex-col gap-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {isBatch ? "Operational End Time" : "Intelligence End"}
+                    {isBatch ? "End time" : "To"}
                   </span>
                   <input
                     type={isBatch ? "time" : "datetime-local"}
@@ -990,11 +990,11 @@ const AvailabilityPage = () => {
                 </label>
               </div>
               <label className="mt-4 flex flex-col gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Deployment Reasoning</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reason (optional)</span>
                 <textarea
                   rows={2}
                   value={dialogReason}
-                  placeholder="Intel/Reason for blackout..."
+                  placeholder="Why are you unavailable?"
                   onChange={(event) => setDialogReason(event.target.value)}
                   className="rounded-xl border-none bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-brand-500"
                 />
@@ -1004,10 +1004,10 @@ const AvailabilityPage = () => {
             <div className="rounded-[28px] bg-slate-50/50 p-6 ring-1 ring-black/5">
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-amber-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Active Blackouts</p>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Time off on this day</p>
               </div>
               {dayBlackouts.length === 0 ? (
-                <p className="mt-2 text-[11px] font-bold text-slate-400 italic">No blackouts for this deployment.</p>
+                <p className="mt-2 text-[11px] font-bold text-slate-400 italic">No time off on this day.</p>
               ) : (
                 <ul className="mt-4 space-y-3">
                   {dayBlackouts.map((entry) => (
@@ -1025,8 +1025,8 @@ const AvailabilityPage = () => {
                           setConfirmAction({
                             type: "delete_blackout",
                             payload: entry.id,
-                            message: "Abort this blackout?",
-                            confirmLabel: "Abort"
+                            message: "Remove this time off?",
+                            confirmLabel: "Remove"
                           })
                         }
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-all hover:text-rose-600"
@@ -1043,10 +1043,10 @@ const AvailabilityPage = () => {
             <div className="rounded-[28px] bg-slate-900 p-6 text-white shadow-xl">
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-brand-400" />
-                <p className="text-xs font-black uppercase tracking-widest text-brand-400">Deployments</p>
+                <p className="text-xs font-black uppercase tracking-widest text-brand-400">Appointments</p>
               </div>
               {dayBookings.length === 0 ? (
-                <p className="mt-2 text-[11px] font-bold text-slate-500 italic">No active missions scheduled.</p>
+                <p className="mt-2 text-[11px] font-bold text-slate-500 italic">No appointments this day.</p>
               ) : (
                 <ul className="mt-4 space-y-3">
                   {dayBookings.map((booking) => {
@@ -1079,9 +1079,9 @@ const AvailabilityPage = () => {
             <div className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-black/5">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-brand-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Batch Tactical Override</p>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Block several days</p>
               </div>
-              <p className="mt-1 text-[11px] font-bold text-slate-400">Applying universal blackout to selected deployment windows.</p>
+              <p className="mt-1 text-[11px] font-bold text-slate-400">This blocks the same times on every day you selected.</p>
 
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <label className="flex flex-col gap-2">
@@ -1104,7 +1104,7 @@ const AvailabilityPage = () => {
                 </label>
               </div>
               <label className="mt-4 flex flex-col gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Deployment Reasoning</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reason (optional)</span>
                 <textarea
                   rows={2}
                   value={dialogReason}
@@ -1116,7 +1116,7 @@ const AvailabilityPage = () => {
             </div>
 
             <div className="rounded-[28px] bg-slate-50/50 p-6 ring-1 ring-black/5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Target Dates</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Selected days</p>
               <div className="flex flex-wrap gap-2">
                 {selectedDatesList.map(date => (
                   <span key={date.toISOString()} className="rounded-lg bg-white px-3 py-1.5 text-[10px] font-bold text-slate-900 ring-1 ring-black/5 shadow-sm">
@@ -1136,11 +1136,11 @@ const AvailabilityPage = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-amber-50 text-amber-600 ring-1 ring-amber-500/20">
               <AlertCircle className="h-5 w-5" />
             </div>
-            <p className="text-sm font-black text-slate-900">Confirm Tactical Action</p>
+            <p className="text-sm font-black text-slate-900">Please confirm</p>
           </div>
         }
         description={confirmAction?.message}
-        confirmLabel={confirmAction?.confirmLabel ?? "Confirm Execution"}
+        confirmLabel={confirmAction?.confirmLabel ?? "Confirm"}
         onConfirm={() => {
           if (!confirmAction) {
             return;
