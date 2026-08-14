@@ -208,7 +208,12 @@ export const fetchTelemedicinePolicy = async (): Promise<TelemedicinePolicy> => 
 };
 
 export const fetchJitsiHealth = async (): Promise<TelemedicineJitsiHealth> => {
-  const response = await api.get("/admin/telemedicine/jitsi-health");
+  // The backend returns 503 (not 200) when Jitsi is degraded, with a populated body describing
+  // why -- that's a valid, informative result, not a request failure, so it must resolve instead
+  // of rejecting like a real error (auth failure, network drop) would.
+  const response = await api.get("/admin/telemedicine/jitsi-health", {
+    validateStatus: (status) => (status >= 200 && status < 300) || status === 503
+  });
   const health = mapTelemedicineJitsiHealth(response.data?.data);
   if (!health) {
     throw new Error("Failed to load Jitsi health status");
