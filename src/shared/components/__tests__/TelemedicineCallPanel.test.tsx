@@ -136,4 +136,21 @@ describe("TelemedicineCallPanel", () => {
 
     expect(screen.queryByRole("button", { name: /end consultation/i })).not.toBeInTheDocument();
   });
+
+  it("offers a reconnect action on a failed join instead of only closing", async () => {
+    hooks.joinSessionMutateAsync.mockReset();
+    hooks.joinSessionMutateAsync.mockRejectedValueOnce(new Error("Network error"));
+    hooks.joinSessionMutateAsync.mockResolvedValueOnce(joinPayload());
+
+    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+
+    const reconnectButton = await screen.findByRole("button", { name: "Reconnect" });
+    expect(screen.getByText("Network error")).toBeInTheDocument();
+
+    fireEvent.click(reconnectButton);
+
+    await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
+    expect(hooks.joinSessionMutateAsync).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Network error")).not.toBeInTheDocument();
+  });
 });

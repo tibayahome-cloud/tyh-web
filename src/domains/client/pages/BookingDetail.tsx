@@ -19,15 +19,19 @@ import Drawer from "@mui/material/Drawer";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
-import { useReportNoShowMutation } from "../../../shared/hooks/useTelemedicine";
+import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
 import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
+import { TechnicalIssueDialog } from "../../../shared/components/TechnicalIssueDialog";
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
-import { isWithinJoinWindow } from "../../../shared/utils/telemedicine";
+import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
+import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
+import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
 
@@ -43,11 +47,15 @@ const BookingDetailPage = () => {
   const cancelMutation = useCancelBookingMutation("detail");
   const rerouteMutation = useRerouteBookingMutation("detail");
   const reportNoShowMutation = useReportNoShowMutation();
+  const policyQuery = useTelemedicinePolicy();
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [noShowDialogOpen, setNoShowDialogOpen] = useState(false);
   const [noShowError, setNoShowError] = useState<string | null>(null);
+  const [cancelAppointmentDialogOpen, setCancelAppointmentDialogOpen] = useState(false);
+  const [cancelAppointmentError, setCancelAppointmentError] = useState<ClassifiedApiError | null>(null);
+  const [technicalIssueDialogOpen, setTechnicalIssueDialogOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
@@ -148,6 +156,24 @@ const BookingDetailPage = () => {
     }
   };
 
+  const handleCancelAppointment = async () => {
+    setCancelAppointmentError(null);
+    try {
+      const updated = await cancelMutation.mutateAsync({ bookingId: booking.id, reason: "Cancelled by client" });
+      setCancelAppointmentDialogOpen(false);
+      toast.showToast({
+        title: "Appointment cancelled",
+        description:
+          updated.status === "telemedicine_cancelled_payment_review"
+            ? "Your payment is now under review. This is not confirmation of a refund."
+            : "Your appointment has been cancelled.",
+        variant: "info"
+      });
+    } catch (error) {
+      setCancelAppointmentError(classifyApiError(error, "Unable to cancel this appointment."));
+    }
+  };
+
   const handleOpenReroute = () => {
     setSelectedRerouteFacilityId(alternativeFacilities[0]?.id ?? null);
     setRerouteOpen(true);
@@ -170,7 +196,22 @@ const BookingDetailPage = () => {
     }
   };
 
-  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === "telemedicine_no_show");
+  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
+
+  // The cutoff is backend policy (scheduled_at - cancellationCutoffMinutes), not a client
+  // guess -- until the policy loads, cancellation stays hidden rather than optimistically shown.
+  const canCancelAppointment =
+    booking.isTelemedicine &&
+    booking.status === "scheduled" &&
+    Boolean(booking.scheduledAt) &&
+    Boolean(policyQuery.data) &&
+    Date.now() < new Date(booking.scheduledAt as string).getTime() - (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000;
+
+  // Reporting stays open for 24h after the call ends (report_technical_issue on the backend),
+  // well past the call-join window -- these are deliberately different windows.
+  const canReportTechnicalIssue =
+    booking.isTelemedicine &&
+    isWithinTechnicalIssueReportWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), policyQuery.data?.joinWindowBeforeMinutes);
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
@@ -197,7 +238,16 @@ const BookingDetailPage = () => {
             </span>
             {booking.scheduledAt && (
               <span className="flex items-center gap-1">
-                • {new Date(booking.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {/* A remote appointment is anchored to the facility's timezone, not wherever the
+                    client's device happens to be; an in-person visit is wherever the client is,
+                    so browser-local time is the correct display for that case. */}
+                •{" "}
+                {booking.isTelemedicine
+                  ? formatTelemedicineDateTime(booking.scheduledAt, policyQuery.data?.defaultTimezone, {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })
+                  : new Date(booking.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
@@ -318,7 +368,12 @@ const BookingDetailPage = () => {
       {booking.isTelemedicine && booking.status === "scheduled" && (
         <div className="space-y-3">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Video consultation</h4>
-          {isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes) ? (
+          {isWithinJoinWindow(
+            booking.scheduledAt,
+            booking.estimateDurationMinutes,
+            Date.now(),
+            policyQuery.data?.joinWindowBeforeMinutes
+          ) ? (
             <Button
               type="button"
               className="w-full h-12 rounded-xl text-xs font-bold"
@@ -329,7 +384,9 @@ const BookingDetailPage = () => {
             </Button>
           ) : (
             <p className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500">
-              The call opens 10 minutes before your appointment time.
+              {policyQuery.data
+                ? `The call opens ${policyQuery.data.joinWindowBeforeMinutes} minutes before your appointment time.`
+                : "The call opens shortly before your appointment time."}
             </p>
           )}
           {existingNoShowDispute ? (
@@ -344,9 +401,29 @@ const BookingDetailPage = () => {
                 className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
                 onClick={() => setNoShowDialogOpen(true)}
               >
-                Report a problem with this appointment
+                The provider didn't show up
               </Button>
             )
+          )}
+          {canReportTechnicalIssue && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
+              onClick={() => setTechnicalIssueDialogOpen(true)}
+            >
+              Report a technical issue
+            </Button>
+          )}
+          {canCancelAppointment && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
+              onClick={() => setCancelAppointmentDialogOpen(true)}
+            >
+              Cancel this appointment
+            </Button>
           )}
         </div>
       )}
@@ -562,10 +639,43 @@ const BookingDetailPage = () => {
           onConfirm={handleReportNoShow}
           loading={reportNoShowMutation.isPending}
           title="Report a problem"
-          description="Let admin.ops know if the provider didn't join, or you had a technical issue. This flags the appointment for review -- it doesn't request a refund by itself."
+          description="Let admin.ops know if the provider didn't join for this appointment. This flags the appointment for review -- it doesn't request a refund by itself."
           confirmLabel="Report"
           confirmVariant="secondary"
           error={noShowError ?? undefined}
+        />
+
+        <ConfirmDialog
+          open={cancelAppointmentDialogOpen}
+          onClose={() => {
+            if (!cancelMutation.isPending) {
+              setCancelAppointmentDialogOpen(false);
+              setCancelAppointmentError(null);
+            }
+          }}
+          onConfirm={handleCancelAppointment}
+          loading={cancelMutation.isPending}
+          title="Cancel this appointment"
+          description="If you already paid, cancelling puts your payment under review -- it does not confirm a refund. This can't be undone."
+          confirmLabel="Cancel appointment"
+          confirmVariant="secondary"
+        >
+          {cancelAppointmentError && (
+            <ApiErrorBanner category={cancelAppointmentError.category} message={cancelAppointmentError.message} />
+          )}
+        </ConfirmDialog>
+
+        <TechnicalIssueDialog
+          open={technicalIssueDialogOpen}
+          bookingId={booking.id}
+          onClose={() => setTechnicalIssueDialogOpen(false)}
+          onReported={() =>
+            toast.showToast({
+              title: "Reported",
+              description: "Admin.ops will review this technical issue.",
+              variant: "info"
+            })
+          }
         />
       </div>
 

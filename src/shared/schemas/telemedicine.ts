@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { coerceBoolean, coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
 
+// Mirrors DISPUTE_TYPE_TELEMEDICINE_* on the backend (app/models/bookings.py) -- string literals
+// checked against `booking.disputes[].disputeType`, kept here so every screen matches the same
+// spelling rather than each hardcoding its own copy.
+export const TELEMEDICINE_DISPUTE_TYPE_NO_SHOW = "telemedicine_no_show";
+export const TELEMEDICINE_DISPUTE_TYPE_ASSIGNMENT_TIMEOUT = "telemedicine_assignment_timeout";
+export const TELEMEDICINE_DISPUTE_TYPE_CANCELLATION_PAYMENT_REVIEW = "telemedicine_cancellation_payment_review";
+
+export const BOOKING_STATUS_TELEMEDICINE_CANCELLED_PAYMENT_REVIEW = "telemedicine_cancelled_payment_review";
+
 export const TelemedicineHoldSchema = z.object({
   id: z.string(),
   facilityId: z.string(),
@@ -184,6 +193,145 @@ export const mapTelemedicineSessionJoin = (payload: unknown): TelemedicineSessio
     return null;
   }
   return result.data;
+};
+
+// GET /api/v1/telemedicine/policy -- the backend-owned source of truth for country support,
+// display timezone, and the join/cancellation window. Never hardcode these values; a policy
+// change (e.g. a longer join window) must reach every screen through this endpoint.
+export const TelemedicinePolicySchema = z.object({
+  policyVersion: z.string(),
+  supportedCountryCodes: z.array(z.string()),
+  defaultTimezone: z.string(),
+  joinWindowBeforeMinutes: z.number(),
+  cancellationCutoffMinutes: z.number(),
+  remindersEnabled: z.boolean(),
+  reminderWindowsMinutes: z.array(z.number())
+});
+
+export type TelemedicinePolicy = z.infer<typeof TelemedicinePolicySchema>;
+
+export const mapTelemedicinePolicy = (payload: unknown): TelemedicinePolicy | null => {
+  const raw = toObject(payload);
+  const remindersRaw = toObject(raw.reminders);
+  const cancellationRaw = toObject(raw.cancellation);
+  const countryCodes = Array.isArray(raw.supported_country_codes)
+    ? raw.supported_country_codes.filter((code): code is string => typeof code === "string")
+    : [];
+  const reminderWindows = Array.isArray(remindersRaw.windows_minutes_before)
+    ? remindersRaw.windows_minutes_before.filter((value): value is number => typeof value === "number")
+    : [];
+  const normalized = {
+    // The backend field is "version" (see get_telemedicine_policy in
+    // telemedicine_policy_service.py), not "policy_version".
+    policyVersion: coerceString(raw.version) ?? "",
+    supportedCountryCodes: countryCodes,
+    defaultTimezone: coerceString(raw.default_timezone) ?? "Africa/Nairobi",
+    joinWindowBeforeMinutes: coerceNumber(raw.join_window_before_minutes) ?? 0,
+    cancellationCutoffMinutes:
+      coerceNumber(cancellationRaw.client_cutoff_minutes_before_scheduled_at) ?? coerceNumber(raw.join_window_before_minutes) ?? 0,
+    remindersEnabled: coerceBoolean(remindersRaw.enabled) ?? false,
+    reminderWindowsMinutes: reminderWindows
+  };
+  const result = TelemedicinePolicySchema.safeParse(normalized);
+  if (!result.success) {
+    if (import.meta.env.DEV) {
+      console.error("[Zod] TelemedicinePolicy Schema Mismatch:", result.error, normalized);
+    }
+    return null;
+  }
+  return result.data;
+};
+
+// POST/GET/PATCH .../technical-issues -- a review-flag record, not a financial or dispute
+// decision. `status` transitions are admin-only; nothing here ever confirms a refund.
+export const TECHNICAL_ISSUE_STATUSES = ["open", "under_review", "resolved"] as const;
+
+// Mirrors TECHNICAL_ISSUE_CATEGORIES in app/services/telemedicine_service.py exactly -- the
+// backend rejects any other value with 400, so this is an enum, not free text.
+export const TECHNICAL_ISSUE_CATEGORIES = ["connection", "audio", "video", "browser", "jitsi", "other"] as const;
+export type TechnicalIssueCategory = (typeof TECHNICAL_ISSUE_CATEGORIES)[number];
+
+export const TECHNICAL_ISSUE_CATEGORY_LABEL: Record<TechnicalIssueCategory, string> = {
+  connection: "Connection",
+  audio: "Audio",
+  video: "Video",
+  browser: "Browser",
+  jitsi: "Jitsi / call platform",
+  other: "Other"
+};
+
+export const TelemedicineTechnicalIssueSchema = z.object({
+  id: z.string(),
+  bookingId: z.string(),
+  reporterRole: z.enum(["client", "provider"]),
+  category: z.string().nullable(),
+  description: z.string().nullable(),
+  status: z.enum(TECHNICAL_ISSUE_STATUSES),
+  adminNote: z.string().nullable(),
+  createdAt: z.string().nullable()
+});
+
+export type TelemedicineTechnicalIssue = z.infer<typeof TelemedicineTechnicalIssueSchema>;
+
+export const mapTelemedicineTechnicalIssue = (payload: unknown): TelemedicineTechnicalIssue | null => {
+  const raw = toObject(payload);
+  const id = coerceId(raw.id);
+  const bookingId = coerceId(raw.booking_id);
+  if (!id || !bookingId) {
+    return null;
+  }
+  const roleRaw = coerceString(raw.reporter_role);
+  const statusRaw = coerceString(raw.status) ?? "open";
+  const normalized = {
+    id,
+    bookingId,
+    reporterRole: roleRaw === "provider" ? "provider" : "client",
+    category: coerceString(raw.category),
+    description: coerceString(raw.description),
+    status: (TECHNICAL_ISSUE_STATUSES as readonly string[]).includes(statusRaw) ? statusRaw : "open",
+    adminNote: coerceString(raw.admin_note),
+    createdAt: coerceDate(raw.created_at)
+  };
+  const result = TelemedicineTechnicalIssueSchema.safeParse(normalized);
+  if (!result.success) {
+    if (import.meta.env.DEV) {
+      console.error("[Zod] TelemedicineTechnicalIssue Schema Mismatch:", result.error, normalized);
+    }
+    return null;
+  }
+  return result.data;
+};
+
+export const mapTelemedicineTechnicalIssues = (payload: unknown): TelemedicineTechnicalIssue[] => {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  return payload
+    .map(mapTelemedicineTechnicalIssue)
+    .filter((entry): entry is TelemedicineTechnicalIssue => Boolean(entry));
+};
+
+// GET /api/v1/admin/telemedicine/jitsi-health -- deliberately excludes domains, room
+// identifiers, and secrets; this is an operational status view, not connection detail.
+export const TelemedicineJitsiHealthSchema = z.object({
+  status: z.string(),
+  checkedAt: z.string().nullable(),
+  latencyMs: z.number().nullable(),
+  errorCategory: z.string().nullable()
+});
+
+export type TelemedicineJitsiHealth = z.infer<typeof TelemedicineJitsiHealthSchema>;
+
+export const mapTelemedicineJitsiHealth = (payload: unknown): TelemedicineJitsiHealth | null => {
+  const raw = toObject(payload);
+  const normalized = {
+    status: coerceString(raw.status) ?? "unknown",
+    checkedAt: coerceDate(raw.checked_at),
+    latencyMs: coerceNumber(raw.latency_ms),
+    errorCategory: coerceString(raw.error_category)
+  };
+  const result = TelemedicineJitsiHealthSchema.safeParse(normalized);
+  return result.success ? result.data : null;
 };
 
 // Nested summary attached to a Booking (see mapBooking in ./booking.ts), not the join-token

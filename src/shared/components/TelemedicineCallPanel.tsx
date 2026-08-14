@@ -72,6 +72,10 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   const [endError, setEndError] = useState<string | null>(null);
   const [joinDetails, setJoinDetails] = useState<TelemedicineSessionJoin | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  // Bumping this re-runs the join effect below, so "Reconnect" can retry a failed connection
+  // attempt (token fetch or Jitsi script load) without the caller having to unmount and remount
+  // this whole panel.
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const joinMutation = useJoinSessionMutation();
   const confirmJoinMutation = useConfirmSessionJoinMutation();
   const endSessionMutation = useEndSessionMutation();
@@ -84,6 +88,12 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
     apiRef.current?.dispose();
     apiRef.current = null;
     onLeave();
+  };
+
+  const handleReconnect = () => {
+    setConnectionError(null);
+    setLoading(true);
+    setConnectionAttempt((attempt) => attempt + 1);
   };
 
   useEffect(() => {
@@ -143,10 +153,11 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
       apiRef.current?.dispose();
       apiRef.current = null;
     };
-    // Only re-run when the target booking changes -- join/end mutations are stable identities
-    // from react-query and re-running on every render would tear down and rejoin the call.
+    // Re-run when the target booking changes, or connectionAttempt is bumped by "Reconnect" --
+    // join/end mutations are stable identities from react-query and re-running on every render
+    // would tear down and rejoin the call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]);
+  }, [bookingId, connectionAttempt]);
 
   const handleManualLeave = () => {
     leaveLocalCall();
@@ -202,9 +213,14 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
       {connectionError && (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-white">
           <p className="text-sm">{connectionError}</p>
-          <Button type="button" variant="secondary" onClick={onLeave}>
-            Close
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" onClick={handleReconnect}>
+              Reconnect
+            </Button>
+            <Button type="button" variant="secondary" onClick={onLeave}>
+              Close
+            </Button>
+          </div>
         </div>
       )}
       <div
