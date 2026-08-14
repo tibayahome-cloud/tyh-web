@@ -213,18 +213,22 @@ export type TelemedicinePolicy = z.infer<typeof TelemedicinePolicySchema>;
 export const mapTelemedicinePolicy = (payload: unknown): TelemedicinePolicy | null => {
   const raw = toObject(payload);
   const remindersRaw = toObject(raw.reminders);
+  const cancellationRaw = toObject(raw.cancellation);
   const countryCodes = Array.isArray(raw.supported_country_codes)
     ? raw.supported_country_codes.filter((code): code is string => typeof code === "string")
     : [];
-  const reminderWindows = Array.isArray(remindersRaw.windows_minutes)
-    ? remindersRaw.windows_minutes.filter((value): value is number => typeof value === "number")
+  const reminderWindows = Array.isArray(remindersRaw.windows_minutes_before)
+    ? remindersRaw.windows_minutes_before.filter((value): value is number => typeof value === "number")
     : [];
   const normalized = {
-    policyVersion: coerceString(raw.policy_version) ?? "",
+    // The backend field is "version" (see get_telemedicine_policy in
+    // telemedicine_policy_service.py), not "policy_version".
+    policyVersion: coerceString(raw.version) ?? "",
     supportedCountryCodes: countryCodes,
     defaultTimezone: coerceString(raw.default_timezone) ?? "Africa/Nairobi",
     joinWindowBeforeMinutes: coerceNumber(raw.join_window_before_minutes) ?? 0,
-    cancellationCutoffMinutes: coerceNumber(raw.cancellation_cutoff_minutes) ?? coerceNumber(raw.join_window_before_minutes) ?? 0,
+    cancellationCutoffMinutes:
+      coerceNumber(cancellationRaw.client_cutoff_minutes_before_scheduled_at) ?? coerceNumber(raw.join_window_before_minutes) ?? 0,
     remindersEnabled: coerceBoolean(remindersRaw.enabled) ?? false,
     reminderWindowsMinutes: reminderWindows
   };
@@ -241,6 +245,20 @@ export const mapTelemedicinePolicy = (payload: unknown): TelemedicinePolicy | nu
 // POST/GET/PATCH .../technical-issues -- a review-flag record, not a financial or dispute
 // decision. `status` transitions are admin-only; nothing here ever confirms a refund.
 export const TECHNICAL_ISSUE_STATUSES = ["open", "under_review", "resolved"] as const;
+
+// Mirrors TECHNICAL_ISSUE_CATEGORIES in app/services/telemedicine_service.py exactly -- the
+// backend rejects any other value with 400, so this is an enum, not free text.
+export const TECHNICAL_ISSUE_CATEGORIES = ["connection", "audio", "video", "browser", "jitsi", "other"] as const;
+export type TechnicalIssueCategory = (typeof TECHNICAL_ISSUE_CATEGORIES)[number];
+
+export const TECHNICAL_ISSUE_CATEGORY_LABEL: Record<TechnicalIssueCategory, string> = {
+  connection: "Connection",
+  audio: "Audio",
+  video: "Video",
+  browser: "Browser",
+  jitsi: "Jitsi / call platform",
+  other: "Other"
+};
 
 export const TelemedicineTechnicalIssueSchema = z.object({
   id: z.string(),

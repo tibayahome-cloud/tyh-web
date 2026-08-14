@@ -20,6 +20,7 @@ import {
   reportTechnicalIssue,
   reviewTechnicalIssue
 } from "../libs/telemedicine";
+import type { TechnicalIssueCategory } from "../schemas/telemedicine";
 import { bookingKeys } from "./useBookings";
 
 export const telemedicineKeys = {
@@ -181,8 +182,15 @@ export const useLeaveSessionMutation = () => {
 export const useReportTechnicalIssueMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ bookingId, category, description }: { bookingId: string; category?: string; description?: string }) =>
-      reportTechnicalIssue(bookingId, { category, description }),
+    mutationFn: ({
+      bookingId,
+      category,
+      description
+    }: {
+      bookingId: string;
+      category: TechnicalIssueCategory;
+      description: string;
+    }) => reportTechnicalIssue(bookingId, { category, description }),
     onSuccess: (_result, { bookingId }) => {
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: telemedicineKeys.technicalIssues(), exact: false }).catch(() => undefined);

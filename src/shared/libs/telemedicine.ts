@@ -1,5 +1,6 @@
 import api from "./api";
 import type {
+  TechnicalIssueCategory,
   TelemedicineAssignmentBooking,
   TelemedicineHold,
   TelemedicineJitsiHealth,
@@ -217,7 +218,7 @@ export const fetchJitsiHealth = async (): Promise<TelemedicineJitsiHealth> => {
 
 export const reportTechnicalIssue = async (
   bookingId: string,
-  input: { category?: string; description?: string }
+  input: { category: TechnicalIssueCategory; description: string }
 ): Promise<TelemedicineTechnicalIssue> => {
   const response = await api.post(`/telemedicine/bookings/${bookingId}/technical-issues`, {
     category: input.category,

@@ -13,7 +13,7 @@ import { useAuth } from "../../../shared/hooks/useAuth";
 import { bookingKeys, useBookingList } from "../../../shared/hooks/useBookings";
 import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../shared/utils/bookingStatus";
-import { formatTelemedicineDateTime, isWithinJoinWindow } from "../../../shared/utils/telemedicine";
+import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
 import type { Booking } from "../../../shared/schemas/booking";
 import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
 
@@ -40,7 +40,13 @@ const ConsultationRow = ({
   const canJoin = booking.status === "scheduled" && withinWindow;
   const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
   const canReportNoShow = !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status);
-  const canReportTechnicalIssue = withinWindow;
+  // Reporting stays open for 24h after the call ends -- a longer, separate window from joining.
+  const canReportTechnicalIssue = isWithinTechnicalIssueReportWindow(
+    booking.scheduledAt,
+    booking.estimateDurationMinutes,
+    Date.now(),
+    joinWindowBeforeMinutes
+  );
 
   const minutesUntilJoinable =
     !canJoin && booking.status === "scheduled" && booking.scheduledAt && joinWindowBeforeMinutes !== undefined

@@ -29,7 +29,7 @@ import { TechnicalIssueDialog } from "../../../shared/components/TechnicalIssueD
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
-import { formatTelemedicineDateTime, isWithinJoinWindow } from "../../../shared/utils/telemedicine";
+import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -207,11 +207,11 @@ const BookingDetailPage = () => {
     Boolean(policyQuery.data) &&
     Date.now() < new Date(booking.scheduledAt as string).getTime() - (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000;
 
-  // Technical-issue reporting is allowed for the same join/session-plus-buffer window the
-  // "Join call" button already uses, rather than a separately invented cutoff.
+  // Reporting stays open for 24h after the call ends (report_technical_issue on the backend),
+  // well past the call-join window -- these are deliberately different windows.
   const canReportTechnicalIssue =
     booking.isTelemedicine &&
-    isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), policyQuery.data?.joinWindowBeforeMinutes);
+    isWithinTechnicalIssueReportWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), policyQuery.data?.joinWindowBeforeMinutes);
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">

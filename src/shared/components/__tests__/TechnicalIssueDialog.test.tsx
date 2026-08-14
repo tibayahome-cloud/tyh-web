@@ -54,9 +54,28 @@ describe("TechnicalIssueDialog", () => {
     );
 
     render(<TechnicalIssueDialog open bookingId="booking-1" onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/what kind of issue/i), { target: { value: "audio" } });
+    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: "Could not hear the provider" } });
     fireEvent.click(screen.getByRole("button", { name: "Report issue" }));
 
     expect(await screen.findByText("Reporting window has passed for this appointment")).toBeInTheDocument();
+  });
+
+  it("blocks submission and never calls the backend with a missing category or description", async () => {
+    render(<TechnicalIssueDialog open bookingId="booking-1" onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Report issue" }));
+
+    expect(await screen.findByText("Choose the kind of issue.")).toBeInTheDocument();
+    expect(screen.getByText("Describe what happened.")).toBeInTheDocument();
+    expect(hooks.reportMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("only accepts one of the backend's fixed issue categories", () => {
+    render(<TechnicalIssueDialog open bookingId="booking-1" onClose={vi.fn()} />);
+
+    const options = screen.getAllByRole("option").map((option) => (option as HTMLOptionElement).value);
+    expect(options.filter(Boolean)).toEqual(["connection", "audio", "video", "browser", "jitsi", "other"]);
   });
 
   it("never claims a refund or resolution in its copy", () => {
