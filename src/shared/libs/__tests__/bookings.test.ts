@@ -126,3 +126,32 @@ describe("booking API helpers", () => {
     );
   });
 });
+
+describe("fetchBookings telemedicine filter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGet.mockResolvedValue({ data: { data: [], meta: {} } });
+  });
+
+  it("asks the server for in-person bookings only when isTelemedicine is false", async () => {
+    // The client home page uses this to keep the "finding a provider" card off remote
+    // consultations. false is a real filter, so it must survive the falsy check that omits
+    // unset params -- dropping it would silently restore the bug.
+    await fetchBookings({ statuses: ["broadcasting"], isTelemedicine: false });
+
+    expect(mockGet).toHaveBeenCalledWith(
+      "/bookings",
+      expect.objectContaining({
+        params: expect.objectContaining({ "filter[is_telemedicine]": false })
+      })
+    );
+  });
+
+  it("omits the filter entirely when isTelemedicine is not given", async () => {
+    // Absent means "no opinion": every other caller must keep seeing both kinds of booking.
+    await fetchBookings({ statuses: ["broadcasting"] });
+
+    const params = mockGet.mock.calls[0][1].params as Record<string, unknown>;
+    expect(params).not.toHaveProperty("filter[is_telemedicine]");
+  });
+});
