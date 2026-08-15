@@ -130,12 +130,20 @@ const ClientHome = () => {
     {
       statuses: ["broadcasting"],
       clientId: user?.id ?? undefined,
+      // A remote consultation is booked into a fixed slot with a named provider, so nothing is
+      // ever searching nearby providers for one. Filtering server-side rather than trimming the
+      // result keeps the page counts honest.
+      isTelemedicine: false,
       pageSize: 1,
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
   ) as { data?: { bookings?: Booking[] } };
-  const matchingBooking = searchingQuery.data?.bookings?.[0];
+  // Belt and braces behind the server filter: this card announces that a search is underway,
+  // and claiming that over a consultation the client has already booked is worse than showing
+  // nothing at all.
+  const matchingCandidate = searchingQuery.data?.bookings?.[0];
+  const matchingBooking = matchingCandidate?.isTelemedicine ? undefined : matchingCandidate;
 
   const upcomingParams = useMemo(() => {
     // Snap to current minute to avoid infinite re-renders while keeping data relatively fresh
