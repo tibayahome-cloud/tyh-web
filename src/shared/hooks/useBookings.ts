@@ -22,6 +22,7 @@ const normalizeListParams = (params: BookingListParams = {}) => ({
   to: params.to ?? null,
   scheduledFrom: params.scheduledFrom ?? null,
   scheduledTo: params.scheduledTo ?? null,
+  isTelemedicine: params.isTelemedicine ?? null,
   preset: params.preset ?? "card"
 });
 
