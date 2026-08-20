@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { GenderField } from "../components/GenderField";
+import { GenderSettingRow } from "../components/ProviderSetupCard";
 
 import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
