@@ -20,6 +20,7 @@ import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
 import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { useAuth } from "../../../shared/hooks/useAuth";
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
@@ -28,6 +29,8 @@ import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
 import { TechnicalIssueDialog } from "../../../shared/components/TechnicalIssueDialog";
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
+import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
+import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
@@ -48,6 +51,7 @@ const BookingDetailPage = () => {
   const rerouteMutation = useRerouteBookingMutation("detail");
   const reportNoShowMutation = useReportNoShowMutation();
   const policyQuery = useTelemedicinePolicy();
+  const { user } = useAuth();
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
@@ -213,8 +217,17 @@ const BookingDetailPage = () => {
     booking.isTelemedicine &&
     isWithinTechnicalIssueReportWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), policyQuery.data?.joinWindowBeforeMinutes);
 
+  // Same window as cancellation, and for the same reason: once the consultation is under way
+  // the appointment is no longer a plan to negotiate. The backend refuses either way, so this
+  // only decides whether to offer something that would be rejected.
+  const canReschedule = canCancelAppointment;
+
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
+      {booking.paymentReviewPending && (
+        <PaymentReviewNotice />
+      )}
+
       {/* Header Info */}
       <div className="space-y-3 border-b border-slate-100 pb-4">
         <div className="flex items-center justify-between">
@@ -405,6 +418,14 @@ const BookingDetailPage = () => {
               </Button>
             )
           )}
+          {booking.isTelemedicine && user?.id && (
+            <ReschedulePanel
+              bookingId={booking.id}
+              currentUserId={String(user.id)}
+              canReschedule={canReschedule}
+            />
+          )}
+
           {canReportTechnicalIssue && (
             <Button
               type="button"
