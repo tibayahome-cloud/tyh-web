@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
+import { GenderField } from "../components/GenderField";
 
 import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
@@ -266,6 +267,9 @@ const ProviderHome = () => {
       )}
 
       <div className="space-y-5 pb-20">
+        {/* Non-blocking: every provider predates this field, and a required answer would lock
+            them out of their own dashboard until they filled it in. */}
+        <GenderField variant="prompt" />
 
         {/* Intelligence Layer */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
