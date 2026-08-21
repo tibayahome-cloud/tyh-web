@@ -14,6 +14,8 @@ import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { BookingSearchStatus } from "../components/BookingSearchStatus";
+import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
+import { findBookingUnderPaymentReview } from "../utils/paymentReview";
 import { AIRecommendationsCard } from "../components/AIRecommendationsCard";
 import { ClientPageHeader } from "../components/ClientPageHeader";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -145,6 +147,7 @@ const ClientHome = () => {
   const matchingCandidate = searchingQuery.data?.bookings?.[0];
   const matchingBooking = matchingCandidate?.isTelemedicine ? undefined : matchingCandidate;
 
+
   const upcomingParams = useMemo(() => {
     // Snap to current minute to avoid infinite re-renders while keeping data relatively fresh
     const now = new Date();
@@ -163,6 +166,16 @@ const ClientHome = () => {
     { enabled: Boolean(user?.id) }
   ) as { data?: { bookings?: Booking[] }, isLoading: boolean };
   const upcomingList = upcomingQuery.data;
+
+  // A payment that arrived for an appointment that could not be honoured. Surfaced above
+  // everything else because the client has paid and, without this, has no way of knowing
+  // anything is wrong until nobody joins the call. Declared after upcomingList because it
+  // reads it.
+  const underReview = findBookingUnderPaymentReview([
+    activeBooking,
+    matchingCandidate,
+    ...(upcomingList?.bookings ?? [])
+  ]);
   useEffect(() => {
     if (activeBooking?.status === "completed_by_provider") {
       setCompletionPrompt(activeBooking);
@@ -395,6 +408,12 @@ const ClientHome = () => {
         </section>
 
         <div className="flex flex-col gap-4 px-4 sm:px-6">
+          {underReview && (
+            <PaymentReviewNotice
+              onViewBooking={() => navigate(`/app/bookings/${underReview.id}`)}
+            />
+          )}
+
           {matchingBooking && (
             <BookingSearchStatus
               booking={matchingBooking}

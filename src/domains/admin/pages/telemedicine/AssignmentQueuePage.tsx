@@ -9,6 +9,7 @@ import { TechnicalIssueReviewList } from "../../../../shared/components/Technica
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useAssignProviderMutation, useAssignmentQueue, useTechnicalIssues, useTelemedicinePolicy } from "../../../../shared/hooks/useTelemedicine";
 import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
+import { PreferenceSummary } from "../../components/PreferenceSummary";
 import { classifyApiError, type ClassifiedApiError } from "../../../../shared/utils/errors";
 import type { TelemedicineAssignmentBooking } from "../../../../shared/schemas/telemedicine";
 
@@ -39,6 +40,7 @@ const AssignmentCard = ({ booking, timezone }: { booking: TelemedicineAssignment
           <p className="text-xs text-slate-500">{booking.id}</p>
           <p className="mt-1 text-sm text-slate-700">{booking.clientFullName ?? booking.clientUserId}</p>
           <p className="text-xs text-slate-500">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
+          <PreferenceSummary bookingId={booking.id} />
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           {booking.assignableProviders.length === 0 ? (

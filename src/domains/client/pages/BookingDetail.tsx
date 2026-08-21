@@ -26,6 +26,7 @@ import { Modal } from "../../../shared/components/Modal";
 import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
 import { TechnicalIssueDialog } from "../../../shared/components/TechnicalIssueDialog";
+import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
@@ -215,6 +216,9 @@ const BookingDetailPage = () => {
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
+      {booking.paymentReviewPending && (
+        <PaymentReviewNotice />
+      )}
       {/* Header Info */}
       <div className="space-y-3 border-b border-slate-100 pb-4">
         <div className="flex items-center justify-between">
