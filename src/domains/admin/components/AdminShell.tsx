@@ -40,6 +40,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
       { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
       { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
       { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
+      { label: "Reviews", to: "/admin/finance/reviews", icon: <AssignmentIcon /> },
       { label: "Self Care", to: "/admin/selfcare", icon: <ShieldOutlinedIcon /> },
       { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread },
       { label: "Settings", to: "/admin/settings", icon: <SettingsApplicationsIcon /> }
@@ -58,6 +59,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
     { label: "Facilities", to: "/admin/facilities", icon: <BusinessIcon /> },
     { label: "Map", to: "/admin/providers/directory", icon: <MapIcon /> },
     { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
+    { label: "Reviews", to: "/admin/finance/reviews", icon: <AssignmentIcon /> },
     { label: "Inbox", to: "/admin/conversations", icon: <ForumIcon />, badge: conversationUnread },
     { label: "Settings", to: "/admin/system-settings", icon: <SettingsApplicationsIcon /> }
   ];

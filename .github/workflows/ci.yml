@@ -1,11 +1,10 @@
 name: Frontend CI
 
 on:
+  # Every pull request, whatever it targets. Filtering by base branch meant a PR stacked on
+  # another feature branch ran only the Vercel deployment check -- so the tests and the build
+  # never ran, and the PR still showed a full row of green ticks.
   pull_request:
-    branches:
-      - dev
-      - main
-      - master
   push:
     branches:
       - dev
