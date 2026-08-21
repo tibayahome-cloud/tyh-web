@@ -6,6 +6,11 @@ import { Button } from "../../../shared/components/Button";
 import { Input } from "../../../shared/components/Input";
 import { Stepper } from "../../../shared/components/Stepper";
 import { Loading } from "../../../shared/components/Loading";
+import { useMutation } from "@tanstack/react-query";
+
+import { saveProviderPreference } from "../../../shared/libs/telemedicineOps";
+import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
+import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
@@ -96,6 +101,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
+  const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -120,6 +126,10 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const createHoldMutation = useCreateHoldMutation();
   const releaseHoldMutation = useReleaseHoldMutation();
   const initiatePaymentMutation = useInitiateHoldPaymentMutation();
+  const savePreference = useMutation({
+    mutationFn: ({ bookingId, preference: next }: { bookingId: string; preference: Partial<ProviderPreference> }) =>
+      saveProviderPreference(bookingId, next)
+  });
 
   const selectedService = servicesQuery.data?.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
@@ -204,6 +214,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       return;
     }
     try {
+      // Saved before payment is requested, so a preference the client took the trouble to
+      // express is recorded even if the M-Pesa prompt is never approved. A failure here must
+      // not block the payment: an unsaved preference is a disappointment, an unpaid booking is
+      // a lost appointment.
+      if (hold?.bookingId && Object.values(preference).some(Boolean)) {
+        try {
+          await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
+        } catch {
+          // Intentionally swallowed; see above.
+        }
+      }
       await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
       toast.showToast({
         title: "Payment initiated",
@@ -338,6 +359,16 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 {formatCurrency(selectedFacility.priceCents, selectedFacility.currency)}
               </p>
             </div>
+
+            {/* Offered here because the booking now exists but no provider is assigned yet,
+                which is exactly the window the backend allows a preference to be set in. */}
+            {!holdExpired && !paymentConfirmed && hold?.bookingId && (
+              <ProviderPreferenceFields
+                value={preference}
+                onChange={setPreference}
+                disabled={savePreference.isPending}
+              />
+            )}
 
             {!holdExpired && !paymentConfirmed && (
               <p className="text-xs text-amber-700">
