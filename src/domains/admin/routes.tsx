@@ -32,6 +32,7 @@ const AdminConversationsPage = lazy(() => import("./pages/ConversationsPage"));
 const FinanceOverviewPage = lazy(() => import("./pages/finance/OverviewPage"));
 const FinancePaymentsPage = lazy(() => import("./pages/finance/PaymentsPage"));
 const FinanceWithdrawalsPage = lazy(() => import("./pages/finance/WithdrawalsPage"));
+const ReviewQueuePage = lazy(() => import("./pages/finance/ReviewQueuePage"));
 const AdminAccountSettingsPage = lazy(() => import("./pages/system/AdminAccountSettingsPage"));
 const SystemSettingsPage = lazy(() => import("./pages/system/SystemSettingsPage"));
 const AdminSelfCareAlertsPage = lazy(() => import("./pages/selfcare/AlertsPage"));
@@ -110,6 +111,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <FinanceWithdrawalsPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "finance/reviews",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <ReviewQueuePage />
           </Suspense>
         )
       },
