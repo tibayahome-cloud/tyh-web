@@ -6,8 +6,10 @@ import classNames from "classnames";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
+import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
 import { useBookingDetail, useMarkBookingMutation } from "../../../shared/hooks/useBookings";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { Loading } from "../../../shared/components/Loading";
 import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
@@ -68,8 +70,17 @@ const ProviderBookingDetailPage = () => {
   const { user } = useAuth();
   const profileQuery = useProviderProfile(user?.id);
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
+  const policyQuery = useTelemedicinePolicy();
   const booking = detailQuery.data;
   const financialsVisible = !profileQuery.isLoading && providerFinancialsAreVisible(profileQuery.data);
+  const canReschedule =
+    Boolean(booking?.isTelemedicine) &&
+    booking?.status === "scheduled" &&
+    Boolean(booking.scheduledAt) &&
+    Boolean(policyQuery.data) &&
+    Date.now() <
+      new Date(booking.scheduledAt as string).getTime() -
+        (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000;
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
@@ -220,6 +231,14 @@ const ProviderBookingDetailPage = () => {
               </div>
 
             </Card>
+
+            {booking.isTelemedicine && user?.id && (
+              <ReschedulePanel
+                bookingId={booking.id}
+                currentUserId={String(user.id)}
+                canReschedule={canReschedule}
+              />
+            )}
 
             {/* Service Notes Panel - shown during active service */}
             {["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider"].includes(booking.status) && (
