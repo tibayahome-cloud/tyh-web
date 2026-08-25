@@ -198,6 +198,23 @@ export const assignProvider = async (
   };
 };
 
+export const reassignProvider = async (
+  bookingId: string,
+  providerUserId: string,
+  reason?: string
+): Promise<{ id: string; status: string; providerUserId: string | null }> => {
+  const response = await api.post(`/telemedicine/bookings/${bookingId}/reassign`, {
+    provider_user_id: providerUserId,
+    ...(reason?.trim() ? { reason: reason.trim() } : {})
+  });
+  const data = (response.data?.data ?? {}) as Record<string, unknown>;
+  return {
+    id: typeof data.id === "string" ? data.id : bookingId,
+    status: typeof data.status === "string" ? data.status : "",
+    providerUserId: typeof data.provider_user_id === "string" ? data.provider_user_id : null
+  };
+};
+
 export const fetchTelemedicinePolicy = async (): Promise<TelemedicinePolicy> => {
   const response = await api.get("/telemedicine/policy");
   const policy = mapTelemedicinePolicy(response.data?.data);

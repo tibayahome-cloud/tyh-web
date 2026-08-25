@@ -18,6 +18,7 @@ import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
+import TelemedicineReassignModal from "../../components/TelemedicineReassignModal";
 import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
 import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
 import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
@@ -46,6 +47,13 @@ const AdminBookingDetailPage = () => {
 
   const booking = detailQuery.data;
   const events = eventsQuery.data ?? [];
+  const canReassignTelemedicine = Boolean(
+    booking?.isTelemedicine &&
+      booking.provider &&
+      !booking.telemedicineSession?.providerJoinedAt &&
+      !booking.telemedicineSession?.clientJoinedAt &&
+      !["in_progress", "ended", "expired", "technical_review"].includes(booking.telemedicineSession?.status ?? "")
+  );
 
   const handleCancelConfirm = async () => {
     if (!booking) {
@@ -136,6 +144,11 @@ const AdminBookingDetailPage = () => {
               Reassign provider
             </Button>
           )}
+          {canReassignTelemedicine && (
+            <Button variant="secondary" onClick={() => setReassignOpen(true)}>
+              Reassign provider
+            </Button>
+          )}
           {STK_PUSH_ELIGIBLE_STATUSES.includes(booking.status) && (
             <Button variant="secondary" onClick={openStkPushModal}>
               Request payment (STK push)
@@ -178,7 +191,7 @@ const AdminBookingDetailPage = () => {
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Provider assignment changes for remote consultations are handled from the telemedicine assignment workspace.
+            Provider assignment changes for remote consultations are handled from the telemedicine assignment workspace or this booking.
             <Link className="ml-1 font-semibold text-primary-700 hover:underline" to="/admin/telemedicine">
               Open workspace
             </Link>
@@ -215,12 +228,22 @@ const AdminBookingDetailPage = () => {
           </ol>
         )}
       </Card>
-      <ReassignBookingModal
-        bookingId={reassignOpen ? booking.id : null}
-        open={reassignOpen}
-        onClose={() => setReassignOpen(false)}
-        onSuccess={() => detailQuery.refetch()}
-      />
+      {booking.isTelemedicine ? (
+        <TelemedicineReassignModal
+          bookingId={reassignOpen ? booking.id : null}
+          currentProviderName={booking.provider?.fullName}
+          open={reassignOpen}
+          onClose={() => setReassignOpen(false)}
+          onSuccess={() => detailQuery.refetch()}
+        />
+      ) : (
+        <ReassignBookingModal
+          bookingId={reassignOpen ? booking.id : null}
+          open={reassignOpen}
+          onClose={() => setReassignOpen(false)}
+          onSuccess={() => detailQuery.refetch()}
+        />
+      )}
       <ConfirmDialog
         open={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}

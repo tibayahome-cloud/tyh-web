@@ -18,6 +18,7 @@ import {
   releaseHold,
   reportNoShow,
   reportTechnicalIssue,
+  reassignProvider,
   reviewTechnicalIssue
 } from "../libs/telemedicine";
 import type { TechnicalIssueCategory } from "../schemas/telemedicine";
@@ -243,6 +244,19 @@ export const useAssignProviderMutation = () => {
       assignProvider(bookingId, providerUserId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
+    }
+  });
+};
+
+export const useReassignTelemedicineProviderMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, providerUserId }: { bookingId: string; providerUserId: string }) =>
+      reassignProvider(bookingId, providerUserId),
+    onSuccess: (_result, { bookingId }) => {
+      queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
     }
   });
