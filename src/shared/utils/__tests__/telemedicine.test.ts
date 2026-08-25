@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTelemedicineDateTime, isWithinJoinWindow } from "../telemedicine";
+import { formatTelemedicineDateTime, isWithinJoinWindow, splitTelemedicineBookings } from "../telemedicine";
 
 describe("isWithinJoinWindow", () => {
   const scheduledAt = "2026-08-13T12:00:00.000Z";
@@ -55,5 +55,21 @@ describe("formatTelemedicineDateTime", () => {
   it("returns a fallback label for a missing or invalid timestamp", () => {
     expect(formatTelemedicineDateTime(null)).toBe("Not scheduled");
     expect(formatTelemedicineDateTime("not-a-date")).toBe("Not scheduled");
+  });
+});
+
+describe("splitTelemedicineBookings", () => {
+  it("keeps active sessions upcoming and moves completed or expired consultations to history", () => {
+    const result = splitTelemedicineBookings([
+      { id: "scheduled", status: "scheduled", telemedicineSession: { status: "scheduled" } },
+      { id: "active", status: "broadcasting", telemedicineSession: { status: "in_progress" } },
+      { id: "ended", status: "fully_completed", telemedicineSession: { status: "ended" } },
+      { id: "expired", status: "scheduled", telemedicineSession: { status: "expired" } },
+      { id: "unattended", status: "telemedicine_unattended", telemedicineSession: { status: "expired" } },
+      { id: "cancelled", status: "cancelled_by_client", telemedicineSession: null }
+    ]);
+
+    expect(result.upcoming.map((booking) => booking.id)).toEqual(["scheduled", "active"]);
+    expect(result.history.map((booking) => booking.id)).toEqual(["ended", "expired", "unattended", "cancelled"]);
   });
 });

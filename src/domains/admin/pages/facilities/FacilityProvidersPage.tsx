@@ -17,6 +17,10 @@ import {
   updateFacilityProvider,
   updateFacilityProviderLifecycle
 } from "../../../../shared/libs/facilities";
+import {
+  fetchTelemedicineSubcategories,
+  type TelemedicineSubcategory
+} from "../../../../shared/libs/telemedicineCatalog";
 import type { Provider } from "../../../../shared/schemas/provider";
 import type { ProviderCompensationMode } from "../../../../shared/schemas/facility";
 
@@ -26,7 +30,9 @@ type ProviderForm = {
   fullName: string;
   email: string;
   phone: string;
+  gender: string;
   serviceIds: string[];
+  telemedicineSubcategoryIds: string[];
   mode: ProviderCompensationMode;
   fixedPayout: string;
   percentage: string;
@@ -67,7 +73,9 @@ const emptyForm: ProviderForm = {
   fullName: "",
   email: "",
   phone: "",
+  gender: "",
   serviceIds: [],
+  telemedicineSubcategoryIds: [],
   mode: "employee",
   fixedPayout: "",
   percentage: "",
@@ -78,7 +86,11 @@ const providerToForm = (provider: Provider): ProviderForm => ({
   fullName: provider.user?.fullName ?? "",
   email: provider.user?.email ?? "",
   phone: provider.user?.phone ?? "",
+  gender: provider.gender ?? "",
   serviceIds: provider.services.map((service) => service.serviceId),
+  telemedicineSubcategoryIds: provider.telemedicineSubcategoryAssignments
+    .filter((assignment) => assignment.status === "active")
+    .map((assignment) => assignment.subcategoryId),
   mode: provider.compensation.mode,
   fixedPayout: provider.compensation.fixedPayoutCents === null ? "" : String(provider.compensation.fixedPayoutCents / 100),
   percentage: provider.compensation.payoutPercentage === null ? "" : String(provider.compensation.payoutPercentage),
@@ -88,10 +100,12 @@ const providerToForm = (provider: Provider): ProviderForm => ({
 const ProviderFormFields = ({
   form,
   services,
+  telemedicineSubcategories,
   onChange
 }: {
   form: ProviderForm;
   services: Array<{ serviceId: string; service?: { name?: string | null } | null }>;
+  telemedicineSubcategories: TelemedicineSubcategory[];
   onChange: (next: ProviderForm) => void;
 }) => {
   const toggleService = (serviceId: string) => {
@@ -103,12 +117,43 @@ const ProviderFormFields = ({
     });
   };
 
+  const toggleTelemedicineSubcategory = (subcategoryId: string) => {
+    onChange({
+      ...form,
+      telemedicineSubcategoryIds: form.telemedicineSubcategoryIds.includes(subcategoryId)
+        ? form.telemedicineSubcategoryIds.filter((id) => id !== subcategoryId)
+        : [...form.telemedicineSubcategoryIds, subcategoryId]
+    });
+  };
+
+  const groupedSubcategories = useMemo(() => {
+    const groups = new Map<string, { name: string; items: TelemedicineSubcategory[] }>();
+    telemedicineSubcategories.forEach((subcategory) => {
+      const category = subcategory.category;
+      const key = category?.id ?? "uncategorized";
+      const group = groups.get(key) ?? { name: category?.name ?? "Other", items: [] };
+      group.items.push(subcategory);
+      groups.set(key, group);
+    });
+    return Array.from(groups.values());
+  }, [telemedicineSubcategories]);
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Full name" value={form.fullName} onChange={(event) => onChange({ ...form, fullName: event.target.value })} required />
         <Input label="Email" type="email" value={form.email} onChange={(event) => onChange({ ...form, email: event.target.value })} />
         <Input label="Phone" placeholder="+254..." value={form.phone} onChange={(event) => onChange({ ...form, phone: event.target.value })} />
+        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <span>Gender</span>
+          <select className="rounded-xl border border-slate-200 bg-white px-4 py-3" value={form.gender} onChange={(event) => onChange({ ...form, gender: event.target.value })}>
+            <option value="">Not specified</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+            <option value="other">Other</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </select>
+        </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           <span>Compensation</span>
           <select className="rounded-xl border border-slate-200 bg-white px-4 py-3" value={form.mode} onChange={(event) => onChange({ ...form, mode: event.target.value as ProviderCompensationMode })}>
@@ -131,6 +176,30 @@ const ProviderFormFields = ({
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="mb-1 text-sm font-semibold text-slate-700">Telemedicine specialties</legend>
+        <p className="mb-2 text-xs text-slate-500">Assign subcategories that this provider can handle remotely.</p>
+        {groupedSubcategories.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">No active telemedicine subcategories are available.</p>
+        ) : (
+          <div className="space-y-3">
+            {groupedSubcategories.map((group) => (
+              <div key={group.name}>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.name}</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {group.items.map((subcategory) => (
+                    <label key={subcategory.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                      <input type="checkbox" checked={form.telemedicineSubcategoryIds.includes(subcategory.id)} onChange={() => toggleTelemedicineSubcategory(subcategory.id)} />
+                      {subcategory.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </fieldset>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
@@ -165,6 +234,11 @@ const FacilityProvidersPage = () => {
     queryFn: () => fetchFacilityServices(facilityId as string),
     enabled: Boolean(facilityId)
   });
+  const telemedicineSubcategoriesQuery = useQuery({
+    queryKey: ["telemedicine", "catalog", "subcategories"],
+    queryFn: () => fetchTelemedicineSubcategories(),
+    enabled: Boolean(facilityId)
+  });
   const services = useMemo(() => servicesQuery.data?.filter((service) => service.active) ?? [], [servicesQuery.data]);
   const invalidateProviders = () => void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
 
@@ -173,7 +247,9 @@ const FacilityProvidersPage = () => {
       fullName: form.fullName,
       email: form.email || undefined,
       phone: form.phone || undefined,
+      gender: form.gender || null,
       serviceIds: form.serviceIds,
+      telemedicineSubcategoryIds: form.telemedicineSubcategoryIds,
       invitationChannel: form.email ? "email" : "sms",
       compensation: {
         mode: form.mode,
@@ -196,7 +272,9 @@ const FacilityProvidersPage = () => {
         fullName: form.fullName,
         email: form.email || null,
         phone: form.phone || null,
+        gender: form.gender || null,
         serviceIds: form.serviceIds,
+        telemedicineSubcategoryIds: form.telemedicineSubcategoryIds,
         providerFinancialsVisible: form.visibility === "inherit" ? null : form.visibility === "visible",
         compensation: {
           mode: form.mode,
@@ -265,7 +343,7 @@ const FacilityProvidersPage = () => {
 
       {(showForm || editingProvider) && (
         <Card title={editingProvider ? "Edit provider" : "Add provider"} subtitle={editingProvider ? "Changes apply only to this facility provider." : "The provider will receive an invitation when an email is supplied."}>
-          <ProviderFormFields form={form} services={services} onChange={setForm} />
+          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} onChange={setForm} />
           {(createMutation.error || updateMutation.error) && (
             <p className="mt-4 text-sm text-danger-600">
               {getApiError(createMutation.error || updateMutation.error, "Unable to save provider")}
@@ -285,7 +363,7 @@ const FacilityProvidersPage = () => {
         <div className="divide-y divide-slate-100">
           {providersQuery.data?.providers.map((provider) => (
             <div key={provider.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
-              <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p></div>
+              <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.telemedicineSubcategoryAssignments.length} remote specialties · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p></div>
               <div className="flex flex-col gap-2 sm:items-end">
                 {/* State first, on its own line -- actions below, so the two never mix into one wrapped blob. */}
                 <div className="flex flex-wrap gap-1.5 text-xs font-semibold sm:justify-end">

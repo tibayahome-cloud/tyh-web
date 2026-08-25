@@ -16,6 +16,7 @@ import { Button } from "../../../shared/components/Button";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { BookingNotesPanel } from "../components/BookingNotesPanel";
 import type { Booking } from "../../../shared/schemas/booking";
+import { BOOKING_STATUS_TELEMEDICINE_UNATTENDED } from "../../../shared/schemas/telemedicine";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 
 const ACTION_COPY: Record<
@@ -75,12 +76,13 @@ const ProviderBookingDetailPage = () => {
   const financialsVisible = !profileQuery.isLoading && providerFinancialsAreVisible(profileQuery.data);
   const canReschedule =
     Boolean(booking?.isTelemedicine) &&
-    booking?.status === "scheduled" &&
-    Boolean(booking.scheduledAt) &&
-    Boolean(policyQuery.data) &&
-    Date.now() <
-      new Date(booking.scheduledAt as string).getTime() -
-        (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000;
+    (booking?.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED ||
+      (booking?.status === "scheduled" &&
+        Boolean(booking.scheduledAt) &&
+        Boolean(policyQuery.data) &&
+        Date.now() <
+          new Date(booking.scheduledAt as string).getTime() -
+            (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000));
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);

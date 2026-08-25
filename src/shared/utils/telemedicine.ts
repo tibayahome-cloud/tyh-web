@@ -1,3 +1,5 @@
+import { BOOKING_STATUS_TELEMEDICINE_UNATTENDED } from "../schemas/telemedicine";
+
 // Fallback only for screens rendered before GET /telemedicine/policy resolves; once loaded, the
 // live joinWindowBeforeMinutes from useTelemedicinePolicy() should always be passed in instead.
 // The backend re-enforces the real window itself regardless -- this only gates button visibility.
@@ -5,9 +7,9 @@ const JOIN_WINDOW_BEFORE_MINUTES_FALLBACK = 10;
 const JOIN_WINDOW_AFTER_MINUTES = 30;
 const DEFAULT_DURATION_MINUTES = 60;
 
-// Kenya is the only supported country in V1.2 (SUPPORTED_COUNTRY_CODES = ("KE",) on the
-// backend), so this is a safe non-arbitrary default while the policy query is still loading --
-// not a guess, the only value it could currently be.
+// Kenya is currently the only supported country (SUPPORTED_COUNTRY_CODES = ("KE",) on the
+// backend), so this is a safe default while the policy query is still loading. The policy
+// endpoint remains authoritative when the supported-country configuration expands.
 export const TELEMEDICINE_DEFAULT_TIMEZONE = "Africa/Nairobi";
 
 export const isWithinJoinWindow = (
@@ -59,3 +61,31 @@ export const formatTelemedicineDateTime = (
   if (Number.isNaN(date.getTime())) return "Not scheduled";
   return new Intl.DateTimeFormat(undefined, { ...options, timeZone: timezone }).format(date);
 };
+
+const TERMINAL_TELEMEDICINE_BOOKING_STATUSES = new Set([
+  "fully_completed",
+  "completed_by_provider",
+  "client_completed",
+  "client_confirmed",
+  "cancelled_by_client",
+  "cancelled_by_admin",
+  "expired_no_accept",
+  "telemedicine_cancelled_payment_review",
+  BOOKING_STATUS_TELEMEDICINE_UNATTENDED,
+  "disputed"
+]);
+
+export const isHistoricalTelemedicineBooking = (booking: {
+  status: string;
+  telemedicineSession?: { status?: string | null } | null;
+}): boolean => {
+  if (TERMINAL_TELEMEDICINE_BOOKING_STATUSES.has(booking.status)) return true;
+  return booking.telemedicineSession?.status === "ended" || booking.telemedicineSession?.status === "expired";
+};
+
+export const splitTelemedicineBookings = <T extends { status: string; telemedicineSession?: { status?: string | null } | null }>(
+  bookings: T[]
+) => ({
+  upcoming: bookings.filter((booking) => !isHistoricalTelemedicineBooking(booking)),
+  history: bookings.filter(isHistoricalTelemedicineBooking)
+});

@@ -10,7 +10,7 @@ import { useAuth } from "../../../shared/hooks/useAuth";
 import { useBookingList } from "../../../shared/hooks/useBookings";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../shared/utils/bookingStatus";
-import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
+import { formatTelemedicineDateTime, splitTelemedicineBookings } from "../../../shared/utils/telemedicine";
 import type { Booking } from "../../../shared/schemas/booking";
 import { TelemedicineRequestDialog } from "../components/TelemedicineRequestDialog";
 
@@ -69,7 +69,8 @@ const ClientTelemedicinePage = () => {
     { enabled: Boolean(user?.id) }
   );
 
-  const consultations = useMemo(() => (data?.bookings ?? []).filter((booking) => booking.isTelemedicine), [data]);
+  const consultations = useMemo(() => splitTelemedicineBookings((data?.bookings ?? []).filter((booking) => booking.isTelemedicine)), [data]);
+  const hasConsultations = consultations.upcoming.length > 0 || consultations.history.length > 0;
 
   const handleCreated = (bookingId: string) => {
     setDialogOpen(false);
@@ -95,7 +96,7 @@ const ClientTelemedicinePage = () => {
         <div className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold text-slate-700">Upcoming consultations</h2>
           {isLoading && <Loading />}
-          {!isLoading && consultations.length === 0 && (
+          {!isLoading && !hasConsultations && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-white py-12 text-center">
               <Video size={24} className="mb-2 text-slate-300" />
               <p className="text-sm font-semibold text-slate-900">No consultations yet</p>
@@ -104,8 +105,11 @@ const ClientTelemedicinePage = () => {
               </p>
             </div>
           )}
+          {!isLoading && consultations.upcoming.length === 0 && consultations.history.length > 0 && (
+            <p className="rounded-2xl border border-slate-100 bg-white px-4 py-6 text-sm text-slate-500">No upcoming consultations.</p>
+          )}
           <div className="grid gap-2 sm:grid-cols-2">
-            {consultations.map((booking) => (
+            {consultations.upcoming.map((booking) => (
               <ConsultationCard
                 key={booking.id}
                 booking={booking}
@@ -115,6 +119,22 @@ const ClientTelemedicinePage = () => {
             ))}
           </div>
         </div>
+
+        {!isLoading && consultations.history.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-slate-700">Consultation history</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {consultations.history.map((booking) => (
+                <ConsultationCard
+                  key={booking.id}
+                  booking={booking}
+                  timezone={policyQuery.data?.defaultTimezone}
+                  onClick={() => navigate(`/app/bookings/${booking.id}`)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <TelemedicineRequestDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={handleCreated} />

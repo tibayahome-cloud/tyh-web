@@ -18,8 +18,10 @@ import {
   releaseHold,
   reportNoShow,
   reportTechnicalIssue,
+  reassignProvider,
   reviewTechnicalIssue
 } from "../libs/telemedicine";
+import { fetchRescheduleRequests } from "../libs/telemedicineOps";
 import type { TechnicalIssueCategory } from "../schemas/telemedicine";
 import { bookingKeys } from "./useBookings";
 
@@ -32,7 +34,21 @@ export const telemedicineKeys = {
   assignments: () => ["telemedicine", "assignments"] as const,
   policy: () => ["telemedicine", "policy"] as const,
   jitsiHealth: () => ["telemedicine", "jitsi-health"] as const,
-  technicalIssues: () => ["telemedicine", "technical-issues"] as const
+  technicalIssues: () => ["telemedicine", "technical-issues"] as const,
+  reschedules: (bookingId: string) => ["telemedicine", "reschedules", bookingId] as const
+};
+
+export const useTelemedicineReschedules = (bookingId: string | null, options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: telemedicineKeys.reschedules(bookingId ?? "unknown"),
+    queryFn: () => {
+      if (!bookingId) {
+        return Promise.reject(new Error("bookingId required"));
+      }
+      return fetchRescheduleRequests(bookingId);
+    },
+    enabled: Boolean(bookingId) && (options?.enabled ?? true)
+  });
 };
 
 // The join/cancellation window, supported countries, and display timezone are backend policy,
@@ -243,6 +259,19 @@ export const useAssignProviderMutation = () => {
       assignProvider(bookingId, providerUserId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
+    }
+  });
+};
+
+export const useReassignTelemedicineProviderMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, providerUserId }: { bookingId: string; providerUserId: string }) =>
+      reassignProvider(bookingId, providerUserId),
+    onSuccess: (_result, { bookingId }) => {
+      queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
     }
   });

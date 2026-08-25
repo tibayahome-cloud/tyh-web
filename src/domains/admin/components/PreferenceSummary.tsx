@@ -20,8 +20,8 @@ const LANGUAGE_LABEL: Record<string, string> = { en: "English", sw: "Kiswahili" 
  * where a real one would appear.
  *
  * The system can only verify some of this. Gender and language are matched where the provider
- * recorded them; specialty and the free-text note are not matched at all and are here precisely
- * because a person can act on them when software cannot.
+ * recorded them; the free-text note is not matched automatically and is shown so an operator can
+ * act on it when software cannot.
  */
 export const PreferenceSummary = ({ bookingId }: Props) => {
   const { data: preference } = useQuery({
@@ -36,8 +36,7 @@ export const PreferenceSummary = ({ bookingId }: Props) => {
     preference.preferredGender ? GENDER_LABEL[preference.preferredGender] : null,
     preference.preferredLanguage
       ? `speaks ${LANGUAGE_LABEL[preference.preferredLanguage] ?? preference.preferredLanguage}`
-      : null,
-    preference.preferredSpecialty ? `${preference.preferredSpecialty}` : null
+      : null
   ].filter(Boolean);
 
   if (!parts.length && !preference.note) return null;

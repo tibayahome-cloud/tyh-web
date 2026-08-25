@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   acceptReschedule,
   cancelReschedule,
-  declineReschedule,
   fetchRescheduleRequests,
   proposeReschedule,
   type RescheduleRequest
@@ -40,9 +39,9 @@ const formatWhen = (iso: string | null) =>
  * moved or did not.
  *
  * Which actions appear depends on who is looking. You may withdraw your own proposal but not
- * answer it; the other participant may accept or decline but not withdraw. That mirrors the
- * backend, which refuses the rest, so the interface never offers something that will be
- * rejected.
+ * answer it; the other participant may accept it but does not need a separate decline workflow.
+ * Participants can discuss the proposal outside the system, then accept the agreed time or
+ * withdraw and make another proposal.
  */
 export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Props) => {
   const queryClient = useQueryClient();
@@ -75,12 +74,10 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
   });
 
   const respond = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "accept" | "decline" | "cancel" }) =>
+    mutationFn: ({ id, action }: { id: string; action: "accept" | "cancel" }) =>
       action === "accept"
         ? acceptReschedule(id)
-        : action === "decline"
-          ? declineReschedule(id)
-          : cancelReschedule(id),
+        : cancelReschedule(id),
     onSuccess: () => {
       setError(null);
       refresh();
@@ -133,15 +130,6 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
                   onClick={() => respond.mutate({ id: open.id, action: "accept" })}
                 >
                   Accept this time
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  loading={respond.isPending}
-                  onClick={() => respond.mutate({ id: open.id, action: "decline" })}
-                >
-                  Decline
                 </Button>
               </>
             )}
