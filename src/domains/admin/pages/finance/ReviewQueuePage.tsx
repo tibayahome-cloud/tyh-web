@@ -33,7 +33,8 @@ const CATEGORY_TONE: Record<ReviewCategory, string> = {
  * refuses, so the interface points at the right place instead of offering a button that fails.
  */
 const ANSWERED_ELSEWHERE: Partial<Record<ReviewCategory, string>> = {
-  reschedule_escalation: "Open the booking to accept or decline the proposed time"
+  reschedule_escalation:
+    "Open the booking to review the proposal; the client or provider must accept or decline it"
 };
 
 const formatWhen = (iso: string | null) =>

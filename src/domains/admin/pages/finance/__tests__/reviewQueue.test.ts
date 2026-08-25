@@ -16,7 +16,8 @@ const CATEGORY_LABEL = {
 };
 
 const ANSWERED_ELSEWHERE = {
-  reschedule_escalation: "Open the booking to accept or decline the proposed time"
+  reschedule_escalation:
+    "Open the booking to review the proposal; the client or provider must accept or decline it"
 };
 
 describe("categories", () => {
@@ -43,7 +44,9 @@ describe("items answered elsewhere", () => {
   it("points at the right place rather than offering a button that fails", () => {
     // The backend refuses to close a reschedule from the queue, because doing so would leave
     // the appointment unchanged and the client still waiting.
-    expect(ANSWERED_ELSEWHERE.reschedule_escalation).toMatch(/accept or decline/i);
+    expect(ANSWERED_ELSEWHERE.reschedule_escalation).toMatch(
+      /client or provider must accept or decline/i,
+    );
   });
 
   it("only diverts the categories that genuinely resolve elsewhere", () => {
