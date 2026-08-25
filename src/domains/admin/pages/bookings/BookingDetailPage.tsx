@@ -131,9 +131,11 @@ const AdminBookingDetailPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setReassignOpen(true)}>
-            Reassign provider
-          </Button>
+          {!booking.isTelemedicine && (
+            <Button variant="secondary" onClick={() => setReassignOpen(true)}>
+              Reassign provider
+            </Button>
+          )}
           {STK_PUSH_ELIGIBLE_STATUSES.includes(booking.status) && (
             <Button variant="secondary" onClick={openStkPushModal}>
               Request payment (STK push)
@@ -175,6 +177,12 @@ const AdminBookingDetailPage = () => {
               </p>
             </div>
           </div>
+          <p className="mt-4 text-xs text-slate-500">
+            Provider assignment changes for remote consultations are handled from the telemedicine assignment workspace.
+            <Link className="ml-1 font-semibold text-primary-700 hover:underline" to="/admin/telemedicine">
+              Open workspace
+            </Link>
+          </p>
         </Card>
       ) : (
         <BookingLiveMapCard bookingId={booking.id} role="admin" onOpenChat={dispatchChat} />
