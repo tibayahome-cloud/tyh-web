@@ -4,11 +4,13 @@ import { useState } from "react";
 import { ServiceCatalogPanel } from "./CatalogPage";
 import { ServiceListPanel } from "./ServiceListPage";
 import { ServiceRequestsPanel } from "./RequestsPage";
+import TelemedicineCatalogPage from "./TelemedicineCatalogPage";
 
 const tabs = [
   { key: "categories", label: "Categories" },
   { key: "services", label: "Services" },
-  { key: "requests", label: "Requests" }
+  { key: "requests", label: "Requests" },
+  { key: "telemedicine", label: "Telemedicine" }
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
@@ -48,6 +50,7 @@ const ServiceManagementPage = () => {
       {activeTab === "categories" && <ServiceCatalogPanel />}
       {activeTab === "services" && <ServiceListPanel />}
       {activeTab === "requests" && <ServiceRequestsPanel />}
+      {activeTab === "telemedicine" && <TelemedicineCatalogPage />}
     </div>
   );
 };
