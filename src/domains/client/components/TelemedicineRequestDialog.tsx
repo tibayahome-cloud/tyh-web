@@ -10,6 +10,11 @@ import { useMutation } from "@tanstack/react-query";
 
 import { saveProviderPreference } from "../../../shared/libs/telemedicineOps";
 import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
+import {
+  fetchTelemedicineCatalogServices,
+  fetchTelemedicineCategories,
+  fetchTelemedicineSubcategories
+} from "../../../shared/libs/telemedicineCatalog";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
@@ -96,6 +101,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayISODate());
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
@@ -107,7 +114,22 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const policyQuery = useTelemedicinePolicy();
-  const servicesQuery = useRemoteServiceOptions(open);
+  const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
+  const categoriesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "categories"],
+    queryFn: fetchTelemedicineCategories,
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+  });
+  const subcategoriesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "subcategories", selectedCategoryId],
+    queryFn: () => fetchTelemedicineSubcategories(selectedCategoryId ?? undefined),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId && Boolean(selectedCategoryId)
+  });
+  const catalogServicesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "services", selectedSubcategoryId],
+    queryFn: () => fetchTelemedicineCatalogServices(selectedSubcategoryId ?? undefined),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId && Boolean(selectedSubcategoryId)
+  });
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
   });
@@ -131,7 +153,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       saveProviderPreference(bookingId, next)
   });
 
-  const selectedService = servicesQuery.data?.find((service) => service.id === selectedServiceId) ?? null;
+  const catalogServiceOptions = (catalogServicesQuery.data ?? []).map((service) => ({
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    base_price_cents: service.basePriceCents,
+    default_estimate_minutes: service.defaultEstimateMinutes,
+    remote_capable: true,
+    active: true
+  }));
+  const serviceOptions = serviceId ? servicesQuery.data ?? [] : catalogServiceOptions;
+  const selectedService = serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
 
   useEffect(() => {
@@ -177,6 +209,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     releaseCurrentHold();
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
+    setSelectedCategoryId(null);
+    setSelectedSubcategoryId(null);
     setSelectedFacility(null);
     setSelectedSlot(null);
     setHoldId(null);
@@ -247,12 +281,65 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         {step === TM_STEP_INDEX.service && (
           <div className="space-y-3">
             {!user?.countryCode && <CountryRequiredBanner onComplete={handleClose} />}
-            {servicesQuery.isLoading && <Loading />}
-            {!servicesQuery.isLoading && (servicesQuery.data ?? []).length === 0 && (
+            {serviceId ? (
+              servicesQuery.isLoading && <Loading />
+            ) : (
+              <>
+                <label className="block text-sm font-medium text-slate-700" htmlFor="telemedicine-category">
+                  Consultation area
+                </label>
+                <select
+                  id="telemedicine-category"
+                  value={selectedCategoryId ?? ""}
+                  onChange={(event) => {
+                    setSelectedCategoryId(event.target.value || null);
+                    setSelectedSubcategoryId(null);
+                    setSelectedServiceId(null);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                >
+                  <option value="">Select a consultation area</option>
+                  {(categoriesQuery.data ?? []).map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedCategoryId && (
+                  <>
+                    <label className="block text-sm font-medium text-slate-700" htmlFor="telemedicine-subcategory">
+                      Specialty
+                    </label>
+                    <select
+                      id="telemedicine-subcategory"
+                      value={selectedSubcategoryId ?? ""}
+                      onChange={(event) => {
+                        setSelectedSubcategoryId(event.target.value || null);
+                        setSelectedServiceId(null);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                    >
+                      <option value="">Select a specialty</option>
+                      {(subcategoriesQuery.data ?? []).map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {(categoriesQuery.isLoading || subcategoriesQuery.isLoading || catalogServicesQuery.isLoading) && <Loading />}
+              </>
+            )}
+            {!serviceId && selectedSubcategoryId && !catalogServicesQuery.isLoading && serviceOptions.length === 0 && (
+              <p className="text-sm text-slate-500">No consultations are available for this specialty right now.</p>
+            )}
+            {serviceId && !servicesQuery.isLoading && serviceOptions.length === 0 && (
               <p className="text-sm text-slate-500">No remote-consultation services are available right now.</p>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
-              {(servicesQuery.data ?? []).map((service) => (
+              {serviceOptions.map((service) => (
                 <button
                   key={service.id}
                   type="button"
