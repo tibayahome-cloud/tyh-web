@@ -335,9 +335,11 @@ const MonitoringPage = () => {
                 />
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Button variant="secondary" onClick={openReassignModal}>
-                  Reassign provider
-                </Button>
+                {!selectedBooking.isTelemedicine && (
+                  <Button variant="secondary" onClick={openReassignModal}>
+                    Reassign provider
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   className="border-rose-200 text-rose-600 hover:bg-rose-50"

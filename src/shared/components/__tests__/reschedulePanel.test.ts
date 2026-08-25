@@ -39,7 +39,7 @@ describe("what each outcome tells the reader", () => {
 });
 
 /** Mirrors the action rules in the panel, which mirror what the backend permits. */
-const actionsFor = (isMine: boolean) => (isMine ? ["cancel"] : ["accept", "decline"]);
+const actionsFor = (isMine: boolean) => (isMine ? ["cancel"] : ["accept"]);
 
 describe("who may do what to an open proposal", () => {
   it("lets the requester withdraw but not answer", () => {
@@ -50,7 +50,7 @@ describe("who may do what to an open proposal", () => {
   });
 
   it("lets the other participant answer but not withdraw", () => {
-    expect(actionsFor(false)).toEqual(["accept", "decline"]);
+    expect(actionsFor(false)).toEqual(["accept"]);
     expect(actionsFor(false)).not.toContain("cancel");
   });
 });

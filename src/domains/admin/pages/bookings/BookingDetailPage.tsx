@@ -13,13 +13,16 @@ import {
   useCancelBookingMutation,
   usePayBookingMutation
 } from "../../../../shared/hooks/useBookings";
+import { useTelemedicineReschedules } from "../../../../shared/hooks/useTelemedicine";
 import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
+import TelemedicineReassignModal from "../../components/TelemedicineReassignModal";
 import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
 import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
+import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
 
 const STK_PUSH_ELIGIBLE_STATUSES = ["client_completed", "completed_by_provider"];
 
@@ -27,6 +30,7 @@ const AdminBookingDetailPage = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const eventsQuery = useBookingEvents(bookingId ?? null);
+  const reschedulesQuery = useTelemedicineReschedules(bookingId ?? null, { enabled: Boolean(detailQuery.data?.isTelemedicine) });
   const cancelMutation = useCancelBookingMutation("detail");
   const stkPushMutation = usePayBookingMutation("detail");
   const toast = useToast();
@@ -45,6 +49,19 @@ const AdminBookingDetailPage = () => {
 
   const booking = detailQuery.data;
   const events = eventsQuery.data ?? [];
+  const reschedules = reschedulesQuery.data ?? [];
+  const participantLabel = (userId: string | null) => {
+    if (userId && userId === booking?.client?.id) return "Client";
+    if (userId && userId === booking?.provider?.id) return "Provider";
+    return "Participant";
+  };
+  const canReassignTelemedicine = Boolean(
+    booking?.isTelemedicine &&
+      booking.provider &&
+      !booking.telemedicineSession?.providerJoinedAt &&
+      !booking.telemedicineSession?.clientJoinedAt &&
+      !["in_progress", "ended", "expired", "technical_review"].includes(booking.telemedicineSession?.status ?? "")
+  );
 
   const handleCancelConfirm = async () => {
     if (!booking) {
@@ -130,9 +147,16 @@ const AdminBookingDetailPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setReassignOpen(true)}>
-            Reassign provider
-          </Button>
+          {!booking.isTelemedicine && (
+            <Button variant="secondary" onClick={() => setReassignOpen(true)}>
+              Reassign provider
+            </Button>
+          )}
+          {canReassignTelemedicine && (
+            <Button variant="secondary" onClick={() => setReassignOpen(true)}>
+              Reassign provider
+            </Button>
+          )}
           {STK_PUSH_ELIGIBLE_STATUSES.includes(booking.status) && (
             <Button variant="secondary" onClick={openStkPushModal}>
               Request payment (STK push)
@@ -152,7 +176,73 @@ const AdminBookingDetailPage = () => {
         </div>
       </div>
 
-      <BookingLiveMapCard bookingId={booking.id} role="admin" onOpenChat={dispatchChat} />
+      {booking.isTelemedicine ? (
+        <Card title="Video consultation" description="Remote appointment details and session state">
+          <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Appointment</p>
+              <p className="mt-1 font-medium">{formatTelemedicineDateTime(booking.scheduledAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Provider</p>
+              <p className="mt-1 font-medium">{booking.provider?.fullName ?? "Unassigned"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Session</p>
+              <p className="mt-1 font-medium">{booking.telemedicineSession?.status ?? "Not started"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration</p>
+              <p className="mt-1 font-medium">
+                {booking.estimateDurationMinutes ? `${booking.estimateDurationMinutes} minutes` : "Not provided"}
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-500">
+            Provider assignment changes for remote consultations are handled from the telemedicine assignment workspace or this booking.
+            <Link className="ml-1 font-semibold text-primary-700 hover:underline" to="/admin/telemedicine">
+              Open workspace
+            </Link>
+          </p>
+        </Card>
+      ) : (
+        <BookingLiveMapCard bookingId={booking.id} role="admin" onOpenChat={dispatchChat} />
+      )}
+
+      {booking.isTelemedicine && (reschedulesQuery.isLoading || reschedules.length > 0) && (
+        <Card title="Reschedule history" description="Proposals and responses recorded for this consultation">
+          {reschedulesQuery.isLoading ? (
+            <Loading />
+          ) : (
+            <ol className="space-y-3">
+              {reschedules.map((request) => (
+                <li key={request.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-slate-900">
+                      {participantLabel(request.requestedByUserId)} proposal
+                    </p>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold uppercase text-slate-600">
+                      {request.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-slate-700">
+                    {request.proposedStartAt
+                      ? formatTelemedicineDateTime(request.proposedStartAt)
+                      : "No proposed appointment time"}
+                  </p>
+                  {request.reason && <p className="mt-1 text-slate-500">Reason: {request.reason}</p>}
+                  {request.responseNote && <p className="mt-1 text-slate-500">Response: {request.responseNote}</p>}
+                  {request.resolvedAt && (
+                    <p className="mt-1 text-xs text-slate-400">
+                      Resolved {new Date(request.resolvedAt).toLocaleString()}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      )}
 
       <Card title="Event timeline" description="Audit trail for this booking">
         {eventsQuery.isLoading ? (
@@ -181,12 +271,22 @@ const AdminBookingDetailPage = () => {
           </ol>
         )}
       </Card>
-      <ReassignBookingModal
-        bookingId={reassignOpen ? booking.id : null}
-        open={reassignOpen}
-        onClose={() => setReassignOpen(false)}
-        onSuccess={() => detailQuery.refetch()}
-      />
+      {booking.isTelemedicine ? (
+        <TelemedicineReassignModal
+          bookingId={reassignOpen ? booking.id : null}
+          currentProviderName={booking.provider?.fullName}
+          open={reassignOpen}
+          onClose={() => setReassignOpen(false)}
+          onSuccess={() => detailQuery.refetch()}
+        />
+      ) : (
+        <ReassignBookingModal
+          bookingId={reassignOpen ? booking.id : null}
+          open={reassignOpen}
+          onClose={() => setReassignOpen(false)}
+          onSuccess={() => detailQuery.refetch()}
+        />
+      )}
       <ConfirmDialog
         open={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}

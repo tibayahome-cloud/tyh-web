@@ -14,7 +14,12 @@ import { useAuth } from "../../../shared/hooks/useAuth";
 import { bookingKeys, useBookingList } from "../../../shared/hooks/useBookings";
 import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../shared/utils/bookingStatus";
-import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
+import {
+  formatTelemedicineDateTime,
+  isWithinJoinWindow,
+  isWithinTechnicalIssueReportWindow,
+  splitTelemedicineBookings
+} from "../../../shared/utils/telemedicine";
 import type { Booking } from "../../../shared/schemas/booking";
 import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
 
@@ -26,7 +31,8 @@ const ConsultationRow = ({
   joinWindowBeforeMinutes,
   onJoin,
   onReportNoShow,
-  onReportTechnicalIssue
+  onReportTechnicalIssue,
+  interactive = true
 }: {
   booking: Booking;
   timezone: string | undefined;
@@ -34,15 +40,16 @@ const ConsultationRow = ({
   onJoin: () => void;
   onReportNoShow: () => void;
   onReportTechnicalIssue: () => void;
+  interactive?: boolean;
 }) => {
   const statusTheme = getBookingStatusTheme(booking.status);
   const sessionTheme = booking.telemedicineSession ? getSessionStatusTheme(booking.telemedicineSession.status) : null;
-  const withinWindow = isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), joinWindowBeforeMinutes);
+  const withinWindow = interactive && isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), joinWindowBeforeMinutes);
   const canJoin = booking.status === "scheduled" && withinWindow;
   const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
-  const canReportNoShow = !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status);
+  const canReportNoShow = interactive && !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status);
   // Reporting stays open for 24h after the call ends -- a longer, separate window from joining.
-  const canReportTechnicalIssue = isWithinTechnicalIssueReportWindow(
+  const canReportTechnicalIssue = interactive && isWithinTechnicalIssueReportWindow(
     booking.scheduledAt,
     booking.estimateDurationMinutes,
     Date.now(),
@@ -118,7 +125,7 @@ const ProviderTelemedicinePage = () => {
     { enabled: Boolean(user?.id) }
   );
 
-  const consultations = useMemo(() => (data?.bookings ?? []).filter((booking) => booking.isTelemedicine), [data]);
+  const consultations = useMemo(() => splitTelemedicineBookings((data?.bookings ?? []).filter((booking) => booking.isTelemedicine)), [data]);
 
   const handleReportNoShow = async () => {
     if (!reportBookingId) return;
@@ -163,7 +170,7 @@ const ProviderTelemedicinePage = () => {
         </div>
 
         {isLoading && <Loading />}
-        {!isLoading && consultations.length === 0 && (
+        {!isLoading && consultations.upcoming.length === 0 && consultations.history.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-white py-12 text-center">
             <Video size={24} className="mb-2 text-slate-300" />
             <p className="text-sm font-semibold text-slate-900">No consultations assigned yet</p>
@@ -177,8 +184,11 @@ const ProviderTelemedicinePage = () => {
             </Button>
           </div>
         )}
+        {!isLoading && consultations.upcoming.length === 0 && consultations.history.length > 0 && (
+          <p className="rounded-2xl border border-slate-100 bg-white px-4 py-6 text-sm text-slate-500">No upcoming consultations.</p>
+        )}
         <div className="grid gap-3">
-          {consultations.map((booking) => (
+          {consultations.upcoming.map((booking) => (
             <ConsultationRow
               key={booking.id}
               booking={booking}
@@ -193,6 +203,23 @@ const ProviderTelemedicinePage = () => {
             />
           ))}
         </div>
+        {!isLoading && consultations.history.length > 0 && (
+          <div className="mt-2 space-y-3">
+            <h2 className="text-sm font-semibold text-slate-700">Consultation history</h2>
+            {consultations.history.map((booking) => (
+              <ConsultationRow
+                key={booking.id}
+                booking={booking}
+                timezone={policyQuery.data?.defaultTimezone}
+                joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+                interactive={false}
+                onJoin={() => undefined}
+                onReportNoShow={() => undefined}
+                onReportTechnicalIssue={() => undefined}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {activeCallBookingId && (

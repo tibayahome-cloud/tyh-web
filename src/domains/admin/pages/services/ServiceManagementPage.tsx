@@ -3,14 +3,14 @@ import { useState } from "react";
 
 import { ServiceCatalogPanel } from "./CatalogPage";
 import { ServiceListPanel } from "./ServiceListPage";
-import { ServiceLocalizationPanel } from "./LocalizationPage";
 import { ServiceRequestsPanel } from "./RequestsPage";
+import TelemedicineCatalogPage from "./TelemedicineCatalogPage";
 
 const tabs = [
   { key: "categories", label: "Categories" },
   { key: "services", label: "Services" },
   { key: "requests", label: "Requests" },
-  { key: "localization", label: "Localization" }
+  { key: "telemedicine", label: "Telemedicine" }
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
@@ -24,7 +24,7 @@ const ServiceManagementPage = () => {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Service workspace</h1>
           <p className="text-sm text-slate-500">
-            Configure categories, manage localized metadata, and tune offerings without leaving this screen.
+            Configure categories, manage offerings, and review service requests without leaving this screen.
           </p>
         </div>
         <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 text-sm font-medium text-slate-600 shadow-sm">
@@ -50,7 +50,7 @@ const ServiceManagementPage = () => {
       {activeTab === "categories" && <ServiceCatalogPanel />}
       {activeTab === "services" && <ServiceListPanel />}
       {activeTab === "requests" && <ServiceRequestsPanel />}
-      {activeTab === "localization" && <ServiceLocalizationPanel />}
+      {activeTab === "telemedicine" && <TelemedicineCatalogPage />}
     </div>
   );
 };

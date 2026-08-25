@@ -1,21 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGet } = vi.hoisted(() => ({
-  mockGet: vi.fn()
+const { mockGet, mockPost } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+  mockPost: vi.fn()
 }));
 
 vi.mock("../api", () => ({
   __esModule: true,
   default: {
-    get: mockGet
+    get: mockGet,
+    post: mockPost
   }
 }));
 
-import { fetchJitsiHealth } from "../telemedicine";
+import { fetchJitsiHealth, reassignProvider } from "../telemedicine";
 
-describe("fetchJitsiHealth", () => {
+describe("telemedicine client", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("uses the dedicated telemedicine reassignment endpoint", async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { data: { id: "booking-1", status: "scheduled", provider_user_id: "provider-2" } }
+    });
+
+    await expect(reassignProvider("booking-1", "provider-2", "Provider unavailable")).resolves.toEqual({
+      id: "booking-1",
+      status: "scheduled",
+      providerUserId: "provider-2"
+    });
+    expect(mockPost).toHaveBeenCalledWith("/telemedicine/bookings/booking-1/reassign", {
+      provider_user_id: "provider-2",
+      reason: "Provider unavailable"
+    });
   });
 
   it("accepts the backend's 503 degraded response instead of treating it as a request failure", async () => {

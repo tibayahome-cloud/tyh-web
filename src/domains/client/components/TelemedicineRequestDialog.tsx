@@ -10,6 +10,11 @@ import { useMutation } from "@tanstack/react-query";
 
 import { saveProviderPreference } from "../../../shared/libs/telemedicineOps";
 import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
+import {
+  fetchTelemedicineCatalogServices,
+  fetchTelemedicineCategories,
+  fetchTelemedicineSubcategories
+} from "../../../shared/libs/telemedicineCatalog";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
@@ -96,18 +101,36 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayISODate());
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
+  const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const policyQuery = useTelemedicinePolicy();
-  const servicesQuery = useRemoteServiceOptions(open);
+  const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
+  const categoriesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "categories"],
+    queryFn: fetchTelemedicineCategories,
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+  });
+  const subcategoriesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "subcategories", selectedCategoryId],
+    queryFn: () => fetchTelemedicineSubcategories(selectedCategoryId ?? undefined),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId && Boolean(selectedCategoryId)
+  });
+  const catalogServicesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "services", selectedSubcategoryId],
+    queryFn: () => fetchTelemedicineCatalogServices(selectedSubcategoryId ?? undefined),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId && Boolean(selectedSubcategoryId)
+  });
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
   });
@@ -131,7 +154,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       saveProviderPreference(bookingId, next)
   });
 
-  const selectedService = servicesQuery.data?.find((service) => service.id === selectedServiceId) ?? null;
+  const catalogServiceOptions = (catalogServicesQuery.data ?? []).map((service) => ({
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    base_price_cents: service.basePriceCents,
+    default_estimate_minutes: service.defaultEstimateMinutes,
+    remote_capable: true,
+    active: true
+  }));
+  const serviceOptions = serviceId ? servicesQuery.data ?? [] : catalogServiceOptions;
+  const selectedService = serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
 
   useEffect(() => {
@@ -177,6 +210,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     releaseCurrentHold();
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
+    setSelectedCategoryId(null);
+    setSelectedSubcategoryId(null);
     setSelectedFacility(null);
     setSelectedSlot(null);
     setHoldId(null);
@@ -208,6 +243,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     if (!holdId) return;
     setPhoneTouched(true);
     setSubmitError(null);
+    setPreferenceSaveError(null);
     // Catch an unusable number here, before the STK push is even requested, rather than letting
     // the client find out only after the backend rejects it.
     if (mpesaPhoneValidationError(phone)) {
@@ -222,7 +258,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         try {
           await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
         } catch {
-          // Intentionally swallowed; see above.
+          setPreferenceSaveError(
+            "Your provider preference could not be saved. Payment can continue, but the facility may not see it."
+          );
         }
       }
       await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
@@ -247,12 +285,65 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         {step === TM_STEP_INDEX.service && (
           <div className="space-y-3">
             {!user?.countryCode && <CountryRequiredBanner onComplete={handleClose} />}
-            {servicesQuery.isLoading && <Loading />}
-            {!servicesQuery.isLoading && (servicesQuery.data ?? []).length === 0 && (
+            {serviceId ? (
+              servicesQuery.isLoading && <Loading />
+            ) : (
+              <>
+                <label className="block text-sm font-medium text-slate-700" htmlFor="telemedicine-category">
+                  Consultation area
+                </label>
+                <select
+                  id="telemedicine-category"
+                  value={selectedCategoryId ?? ""}
+                  onChange={(event) => {
+                    setSelectedCategoryId(event.target.value || null);
+                    setSelectedSubcategoryId(null);
+                    setSelectedServiceId(null);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                >
+                  <option value="">Select a consultation area</option>
+                  {(categoriesQuery.data ?? []).map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedCategoryId && (
+                  <>
+                    <label className="block text-sm font-medium text-slate-700" htmlFor="telemedicine-subcategory">
+                      Specialty
+                    </label>
+                    <select
+                      id="telemedicine-subcategory"
+                      value={selectedSubcategoryId ?? ""}
+                      onChange={(event) => {
+                        setSelectedSubcategoryId(event.target.value || null);
+                        setSelectedServiceId(null);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                    >
+                      <option value="">Select a specialty</option>
+                      {(subcategoriesQuery.data ?? []).map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {(categoriesQuery.isLoading || subcategoriesQuery.isLoading || catalogServicesQuery.isLoading) && <Loading />}
+              </>
+            )}
+            {!serviceId && selectedSubcategoryId && !catalogServicesQuery.isLoading && serviceOptions.length === 0 && (
+              <p className="text-sm text-slate-500">No consultations are available for this specialty right now.</p>
+            )}
+            {serviceId && !servicesQuery.isLoading && serviceOptions.length === 0 && (
               <p className="text-sm text-slate-500">No remote-consultation services are available right now.</p>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
-              {(servicesQuery.data ?? []).map((service) => (
+              {serviceOptions.map((service) => (
                 <button
                   key={service.id}
                   type="button"
@@ -363,11 +454,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {/* Offered here because the booking now exists but no provider is assigned yet,
                 which is exactly the window the backend allows a preference to be set in. */}
             {!holdExpired && !paymentConfirmed && hold?.bookingId && (
-              <ProviderPreferenceFields
-                value={preference}
-                onChange={setPreference}
-                disabled={savePreference.isPending}
-              />
+              <>
+                <ProviderPreferenceFields
+                  value={preference}
+                  onChange={(next) => {
+                    setPreference(next);
+                    setPreferenceSaveError(null);
+                  }}
+                  disabled={savePreference.isPending}
+                />
+                {preferenceSaveError && <p className="text-sm text-amber-700">{preferenceSaveError}</p>}
+              </>
             )}
 
             {!holdExpired && !paymentConfirmed && (

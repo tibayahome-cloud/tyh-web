@@ -43,7 +43,6 @@ describe("provider preferences", () => {
       expect.objectContaining({
         preferred_gender: "female",
         preferred_language: null,
-        preferred_specialty: null,
         note: null
       })
     );

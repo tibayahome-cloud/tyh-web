@@ -28,12 +28,38 @@ export interface ProviderBlackout {
     reason: string | null;
 }
 
+export interface ProviderTelemedicineSubcategoryAssignment {
+    id: string;
+    providerId: string;
+    facilityId: string;
+    subcategoryId: string;
+    status: string;
+    subcategory?: {
+        id: string;
+        categoryId: string;
+        key: string;
+        name: string;
+        description: string | null;
+        status: string;
+        displayOrder: number;
+        category?: {
+            id: string;
+            key: string;
+            name: string;
+            description: string | null;
+            status: string;
+            displayOrder: number;
+        } | null;
+    } | null;
+}
+
 export interface Provider {
     id: string;
     userId: string;
     facilityId: string;
     verified: boolean;
     verifiedAt: string | null;
+    gender: string | null;
     isAvailable: boolean;
     telemedicineEnabled: boolean;
     dailyRequestLimit: number;
@@ -54,6 +80,7 @@ export interface Provider {
     services: ProviderService[];
     availability: ProviderAvailability[];
     blackouts: ProviderBlackout[];
+    telemedicineSubcategoryAssignments: ProviderTelemedicineSubcategoryAssignment[];
 }
 
 export const mapProviderService = (payload: unknown): ProviderService | null => {
@@ -81,6 +108,9 @@ export const mapProvider = (payload: unknown): Provider | null => {
     const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
     const availabilityRaw = Array.isArray(raw.availability) ? raw.availability : [];
     const blackoutsRaw = Array.isArray(raw.blackouts) ? raw.blackouts : [];
+    const telemedicineAssignmentsRaw = Array.isArray(raw.telemedicine_subcategory_assignments)
+        ? raw.telemedicine_subcategory_assignments
+        : [];
 
     return {
         id,
@@ -88,6 +118,7 @@ export const mapProvider = (payload: unknown): Provider | null => {
         facilityId: coerceId(raw.facility_id),
         verified: Boolean(raw.verified),
         verifiedAt: coerceDate(raw.verified_at),
+        gender: coerceString(raw.gender),
         isAvailable: Boolean(raw.is_available),
         telemedicineEnabled: Boolean(raw.telemedicine_enabled),
         dailyRequestLimit: Number(raw.daily_request_limit) || 0,
@@ -129,6 +160,39 @@ export const mapProvider = (payload: unknown): Provider | null => {
                 startAt: coerceDate(blackout.start_at) || "",
                 endAt: coerceDate(blackout.end_at) || "",
                 reason: coerceString(blackout.reason)
+            };
+        }),
+        telemedicineSubcategoryAssignments: telemedicineAssignmentsRaw.map((entry) => {
+            const assignment = toObject(entry);
+            const subcategory = toObject(assignment.subcategory);
+            const category = toObject(subcategory.category);
+            return {
+                id: coerceId(assignment.id),
+                providerId: coerceId(assignment.provider_id),
+                facilityId: coerceId(assignment.facility_id),
+                subcategoryId: coerceId(assignment.subcategory_id),
+                status: coerceString(assignment.status) || "active",
+                subcategory: assignment.subcategory
+                    ? {
+                          id: coerceId(subcategory.id),
+                          categoryId: coerceId(subcategory.category_id),
+                          key: coerceString(subcategory.key) || "",
+                          name: coerceString(subcategory.name) || "",
+                          description: coerceString(subcategory.description),
+                          status: coerceString(subcategory.status) || "active",
+                          displayOrder: Number(subcategory.display_order) || 0,
+                          category: subcategory.category
+                              ? {
+                                    id: coerceId(category.id),
+                                    key: coerceString(category.key) || "",
+                                    name: coerceString(category.name) || "",
+                                    description: coerceString(category.description),
+                                    status: coerceString(category.status) || "active",
+                                    displayOrder: Number(category.display_order) || 0
+                                }
+                              : null
+                      }
+                    : null
             };
         })
     };

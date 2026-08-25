@@ -14,7 +14,7 @@ const CATEGORY_LABEL: Record<ReviewCategory, string> = {
   cancellation_payment_review: "Cancelled after paying",
   no_show: "Nobody attended",
   technical_issue: "Technical problem",
-  reschedule_escalation: "Waiting on a reschedule answer"
+  reschedule_escalation: "Pending reschedule proposal"
 };
 
 const CATEGORY_TONE: Record<ReviewCategory, string> = {
@@ -33,7 +33,8 @@ const CATEGORY_TONE: Record<ReviewCategory, string> = {
  * refuses, so the interface points at the right place instead of offering a button that fails.
  */
 const ANSWERED_ELSEWHERE: Partial<Record<ReviewCategory, string>> = {
-  reschedule_escalation: "Open the booking to accept or decline the proposed time"
+  reschedule_escalation:
+    "Open the booking to review the proposal; the client or provider must accept or decline it"
 };
 
 const formatWhen = (iso: string | null) =>
@@ -112,8 +113,8 @@ export const ReviewQueuePage = () => {
       <header>
         <h1 className="text-xl font-semibold text-slate-900">Needs attention</h1>
         <p className="text-sm text-slate-500">
-          Payments held, missed appointments, technical problems and unanswered reschedule
-          requests, for your facility.
+          Payments held, missed appointments, technical problems and pending reschedule proposals,
+          for your facility.
         </p>
       </header>
 

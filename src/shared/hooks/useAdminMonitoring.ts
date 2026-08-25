@@ -13,6 +13,7 @@ export type MonitoringLocation = {
 export type MonitoringBooking = {
   id: string;
   status: string;
+  isTelemedicine: boolean;
   service: {
     id: string;
     name: string | null;
@@ -78,7 +79,10 @@ const mapMonitoringResponse = (payload: unknown): MonitoringMapPayload => {
   const root = toRecord(payload);
   const data = toRecord(root.data ?? root);
   const bookingsRaw = Array.isArray(data.bookings) ? data.bookings : [];
-  const bookings = bookingsRaw.map((entry) => {
+  const bookings = bookingsRaw.filter((entry) => {
+    const booking = toRecord(entry);
+    return booking.is_telemedicine !== true && booking.isTelemedicine !== true;
+  }).map((entry) => {
     const booking = toRecord(entry);
     const serviceRaw = toRecord(booking.service);
     const clientRaw = toRecord(booking.client);
@@ -88,6 +92,7 @@ const mapMonitoringResponse = (payload: unknown): MonitoringMapPayload => {
     return {
       id: String(booking.id),
       status: typeof booking.status === "string" ? booking.status : "unknown",
+      isTelemedicine: booking.is_telemedicine === true || booking.isTelemedicine === true,
       service: booking.service
         ? {
           id: String(serviceRaw.id),
