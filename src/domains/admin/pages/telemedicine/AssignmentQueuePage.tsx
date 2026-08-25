@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 
 import { Card } from "../../../../shared/components/Card";
@@ -41,6 +42,12 @@ const AssignmentCard = ({ booking, timezone }: { booking: TelemedicineAssignment
           <p className="mt-1 text-sm text-slate-700">{booking.clientFullName ?? booking.clientUserId}</p>
           <p className="text-xs text-slate-500">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
           <PreferenceSummary bookingId={booking.id} />
+          <Link
+            to={`/admin/bookings/${booking.id}`}
+            className="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline"
+          >
+            View consultation details
+          </Link>
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           {booking.assignableProviders.length === 0 ? (

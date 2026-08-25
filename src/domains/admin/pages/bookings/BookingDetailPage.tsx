@@ -20,6 +20,7 @@ import { useToast } from "../../../../shared/components/ToastProvider";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
 import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
 import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
+import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
 
 const STK_PUSH_ELIGIBLE_STATUSES = ["client_completed", "completed_by_provider"];
 
@@ -152,7 +153,32 @@ const AdminBookingDetailPage = () => {
         </div>
       </div>
 
-      <BookingLiveMapCard bookingId={booking.id} role="admin" onOpenChat={dispatchChat} />
+      {booking.isTelemedicine ? (
+        <Card title="Video consultation" description="Remote appointment details and session state">
+          <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Appointment</p>
+              <p className="mt-1 font-medium">{formatTelemedicineDateTime(booking.scheduledAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Provider</p>
+              <p className="mt-1 font-medium">{booking.provider?.fullName ?? "Unassigned"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Session</p>
+              <p className="mt-1 font-medium">{booking.telemedicineSession?.status ?? "Not started"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration</p>
+              <p className="mt-1 font-medium">
+                {booking.estimateDurationMinutes ? `${booking.estimateDurationMinutes} minutes` : "Not provided"}
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <BookingLiveMapCard bookingId={booking.id} role="admin" onOpenChat={dispatchChat} />
+      )}
 
       <Card title="Event timeline" description="Audit trail for this booking">
         {eventsQuery.isLoading ? (
