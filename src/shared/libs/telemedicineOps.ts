@@ -17,7 +17,6 @@ import api from "./api";
 export type ProviderPreference = {
   preferredGender: string | null;
   preferredLanguage: string | null;
-  preferredSpecialty: string | null;
   note: string | null;
 };
 
@@ -26,7 +25,6 @@ const mapPreference = (raw: Record<string, unknown> | null | undefined): Provide
   return {
     preferredGender: (raw.preferred_gender as string) ?? null,
     preferredLanguage: (raw.preferred_language as string) ?? null,
-    preferredSpecialty: (raw.preferred_specialty as string) ?? null,
     note: (raw.note as string) ?? null
   };
 };
@@ -43,7 +41,6 @@ export const saveProviderPreference = async (
   const response = await api.put(`/telemedicine/bookings/${bookingId}/provider-preference`, {
     preferred_gender: preference.preferredGender ?? null,
     preferred_language: preference.preferredLanguage ?? null,
-    preferred_specialty: preference.preferredSpecialty ?? null,
     note: preference.note ?? null
   });
   return mapPreference(response.data?.data);
