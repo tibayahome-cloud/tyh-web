@@ -34,7 +34,10 @@ import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
-import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
+import {
+  BOOKING_STATUS_TELEMEDICINE_UNATTENDED,
+  TELEMEDICINE_DISPUTE_TYPE_NO_SHOW
+} from "../../../shared/schemas/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
 
@@ -220,7 +223,9 @@ const BookingDetailPage = () => {
   // Same window as cancellation, and for the same reason: once the consultation is under way
   // the appointment is no longer a plan to negotiate. The backend refuses either way, so this
   // only decides whether to offer something that would be rejected.
-  const canReschedule = canCancelAppointment;
+  const canReschedule =
+    booking.isTelemedicine &&
+    (booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED || canCancelAppointment);
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
@@ -377,10 +382,14 @@ const BookingDetailPage = () => {
       )}
 
       {/* Telemedicine join call */}
-      {booking.isTelemedicine && booking.status === "scheduled" && (
+      {booking.isTelemedicine && (
         <div className="space-y-3">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Video consultation</h4>
-          {isWithinJoinWindow(
+          {booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED ? (
+            <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
+              This consultation was unattended. You can propose a new time below.
+            </p>
+          ) : isWithinJoinWindow(
             booking.scheduledAt,
             booking.estimateDurationMinutes,
             Date.now(),
@@ -401,12 +410,12 @@ const BookingDetailPage = () => {
                 : "The call opens shortly before your appointment time."}
             </p>
           )}
-          {existingNoShowDispute ? (
+          {booking.status === "scheduled" && existingNoShowDispute ? (
             <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
               You reported a problem with this appointment. Admin.ops is reviewing it.
             </p>
           ) : (
-            !NOT_REPORTABLE_STATUSES.includes(booking.status) && (
+            booking.status === "scheduled" && !NOT_REPORTABLE_STATUSES.includes(booking.status) && (
               <Button
                 type="button"
                 variant="ghost"

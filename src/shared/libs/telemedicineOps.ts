@@ -110,7 +110,6 @@ const respond = async (requestId: string, action: string, note?: string): Promis
 };
 
 export const acceptReschedule = (requestId: string, note?: string) => respond(requestId, "accept", note);
-export const declineReschedule = (requestId: string, note?: string) => respond(requestId, "decline", note);
 export const cancelReschedule = (requestId: string) => respond(requestId, "cancel");
 
 // ---------------------------------------------------------------------------

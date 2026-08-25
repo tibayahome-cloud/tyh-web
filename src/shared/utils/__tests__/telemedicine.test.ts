@@ -65,10 +65,11 @@ describe("splitTelemedicineBookings", () => {
       { id: "active", status: "broadcasting", telemedicineSession: { status: "in_progress" } },
       { id: "ended", status: "fully_completed", telemedicineSession: { status: "ended" } },
       { id: "expired", status: "scheduled", telemedicineSession: { status: "expired" } },
+      { id: "unattended", status: "telemedicine_unattended", telemedicineSession: { status: "expired" } },
       { id: "cancelled", status: "cancelled_by_client", telemedicineSession: null }
     ]);
 
     expect(result.upcoming.map((booking) => booking.id)).toEqual(["scheduled", "active"]);
-    expect(result.history.map((booking) => booking.id)).toEqual(["ended", "expired", "cancelled"]);
+    expect(result.history.map((booking) => booking.id)).toEqual(["ended", "expired", "unattended", "cancelled"]);
   });
 });

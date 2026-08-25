@@ -12,7 +12,7 @@ const CATEGORY_LABEL = {
   cancellation_payment_review: "Cancelled after paying",
   no_show: "Nobody attended",
   technical_issue: "Technical problem",
-  reschedule_escalation: "Waiting on a reschedule answer"
+  reschedule_escalation: "Pending reschedule proposal"
 };
 
 const ANSWERED_ELSEWHERE = {

@@ -9,6 +9,7 @@ export const TELEMEDICINE_DISPUTE_TYPE_ASSIGNMENT_TIMEOUT = "telemedicine_assign
 export const TELEMEDICINE_DISPUTE_TYPE_CANCELLATION_PAYMENT_REVIEW = "telemedicine_cancellation_payment_review";
 
 export const BOOKING_STATUS_TELEMEDICINE_CANCELLED_PAYMENT_REVIEW = "telemedicine_cancelled_payment_review";
+export const BOOKING_STATUS_TELEMEDICINE_UNATTENDED = "telemedicine_unattended";
 
 export const TelemedicineHoldSchema = z.object({
   id: z.string(),

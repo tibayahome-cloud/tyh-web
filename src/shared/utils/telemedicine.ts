@@ -1,3 +1,5 @@
+import { BOOKING_STATUS_TELEMEDICINE_UNATTENDED } from "../schemas/telemedicine";
+
 // Fallback only for screens rendered before GET /telemedicine/policy resolves; once loaded, the
 // live joinWindowBeforeMinutes from useTelemedicinePolicy() should always be passed in instead.
 // The backend re-enforces the real window itself regardless -- this only gates button visibility.
@@ -69,6 +71,7 @@ const TERMINAL_TELEMEDICINE_BOOKING_STATUSES = new Set([
   "cancelled_by_admin",
   "expired_no_accept",
   "telemedicine_cancelled_payment_review",
+  BOOKING_STATUS_TELEMEDICINE_UNATTENDED,
   "disputed"
 ]);
 
