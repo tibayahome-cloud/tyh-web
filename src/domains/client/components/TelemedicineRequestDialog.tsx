@@ -109,6 +109,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
+  const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -242,6 +243,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     if (!holdId) return;
     setPhoneTouched(true);
     setSubmitError(null);
+    setPreferenceSaveError(null);
     // Catch an unusable number here, before the STK push is even requested, rather than letting
     // the client find out only after the backend rejects it.
     if (mpesaPhoneValidationError(phone)) {
@@ -256,7 +258,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         try {
           await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
         } catch {
-          // Intentionally swallowed; see above.
+          setPreferenceSaveError(
+            "Your provider preference could not be saved. Payment can continue, but the facility may not see it."
+          );
         }
       }
       await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
@@ -450,11 +454,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {/* Offered here because the booking now exists but no provider is assigned yet,
                 which is exactly the window the backend allows a preference to be set in. */}
             {!holdExpired && !paymentConfirmed && hold?.bookingId && (
-              <ProviderPreferenceFields
-                value={preference}
-                onChange={setPreference}
-                disabled={savePreference.isPending}
-              />
+              <>
+                <ProviderPreferenceFields
+                  value={preference}
+                  onChange={(next) => {
+                    setPreference(next);
+                    setPreferenceSaveError(null);
+                  }}
+                  disabled={savePreference.isPending}
+                />
+                {preferenceSaveError && <p className="text-sm text-amber-700">{preferenceSaveError}</p>}
+              </>
             )}
 
             {!holdExpired && !paymentConfirmed && (

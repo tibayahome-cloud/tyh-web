@@ -5,9 +5,9 @@ const JOIN_WINDOW_BEFORE_MINUTES_FALLBACK = 10;
 const JOIN_WINDOW_AFTER_MINUTES = 30;
 const DEFAULT_DURATION_MINUTES = 60;
 
-// Kenya is the only supported country in V1.2 (SUPPORTED_COUNTRY_CODES = ("KE",) on the
-// backend), so this is a safe non-arbitrary default while the policy query is still loading --
-// not a guess, the only value it could currently be.
+// Kenya is currently the only supported country (SUPPORTED_COUNTRY_CODES = ("KE",) on the
+// backend), so this is a safe default while the policy query is still loading. The policy
+// endpoint remains authoritative when the supported-country configuration expands.
 export const TELEMEDICINE_DEFAULT_TIMEZONE = "Africa/Nairobi";
 
 export const isWithinJoinWindow = (
