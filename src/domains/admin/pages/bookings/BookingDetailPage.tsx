@@ -13,6 +13,7 @@ import {
   useCancelBookingMutation,
   usePayBookingMutation
 } from "../../../../shared/hooks/useBookings";
+import { useTelemedicineReschedules } from "../../../../shared/hooks/useTelemedicine";
 import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
@@ -29,6 +30,7 @@ const AdminBookingDetailPage = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const eventsQuery = useBookingEvents(bookingId ?? null);
+  const reschedulesQuery = useTelemedicineReschedules(bookingId ?? null, { enabled: Boolean(detailQuery.data?.isTelemedicine) });
   const cancelMutation = useCancelBookingMutation("detail");
   const stkPushMutation = usePayBookingMutation("detail");
   const toast = useToast();
@@ -47,6 +49,12 @@ const AdminBookingDetailPage = () => {
 
   const booking = detailQuery.data;
   const events = eventsQuery.data ?? [];
+  const reschedules = reschedulesQuery.data ?? [];
+  const participantLabel = (userId: string | null) => {
+    if (userId && userId === booking?.client?.id) return "Client";
+    if (userId && userId === booking?.provider?.id) return "Provider";
+    return "Participant";
+  };
   const canReassignTelemedicine = Boolean(
     booking?.isTelemedicine &&
       booking.provider &&
@@ -199,6 +207,41 @@ const AdminBookingDetailPage = () => {
         </Card>
       ) : (
         <BookingLiveMapCard bookingId={booking.id} role="admin" onOpenChat={dispatchChat} />
+      )}
+
+      {booking.isTelemedicine && (reschedulesQuery.isLoading || reschedules.length > 0) && (
+        <Card title="Reschedule history" description="Proposals and responses recorded for this consultation">
+          {reschedulesQuery.isLoading ? (
+            <Loading />
+          ) : (
+            <ol className="space-y-3">
+              {reschedules.map((request) => (
+                <li key={request.id} className="rounded-xl border border-slate-100 bg-white px-3 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-slate-900">
+                      {participantLabel(request.requestedByUserId)} proposal
+                    </p>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold uppercase text-slate-600">
+                      {request.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-slate-700">
+                    {request.proposedStartAt
+                      ? formatTelemedicineDateTime(request.proposedStartAt)
+                      : "No proposed appointment time"}
+                  </p>
+                  {request.reason && <p className="mt-1 text-slate-500">Reason: {request.reason}</p>}
+                  {request.responseNote && <p className="mt-1 text-slate-500">Response: {request.responseNote}</p>}
+                  {request.resolvedAt && (
+                    <p className="mt-1 text-xs text-slate-400">
+                      Resolved {new Date(request.resolvedAt).toLocaleString()}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
       )}
 
       <Card title="Event timeline" description="Audit trail for this booking">
