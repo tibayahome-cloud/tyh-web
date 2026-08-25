@@ -53,6 +53,24 @@ const slugify = (value: string, fallback: string) => {
   return key || `${fallback}-${Date.now()}`;
 };
 
+const nextDisplayOrder = (items: Array<{ displayOrder: number }>) =>
+  items.reduce((highest, item) => Math.max(highest, item.displayOrder), -1) + 1;
+
+const editorExamples: Record<EditorKind, { name: string; description: string }> = {
+  category: {
+    name: "e.g. General Medicine",
+    description: "e.g. Broad consultation area for primary care"
+  },
+  subcategory: {
+    name: "e.g. General Practitioner",
+    description: "e.g. Routine adult and family consultations"
+  },
+  service: {
+    name: "e.g. Online doctor consultation",
+    description: "e.g. Video consultation with a qualified clinician"
+  }
+};
+
 const statusClass: Record<string, string> = {
   active: "bg-emerald-50 text-emerald-700",
   suspended: "bg-amber-50 text-amber-700",
@@ -159,6 +177,14 @@ const TelemedicineCatalogPage = () => {
         next.emergency = service.isEmergencyCapable;
         next.tags = service.tags.join(", ");
       }
+    } else {
+      next.displayOrder = String(
+        kind === "category"
+          ? nextDisplayOrder(categories)
+          : kind === "subcategory"
+            ? nextDisplayOrder(subcategories)
+            : nextDisplayOrder(services)
+      );
     }
     setForm(next);
     setEditor({ kind, item });
@@ -184,7 +210,7 @@ const TelemedicineCatalogPage = () => {
           <div className="space-y-2 px-6 pb-6 pt-4">
             {categories.map((category) => (
               <button key={category.id} type="button" onClick={() => { setSelectedCategoryId(category.id); setSelectedSubcategoryId(""); }} className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${selectedCategoryId === category.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <span><span className="block font-semibold text-slate-900">{category.name}</span><span className="text-xs text-slate-500">{category.key}</span></span>
+                <span className="block font-semibold text-slate-900">{category.name}</span>
                 <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[category.status] ?? statusClass.archived}`}>{category.status}</span>
               </button>
             ))}
@@ -197,7 +223,7 @@ const TelemedicineCatalogPage = () => {
           <div className="space-y-2 px-6 pb-6 pt-4">
             {subcategories.map((subcategory) => (
               <button key={subcategory.id} type="button" onClick={() => setSelectedSubcategoryId(subcategory.id)} className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${selectedSubcategoryId === subcategory.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <span><span className="block font-semibold text-slate-900">{subcategory.name}</span><span className="text-xs text-slate-500">{subcategory.key}</span></span>
+                <span className="block font-semibold text-slate-900">{subcategory.name}</span>
                 <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[subcategory.status] ?? statusClass.archived}`}>{subcategory.status}</span>
               </button>
             ))}
@@ -211,7 +237,7 @@ const TelemedicineCatalogPage = () => {
             {services.map((service) => (
               <div key={service.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><h3 className="font-semibold text-slate-900">{service.name}</h3><p className="text-xs text-slate-500">{service.key} · {service.currency} {(service.basePriceCents / 100).toLocaleString()} · {service.defaultEstimateMinutes} min</p></div>
+                  <div><h3 className="font-semibold text-slate-900">{service.name}</h3><p className="text-xs text-slate-500">{service.currency} {(service.basePriceCents / 100).toLocaleString()} · {service.defaultEstimateMinutes} min</p></div>
                   <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[service.status] ?? statusClass.archived}`}>{service.status}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500"><span>{service.isEmergencyCapable ? "Emergency capable" : "Routine consultation"}</span><Button size="sm" variant="outline" onClick={() => openEditor("service", service)}>Edit</Button></div>
@@ -224,17 +250,11 @@ const TelemedicineCatalogPage = () => {
 
       <Modal open={Boolean(editor)} onClose={() => !mutation.isPending && setEditor(null)} title={editorTitle}>
         {editor && <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (!form.name.trim()) return; mutation.mutate({ kind: editor.kind, item: editor.item, values: form }); }}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Name" value={form.name} onChange={(event) => updateForm("name", event.target.value)} required />
-            <Input label="Stable key" value={form.key} onChange={(event) => updateForm("key", event.target.value)} placeholder="Auto-generated when empty" />
-          </div>
-          <Input label="Description" value={form.description} onChange={(event) => updateForm("description", event.target.value)} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">Status<select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3"><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select></label>
-            <Input label="Display order" type="number" min="0" value={form.displayOrder} onChange={(event) => updateForm("displayOrder", event.target.value)} />
-          </div>
+          <Input label="Name" value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder={editorExamples[editor.kind].name} required />
+          <Input label="Description" value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder={editorExamples[editor.kind].description} />
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">Status<select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3"><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select><span className="text-xs text-slate-500">Only active entries appear in new discovery and assignment.</span></label>
           {editor.kind === "service" && <>
-            <div className="grid gap-4 sm:grid-cols-2"><Input label="Base price (KES)" type="number" min="0" step="0.01" value={form.basePrice} onChange={(event) => updateForm("basePrice", event.target.value)} required /><Input label="Duration (minutes)" type="number" min="1" value={form.duration} onChange={(event) => updateForm("duration", event.target.value)} required /></div>
+            <div className="grid gap-4 sm:grid-cols-2"><Input label="Base price (KES)" type="number" min="0" step="0.01" value={form.basePrice} onChange={(event) => updateForm("basePrice", event.target.value)} placeholder="e.g. 2500" required /><Input label="Duration (minutes)" type="number" min="1" value={form.duration} onChange={(event) => updateForm("duration", event.target.value)} placeholder="e.g. 30" required /></div>
             <Input label="Tags" value={form.tags} onChange={(event) => updateForm("tags", event.target.value)} placeholder="e.g. remote, oncology" hint="Separate tags with commas." />
             <label className="flex items-center gap-3 text-sm font-medium text-slate-700"><input type="checkbox" checked={form.emergency} onChange={(event) => updateForm("emergency", event.target.checked)} /> Emergency capable</label>
           </>}
