@@ -83,6 +83,7 @@ const TelemedicineCatalogPage = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [editorCategoryId, setEditorCategoryId] = useState("");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   const categoriesQuery = useQuery({
@@ -136,7 +137,7 @@ const TelemedicineCatalogPage = () => {
         const input = { key, name: values.name.trim(), description: values.description.trim() || null, displayOrder: Number(values.displayOrder) || 0, status: values.status };
         return item
           ? updateTelemedicineSubcategory(item.id, input)
-          : createTelemedicineSubcategory({ categoryId: selectedCategoryId, ...input });
+          : createTelemedicineSubcategory({ categoryId: editorCategoryId, ...input });
       }
       const input = {
         key,
@@ -152,7 +153,11 @@ const TelemedicineCatalogPage = () => {
         ? updateTelemedicineCatalogService(item.id, input)
         : createTelemedicineCatalogService(selectedSubcategoryId, input);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      if (variables.kind === "subcategory" && editorCategoryId) {
+        setSelectedCategoryId(editorCategoryId);
+        setSelectedSubcategoryId("");
+      }
       refresh();
       setEditor(null);
       toast.showToast({ title: "Telemedicine catalog updated", description: "The latest taxonomy is now available to eligible users.", variant: "success" });
@@ -187,12 +192,21 @@ const TelemedicineCatalogPage = () => {
       );
     }
     setForm(next);
+    setEditorCategoryId(
+      kind === "subcategory"
+        ? item && "categoryId" in item
+          ? item.categoryId
+          : selectedCategoryId
+        : ""
+    );
     setEditor({ kind, item });
   };
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
   const canCreateSubcategory = Boolean(selectedCategoryId);
   const canCreateService = Boolean(selectedSubcategoryId);
+  const editorCategories = categories.filter((category) => category.status === "active");
+  const editorCategory = categories.find((category) => category.id === editorCategoryId);
   const editorTitle = editor ? `${editor.item ? "Edit" : "Add"} telemedicine ${editor.kind}` : "";
   const selectedServiceCount = useMemo(() => services.length, [services]);
 
@@ -249,7 +263,15 @@ const TelemedicineCatalogPage = () => {
       </div>
 
       <Modal open={Boolean(editor)} onClose={() => !mutation.isPending && setEditor(null)} title={editorTitle}>
-        {editor && <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (!form.name.trim()) return; mutation.mutate({ kind: editor.kind, item: editor.item, values: form }); }}>
+        {editor && <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (!form.name.trim() || (editor.kind === "subcategory" && !editorCategoryId)) return; mutation.mutate({ kind: editor.kind, item: editor.item, values: form }); }}>
+          {editor.kind === "subcategory" && <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Consultation area</span>
+            {editor.item ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-700">{editorCategory?.name ?? "Selected consultation area"}</div> : <select value={editorCategoryId} onChange={(event) => setEditorCategoryId(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900" required>
+              <option value="">Select a consultation area</option>
+              {editorCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>}
+            <span className="text-xs text-slate-500">This specialty will be listed under the selected consultation area.</span>
+          </label>}
           <Input label="Name" value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder={editorExamples[editor.kind].name} required />
           <Input label="Description" value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder={editorExamples[editor.kind].description} />
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">Status<select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3"><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select><span className="text-xs text-slate-500">Only active entries appear in new discovery and assignment.</span></label>
