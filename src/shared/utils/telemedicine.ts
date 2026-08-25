@@ -59,3 +59,30 @@ export const formatTelemedicineDateTime = (
   if (Number.isNaN(date.getTime())) return "Not scheduled";
   return new Intl.DateTimeFormat(undefined, { ...options, timeZone: timezone }).format(date);
 };
+
+const TERMINAL_TELEMEDICINE_BOOKING_STATUSES = new Set([
+  "fully_completed",
+  "completed_by_provider",
+  "client_completed",
+  "client_confirmed",
+  "cancelled_by_client",
+  "cancelled_by_admin",
+  "expired_no_accept",
+  "telemedicine_cancelled_payment_review",
+  "disputed"
+]);
+
+export const isHistoricalTelemedicineBooking = (booking: {
+  status: string;
+  telemedicineSession?: { status?: string | null } | null;
+}): boolean => {
+  if (TERMINAL_TELEMEDICINE_BOOKING_STATUSES.has(booking.status)) return true;
+  return booking.telemedicineSession?.status === "ended" || booking.telemedicineSession?.status === "expired";
+};
+
+export const splitTelemedicineBookings = <T extends { status: string; telemedicineSession?: { status?: string | null } | null }>(
+  bookings: T[]
+) => ({
+  upcoming: bookings.filter((booking) => !isHistoricalTelemedicineBooking(booking)),
+  history: bookings.filter(isHistoricalTelemedicineBooking)
+});
