@@ -152,7 +152,7 @@ const ServicesPage = () => {
       });
       groups.set(categoryKey, group);
     });
-    return Array.from(groups.values()).filter((group) => group.specialties.some((specialty) => specialty.services.length > 0));
+    return Array.from(groups.values());
   }, [profile?.telemedicine_subcategory_assignments, searchTerm, telemedicineCatalog]);
 
   const toggleService = (serviceId: string) => {
@@ -320,16 +320,22 @@ const ServicesPage = () => {
                   {group.specialties.map((specialty) => (
                     <div key={specialty.name} className="rounded-xl bg-slate-50 p-3">
                       <h3 className="text-sm font-semibold text-slate-800">{specialty.name}</h3>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {specialty.services.map((service) => (
-                          <div key={service.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                            <p className="text-sm font-semibold text-slate-900">{service.name}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {financialsVisible ? `${service.currency} ${(service.basePriceCents / 100).toLocaleString()}` : "Facility-managed rate"} · {service.defaultEstimateMinutes} mins
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                      {specialty.services.length === 0 ? (
+                        <p className="mt-2 text-sm text-slate-500">
+                          {searchTerm.trim() ? "No assigned services match your search." : "No bookable services are configured for this specialty yet."}
+                        </p>
+                      ) : (
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {specialty.services.map((service) => (
+                            <div key={service.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                              <p className="text-sm font-semibold text-slate-900">{service.name}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {financialsVisible ? `${service.currency} ${(service.basePriceCents / 100).toLocaleString()}` : "Facility-managed rate"} · {service.defaultEstimateMinutes} mins
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
