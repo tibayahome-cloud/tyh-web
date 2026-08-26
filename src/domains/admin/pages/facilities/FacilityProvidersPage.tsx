@@ -18,7 +18,9 @@ import {
   updateFacilityProviderLifecycle
 } from "../../../../shared/libs/facilities";
 import {
+  fetchTelemedicineAdminServices,
   fetchTelemedicineSubcategories,
+  type TelemedicineCatalogService,
   type TelemedicineSubcategory
 } from "../../../../shared/libs/telemedicineCatalog";
 import type { Provider } from "../../../../shared/schemas/provider";
@@ -239,7 +241,19 @@ const FacilityProvidersPage = () => {
     queryFn: () => fetchTelemedicineSubcategories(),
     enabled: Boolean(facilityId)
   });
-  const services = useMemo(() => servicesQuery.data?.filter((service) => service.active) ?? [], [servicesQuery.data]);
+  const telemedicineServicesQuery = useQuery<TelemedicineCatalogService[]>({
+    queryKey: ["telemedicine", "catalog", "services"],
+    queryFn: () => fetchTelemedicineAdminServices(),
+    enabled: Boolean(facilityId)
+  });
+  const telemedicineServiceIds = useMemo(
+    () => new Set((telemedicineServicesQuery.data ?? []).map((service) => service.id)),
+    [telemedicineServicesQuery.data]
+  );
+  const services = useMemo(
+    () => servicesQuery.data?.filter((service) => service.active && !telemedicineServiceIds.has(service.serviceId)) ?? [],
+    [servicesQuery.data, telemedicineServiceIds]
+  );
   const invalidateProviders = () => void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
 
   const createMutation = useMutation({

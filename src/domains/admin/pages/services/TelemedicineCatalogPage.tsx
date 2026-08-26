@@ -212,9 +212,9 @@ const TelemedicineCatalogPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card title="Telemedicine catalog" description="Maintain consultation areas, specialties, and bookable remote services. Providers are assigned to specialties; clients only see active services." badge={`${categories.length} areas`}>
+      <Card title="Telemedicine catalog" description="Build the catalog in order: consultation area → specialty → bookable service. Providers are assigned to specialties; clients only see active services." badge={`${categories.length} areas`}>
         <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Changes here affect future discovery and assignment. Existing appointments retain their selected service details.
+          Select an area, then a specialty. Services are always created under the selected specialty. Changes here affect future discovery and assignment; existing appointments retain their selected service details.
         </div>
       </Card>
 
@@ -232,7 +232,7 @@ const TelemedicineCatalogPage = () => {
           </div>
         </Card>
 
-        <Card title="Specialties" subtitle={selectedCategory?.name ?? "Select an area"} padding="none">
+        <Card title="Specialties" subtitle={selectedCategory?.name ?? "Select an area first"} padding="none">
           <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateSubcategory} onClick={() => openEditor("subcategory")}>Add specialty</Button></div>
           <div className="space-y-2 px-6 pb-6 pt-4">
             {subcategories.map((subcategory) => (
@@ -245,7 +245,17 @@ const TelemedicineCatalogPage = () => {
           </div>
         </Card>
 
-        <Card title="Consultation services" subtitle={selectedSubcategory ? `${selectedCategory?.name ?? ""} / ${selectedSubcategory.name}` : "Select a specialty"} badge={`${selectedServiceCount} services`} padding="none">
+        <Card title="Consultation services" subtitle={selectedSubcategory ? `${selectedCategory?.name ?? ""} → ${selectedSubcategory.name}` : "Select a specialty first"} badge={`${selectedServiceCount} services`} padding="none">
+          <div className="mx-6 mt-6 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+            {selectedSubcategory ? (
+              <>
+                <p className="font-semibold">Services under {selectedSubcategory.name}</p>
+                <p className="mt-1 text-primary-700">New services created here will automatically belong to this specialty.</p>
+              </>
+            ) : (
+              <p>Select a specialty in the middle panel to view or add its services.</p>
+            )}
+          </div>
           <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateService} onClick={() => openEditor("service")}>Add service</Button></div>
           <div className="space-y-3 px-6 pb-6 pt-4">
             {services.map((service) => (
@@ -272,6 +282,11 @@ const TelemedicineCatalogPage = () => {
             </select>}
             <span className="text-xs text-slate-500">This specialty will be listed under the selected consultation area.</span>
           </label>}
+          {editor.kind === "service" && selectedSubcategory && <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+            <p className="font-semibold">Creating service under</p>
+            <p className="mt-1">{selectedCategory?.name ?? "Consultation area"} <span aria-hidden="true">→</span> {selectedSubcategory.name}</p>
+            <p className="mt-1 text-xs text-primary-700">This parent relationship is saved automatically when you create the service.</p>
+          </div>}
           <Input label="Name" value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder={editorExamples[editor.kind].name} required />
           <Input label="Description" value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder={editorExamples[editor.kind].description} />
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">Status<select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3"><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select><span className="text-xs text-slate-500">Only active entries appear in new discovery and assignment.</span></label>

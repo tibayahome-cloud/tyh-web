@@ -59,10 +59,10 @@ export type TelemedicineCatalogServiceInput = {
   tags?: string[];
 };
 
-const asRecord = (value: unknown): Record<string, any> =>
-  value && typeof value === "object" ? (value as Record<string, any>) : {};
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
-const dataRows = (value: unknown): Record<string, any>[] => {
+const dataRows = (value: unknown): Record<string, unknown>[] => {
   const payload = asRecord(value);
   return Array.isArray(payload.data) ? payload.data.map(asRecord) : [];
 };
@@ -107,7 +107,7 @@ export const mapTelemedicineCatalogService = (value: unknown): TelemedicineCatal
     isEmergencyCapable: Boolean(raw.is_emergency_capable),
     status: String(raw.status ?? "active"),
     tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [],
-    subcategory: raw.subcategory ? mapSubcategory(raw.subcategory) : null
+    subcategory: raw.subcategory ? mapTelemedicineSubcategory(raw.subcategory) : null
   };
 };
 
@@ -155,9 +155,8 @@ export const fetchTelemedicineAdminSubcategories = async (
 export const fetchTelemedicineAdminServices = async (
   subcategoryId?: string
 ): Promise<TelemedicineCatalogService[]> => {
-  if (!subcategoryId) return [];
   const response = await api.get("/telemedicine/catalog/services", {
-    params: { subcategory_id: subcategoryId }
+    params: subcategoryId ? { subcategory_id: subcategoryId } : undefined
   });
   return mapAll(response.data, mapTelemedicineCatalogService).filter((item) => item.id);
 };
