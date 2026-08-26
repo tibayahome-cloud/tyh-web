@@ -212,9 +212,9 @@ const TelemedicineCatalogPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card title="Telemedicine catalog" description="Maintain consultation areas, specialties, and bookable remote services. Providers are assigned to specialties; clients only see active services." badge={`${categories.length} areas`}>
+      <Card title="Telemedicine catalog" description="Build the catalog in order: consultation area → specialty → bookable service. Providers are assigned to specialties; clients only see active services." badge={`${categories.length} areas`}>
         <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Changes here affect future discovery and assignment. Existing appointments retain their selected service details.
+          Select an area, then a specialty. Services are always created under the selected specialty. Changes here affect future discovery and assignment; existing appointments retain their selected service details.
         </div>
       </Card>
 
@@ -223,29 +223,45 @@ const TelemedicineCatalogPage = () => {
           <div className="flex justify-end px-6 pt-6"><Button size="sm" onClick={() => openEditor("category")}>Add area</Button></div>
           <div className="space-y-2 px-6 pb-6 pt-4">
             {categories.map((category) => (
-              <button key={category.id} type="button" onClick={() => { setSelectedCategoryId(category.id); setSelectedSubcategoryId(""); }} className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${selectedCategoryId === category.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <span className="block font-semibold text-slate-900">{category.name}</span>
+              <div key={category.id} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 ${selectedCategoryId === category.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
+                <button type="button" onClick={() => { setSelectedCategoryId(category.id); setSelectedSubcategoryId(""); }} className="min-w-0 flex-1 py-1 text-left">
+                  <span className="block font-semibold text-slate-900">{category.name}</span>
+                </button>
                 <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[category.status] ?? statusClass.archived}`}>{category.status}</span>
-              </button>
+                <Button size="sm" variant="outline" onClick={() => openEditor("category", category)}>Edit</Button>
+              </div>
             ))}
             {!categoriesQuery.isFetching && !categories.length && <p className="py-6 text-sm text-slate-500">No consultation areas configured.</p>}
           </div>
         </Card>
 
-        <Card title="Specialties" subtitle={selectedCategory?.name ?? "Select an area"} padding="none">
+        <Card title="Specialties" subtitle={selectedCategory?.name ?? "Select an area first"} padding="none">
           <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateSubcategory} onClick={() => openEditor("subcategory")}>Add specialty</Button></div>
           <div className="space-y-2 px-6 pb-6 pt-4">
             {subcategories.map((subcategory) => (
-              <button key={subcategory.id} type="button" onClick={() => setSelectedSubcategoryId(subcategory.id)} className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${selectedSubcategoryId === subcategory.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <span className="block font-semibold text-slate-900">{subcategory.name}</span>
+              <div key={subcategory.id} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 ${selectedSubcategoryId === subcategory.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
+                <button type="button" onClick={() => setSelectedSubcategoryId(subcategory.id)} className="min-w-0 flex-1 py-1 text-left">
+                  <span className="block font-semibold text-slate-900">{subcategory.name}</span>
+                </button>
                 <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[subcategory.status] ?? statusClass.archived}`}>{subcategory.status}</span>
-              </button>
+                <Button size="sm" variant="outline" onClick={() => openEditor("subcategory", subcategory)}>Edit</Button>
+              </div>
             ))}
             {selectedCategoryId && !subcategoriesQuery.isFetching && !subcategories.length && <p className="py-6 text-sm text-slate-500">No specialties configured for this area.</p>}
           </div>
         </Card>
 
-        <Card title="Consultation services" subtitle={selectedSubcategory ? `${selectedCategory?.name ?? ""} / ${selectedSubcategory.name}` : "Select a specialty"} badge={`${selectedServiceCount} services`} padding="none">
+        <Card title="Consultation services" subtitle={selectedSubcategory ? `${selectedCategory?.name ?? ""} → ${selectedSubcategory.name}` : "Select a specialty first"} badge={`${selectedServiceCount} services`} padding="none">
+          <div className="mx-6 mt-6 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+            {selectedSubcategory ? (
+              <>
+                <p className="font-semibold">Services under {selectedSubcategory.name}</p>
+                <p className="mt-1 text-primary-700">New services created here will automatically belong to this specialty.</p>
+              </>
+            ) : (
+              <p>Select a specialty in the middle panel to view or add its services.</p>
+            )}
+          </div>
           <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateService} onClick={() => openEditor("service")}>Add service</Button></div>
           <div className="space-y-3 px-6 pb-6 pt-4">
             {services.map((service) => (
@@ -272,6 +288,11 @@ const TelemedicineCatalogPage = () => {
             </select>}
             <span className="text-xs text-slate-500">This specialty will be listed under the selected consultation area.</span>
           </label>}
+          {editor.kind === "service" && selectedSubcategory && <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+            <p className="font-semibold">Creating service under</p>
+            <p className="mt-1">{selectedCategory?.name ?? "Consultation area"} <span aria-hidden="true">→</span> {selectedSubcategory.name}</p>
+            <p className="mt-1 text-xs text-primary-700">This parent relationship is saved automatically when you create the service.</p>
+          </div>}
           <Input label="Name" value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder={editorExamples[editor.kind].name} required />
           <Input label="Description" value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder={editorExamples[editor.kind].description} />
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">Status<select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3"><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select><span className="text-xs text-slate-500">Only active entries appear in new discovery and assignment.</span></label>

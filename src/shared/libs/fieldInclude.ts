@@ -160,6 +160,19 @@ export const providerProfile: FieldPreset = {
           fields: ["id", "name", "key"]
         }
       }
+    },
+    telemedicine_subcategory_assignments: {
+      fields: ["id", "subcategory_id", "status"],
+      children: {
+        subcategory: {
+          fields: ["id", "name", "category_id"],
+          children: {
+            category: {
+              fields: ["id", "name"]
+            }
+          }
+        }
+      }
     }
   }
 };

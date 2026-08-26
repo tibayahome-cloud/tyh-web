@@ -11,6 +11,10 @@ import { useAuth } from "../../../shared/hooks/useAuth";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { api } from "../../../shared/libs/api";
 import { useToast } from "../../../shared/components/ToastProvider";
+import {
+  fetchTelemedicineCatalogServices,
+  type TelemedicineCatalogService
+} from "../../../shared/libs/telemedicineCatalog";
 
 type Service = {
   id: string;
@@ -85,6 +89,11 @@ const ServicesPage = () => {
   const queryClient = useQueryClient();
   const { data: catalog, isLoading: loadingCatalog } = useServiceCatalog(user?.id);
   const { data: membership, isLoading: loadingMembership } = useProviderServices(user?.id);
+  const { data: telemedicineCatalog, isLoading: loadingTelemedicineCatalog } = useQuery<TelemedicineCatalogService[]>({
+    queryKey: ["provider", "telemedicine-catalog"],
+    queryFn: () => fetchTelemedicineCatalogServices(),
+    enabled: Boolean(user?.id)
+  });
 
   const [selected, setSelected] = useState<string[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -119,6 +128,32 @@ const ServicesPage = () => {
     });
     return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
   }, [catalog, searchTerm]);
+
+  const groupedTelemedicineServices = useMemo(() => {
+    const assigned = (profile?.telemedicine_subcategory_assignments ?? []).filter((item) => item.status === "active");
+    const servicesBySubcategory = new Map<string, TelemedicineCatalogService[]>();
+    (telemedicineCatalog ?? []).forEach((service) => {
+      const items = servicesBySubcategory.get(service.subcategoryId) ?? [];
+      items.push(service);
+      servicesBySubcategory.set(service.subcategoryId, items);
+    });
+    const groups = new Map<string, { name: string; specialties: Array<{ name: string; services: TelemedicineCatalogService[] }> }>();
+    assigned.forEach((assignment) => {
+      const subcategory = assignment.subcategory;
+      if (!subcategory) return;
+      const category = subcategory.category;
+      const categoryKey = category?.id ?? "other";
+      const group = groups.get(categoryKey) ?? { name: category?.name ?? "Telemedicine", specialties: [] };
+      group.specialties.push({
+        name: subcategory.name ?? "Specialty",
+        services: (servicesBySubcategory.get(subcategory.id) ?? []).filter((service) =>
+          service.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
+        )
+      });
+      groups.set(categoryKey, group);
+    });
+    return Array.from(groups.values());
+  }, [profile?.telemedicine_subcategory_assignments, searchTerm, telemedicineCatalog]);
 
   const toggleService = (serviceId: string) => {
     if (!profile?.verified) {
@@ -156,7 +191,7 @@ const ServicesPage = () => {
     }
   });
 
-  if (loadingCatalog || loadingMembership || profileQuery.isLoading || !catalog) {
+  if (loadingCatalog || loadingMembership || loadingTelemedicineCatalog || profileQuery.isLoading || !catalog) {
     return <Loading fullHeight />;
   }
 
@@ -274,6 +309,41 @@ const ServicesPage = () => {
           </div>
         </Card>
       ))}
+
+      {groupedTelemedicineServices.length > 0 && (
+        <Card title="Telemedicine services" subtitle="Services available through your assigned specialties." padding="default">
+          <div className="space-y-4">
+            {groupedTelemedicineServices.map((group) => (
+              <section key={group.name} className="rounded-2xl border border-slate-200 p-4">
+                <h2 className="text-base font-bold text-slate-900">{group.name}</h2>
+                <div className="mt-3 space-y-3">
+                  {group.specialties.map((specialty) => (
+                    <div key={specialty.name} className="rounded-xl bg-slate-50 p-3">
+                      <h3 className="text-sm font-semibold text-slate-800">{specialty.name}</h3>
+                      {specialty.services.length === 0 ? (
+                        <p className="mt-2 text-sm text-slate-500">
+                          {searchTerm.trim() ? "No assigned services match your search." : "No bookable services are configured for this specialty yet."}
+                        </p>
+                      ) : (
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {specialty.services.map((service) => (
+                            <div key={service.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                              <p className="text-sm font-semibold text-slate-900">{service.name}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {financialsVisible ? `${service.currency} ${(service.basePriceCents / 100).toLocaleString()}` : "Facility-managed rate"} · {service.defaultEstimateMinutes} mins
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={Boolean(confirmAction)}

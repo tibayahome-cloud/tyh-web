@@ -241,7 +241,7 @@ export const facilityServiceUpdatePayload = (input: Partial<FacilityServiceInput
 };
 
 export const providerCompensationPayload = (input: ProviderCompensationInput): Record<string, unknown> => ({
-  mode: input.mode,
+  compensation_mode: input.mode,
   fixed_payout_cents: input.fixedPayoutCents,
   payout_percentage: input.payoutPercentage
 });

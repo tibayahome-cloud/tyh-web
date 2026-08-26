@@ -47,9 +47,15 @@ describe("telemedicine catalog client", () => {
     expect(mockGet).toHaveBeenNthCalledWith(2, "/telemedicine/catalog/services", { params: { subcategory_id: "sc1" } });
   });
 
-  it("does not request services without a selected subcategory", async () => {
-    await expect(fetchTelemedicineCatalogServices()).resolves.toEqual([]);
-    expect(mockGet).not.toHaveBeenCalled();
+  it("loads all active services when no subcategory is selected", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { data: [{ id: "s1", subcategory_id: "sc1", key: "consult", name: "Consultation", status: "active" }] }
+    });
+
+    await expect(fetchTelemedicineCatalogServices()).resolves.toEqual([
+      expect.objectContaining({ id: "s1", subcategoryId: "sc1" })
+    ]);
+    expect(mockGet).toHaveBeenCalledWith("/telemedicine/catalog/services", { params: undefined });
   });
 
   it("preserves inactive entries for admin catalog management", async () => {

@@ -226,7 +226,7 @@ describe("facility API helpers", () => {
     expect(mockPatch).toHaveBeenCalledWith(
       "/facilities/facility-1/providers/provider-user-1/compensation",
       {
-        mode: "percentage",
+        compensation_mode: "percentage",
         fixed_payout_cents: null,
         payout_percentage: 40
       }
@@ -348,7 +348,7 @@ describe("facility API helpers", () => {
       service_ids: ["service-2"],
       telemedicine_subcategory_ids: ["subcategory-2"],
       provider_financials_visible: null,
-      mode: "fixed",
+      compensation_mode: "fixed",
       fixed_payout_cents: 150000,
       payout_percentage: null
     });
@@ -472,7 +472,7 @@ describe("facility API helpers", () => {
     expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/providers/user-1/bootstrap", {
       services: ["service-1"],
       compensation: {
-        mode: "employee",
+        compensation_mode: "employee",
         fixed_payout_cents: null,
         payout_percentage: null
       }

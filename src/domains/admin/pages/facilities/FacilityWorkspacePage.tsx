@@ -57,6 +57,16 @@ import type { Booking } from "../../../../shared/schemas/booking";
 import type { ServiceRequest, ServiceRequestCreateInput } from "../../../../shared/schemas/serviceRequest";
 import { STATUS_LABELS } from "../../../../shared/schemas/serviceRequest";
 import { useRbac } from "../../../../shared/hooks/useRbac";
+import {
+  fetchTelemedicineAdminCategories,
+  fetchTelemedicineAdminServices,
+  fetchTelemedicineAdminSubcategories
+} from "../../../../shared/libs/telemedicineCatalog";
+import type {
+  TelemedicineCategory,
+  TelemedicineCatalogService,
+  TelemedicineSubcategory
+} from "../../../../shared/libs/telemedicineCatalog";
 
 type Envelope<T> = {
   data: T;
@@ -70,6 +80,11 @@ type CatalogService = {
   default_estimate_minutes: number;
   active: boolean;
   remote_capable: boolean;
+  categoryName?: string;
+  subcategoryName?: string;
+  isTelemedicine?: boolean;
+  categoryId?: string;
+  subcategoryId?: string;
 };
 
 type ServiceFormState = {
@@ -84,6 +99,11 @@ type ServiceFormState = {
 type BulkServiceRow = ServiceFormState & {
   name: string;
   remoteCapable: boolean;
+  categoryName?: string;
+  subcategoryName?: string;
+  isTelemedicine?: boolean;
+  categoryId?: string;
+  subcategoryId?: string;
 };
 
 type ServiceRequestFormState = {
@@ -574,6 +594,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [editingService, setEditingService] = useState<FacilityService | null>(null);
   const [serviceForm, setServiceForm] = useState<ServiceFormState>(initialServiceForm);
   const [bulkServiceRows, setBulkServiceRows] = useState<BulkServiceRow[]>([]);
+  const [catalogServiceType, setCatalogServiceType] = useState<"normal" | "telemedicine">("normal");
   const [serviceFormError, setServiceFormError] = useState<string | null>(null);
   const [pendingDisable, setPendingDisable] = useState<FacilityService | null>(null);
   const [serviceRequestModalOpen, setServiceRequestModalOpen] = useState(false);
@@ -614,6 +635,24 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     queryKey: ["admin", "services", "catalog", "active"],
     queryFn: fetchCatalogServices,
     enabled: canManageServices && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
+  });
+
+  const telemedicineCategoriesQuery = useQuery<TelemedicineCategory[]>({
+    queryKey: ["admin", "telemedicine", "categories"],
+    queryFn: fetchTelemedicineAdminCategories,
+    enabled: catalogQuery.isEnabled
+  });
+
+  const telemedicineSubcategoriesQuery = useQuery<TelemedicineSubcategory[]>({
+    queryKey: ["admin", "telemedicine", "subcategories"],
+    queryFn: () => fetchTelemedicineAdminSubcategories(),
+    enabled: catalogQuery.isEnabled
+  });
+
+  const telemedicineServicesQuery = useQuery<TelemedicineCatalogService[]>({
+    queryKey: ["admin", "telemedicine", "services"],
+    queryFn: () => fetchTelemedicineAdminServices(),
+    enabled: catalogQuery.isEnabled
   });
 
   const serviceRequestsQuery = useQuery({
@@ -662,9 +701,49 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   }, []);
 
   const availableCatalogServices = useMemo(() => {
-    const used = new Set(facilityServices.map((service) => service.serviceId));
-    return (catalogQuery.data ?? []).filter((service) => editingService?.serviceId === service.id || !used.has(service.id));
-  }, [catalogQuery.data, editingService?.serviceId, facilityServices]);
+    return catalogQuery.data ?? [];
+  }, [catalogQuery.data]);
+
+  const telemedicineCatalogServices = useMemo(() => {
+    const categories = new Map((telemedicineCategoriesQuery.data ?? []).map((item) => [item.id, item]));
+    const subcategories = new Map((telemedicineSubcategoriesQuery.data ?? []).map((item) => [item.id, item]));
+    const genericServices = new Map((catalogQuery.data ?? []).map((item) => [item.id, item]));
+    return (telemedicineServicesQuery.data ?? []).map((service): CatalogService => {
+      const subcategory = subcategories.get(service.subcategoryId) ?? service.subcategory;
+      const category = subcategory ? categories.get(subcategory.categoryId) ?? subcategory.category : null;
+      const generic = genericServices.get(service.id);
+      return {
+        id: service.id,
+        key: service.key,
+        name: service.name,
+        base_price_cents: generic?.base_price_cents ?? service.basePriceCents,
+        default_estimate_minutes: generic?.default_estimate_minutes ?? service.defaultEstimateMinutes,
+        active: service.status === "active",
+        remote_capable: generic?.remote_capable ?? true,
+        categoryName: category?.name,
+        subcategoryName: subcategory?.name,
+        isTelemedicine: true,
+        categoryId: category?.id,
+        subcategoryId: subcategory?.id
+      };
+    });
+  }, [catalogQuery.data, telemedicineCategoriesQuery.data, telemedicineServicesQuery.data, telemedicineSubcategoriesQuery.data]);
+
+  const telemedicineServiceIds = useMemo(
+    () => new Set(telemedicineCatalogServices.map((service) => service.id)),
+    [telemedicineCatalogServices]
+  );
+  const availableNormalCatalogServices = useMemo(
+    () => availableCatalogServices.filter((service) => !telemedicineServiceIds.has(service.id)),
+    [availableCatalogServices, telemedicineServiceIds]
+  );
+  const availableTelemedicineCatalogServices = useMemo(() => {
+    return telemedicineCatalogServices;
+  }, [telemedicineCatalogServices]);
+  const assignedFacilityServiceIds = useMemo(
+    () => new Set(facilityServices.map((service) => service.serviceId)),
+    [facilityServices]
+  );
 
   const createBulkServiceRow = (service: CatalogService): BulkServiceRow => ({
     serviceId: service.id,
@@ -673,8 +752,11 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     estimateDurationMinutes: String(service.default_estimate_minutes),
     active: true,
     isEmergencyCapable: false,
-    deliveryMode: "in_person",
-    remoteCapable: service.remote_capable
+    deliveryMode: service.isTelemedicine ? "remote" : "in_person",
+    remoteCapable: service.remote_capable,
+    categoryName: service.categoryName,
+    subcategoryName: service.subcategoryName,
+    isTelemedicine: service.isTelemedicine
   });
 
   const activeServiceCount = facilityServices.filter((service) => service.active).length;
@@ -864,6 +946,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     setEditingService(service ?? null);
     setServiceForm(service ? mapServiceForm(service) : initialServiceForm);
     setBulkServiceRows([]);
+    setCatalogServiceType(service && telemedicineServiceIds.has(service.serviceId) ? "telemedicine" : "normal");
     setServiceFormError(null);
     setServiceModalOpen(true);
   };
@@ -1115,7 +1198,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
       <Card
         title="Facility services"
-        description="Manage facility-specific service rates and availability."
+        description="Choose the exact services this facility offers. Normal and telemedicine services are managed separately."
         badge={`${activeServiceCount} active`}
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1130,7 +1213,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
               </Button>
               <Button className="w-full sm:w-auto" onClick={() => openServiceModal()}>
                 <AddIcon fontSize="small" />
-                Add from catalog
+                Add facility services
               </Button>
             </div>
           )}
@@ -1335,7 +1418,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
       <Modal
         open={serviceModalOpen}
-        title={editingService ? "Edit facility service" : "Add facility service"}
+        title={editingService ? "Edit facility service" : "Add services to this facility"}
         onClose={() => setServiceModalOpen(false)}
         maxWidth="sm"
       >
@@ -1407,18 +1490,40 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             </>
           ) : (
             <>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                <p className="text-sm font-semibold text-slate-900">What does this facility offer?</p>
+                <p className="mt-1 text-xs text-slate-600">Select services below. Telemedicine services are grouped by area and specialty; choose the bookable service itself.</p>
+              </div>
+              <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Service type">
+                {(["normal", "telemedicine"] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    role="tab"
+                    aria-selected={catalogServiceType === type}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${catalogServiceType === type ? "bg-white text-tiba-blue shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                    onClick={() => setCatalogServiceType(type)}
+                  >
+                    {type === "normal" ? "Normal services" : "Telemedicine services"}
+                  </button>
+                ))}
+              </div>
               <div>
-                <p className="text-sm font-semibold text-slate-800">Choose services to add</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  {catalogServiceType === "normal" ? "Choose normal services" : "Choose telemedicine services"}
+                </p>
                 <p className="mt-1 text-xs text-slate-500">You can configure each selected service before saving.</p>
               </div>
               <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-2">
-                {availableCatalogServices.map((service) => {
+                {catalogServiceType === "normal" && availableNormalCatalogServices.map((service) => {
                   const selected = bulkServiceRows.some((row) => row.serviceId === service.id);
+                  const assigned = assignedFacilityServiceIds.has(service.id);
                   return (
-                    <label key={service.id} className="flex cursor-pointer items-center gap-3 rounded-lg border border-transparent p-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                    <label key={service.id} className={`flex items-center gap-3 rounded-lg border p-3 text-sm font-semibold ${assigned ? "border-green-100 bg-green-50/60 text-slate-600" : "cursor-pointer border-transparent text-slate-800 hover:bg-slate-50"}`}>
                       <input
                         type="checkbox"
-                        checked={selected}
+                        checked={selected || assigned}
+                        disabled={assigned}
                         onChange={(event) => {
                           setBulkServiceRows((rows) => event.target.checked
                             ? [...rows, createBulkServiceRow(service)]
@@ -1427,11 +1532,57 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                         className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
                       />
                       <span>{service.name}</span>
-                      {service.remote_capable && <span className="ml-auto text-xs font-medium text-tiba-blue">Remote capable</span>}
+                      {service.remote_capable && !assigned && <span className="ml-auto text-xs font-medium text-tiba-blue">Remote capable</span>}
+                      {assigned && <span className="ml-auto text-xs font-semibold text-green-700">Already assigned</span>}
                     </label>
                   );
                 })}
-                {availableCatalogServices.length === 0 && <p className="p-3 text-sm text-slate-500">All catalog services are already configured.</p>}
+                {catalogServiceType === "telemedicine" && (telemedicineCategoriesQuery.data ?? [])
+                  .filter((category) => availableTelemedicineCatalogServices.some((service) => service.categoryId === category.id))
+                  .map((category) => {
+                  const categorySubcategories = (telemedicineSubcategoriesQuery.data ?? []).filter((item) => item.categoryId === category.id);
+                  return (
+                    <div key={category.id} className="space-y-2 p-2">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{category.name}</p>
+                      {categorySubcategories.map((subcategory) => {
+                        const services = availableTelemedicineCatalogServices.filter((service) => service.subcategoryId === subcategory.id && service.categoryId === category.id);
+                        if (services.length === 0) return null;
+                        return (
+                          <div key={subcategory.id} className="rounded-lg border border-slate-100 p-2">
+                            <p className="mb-1 text-sm font-semibold text-slate-800">{subcategory.name}</p>
+                            <div className="space-y-1">
+                              {services.map((service) => {
+                                const selected = bulkServiceRows.some((row) => row.serviceId === service.id);
+                                const assigned = assignedFacilityServiceIds.has(service.id);
+                                return (
+                                  <label key={service.id} className={`flex items-center gap-3 rounded-lg p-2 text-sm font-semibold ${assigned ? "bg-green-50/60 text-slate-600" : "cursor-pointer text-slate-800 hover:bg-slate-50"}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={selected || assigned}
+                                      disabled={assigned}
+                                      onChange={(event) => setBulkServiceRows((rows) => event.target.checked
+                                        ? [...rows, createBulkServiceRow(service)]
+                                        : rows.filter((row) => row.serviceId !== service.id))}
+                                      className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                                    />
+                                    <span>{service.name}</span>
+                                    <span className="ml-auto text-xs font-medium text-tiba-blue">{assigned ? "Already assigned" : "Telemedicine"}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+                {catalogServiceType === "normal" && availableNormalCatalogServices.length === 0 && <p className="p-3 text-sm text-slate-500">No normal catalog services are available yet.</p>}
+                {catalogServiceType === "telemedicine" && telemedicineCatalogServices.length === 0 && (
+                  <p className="p-3 text-sm text-slate-500">
+                    No telemedicine bookable services are available yet. Create a service under a specialty in the Telemedicine catalog first.
+                  </p>
+                )}
               </div>
               {bulkServiceRows.length > 0 && (
                 <div className="space-y-3">
@@ -1439,7 +1590,12 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                   {bulkServiceRows.map((row) => (
                     <div key={row.serviceId} className="rounded-xl border border-slate-200 p-3">
                       <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {row.isTelemedicine ? `Telemedicine · ${row.categoryName ?? "Area"} → ${row.subcategoryName ?? "Specialty"}` : "Normal service"}
+                          </p>
+                        </div>
                         <button type="button" className="text-xs font-semibold text-danger-600" onClick={() => setBulkServiceRows((rows) => rows.filter((item) => item.serviceId !== row.serviceId))}>Remove</button>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">

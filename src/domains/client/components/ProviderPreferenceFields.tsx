@@ -43,7 +43,7 @@ export const ProviderPreferenceFields = ({ value, onChange, disabled }: Props) =
         disabled={disabled}
         className="w-full rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-left text-sm text-slate-600 hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
       >
-        Any preferences about who sees you? <span className="text-slate-400">(optional)</span>
+        Add a preference for your clinician <span className="text-slate-400">(optional)</span>
       </button>
     );
   }
