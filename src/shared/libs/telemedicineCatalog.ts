@@ -128,9 +128,8 @@ export const fetchTelemedicineSubcategories = async (
 export const fetchTelemedicineCatalogServices = async (
   subcategoryId?: string
 ): Promise<TelemedicineCatalogService[]> => {
-  if (!subcategoryId) return [];
   const response = await api.get("/telemedicine/catalog/services", {
-    params: { subcategory_id: subcategoryId }
+    params: subcategoryId ? { subcategory_id: subcategoryId } : undefined
   });
   return dataRows(response.data).map(mapTelemedicineCatalogService).filter((item) => item.id && item.status === "active");
 };
