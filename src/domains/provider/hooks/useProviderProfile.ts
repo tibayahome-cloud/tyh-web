@@ -21,6 +21,17 @@ type ProviderProfile = {
     name?: string | null;
     provider_financials_visible?: boolean | null;
   } | null;
+  telemedicine_subcategory_assignments?: Array<{
+    id: string;
+    subcategory_id: string;
+    status: string;
+    subcategory?: {
+      id: string;
+      name?: string | null;
+      category_id?: string | null;
+      category?: { id: string; name?: string | null } | null;
+    } | null;
+  }>;
 };
 
 type Envelope<T> = {

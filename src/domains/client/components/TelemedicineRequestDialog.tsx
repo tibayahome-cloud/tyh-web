@@ -101,8 +101,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayISODate());
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
@@ -122,14 +120,14 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     enabled: open && step === TM_STEP_INDEX.service && !serviceId
   });
   const subcategoriesQuery = useQuery({
-    queryKey: ["client", "telemedicine", "subcategories", selectedCategoryId],
-    queryFn: () => fetchTelemedicineSubcategories(selectedCategoryId ?? undefined),
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId && Boolean(selectedCategoryId)
+    queryKey: ["client", "telemedicine", "subcategories"],
+    queryFn: () => fetchTelemedicineSubcategories(),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
   });
   const catalogServicesQuery = useQuery({
-    queryKey: ["client", "telemedicine", "services", selectedSubcategoryId],
-    queryFn: () => fetchTelemedicineCatalogServices(selectedSubcategoryId ?? undefined),
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId && Boolean(selectedSubcategoryId)
+    queryKey: ["client", "telemedicine", "services"],
+    queryFn: () => fetchTelemedicineCatalogServices(),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
   });
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
@@ -166,6 +164,27 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const serviceOptions = serviceId ? servicesQuery.data ?? [] : catalogServiceOptions;
   const selectedService = serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
+  const categoryCards = useMemo(() => {
+    const subcategoriesByCategory = new Map<string, typeof subcategoriesQuery.data>();
+    (subcategoriesQuery.data ?? []).forEach((subcategory) => {
+      const items = subcategoriesByCategory.get(subcategory.categoryId) ?? [];
+      items.push(subcategory);
+      subcategoriesByCategory.set(subcategory.categoryId, items);
+    });
+    const servicesBySubcategory = new Map<string, typeof catalogServicesQuery.data>();
+    (catalogServicesQuery.data ?? []).forEach((service) => {
+      const items = servicesBySubcategory.get(service.subcategoryId) ?? [];
+      items.push(service);
+      servicesBySubcategory.set(service.subcategoryId, items);
+    });
+    return (categoriesQuery.data ?? []).map((category) => ({
+      category,
+      specialties: (subcategoriesByCategory.get(category.id) ?? []).map((subcategory) => ({
+        subcategory,
+        services: servicesBySubcategory.get(subcategory.id) ?? []
+      }))
+    }));
+  }, [categoriesQuery.data, catalogServicesQuery.data, subcategoriesQuery.data]);
 
   useEffect(() => {
     if (!hold) return;
@@ -210,8 +229,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     releaseCurrentHold();
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
-    setSelectedCategoryId(null);
-    setSelectedSubcategoryId(null);
     setSelectedFacility(null);
     setSelectedSlot(null);
     setHoldId(null);
@@ -289,76 +306,61 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               servicesQuery.isLoading && <Loading />
             ) : (
               <>
-                <label className="block text-sm font-medium text-slate-700" htmlFor="telemedicine-category">
-                  Consultation area
-                </label>
-                <select
-                  id="telemedicine-category"
-                  value={selectedCategoryId ?? ""}
-                  onChange={(event) => {
-                    setSelectedCategoryId(event.target.value || null);
-                    setSelectedSubcategoryId(null);
-                    setSelectedServiceId(null);
-                  }}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
-                >
-                  <option value="">Select a consultation area</option>
-                  {(categoriesQuery.data ?? []).map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedCategoryId && (
-                  <>
-                    <label className="block text-sm font-medium text-slate-700" htmlFor="telemedicine-subcategory">
-                      Specialty
-                    </label>
-                    <select
-                      id="telemedicine-subcategory"
-                      value={selectedSubcategoryId ?? ""}
-                      onChange={(event) => {
-                        setSelectedSubcategoryId(event.target.value || null);
-                        setSelectedServiceId(null);
-                      }}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
-                    >
-                      <option value="">Select a specialty</option>
-                      {(subcategoriesQuery.data ?? []).map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.id}>
-                          {subcategory.name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
                 {(categoriesQuery.isLoading || subcategoriesQuery.isLoading || catalogServicesQuery.isLoading) && <Loading />}
               </>
             )}
-            {!serviceId && selectedSubcategoryId && !catalogServicesQuery.isLoading && serviceOptions.length === 0 && (
-              <p className="text-sm text-slate-500">No consultations are available for this specialty right now.</p>
+            {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && categoryCards.length === 0 && (
+              <p className="text-sm text-slate-500">No remote consultations are available right now.</p>
             )}
             {serviceId && !servicesQuery.isLoading && serviceOptions.length === 0 && (
               <p className="text-sm text-slate-500">No remote-consultation services are available right now.</p>
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {serviceOptions.map((service) => (
-                <button
-                  key={service.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedServiceId(service.id);
-                    setStep(TM_STEP_INDEX.facility);
-                  }}
-                  className="rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
-                >
-                  <p className="font-semibold text-slate-900">{service.name}</p>
-                  {service.description && <p className="mt-1 text-xs text-slate-500">{service.description}</p>}
-                  <p className="mt-2 text-sm font-medium text-tiba-blue">From {formatCurrency(service.base_price_cents)}</p>
-                </button>
-              ))}
-            </div>
+            {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">Choose a consultation below to see available facilities and times.</p>
+                {categoryCards.map(({ category, specialties }) => (
+                  <section key={category.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3">
+                      <h3 className="text-base font-bold text-slate-900">{category.name}</h3>
+                      {category.description && <p className="mt-1 text-sm text-slate-500">{category.description}</p>}
+                    </div>
+                    {specialties.length === 0 ? (
+                      <p className="text-sm text-slate-500">No consultations are available in this area yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {specialties.map(({ subcategory, services }) => (
+                          <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
+                            <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
+                            {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
+                            {services.length === 0 ? (
+                              <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
+                            ) : (
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                {services.map((service) => (
+                                  <button
+                                    key={service.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedServiceId(service.id);
+                                      setStep(TM_STEP_INDEX.facility);
+                                    }}
+                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
+                                  >
+                                    <p className="text-sm font-semibold text-slate-900">{service.name}</p>
+                                    {service.description && <p className="mt-1 text-xs text-slate-500">{service.description}</p>}
+                                    <p className="mt-2 text-sm font-medium text-tiba-blue">From {formatCurrency(service.basePriceCents, service.currency)}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
