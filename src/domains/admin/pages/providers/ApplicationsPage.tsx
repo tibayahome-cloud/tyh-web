@@ -97,14 +97,15 @@ const dateTime = new Intl.DateTimeFormat(undefined, {
 
 const PAGE_SIZE = 18;
 
-const useApplicationsQuery = (status: string, enabled = true) =>
+const useApplicationsQuery = (status: string, search: string, enabled = true) =>
   useInfiniteQuery({
-    queryKey: ["admin", "provider-applications", status],
+    queryKey: ["admin", "provider-applications", status, search],
     initialPageParam: 1,
     queryFn: async ({ pageParam = 1 }) => {
       const params = {
         ...buildFieldParams(provApp),
         ...(status ? { "filter[status]": status } : {}),
+        ...(search ? { "filter[search]": search } : {}),
         "page[number]": String(pageParam),
         "page[size]": String(PAGE_SIZE)
       };
@@ -215,7 +216,7 @@ const ProviderApplicationsPage = () => {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage
-  } = useApplicationsQuery(statusFilter === "all" ? "" : statusFilter, activeTab === "applications");
+  } = useApplicationsQuery(statusFilter === "all" ? "" : statusFilter, searchTerm, activeTab === "applications");
   const { data: detail, isFetching: detailLoading } = useApplicationDetailQuery(selectedId);
   const requirementsQuery = useRequirementTypesQuery();
   const applicationPages = useMemo(() => data?.pages ?? [], [data]);

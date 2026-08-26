@@ -134,11 +134,23 @@ const BookingDetailPage = () => {
   const mapHeight = Math.round(viewportHeight * 0.66); // 2/3 of screen
 
   const handleCancel = async () => {
-    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    const isUnpaidTelemedicineRequest =
+      booking.isTelemedicine && booking.status === "telemedicine_payment_pending";
+    const message = isUnpaidTelemedicineRequest
+      ? "Remove this unpaid consultation request? The selected slot will be released."
+      : "Are you sure you want to cancel this booking?";
+    if (!window.confirm(message)) return;
     try {
       await cancelMutation.mutateAsync({ bookingId: booking.id, reason: "Cancelled from detail page" });
-      toast.showToast({ title: "Booking cancelled", variant: "info" });
-      setSheetExpanded(true); // Ensure details are visible after cancel
+      toast.showToast({
+        title: isUnpaidTelemedicineRequest ? "Unpaid request removed" : "Booking cancelled",
+        variant: "info"
+      });
+      if (isUnpaidTelemedicineRequest) {
+        navigate("/app/bookings");
+      } else {
+        setSheetExpanded(true); // Ensure details are visible after cancel
+      }
     } catch (error: unknown) {
       toast.showToast({
         title: "Error cancelling booking",
@@ -485,7 +497,9 @@ const BookingDetailPage = () => {
             onClick={handleCancel}
             loading={cancelMutation.isPending}
           >
-            Cancel Booking Request
+            {booking.isTelemedicine && booking.status === "telemedicine_payment_pending"
+              ? "Remove unpaid request"
+              : "Cancel Booking Request"}
           </Button>
         )}
         <Button

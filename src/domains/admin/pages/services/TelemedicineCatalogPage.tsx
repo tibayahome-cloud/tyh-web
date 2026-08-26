@@ -223,10 +223,13 @@ const TelemedicineCatalogPage = () => {
           <div className="flex justify-end px-6 pt-6"><Button size="sm" onClick={() => openEditor("category")}>Add area</Button></div>
           <div className="space-y-2 px-6 pb-6 pt-4">
             {categories.map((category) => (
-              <button key={category.id} type="button" onClick={() => { setSelectedCategoryId(category.id); setSelectedSubcategoryId(""); }} className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${selectedCategoryId === category.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <span className="block font-semibold text-slate-900">{category.name}</span>
+              <div key={category.id} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 ${selectedCategoryId === category.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
+                <button type="button" onClick={() => { setSelectedCategoryId(category.id); setSelectedSubcategoryId(""); }} className="min-w-0 flex-1 py-1 text-left">
+                  <span className="block font-semibold text-slate-900">{category.name}</span>
+                </button>
                 <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[category.status] ?? statusClass.archived}`}>{category.status}</span>
-              </button>
+                <Button size="sm" variant="outline" onClick={() => openEditor("category", category)}>Edit</Button>
+              </div>
             ))}
             {!categoriesQuery.isFetching && !categories.length && <p className="py-6 text-sm text-slate-500">No consultation areas configured.</p>}
           </div>
@@ -236,10 +239,13 @@ const TelemedicineCatalogPage = () => {
           <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateSubcategory} onClick={() => openEditor("subcategory")}>Add specialty</Button></div>
           <div className="space-y-2 px-6 pb-6 pt-4">
             {subcategories.map((subcategory) => (
-              <button key={subcategory.id} type="button" onClick={() => setSelectedSubcategoryId(subcategory.id)} className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left ${selectedSubcategoryId === subcategory.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <span className="block font-semibold text-slate-900">{subcategory.name}</span>
+              <div key={subcategory.id} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 ${selectedSubcategoryId === subcategory.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
+                <button type="button" onClick={() => setSelectedSubcategoryId(subcategory.id)} className="min-w-0 flex-1 py-1 text-left">
+                  <span className="block font-semibold text-slate-900">{subcategory.name}</span>
+                </button>
                 <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[subcategory.status] ?? statusClass.archived}`}>{subcategory.status}</span>
-              </button>
+                <Button size="sm" variant="outline" onClick={() => openEditor("subcategory", subcategory)}>Edit</Button>
+              </div>
             ))}
             {selectedCategoryId && !subcategoriesQuery.isFetching && !subcategories.length && <p className="py-6 text-sm text-slate-500">No specialties configured for this area.</p>}
           </div>

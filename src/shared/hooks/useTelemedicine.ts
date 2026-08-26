@@ -94,7 +94,11 @@ export const useAvailableSlots = (
       }
       return fetchAvailableSlots(facilityId, facilityServiceId, startDate, endDate);
     },
-    enabled: Boolean(facilityId && facilityServiceId && startDate) && (options?.enabled ?? true)
+    enabled: Boolean(facilityId && facilityServiceId && startDate) && (options?.enabled ?? true),
+    // Slot availability changes when a hold is created, but not every time the dialog renders.
+    // Reusing a recent date also makes moving back and forth between dates feel immediate.
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData
   });
 };
 
