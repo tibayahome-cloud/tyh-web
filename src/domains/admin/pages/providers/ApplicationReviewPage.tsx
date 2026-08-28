@@ -221,7 +221,7 @@ const ApplicationReviewPage = () => {
         comment: comment?.trim() ? comment.trim() : undefined
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       invalidateApplication();
       toast.showToast({
         title: variables.status === "verified" ? "Requirement verified" : "Requirement updated",
