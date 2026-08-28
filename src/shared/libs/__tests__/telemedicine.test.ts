@@ -14,10 +14,27 @@ vi.mock("../api", () => ({
 }));
 
 import { fetchJitsiHealth, reassignProvider } from "../telemedicine";
+import { mapTelemedicineHold } from "../../schemas/telemedicine";
 
 describe("telemedicine client", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("maps the server-derived hold countdown", () => {
+    expect(
+      mapTelemedicineHold({
+        id: "hold-1",
+        facility_id: "facility-1",
+        facility_service_id: "service-1",
+        start_at: "2026-08-28T10:00:00Z",
+        end_at: "2026-08-28T10:30:00Z",
+        status: "active",
+        is_active: true,
+        expires_at: "2026-08-28T09:10:00Z",
+        remaining_seconds: 417,
+      })?.remainingSeconds,
+    ).toBe(417);
   });
 
   it("uses the dedicated telemedicine reassignment endpoint", async () => {
