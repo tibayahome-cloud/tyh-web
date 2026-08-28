@@ -37,6 +37,32 @@ jobs:
       - name: Run Vitest
         run: npm test -- --run
 
+  typecheck:
+    name: Frontend typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Reporting only for now. `vite build` strips types without checking them, and a plain
+      # `tsc --noEmit` was unusable until the tsconfig overlap below was fixed, so errors have
+      # accumulated unseen. Failing this job today would block every pull request; it exists to
+      # make the count visible so it can be driven down, and should be made blocking at zero.
+      - name: Typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
   build:
     name: Frontend build
     runs-on: ubuntu-latest
