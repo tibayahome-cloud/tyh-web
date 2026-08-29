@@ -110,7 +110,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(0);
 
   const policyQuery = useTelemedicinePolicy();
   const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
@@ -187,17 +187,16 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   }, [categoriesQuery.data, catalogServicesQuery.data, subcategoriesQuery.data]);
 
   useEffect(() => {
-    if (!hold) return;
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    if (!hold) {
+      setRemainingHoldSeconds(0);
+      return;
+    }
+    setRemainingHoldSeconds(hold.remainingSeconds);
+    const timer = window.setInterval(() => {
+      setRemainingHoldSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
     return () => window.clearInterval(timer);
-    // Only restart the ticking interval when the hold identity changes, not on every refetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hold?.id]);
-
-  const remainingHoldSeconds = useMemo(() => {
-    if (!hold) return 0;
-    return Math.max(0, Math.floor((new Date(hold.expiresAt).getTime() - nowMs) / 1000));
-  }, [hold, nowMs]);
+  }, [hold?.id, hold?.remainingSeconds]);
 
   const holdExpired = Boolean(hold) && !hold?.isActive && hold?.bookingStatus !== "telemedicine_paid_pending_assignment";
 

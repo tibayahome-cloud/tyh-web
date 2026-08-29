@@ -20,6 +20,7 @@ export const TelemedicineHoldSchema = z.object({
   status: z.enum(["active", "expired", "released", "consumed"]),
   isActive: z.boolean(),
   expiresAt: z.string(),
+  remainingSeconds: z.number().int().nonnegative(),
   bookingId: z.string().nullable(),
   bookingStatus: z.string().nullable()
 });
@@ -44,6 +45,7 @@ export const mapTelemedicineHold = (payload: unknown): TelemedicineHold | null =
     status: status as TelemedicineHold["status"],
     isActive: coerceBoolean(raw.is_active) ?? false,
     expiresAt: coerceDate(raw.expires_at) ?? "",
+    remainingSeconds: Math.max(0, Math.floor(coerceNumber(raw.remaining_seconds) ?? 0)),
     bookingId: coerceId(bookingRaw.id) || null,
     bookingStatus: coerceString(bookingRaw.status)
   };
