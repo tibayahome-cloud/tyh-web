@@ -47,7 +47,7 @@ export const Home = () => {
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (isAuthenticated) {
-            navigate("/client");
+            navigate("/app/home");
         } else {
             navigate("/login");
         }
