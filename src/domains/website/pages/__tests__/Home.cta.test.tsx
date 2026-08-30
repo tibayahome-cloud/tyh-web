@@ -53,7 +53,11 @@ const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
     <MemoryRouter initialEntries={["/"]}>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/app/home" element={<div>{CLIENT_APP_HOME}</div>} />
+        {/* The real router mounts the client app behind a single "/app/*" splat, so every
+            /app destination resolves there. Mirroring that keeps the fallback assertion
+            honest: it fires for paths the app genuinely does not serve, rather than for
+            /app routes this test did not happen to enumerate. */}
+        <Route path="/app/*" element={<div>{CLIENT_APP_HOME}</div>} />
         <Route path="/login" element={<div>{LOGIN_PAGE}</div>} />
         {/* Mirrors src/app/routes.tsx: an unknown path redirects to login. */}
         <Route path="/unknown" element={<div>{NOT_FOUND_FALLBACK}</div>} />
