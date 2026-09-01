@@ -88,6 +88,10 @@ const formatSlotDate = (iso: string, timezone: string | undefined) =>
 // the "min" bound blocked a date that was still today for the client.
 const WEEK_LENGTH = 7;
 
+// Mirrors MAX_SLOT_LOOKAHEAD_DAYS in app/services/telemedicine_service.py. Asking beyond it
+// is refused, so the picker stops offering weeks it knows the API will reject.
+const MAX_LOOKAHEAD_DAYS = 30;
+
 const useRemoteServiceOptions = (enabled: boolean) =>
   useQuery({
     queryKey: ["client", "services", "telemedicine-booking-form"],
@@ -150,8 +154,20 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   // The first day the client may pick, in the facility's calendar rather than the device's.
   const earliestDate = facilityToday(facilityTimezone);
-  const weekStart = selectedDate ?? earliestDate;
+
+  // Which week is on screen, kept separate from which day is chosen. Deriving the week from
+  // the selection made the strip slide forward on every click, so picking the last day threw
+  // away the earlier ones and there was no way back.
+  const [weekOffset, setWeekOffset] = useState(0);
+  const weekStart = useMemo(
+    () => facilityLocalDateRange(earliestDate, weekOffset * WEEK_LENGTH + 1).at(-1) ?? earliestDate,
+    [earliestDate, weekOffset]
+  );
   const weekDates = useMemo(() => facilityLocalDateRange(weekStart, WEEK_LENGTH), [weekStart]);
+  const canGoBack = weekOffset > 0;
+  // The API refuses a range wider than its lookahead, so the last week we may show is the one
+  // that still ends inside it.
+  const canGoForward = (weekOffset + 1) * WEEK_LENGTH < MAX_LOOKAHEAD_DAYS;
 
   // One request for the whole visible week. The backend cost is the same as a single day --
   // the fan-out was per provider, not per date -- so a week of counts is effectively free,
@@ -171,7 +187,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     () => groupSlotsByFacilityLocalDate(slotsQuery.data?.slots ?? [], slotTimezone),
     [slotsQuery.data, slotTimezone]
   );
-  const activeDate = selectedDate ?? earliestDate;
+  const activeDate = selectedDate ?? weekStart;
+  const weekRangeLabel = useMemo(() => {
+    const first = facilityLocalDayLabel(weekDates[0] ?? weekStart);
+    const last = facilityLocalDayLabel(weekDates[weekDates.length - 1] ?? weekStart);
+    return `${first.weekday} ${first.day} \u2013 ${last.weekday} ${last.day}`;
+  }, [weekDates, weekStart]);
   const slotsForActiveDate = slotsByDate.get(activeDate) ?? [];
   const holdQuery = useHoldQuery(holdId, {
     enabled: Boolean(holdId),
@@ -442,6 +463,29 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
+            {/* Week navigation, separate from day selection: choosing a day must not move
+                the window the client is looking at. */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setWeekOffset((current) => Math.max(0, current - 1))}
+                disabled={!canGoBack}
+                aria-label="Previous week"
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                &lsaquo;
+              </button>
+              <span className="text-xs font-medium text-slate-600">{weekRangeLabel}</span>
+              <button
+                type="button"
+                onClick={() => setWeekOffset((current) => current + 1)}
+                disabled={!canGoForward}
+                aria-label="Next week"
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                &rsaquo;
+              </button>
+            </div>
             {/* A week of days with their counts, so the client can see where the openings are
                 instead of picking dates one at a time and being told there are none. */}
             <div className="grid grid-cols-7 gap-1" role="group" aria-label="Choose a day">
@@ -499,7 +543,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   onClick={() => handleSelectSlot(slot)}
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
-                  {formatSlotTime(slot.startAt, slotTimezone)}
+                  {formatSlotTime(slot.startAt, slotTimezone)} &ndash;{" "}
+                  {formatSlotTime(slot.endAt, slotTimezone)}
                 </button>
               ))}
             </div>
