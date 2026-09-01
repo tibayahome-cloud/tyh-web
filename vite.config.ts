@@ -39,6 +39,10 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: "./vitest.setup.ts",
-    css: true
+    css: true,
+    // tests/e2e is Playwright's. Its specs import @playwright/test, which throws under
+    // vitest, so without this the whole suite reports a failure for a file that is not
+    // vitest's to run.
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"]
   }
 });

@@ -37,7 +37,14 @@ import {
   useTelemedicinePolicy
 } from "../../../shared/hooks/useTelemedicine";
 import { bookingKeys } from "../../../shared/hooks/useBookings";
-import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
+import {
+  facilityLocalDateRange,
+  facilityLocalDayLabel,
+  facilityToday,
+  formatTelemedicineDateTime,
+  groupSlotsByFacilityLocalDate,
+  TELEMEDICINE_DEFAULT_TIMEZONE
+} from "../../../shared/utils/telemedicine";
 
 type TelemedicineRequestDialogProps = {
   open: boolean;
@@ -76,7 +83,10 @@ const formatSlotTime = (iso: string, timezone: string | undefined) =>
 const formatSlotDate = (iso: string, timezone: string | undefined) =>
   formatTelemedicineDateTime(iso, timezone, { weekday: "short", month: "short", day: "numeric" });
 
-const todayISODate = () => new Date().toISOString().slice(0, 10);
+// Deliberately not new Date().toISOString(), which yields the UTC date: between 21:00 and
+// midnight in Nairobi that already names tomorrow, so the picker opened on the wrong day and
+// the "min" bound blocked a date that was still today for the client.
+const WEEK_LENGTH = 7;
 
 const useRemoteServiceOptions = (enabled: boolean) =>
   useQuery({
@@ -102,7 +112,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
-  const [selectedDate, setSelectedDate] = useState(todayISODate());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
@@ -132,13 +142,37 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
   });
+  // The facility's own zone decides which calendar the client is picking from. The policy
+  // default is a fallback for a facility the API sent no timezone for -- it is one value for
+  // the whole platform, so it is only correct while every facility shares it.
+  const facilityTimezone =
+    selectedFacility?.timezone ?? policyQuery.data?.defaultTimezone ?? TELEMEDICINE_DEFAULT_TIMEZONE;
+
+  // The first day the client may pick, in the facility's calendar rather than the device's.
+  const earliestDate = facilityToday(facilityTimezone);
+  const weekStart = selectedDate ?? earliestDate;
+  const weekDates = useMemo(() => facilityLocalDateRange(weekStart, WEEK_LENGTH), [weekStart]);
+
+  // One request for the whole visible week. The backend cost is the same as a single day --
+  // the fan-out was per provider, not per date -- so a week of counts is effectively free,
+  // and the client stops guessing dates blind.
   const slotsQuery = useAvailableSlots(
     selectedFacility?.id ?? null,
     selectedFacility?.facilityServiceId ?? null,
-    selectedDate,
-    undefined,
+    weekStart,
+    weekDates[weekDates.length - 1],
     { enabled: open && step === TM_STEP_INDEX.slot && Boolean(selectedFacility) }
   );
+
+  // Prefer the zone the slots themselves arrived with: it travels with the instants it
+  // explains, so it cannot drift from them the way a separately-fetched value can.
+  const slotTimezone = slotsQuery.data?.timezone ?? facilityTimezone;
+  const slotsByDate = useMemo(
+    () => groupSlotsByFacilityLocalDate(slotsQuery.data?.slots ?? [], slotTimezone),
+    [slotsQuery.data, slotTimezone]
+  );
+  const activeDate = selectedDate ?? earliestDate;
+  const slotsForActiveDate = slotsByDate.get(activeDate) ?? [];
   const holdQuery = useHoldQuery(holdId, {
     enabled: Boolean(holdId),
     refetchInterval: holdId ? 4000 : false
@@ -229,6 +263,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
     setSelectedFacility(null);
+    setSelectedDate(null);
     setSelectedSlot(null);
     setHoldId(null);
     setSubmitError(null);
@@ -382,6 +417,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       type="button"
                       onClick={() => {
                         setSelectedFacility(facility);
+                        // Clear the day: another facility may keep a different calendar, so
+                        // the same date string would not mean the same window.
+                        setSelectedDate(null);
                         setStep(TM_STEP_INDEX.slot);
                       }}
                       className="w-full rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
@@ -404,20 +442,56 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
-            <Input
-              label="Date"
-              type="date"
-              min={todayISODate()}
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-            />
+            {/* A week of days with their counts, so the client can see where the openings are
+                instead of picking dates one at a time and being told there are none. */}
+            <div className="grid grid-cols-7 gap-1" role="group" aria-label="Choose a day">
+              {weekDates.map((date) => {
+                const label = facilityLocalDayLabel(date);
+                const count = (slotsByDate.get(date) ?? []).length;
+                const isActive = date === activeDate;
+                const isEmpty = !slotsQuery.isLoading && count === 0;
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    aria-pressed={isActive}
+                    disabled={isEmpty}
+                    onClick={() => setSelectedDate(date)}
+                    className={`flex flex-col items-center rounded-xl border px-1 py-2 transition ${
+                      isActive
+                        ? "border-tiba-blue bg-tiba-blue/5 text-tiba-blue"
+                        : "border-slate-200 text-slate-700 hover:border-tiba-blue"
+                    } ${isEmpty ? "cursor-not-allowed opacity-40" : ""}`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wide">{label.weekday}</span>
+                    <span className="text-base font-semibold">{label.day}</span>
+                    <span className="text-[10px] text-slate-500">
+                      {slotsQuery.isLoading ? "\u00a0" : count > 0 ? `${count} open` : "\u2014"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             {slotsQuery.isLoading && <Loading />}
-            {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
-            {!slotsQuery.isLoading && (slotsQuery.data ?? []).length === 0 && (
-              <p className="text-sm text-slate-500">No open slots on this date. Try another day.</p>
+            {slotsQuery.isError && (
+              <p className="text-sm text-slate-500">
+                We could not load appointment times. Close this and try again.
+              </p>
             )}
+            {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
+            {!slotsQuery.isLoading && !slotsQuery.isError && (slotsQuery.data?.slots ?? []).length === 0 && (
+              <p className="text-sm text-slate-500">
+                No open appointments in the next {WEEK_LENGTH} days at this facility.
+              </p>
+            )}
+            {!slotsQuery.isLoading && !slotsQuery.isError && slotsForActiveDate.length === 0 &&
+              (slotsQuery.data?.slots ?? []).length > 0 && (
+                <p className="text-sm text-slate-500">
+                  Nothing open on this day. Pick a day above with times available.
+                </p>
+              )}
             <div className="grid gap-2 sm:grid-cols-3">
-              {(slotsQuery.data ?? []).map((slot) => (
+              {slotsForActiveDate.map((slot) => (
                 <button
                   key={slot.startAt}
                   type="button"
@@ -425,8 +499,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   onClick={() => handleSelectSlot(slot)}
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
-                  <span className="block text-xs text-slate-400">{formatSlotDate(slot.startAt, policyQuery.data?.defaultTimezone)}</span>
-                  {formatSlotTime(slot.startAt, policyQuery.data?.defaultTimezone)}
+                  {formatSlotTime(slot.startAt, slotTimezone)}
                 </button>
               ))}
             </div>
@@ -444,8 +517,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
               <p className="text-sm text-slate-500">{selectedFacility.name}</p>
               <p className="mt-1 text-sm text-slate-700">
-                {formatSlotDate(selectedSlot.startAt, policyQuery.data?.defaultTimezone)} at{" "}
-                {formatSlotTime(selectedSlot.startAt, policyQuery.data?.defaultTimezone)}
+                {formatSlotDate(selectedSlot.startAt, slotTimezone)} at{" "}
+                {formatSlotTime(selectedSlot.startAt, slotTimezone)}
               </p>
               <p className="mt-2 text-lg font-semibold text-tiba-blue">
                 {formatCurrency(selectedFacility.priceCents, selectedFacility.currency)}
