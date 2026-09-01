@@ -17,7 +17,9 @@ import {
     Shield,
     Video,
     Stethoscope,
-    CalendarClock
+    CalendarClock,
+    Search,
+    House
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
@@ -115,26 +117,56 @@ export const Home = () => {
                             className="flex-1 max-w-2xl"
                         >
                             <h1 className="leading-tight mb-6">
-                                Care That Comes to You
+                                Your Healthcare. One Click Away.
                             </h1>
                             <p className="text-lg md:text-xl text-slate-700 mb-10 leading-relaxed">
-                                Professional medical care, nursing, therapy, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> – delivered to your home with dignity, safety, and compassion.
+                                From a doctor on video to a specialist at your fingertips, and professional care delivered to your home. Tiba Ya Home connects you to doctors, specialists, nurses, therapists, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> whenever and wherever you need them.
                             </p>
 
-                            <div className="flex flex-wrap gap-4 mb-10">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                                <button
+                                    onClick={handleTelemedicineClick}
+                                    className="btn-primary inline-flex items-center justify-center gap-2"
+                                >
+                                    <Video className="w-5 h-5" />
+                                    <span>Talk to a Doctor</span>
+                                </button>
                                 <button
                                     onClick={handleServiceClick}
-                                    className="btn-primary"
+                                    className="btn-secondary inline-flex items-center justify-center gap-2"
                                 >
+                                    <House className="w-5 h-5" />
                                     Book Home Care
                                 </button>
                                 <button
-                                    onClick={handleServiceClick}
-                                    className="btn-secondary"
+                                    onClick={handleTelemedicineClick}
+                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-tiba-blue px-5 py-3 font-semibold text-tiba-blue transition-colors hover:bg-tiba-blue/5"
                                 >
+                                    <Search className="w-5 h-5" />
+                                    Find a Specialist
+                                </button>
+                                <button
+                                    onClick={handleServiceClick}
+                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-tiba-gold px-5 py-3 font-semibold text-tiba-gold transition-colors hover:bg-tiba-gold/10"
+                                >
+                                    <Siren className="w-5 h-5" />
                                     Get Ambulance
                                 </button>
                             </div>
+
+                            <button
+                                onClick={handleTelemedicineClick}
+                                className="mb-10 flex w-full items-center gap-4 rounded-xl border border-tiba-blue/15 bg-white p-4 text-left shadow-sm transition hover:border-tiba-blue/40 hover:shadow-md"
+                            >
+                                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-tiba-blue/10 text-tiba-blue">
+                                    <Video className="w-5 h-5" />
+                                </span>
+                                <span>
+                                    <span className="block font-bold text-slate-900">Talk to a Doctor Online</span>
+                                    <span className="block text-sm text-slate-600">Speak with a qualified doctor by video from wherever you are.</span>
+                                </span>
+                                <ArrowRight className="ml-auto h-5 w-5 flex-shrink-0 text-tiba-blue" />
+                            </button>
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 {[
@@ -319,16 +351,17 @@ export const Home = () => {
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-8">
                         {[
-                            { name: "Doctor & Nurse Home Visits", img: doctorImage },
-                            { name: "Nursing & Long-Term Care", img: nursingImage },
-                            { name: "Therapy & Rehabilitation", img: therapyImage },
-                            { name: "Elderly & Assisted Living Care", img: elderlyImage },
-                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage },
-                            { name: "Lab Sample Collection", img: labSampleCollectionImage }
+                            { name: "Online Doctor Consultation", img: doctorImage, onClick: handleTelemedicineClick },
+                            { name: "Doctor & Nurse Home Visits", img: doctorImage, onClick: handleServiceClick },
+                            { name: "Nursing & Long-Term Care", img: nursingImage, onClick: handleServiceClick },
+                            { name: "Therapy & Rehabilitation", img: therapyImage, onClick: handleServiceClick },
+                            { name: "Elderly & Assisted Living Care", img: elderlyImage, onClick: handleServiceClick },
+                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage, onClick: handleServiceClick },
+                            { name: "Lab Sample Collection", img: labSampleCollectionImage, onClick: handleServiceClick }
                         ].map((service, i) => (
                             <button
                                 key={i}
-                                onClick={handleServiceClick}
+                                onClick={service.onClick}
                                 className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 text-left"
                             >
                                 <div className="aspect-square relative overflow-hidden bg-slate-100">
