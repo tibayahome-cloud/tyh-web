@@ -38,6 +38,7 @@ export const WebsiteFooter = () => {
                         <h4 className="text-white font-bold text-lg mb-6">Quick Links</h4>
                         <ul className="space-y-4">
                             <li><button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-tiba-gold transition-colors">Home</button></li>
+                            <li><a href="/#telemedicine" className="hover:text-tiba-gold transition-colors">Consult a doctor online</a></li>
                             <li><Link to="/privacy" className="hover:text-tiba-gold transition-colors">Privacy Policy</Link></li>
                             <li><Link to="/terms" className="hover:text-tiba-gold transition-colors">Terms of Service</Link></li>
                         </ul>

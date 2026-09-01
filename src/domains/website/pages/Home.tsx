@@ -14,7 +14,10 @@ import {
     Smartphone,
     Check,
     Zap,
-    Shield
+    Shield,
+    Video,
+    Stethoscope,
+    CalendarClock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
@@ -47,11 +50,49 @@ export const Home = () => {
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (isAuthenticated) {
-            navigate("/client");
+            navigate("/app/home");
         } else {
             navigate("/login");
         }
     };
+
+    // Remote consultations are booked in the client app, which owns the catalogue, the
+    // slot picker and payment. The public page only introduces the service and hands the
+    // visitor over: signed-in clients land on the booking screen, everyone else signs in
+    // first. Nothing about providers, availability or the catalogue is fetched or shown
+    // here -- that data is not public, and duplicating any of it would give us a second
+    // booking flow to keep in step with the real one.
+    const handleTelemedicineClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (isAuthenticated) {
+            navigate("/app/telemedicine");
+        } else {
+            navigate("/login");
+        }
+    };
+
+    const telemedicineHighlights = [
+        {
+            icon: Stethoscope,
+            title: "Online doctor consultations",
+            description: "Speak to a licensed Kenyan doctor from home, work, or anywhere with a signal."
+        },
+        {
+            icon: HeartPulse,
+            title: "Specialty consultations",
+            description: "General practice through to specialist care, matched to what you need."
+        },
+        {
+            icon: Video,
+            title: "Secure video appointments",
+            description: "A private, encrypted video room that opens when your appointment starts."
+        },
+        {
+            icon: CalendarClock,
+            title: "Book a time that suits you",
+            description: "Choose your appointment slot and confirm it in a few minutes."
+        }
+    ];
 
     const packages = [
         { name: "Tiba Basic", price: "KES 5,000", color: "blue" },
@@ -123,6 +164,68 @@ export const Home = () => {
                                 className="w-full h-auto rounded-3xl shadow-2xl relative z-10"
                             />
                             <div className="absolute -bottom-6 -right-6 w-full h-full bg-tiba-gold/10 rounded-3xl -z-10" />
+                        </motion.div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Telemedicine */}
+            <section id="telemedicine" className="py-24 bg-white">
+                <div className="container mx-auto px-4 md:px-6">
+                    <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+                        <motion.div
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.6 }}
+                            className="flex-1"
+                        >
+                            <span className="inline-flex items-center gap-2 px-3 py-1 mb-6 rounded-full bg-tiba-blue/10 text-tiba-blue text-sm font-semibold">
+                                <Video className="w-4 h-4" /> Telemedicine
+                            </span>
+
+                            <h2 className="mb-4">See a Doctor Online</h2>
+                            <p className="text-lg text-slate-700 mb-10 leading-relaxed max-w-xl">
+                                Not every visit needs a visit. Book a remote consultation with a licensed
+                                doctor and join a secure video appointment from wherever you are.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+                                {telemedicineHighlights.map((item) => (
+                                    <div
+                                        key={item.title}
+                                        className="p-5 bg-slate-50 rounded-2xl border border-slate-100"
+                                    >
+                                        <item.icon className="w-6 h-6 text-tiba-gold mb-3" />
+                                        <h3 className="text-base font-bold mb-1">{item.title}</h3>
+                                        <p className="text-sm text-slate-600 leading-relaxed">{item.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+                                <button onClick={handleTelemedicineClick} className="btn-primary">
+                                    Book online consultation <ArrowRight className="w-4 h-4" />
+                                </button>
+                                <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                                    <Smartphone className="w-4 h-4 text-tiba-blue" /> Pay with M-Pesa
+                                </span>
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.94 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.7 }}
+                            className="flex-1 relative w-full"
+                        >
+                            <img
+                                src={doctorImage}
+                                alt="A doctor speaking with a patient during a remote consultation"
+                                className="w-full rounded-3xl shadow-lg object-cover aspect-[4/5] lg:aspect-square"
+                            />
+                            <div className="absolute -bottom-6 -left-6 w-full h-full bg-tiba-blue/10 rounded-3xl -z-10" />
                         </motion.div>
                     </div>
                 </div>
