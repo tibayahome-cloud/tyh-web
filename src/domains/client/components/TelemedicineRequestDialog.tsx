@@ -63,11 +63,12 @@ type RemoteServiceOption = {
   active?: boolean;
 };
 
-const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, confirm: 3 } as const;
+const TM_STEP_INDEX = { service: 0, facility: 1, preferences: 2, slot: 3, confirm: 4 } as const;
 
 const TM_STEPS = [
   { title: "Service", description: "What kind of consultation?" },
   { title: "Facility", description: "Choose a care site" },
+  { title: "Preferences", description: "Optional requests" },
   { title: "Slot", description: "Pick a time" },
   { title: "Confirm", description: "Review & pay" }
 ];
@@ -121,6 +122,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
+  const [preferenceSaved, setPreferenceSaved] = useState(false);
   const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
   // Guards against a double-tap sending two M-Pesa prompts; see handlePay.
   const payInFlightRef = useRef(false);
@@ -289,6 +291,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setSelectedDate(null);
     setSelectedSlot(null);
     setHoldId(null);
+    setPreference({});
+    setPreferenceSaved(false);
+    setPreferenceSaveError(null);
     setSubmitError(null);
     onClose();
   };
@@ -296,6 +301,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const handleSelectSlot = async (slot: TelemedicineSlot) => {
     if (!selectedFacility) return;
     setSubmitError(null);
+    setPreferenceSaveError(null);
+    setPreferenceSaved(false);
     setSelectedSlot(slot);
     try {
       const newHold = await createHoldMutation.mutateAsync({
@@ -306,6 +313,20 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       });
       queryClient.setQueryData(["telemedicine", "hold", newHold.id], newHold);
       setHoldId(newHold.id);
+      if (Object.values(preference).some(Boolean)) {
+        try {
+          if (!newHold.bookingId) {
+            throw new Error("The appointment was created without a booking reference.");
+          }
+          await savePreference.mutateAsync({ bookingId: newHold.bookingId, preference });
+          setPreferenceSaved(true);
+        } catch (error) {
+          const detail = classifyApiError(error, "").message;
+          setPreferenceSaveError(
+            `Your provider preference could not be saved.${detail ? ` ${detail}` : ""}`
+          );
+        }
+      }
       setStep(TM_STEP_INDEX.confirm);
     } catch (error) {
       setSubmitError(classifyApiError(error, "Please try a different slot."));
@@ -336,9 +357,10 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       // money for a preference we failed to record means the client pays for a consultation
       // chosen on criteria the facility never sees, and finds out at the appointment. Better
       // to stop here, where they can retry or clear the preference and continue deliberately.
-      if (hold?.bookingId && Object.values(preference).some(Boolean)) {
+      if (hold?.bookingId && Object.values(preference).some(Boolean) && !preferenceSaved) {
         try {
           await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
+          setPreferenceSaved(true);
         } catch (error) {
           // A fixed lead sentence, then whatever the server said. The raw message alone is
           // often "Network Error", which does not tell a client what it means for them.
@@ -484,7 +506,10 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                         // Clear the day: another facility may keep a different calendar, so
                         // the same date string would not mean the same window.
                         setSelectedDate(null);
-                        setStep(TM_STEP_INDEX.slot);
+                        setPreference({});
+                        setPreferenceSaved(false);
+                        setPreferenceSaveError(null);
+                        setStep(TM_STEP_INDEX.preferences);
                       }}
                       className="w-full rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
                     >
@@ -498,6 +523,39 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             )}
             <div className="flex justify-start">
               <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.service)}>
+                Back
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === TM_STEP_INDEX.preferences && selectedFacility && (
+          <div className="space-y-4">
+            <div>
+              <p className="font-semibold text-slate-900">Provider preferences</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Optional requests for the care site. You can skip this and choose a time now.
+              </p>
+            </div>
+            <ProviderPreferenceFields
+              value={preference}
+              alwaysExpanded
+              onChange={(next) => {
+                setPreference(next);
+                setPreferenceSaved(false);
+                setPreferenceSaveError(null);
+              }}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Continue to available times
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Skip preferences
+              </Button>
+            </div>
+            <div className="flex justify-start">
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
                 Back
               </Button>
             </div>
@@ -592,7 +650,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               ))}
             </div>
             <div className="flex justify-start">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.preferences)}>
                 Back
               </Button>
             </div>
@@ -613,19 +671,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               </p>
             </div>
 
-            {/* Offered here because the booking now exists but no provider is assigned yet,
-                which is exactly the window the backend allows a preference to be set in. */}
-            {!holdExpired && !paymentConfirmed && hold?.bookingId && (
-              <>
-                <ProviderPreferenceFields
-                  value={preference}
-                  onChange={(next) => {
-                    setPreference(next);
-                    setPreferenceSaveError(null);
-                  }}
-                  disabled={savePreference.isPending}
-                />
-                {preferenceSaveError && (
+            {!holdExpired && !paymentConfirmed && hold?.bookingId && preferenceSaveError && (
                   <div
                     role="alert"
                     className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3"
@@ -653,8 +699,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       </Button>
                     </div>
                   </div>
-                )}
-              </>
             )}
 
             {!holdExpired && !paymentConfirmed && (

@@ -6,6 +6,7 @@ type Props = {
   value: Partial<ProviderPreference>;
   onChange: (next: Partial<ProviderPreference>) => void;
   disabled?: boolean;
+  alwaysExpanded?: boolean;
 };
 
 const GENDER_OPTIONS = [
@@ -31,11 +32,11 @@ const NOTE_MAX_LENGTH = 500;
  * someone they will get a female clinician and then assigning otherwise is worse than being
  * clear that it may not be possible.
  */
-export const ProviderPreferenceFields = ({ value, onChange, disabled }: Props) => {
+export const ProviderPreferenceFields = ({ value, onChange, disabled, alwaysExpanded = false }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const note = value.note ?? "";
 
-  if (!expanded) {
+  if (!expanded && !alwaysExpanded) {
     return (
       <button
         type="button"

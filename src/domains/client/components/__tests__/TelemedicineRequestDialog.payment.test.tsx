@@ -134,23 +134,28 @@ const renderDialog = () => {
   );
 };
 
-/** Walk to the confirm step. Picking a slot creates the hold and advances the dialog. */
+/** Walk to the confirm step, taking the optional-preferences skip path. */
 const reachConfirmStep = async (user: ReturnType<typeof userEvent.setup>) => {
   renderDialog();
   await user.click(await screen.findByText(FACILITY.name));
+  await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
   await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
   return screen.findByRole("button", { name: /confirm & pay/i });
 };
 
-/** Express a preference, so the save is attempted at all. */
+/** Express a preference before the client chooses a slot. */
 const expressAPreference = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.click(await screen.findByRole("button", { name: /add a preference/i }));
   await user.selectOptions(await screen.findByRole("combobox", { name: /clinician/i }), "female");
 };
 
 const reachConfirmStepWithPreference = async (user: ReturnType<typeof userEvent.setup>) => {
-  const payButton = await reachConfirmStep(user);
+  renderDialog();
+  await user.click(await screen.findByText(FACILITY.name));
+  await screen.findByText("Provider preferences");
   await expressAPreference(user);
+  await user.click(await screen.findByRole("button", { name: /continue to available times/i }));
+  await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
+  const payButton = await screen.findByRole("button", { name: /confirm & pay/i });
   return payButton;
 };
 
@@ -225,6 +230,16 @@ describe("paying for a telemedicine hold", () => {
     });
   });
 
+  it("lets the client skip preferences without making a preference request", async () => {
+    const user = userEvent.setup();
+    const payButton = await reachConfirmStep(user);
+
+    await user.click(payButton);
+
+    await waitFor(() => expect(initiatePaymentMock).toHaveBeenCalledTimes(1));
+    expect(savePreferenceMock).not.toHaveBeenCalled();
+  });
+
   describe("not charging twice", () => {
     it("ignores a second click while payment is in flight", async () => {
       let release: (() => void) | undefined;
@@ -251,6 +266,7 @@ describe("paying for a telemedicine hold", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(await screen.findByText(FACILITY.name));
+      await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
       await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
 
       expect(await screen.findByText(/waiting for m-pesa confirmation/i)).toBeInTheDocument();
@@ -263,6 +279,7 @@ describe("paying for a telemedicine hold", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(await screen.findByText(FACILITY.name));
+      await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
       await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
 
       expect(await screen.findByRole("button", { name: /confirm & pay/i })).toBeInTheDocument();
