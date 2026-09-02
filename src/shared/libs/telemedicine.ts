@@ -132,11 +132,22 @@ export const releaseHold = async (holdId: string): Promise<TelemedicineHold> => 
 
 export const initiateHoldPayment = async (
   holdId: string,
-  options: { phone?: string; method?: string } = {}
+  options: {
+    phone?: string;
+    method?: string;
+    preference?: { preferredGender?: string | null; preferredLanguage?: string | null; note?: string | null };
+  } = {}
 ): Promise<{ hold: TelemedicineHold; paymentId?: string; paymentStatus?: string }> => {
   const response = await api.post(`/telemedicine/holds/${holdId}/payment`, {
     phone: options.phone,
-    method: options.method
+    method: options.method,
+    ...(options.preference ? {
+      preference: {
+        preferred_gender: options.preference.preferredGender ?? null,
+        preferred_language: options.preference.preferredLanguage ?? null,
+        note: options.preference.note ?? null
+      }
+    } : {})
   });
   const hold = mapTelemedicineHold(response.data?.data);
   if (!hold) {

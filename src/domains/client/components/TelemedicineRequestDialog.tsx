@@ -6,9 +6,6 @@ import { Button } from "../../../shared/components/Button";
 import { Input } from "../../../shared/components/Input";
 import { Stepper } from "../../../shared/components/Stepper";
 import { Loading } from "../../../shared/components/Loading";
-import { useMutation } from "@tanstack/react-query";
-
-import { saveProviderPreference } from "../../../shared/libs/telemedicineOps";
 import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
 import {
   fetchTelemedicineCatalogServices,
@@ -63,11 +60,12 @@ type RemoteServiceOption = {
   active?: boolean;
 };
 
-const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, confirm: 3 } as const;
+const TM_STEP_INDEX = { service: 0, facility: 1, preferences: 2, slot: 3, confirm: 4 } as const;
 
 const TM_STEPS = [
   { title: "Service", description: "What kind of consultation?" },
   { title: "Facility", description: "Choose a care site" },
+  { title: "Preferences", description: "Optional requests" },
   { title: "Slot", description: "Pick a time" },
   { title: "Confirm", description: "Review & pay" }
 ];
@@ -121,7 +119,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
-  const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
   // Guards against a double-tap sending two M-Pesa prompts; see handlePay.
   const payInFlightRef = useRef(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
@@ -204,10 +201,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const createHoldMutation = useCreateHoldMutation();
   const releaseHoldMutation = useReleaseHoldMutation();
   const initiatePaymentMutation = useInitiateHoldPaymentMutation();
-  const savePreference = useMutation({
-    mutationFn: ({ bookingId, preference: next }: { bookingId: string; preference: Partial<ProviderPreference> }) =>
-      saveProviderPreference(bookingId, next)
-  });
 
   const catalogServiceOptions = (catalogServicesQuery.data ?? []).map((service) => ({
     id: service.id,
@@ -289,6 +282,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setSelectedDate(null);
     setSelectedSlot(null);
     setHoldId(null);
+    setPreference({});
     setSubmitError(null);
     onClose();
   };
@@ -302,7 +296,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         facilityId: selectedFacility.id,
         facilityServiceId: selectedFacility.facilityServiceId,
         startAt: slot.startAt,
-        idempotencyKey: `${selectedFacility.facilityServiceId}:${slot.startAt}`
+        // This key identifies one hold attempt, not the appointment slot forever. Reusing a
+        // slot-derived key would make a later selection return the same expired hold.
+        idempotencyKey: crypto.randomUUID()
       });
       queryClient.setQueryData(["telemedicine", "hold", newHold.id], newHold);
       setHoldId(newHold.id);
@@ -317,7 +313,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     if (!holdId) return;
     setPhoneTouched(true);
     setSubmitError(null);
-    setPreferenceSaveError(null);
     // Catch an unusable number here, before the STK push is even requested, rather than letting
     // the client find out only after the backend rejects it.
     if (mpesaPhoneValidationError(phone)) {
@@ -332,44 +327,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     payInFlightRef.current = true;
 
     try {
-      // Saved before payment is requested, and payment does not proceed without it. Taking
-      // money for a preference we failed to record means the client pays for a consultation
-      // chosen on criteria the facility never sees, and finds out at the appointment. Better
-      // to stop here, where they can retry or clear the preference and continue deliberately.
-      if (hold?.bookingId && Object.values(preference).some(Boolean)) {
-        try {
-          await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
-        } catch (error) {
-          // A fixed lead sentence, then whatever the server said. The raw message alone is
-          // often "Network Error", which does not tell a client what it means for them.
-          const detail = classifyApiError(error, "").message;
-          setPreferenceSaveError(
-            `Your provider preference could not be saved.${detail ? ` ${detail}` : ""}`
-          );
-          return;
-        }
-      }
-      await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
-      toast.showToast({
-        title: "Payment initiated",
-        description: "Check your phone to approve the M-Pesa prompt."
+      const hasPreference = Object.values(preference).some(Boolean);
+      await initiatePaymentMutation.mutateAsync({
+        holdId,
+        phone: phone.trim() || undefined,
+        ...(hasPreference ? { preference } : {})
       });
-    } catch (error) {
-      setSubmitError(classifyApiError(error, "Unable to start payment."));
-    } finally {
-      payInFlightRef.current = false;
-    }
-  };
-
-  /** Continue without the preference, once the client has been told it could not be saved. */
-  const handlePayWithoutPreference = async () => {
-    if (!holdId || payInFlightRef.current || paymentInitiated) return;
-    payInFlightRef.current = true;
-    setPreferenceSaveError(null);
-    // Cleared so a later retry does not silently reattach it: the client has chosen to go
-    // ahead without one, and the form still shows what they had entered.
-    try {
-      await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
       toast.showToast({
         title: "Payment initiated",
         description: "Check your phone to approve the M-Pesa prompt."
@@ -389,7 +352,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const paymentInitiated =
     Boolean(hold?.bookingId) && (initiatePaymentMutation.isSuccess || Boolean(hold?.paymentPending));
   // Any work in flight that a second click would duplicate.
-  const paymentInFlight = initiatePaymentMutation.isPending || savePreference.isPending;
+  const paymentInFlight = initiatePaymentMutation.isPending;
   const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
 
   return (
@@ -484,7 +447,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                         // Clear the day: another facility may keep a different calendar, so
                         // the same date string would not mean the same window.
                         setSelectedDate(null);
-                        setStep(TM_STEP_INDEX.slot);
+                        setPreference({});
+                        setStep(TM_STEP_INDEX.preferences);
                       }}
                       className="w-full rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
                     >
@@ -498,6 +462,35 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             )}
             <div className="flex justify-start">
               <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.service)}>
+                Back
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === TM_STEP_INDEX.preferences && selectedFacility && (
+          <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            <div>
+              <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
+              <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
+            </div>
+            <ProviderPreferenceFields
+              value={preference}
+              alwaysExpanded
+              onChange={(next) => {
+                setPreference(next);
+              }}
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button type="button" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Continue to choose a time
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Skip for now
+              </Button>
+            </div>
+            <div className="flex justify-start border-t border-slate-200 pt-3">
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
                 Back
               </Button>
             </div>
@@ -592,7 +585,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               ))}
             </div>
             <div className="flex justify-start">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.preferences)}>
                 Back
               </Button>
             </div>
@@ -613,50 +606,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               </p>
             </div>
 
-            {/* Offered here because the booking now exists but no provider is assigned yet,
-                which is exactly the window the backend allows a preference to be set in. */}
-            {!holdExpired && !paymentConfirmed && hold?.bookingId && (
-              <>
-                <ProviderPreferenceFields
-                  value={preference}
-                  onChange={(next) => {
-                    setPreference(next);
-                    setPreferenceSaveError(null);
-                  }}
-                  disabled={savePreference.isPending}
-                />
-                {preferenceSaveError && (
-                  <div
-                    role="alert"
-                    className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3"
-                  >
-                    <p className="text-sm text-amber-800">
-                      {preferenceSaveError} Payment has not been taken, so nothing has been
-                      charged yet.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        onClick={handlePay}
-                        loading={savePreference.isPending}
-                        disabled={paymentInFlight}
-                      >
-                        Try again
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={handlePayWithoutPreference}
-                        disabled={paymentInFlight}
-                      >
-                        Continue without a preference
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
             {!holdExpired && !paymentConfirmed && (
               <p className="text-xs text-amber-700">
                 Holding this slot for {Math.floor(remainingHoldSeconds / 60)}:
@@ -666,7 +615,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
             {holdExpired && !paymentConfirmed && (
               <div className="space-y-3">
-                <p className="text-sm text-danger-600">This hold expired. Pick a new time to continue.</p>
+                <p className="text-sm text-danger-600">
+                  Your payment reservation expired before it was completed. The appointment date has not passed; choose a new time to continue.
+                </p>
                 <Button type="button" onClick={resetToStart}>
                   Choose another slot
                 </Button>
@@ -685,12 +636,16 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   error={phoneError ?? undefined}
                   hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
-                {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
+                {paymentInFlight && (
+                  <p role="status" className="text-sm text-slate-600">
+                    Preparing payment...
+                  </p>
+                )}
                 {!paymentInitiated ? (
                   <Button
                     type="button"
                     loading={paymentInFlight}
-                    disabled={paymentInFlight || Boolean(preferenceSaveError)}
+                    disabled={paymentInFlight}
                     onClick={handlePay}
                   >
                     Confirm &amp; pay
@@ -704,6 +659,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     />
                   </div>
                 )}
+                {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
               </>
             )}
 

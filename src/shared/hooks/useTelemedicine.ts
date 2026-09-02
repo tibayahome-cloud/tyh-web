@@ -145,8 +145,12 @@ export const useReleaseHoldMutation = () => {
 export const useInitiateHoldPaymentMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ holdId, phone, method }: { holdId: string; phone?: string; method?: string }) =>
-      initiateHoldPayment(holdId, { phone, method }),
+    mutationFn: ({ holdId, phone, method, preference }: {
+      holdId: string;
+      phone?: string;
+      method?: string;
+      preference?: { preferredGender?: string | null; preferredLanguage?: string | null; note?: string | null };
+    }) => initiateHoldPayment(holdId, { phone, method, preference }),
     onSuccess: ({ hold }) => {
       queryClient.setQueryData(telemedicineKeys.hold(hold.id), hold);
     }

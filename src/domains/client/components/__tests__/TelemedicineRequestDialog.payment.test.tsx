@@ -15,13 +15,8 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const savePreferenceMock = vi.fn();
 const initiatePaymentMock = vi.fn();
 const holdQueryMock = vi.fn();
-
-vi.mock("../../../../shared/libs/telemedicineOps", () => ({
-  saveProviderPreference: (...args: unknown[]) => savePreferenceMock(...args)
-}));
 
 const initiateMutation = {
   mutateAsync: (...args: unknown[]) => initiatePaymentMock(...args),
@@ -134,23 +129,28 @@ const renderDialog = () => {
   );
 };
 
-/** Walk to the confirm step. Picking a slot creates the hold and advances the dialog. */
+/** Walk to the confirm step, taking the optional-preferences skip path. */
 const reachConfirmStep = async (user: ReturnType<typeof userEvent.setup>) => {
   renderDialog();
   await user.click(await screen.findByText(FACILITY.name));
+  await user.click(await screen.findByRole("button", { name: /skip for now/i }));
   await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
   return screen.findByRole("button", { name: /confirm & pay/i });
 };
 
-/** Express a preference, so the save is attempted at all. */
+/** Express a preference before the client chooses a slot. */
 const expressAPreference = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.click(await screen.findByRole("button", { name: /add a preference/i }));
   await user.selectOptions(await screen.findByRole("combobox", { name: /clinician/i }), "female");
 };
 
 const reachConfirmStepWithPreference = async (user: ReturnType<typeof userEvent.setup>) => {
-  const payButton = await reachConfirmStep(user);
+  renderDialog();
+  await user.click(await screen.findByText(FACILITY.name));
+  await screen.findByRole("combobox", { name: /clinician/i });
   await expressAPreference(user);
+  await user.click(await screen.findByRole("button", { name: /continue to choose a time/i }));
+  await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
+  const payButton = await screen.findByRole("button", { name: /confirm & pay/i });
   return payButton;
 };
 
@@ -160,69 +160,32 @@ describe("paying for a telemedicine hold", () => {
     initiateMutation.isPending = false;
     initiateMutation.isSuccess = false;
     holdQueryMock.mockReturnValue(hold());
-    savePreferenceMock.mockResolvedValue({});
     initiatePaymentMock.mockResolvedValue({});
   });
 
-  describe("when a preference cannot be saved", () => {
-    it("does not request payment", async () => {
-      savePreferenceMock.mockRejectedValue(new Error("network"));
+  describe("preference submission", () => {
+    it("sends the entered preference with payment initiation", async () => {
       const user = userEvent.setup();
       const payButton = await reachConfirmStepWithPreference(user);
 
       await user.click(payButton);
-
-      await waitFor(() => expect(savePreferenceMock).toHaveBeenCalled());
-      expect(initiatePaymentMock).not.toHaveBeenCalled();
-    });
-
-    it("says nothing has been charged", async () => {
-      savePreferenceMock.mockRejectedValue(new Error("network"));
-      const user = userEvent.setup();
-      const payButton = await reachConfirmStepWithPreference(user);
-
-      await user.click(payButton);
-
-      const alert = await screen.findByRole("alert");
-      expect(alert).toHaveTextContent(/could not be saved/i);
-      expect(alert).toHaveTextContent(/nothing has been charged/i);
-    });
-
-    it("offers a retry that saves and then pays", async () => {
-      savePreferenceMock.mockRejectedValueOnce(new Error("network")).mockResolvedValue({});
-      const user = userEvent.setup();
-      const payButton = await reachConfirmStepWithPreference(user);
-
-      await user.click(payButton);
-      await user.click(await screen.findByRole("button", { name: /try again/i }));
 
       await waitFor(() => expect(initiatePaymentMock).toHaveBeenCalledTimes(1));
-      expect(savePreferenceMock).toHaveBeenCalledTimes(2);
+      expect(initiatePaymentMock.mock.calls[0][0]).toMatchObject({
+        holdId: "hold-1",
+        preference: { preferredGender: "female" }
+      });
     });
+  });
 
-    it("offers to continue without one, which pays and does not retry the save", async () => {
-      savePreferenceMock.mockRejectedValue(new Error("network"));
-      const user = userEvent.setup();
-      const payButton = await reachConfirmStepWithPreference(user);
+  it("lets the client skip preferences without making a preference request", async () => {
+    const user = userEvent.setup();
+    const payButton = await reachConfirmStep(user);
 
-      await user.click(payButton);
-      savePreferenceMock.mockClear();
-      await user.click(await screen.findByRole("button", { name: /continue without/i }));
+    await user.click(payButton);
 
-      await waitFor(() => expect(initiatePaymentMock).toHaveBeenCalledTimes(1));
-      expect(savePreferenceMock).not.toHaveBeenCalled();
-    });
-
-    it("keeps the entered preference on screen so it is not retyped", async () => {
-      savePreferenceMock.mockRejectedValue(new Error("network"));
-      const user = userEvent.setup();
-      const payButton = await reachConfirmStepWithPreference(user);
-      await user.click(payButton);
-
-      await screen.findByRole("alert");
-      // The preference fields are still rendered; the failure did not reset the step.
-      expect(screen.queryByRole("button", { name: /try again/i })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(initiatePaymentMock).toHaveBeenCalledTimes(1));
+    expect(initiatePaymentMock.mock.calls[0][0]).not.toHaveProperty("preference");
   });
 
   describe("not charging twice", () => {
@@ -251,6 +214,7 @@ describe("paying for a telemedicine hold", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(await screen.findByText(FACILITY.name));
+      await user.click(await screen.findByRole("button", { name: /skip for now/i }));
       await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
 
       expect(await screen.findByText(/waiting for m-pesa confirmation/i)).toBeInTheDocument();
@@ -263,6 +227,7 @@ describe("paying for a telemedicine hold", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(await screen.findByText(FACILITY.name));
+      await user.click(await screen.findByRole("button", { name: /skip for now/i }));
       await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
 
       expect(await screen.findByRole("button", { name: /confirm & pay/i })).toBeInTheDocument();
