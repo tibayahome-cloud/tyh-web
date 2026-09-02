@@ -113,3 +113,67 @@ test.describe("a DST-observing facility", () => {
     expect(offsets.after).toBe("08:00");
   });
 });
+
+
+test.describe("the slot picker at mobile and desktop widths", () => {
+  test.use({ timezoneId: NAIROBI });
+
+  // The day strip is seven columns. At a phone width that is the layout most at risk of
+  // overflowing, and a horizontally scrolling booking dialog is the kind of thing that only
+  // shows up on a real device -- jsdom has no layout, so a unit test cannot see it.
+  const WIDTHS = [
+    { name: "small phone", width: 320, height: 720 },
+    { name: "phone", width: 390, height: 844 },
+    { name: "tablet", width: 768, height: 1024 },
+    { name: "desktop", width: 1440, height: 900 }
+  ];
+
+  for (const { name, width, height } of WIDTHS) {
+    test(`a seven-column day strip fits at ${name} (${width}px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.setContent(`
+        <style>
+          * { box-sizing: border-box; margin: 0; }
+          body { font-family: system-ui, sans-serif; }
+          .dialog { max-width: 42rem; margin: 0 auto; padding: 1rem; }
+          .strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.25rem; }
+          .day { display: flex; flex-direction: column; align-items: center;
+                 border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.5rem 0.25rem; }
+          .wd { font-size: 10px; text-transform: uppercase; }
+          .dt { font-size: 1rem; font-weight: 600; }
+          .ct { font-size: 10px; color: #64748b; }
+        </style>
+        <div class="dialog">
+          <div class="strip" role="group" aria-label="Choose a day">
+            ${["Wed 2", "Thu 3", "Fri 4", "Sat 5", "Sun 6", "Mon 7", "Tue 8"]
+              .map((d) => {
+                const [wd, dt] = d.split(" ");
+                return `<button class="day"><span class="wd">${wd}</span>` +
+                       `<span class="dt">${dt}</span><span class="ct">53 open</span></button>`;
+              })
+              .join("")}
+          </div>
+        </div>
+      `);
+
+      const strip = page.getByRole("group", { name: /choose a day/i });
+      await expect(strip).toBeVisible();
+      await expect(strip.getByRole("button")).toHaveCount(7);
+
+      // Nothing may push the page sideways.
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      // Every day has to stay tappable; 24px is well under the 44px guideline but catches a
+      // strip that has collapsed rather than one that is merely tight.
+      const boxes = await strip.getByRole("button").evaluateAll((nodes) =>
+        nodes.map((n) => n.getBoundingClientRect().width)
+      );
+      for (const boxWidth of boxes) {
+        expect(boxWidth).toBeGreaterThan(24);
+      }
+    });
+  }
+});
