@@ -34,6 +34,7 @@ import therapyImage from "../../../assets/images/service-therapy.png";
 import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
 import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
+import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -260,8 +261,8 @@ export const Home = () => {
                             className="flex-1 relative w-full"
                         >
                             <img
-                                src={doctorImage}
-                                alt="A doctor speaking with a patient during a remote consultation"
+                                src={telemedicineImage}
+                                alt="A doctor speaking with a patient during a video consultation"
                                 className="w-full rounded-3xl shadow-lg object-cover aspect-[4/5] lg:aspect-square"
                             />
                             <div className="absolute -bottom-6 -left-6 w-full h-full bg-tiba-blue/10 rounded-3xl -z-10" />
@@ -358,7 +359,7 @@ export const Home = () => {
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-8">
                         {[
-                            { name: "Online Doctor Consultation", img: doctorImage, onClick: handleTelemedicineClick },
+                            { name: "Online Doctor Consultation", img: telemedicineImage, onClick: handleTelemedicineClick },
                             { name: "Doctor & Nurse Home Visits", img: doctorImage, onClick: handleServiceClick },
                             { name: "Nursing & Long-Term Care", img: nursingImage, onClick: handleServiceClick },
                             { name: "Therapy & Rehabilitation", img: therapyImage, onClick: handleServiceClick },
