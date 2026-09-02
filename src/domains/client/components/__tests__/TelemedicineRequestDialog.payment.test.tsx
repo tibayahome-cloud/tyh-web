@@ -30,10 +30,13 @@ const initiateMutation = {
 };
 
 vi.mock("../../../../shared/hooks/useTelemedicine", () => ({
-  // This branch is based on dev, where the slots hook still returns a bare array. The
-  // facility-timezone branch changes that shape; these tests deliberately match the contract
-  // this branch actually builds against.
-  useAvailableSlots: () => ({ data: [SLOT], isLoading: false, isError: false }),
+  // The slots hook returns the facility's zone alongside the instants it explains, so the
+  // picker can group and label them in the facility's calendar rather than the device's.
+  useAvailableSlots: () => ({
+    data: { slots: [SLOT], timezone: "Africa/Nairobi" },
+    isLoading: false,
+    isError: false
+  }),
   useRemoteFacilities: () => ({ data: [FACILITY], isLoading: false }),
   useTelemedicinePolicy: () => ({ data: { defaultTimezone: "Africa/Nairobi" } }),
   useCreateHoldMutation: () => ({ mutateAsync: () => Promise.resolve(holdQueryMock().data), isPending: false }),
@@ -52,19 +55,30 @@ vi.mock("../../../../shared/components/ToastProvider", () => ({
 
 import { TelemedicineRequestDialog } from "../TelemedicineRequestDialog";
 
+// The picker shows one facility-local day at a time, opening on today, so the slot has to
+// fall on that day or it is simply not rendered. Built from the current date in the
+// facility's zone rather than a fixed one, for the same reason.
+const NAIROBI = "Africa/Nairobi";
+const TODAY_IN_NAIROBI = new Intl.DateTimeFormat("en-CA", {
+  timeZone: NAIROBI,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+}).format(new Date());
+
 const SLOT = {
-  startAt: "2026-09-10T06:00:00Z",
-  endAt: "2026-09-10T06:30:00Z",
+  // 06:00Z is 09:00 in Nairobi, so this lands mid-morning on the day the picker opens on.
+  startAt: `${TODAY_IN_NAIROBI}T06:00:00Z`,
+  endAt: `${TODAY_IN_NAIROBI}T06:30:00Z`,
   availableProviderCount: 2
 };
 
-// How the slot button is found, for clicking. Deliberately just the digits.
+// How the slot button is found, for clicking. Deliberately just the start-time digits.
 //
 // These tests are about payment, not formatting, so the selector should not depend on how a
-// time is rendered. Matching the full label made it depend on the runtime locale twice over:
-// whether the hour is 12- or 24-hour, and whether ICU separates AM/PM with an ordinary space
-// or a narrow no-break one. That passed locally and failed in CI. "09:00" appears in every
-// spelling, and the facility-timezone tests are where the label itself is asserted.
+// time is rendered. The button carries the whole appointment interval and the runtime locale
+// decides 12- or 24-hour, so matching the rendered label would tie these tests to both. The
+// facility-timezone tests are where the label itself is the thing under assertion.
 const SLOT_LABEL = /09:00/;
 
 const FACILITY = {
@@ -85,8 +99,8 @@ const hold = (overrides: Record<string, unknown> = {}) => ({
     id: "hold-1",
     facilityId: FACILITY.id,
     facilityServiceId: FACILITY.facilityServiceId,
-    startAt: "2026-09-10T06:00:00Z",
-    endAt: "2026-09-10T06:30:00Z",
+    startAt: SLOT.startAt,
+    endAt: SLOT.endAt,
     status: "active",
     isActive: true,
     expiresAt: "2099-01-01T00:00:00Z",
