@@ -58,17 +58,14 @@ const SLOT = {
   availableProviderCount: 2
 };
 
-// The slot button carries a date as well as a time, so match on the time alone. Built with
-// Intl rather than hard-coded, since the runtime locale decides 12- or 24-hour.
-const SLOT_LABEL = new RegExp(
-  new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Africa/Nairobi"
-  })
-    .format(new Date(SLOT.startAt))
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-);
+// How the slot button is found, for clicking. Deliberately just the digits.
+//
+// These tests are about payment, not formatting, so the selector should not depend on how a
+// time is rendered. Matching the full label made it depend on the runtime locale twice over:
+// whether the hour is 12- or 24-hour, and whether ICU separates AM/PM with an ordinary space
+// or a narrow no-break one. That passed locally and failed in CI. "09:00" appears in every
+// spelling, and the facility-timezone tests are where the label itself is asserted.
+const SLOT_LABEL = /09:00/;
 
 const FACILITY = {
   id: "facility-1",
