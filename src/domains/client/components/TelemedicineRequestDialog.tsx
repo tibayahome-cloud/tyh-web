@@ -669,34 +669,36 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               </p>
             </div>
 
-            {!holdExpired && !paymentConfirmed && hold?.bookingId && preferenceSaveError && (
-                  <div
-                    role="alert"
-                    className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3"
-                  >
-                    <p className="text-sm text-amber-800">
-                      {preferenceSaveError} Payment has not been taken, so nothing has been
-                      charged yet.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        onClick={handlePay}
-                        loading={savePreference.isPending}
-                        disabled={paymentInFlight}
-                      >
-                        Try again
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={handlePayWithoutPreference}
-                        disabled={paymentInFlight}
-                      >
-                        Continue without a preference
-                      </Button>
-                    </div>
+            {!holdExpired && !paymentConfirmed && preferenceSaveError && (
+              <div role="alert" className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm text-amber-800">
+                  {preferenceSaveError} Payment has not been taken, so nothing has been charged yet.
+                </p>
+                {hold?.bookingId ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={handlePay}
+                      loading={savePreference.isPending}
+                      disabled={paymentInFlight}
+                    >
+                      Try again
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handlePayWithoutPreference}
+                      disabled={paymentInFlight}
+                    >
+                      Continue without a preference
+                    </Button>
                   </div>
+                ) : (
+                  <Button type="button" variant="secondary" onClick={resetToStart}>
+                    Choose another time
+                  </Button>
+                )}
+              </div>
             )}
 
             {!holdExpired && !paymentConfirmed && (
@@ -728,6 +730,11 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
                 {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
+                {paymentInFlight && !preferenceSaveError && (
+                  <p role="status" className="text-sm text-slate-600">
+                    {savePreference.isPending ? "Saving your preference..." : "Preparing payment..."}
+                  </p>
+                )}
                 {!paymentInitiated ? (
                   <Button
                     type="button"
