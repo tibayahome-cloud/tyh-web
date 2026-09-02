@@ -50,16 +50,12 @@ export const ProviderPreferenceFields = ({ value, onChange, disabled, alwaysExpa
   }
 
   return (
-    <fieldset className="space-y-3 rounded-2xl border border-slate-200 p-4" disabled={disabled}>
-      <legend className="px-1 text-sm font-semibold text-slate-900">
-        Preferences <span className="font-normal text-slate-500">(optional)</span>
-      </legend>
+    <fieldset className="space-y-4" disabled={disabled}>
+      <legend className="sr-only">Preferences (optional)</legend>
 
-      <p className="text-xs text-slate-500">
-        We pass these to the care site when they choose your clinician. They will do their best,
-        but we cannot promise a match.
-      </p>
+      <p className="text-sm text-slate-500">Optional requests. We&apos;ll do our best to accommodate them.</p>
 
+      <div className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm">
         <span className="mb-1 block font-medium text-slate-700">Clinician</span>
         <select
@@ -89,18 +85,19 @@ export const ProviderPreferenceFields = ({ value, onChange, disabled, alwaysExpa
           ))}
         </select>
       </label>
+      </div>
 
       <label className="block text-sm">
         <span className="mb-1 block font-medium text-slate-700">
-          Anything else they should know?
+          Additional request <span className="font-normal text-slate-400">(optional)</span>
         </span>
         <textarea
           value={note}
           maxLength={NOTE_MAX_LENGTH}
-          rows={3}
+          rows={2}
           onChange={(event) => onChange({ ...value, note: event.target.value || null })}
           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-          placeholder="For example, you use a wheelchair, or you would rather not be seen by someone you know."
+          placeholder="For example, a mobility need or clinician preference."
         />
         <span className="mt-1 block text-right text-xs text-slate-400">
           {note.length}/{NOTE_MAX_LENGTH}
@@ -110,7 +107,7 @@ export const ProviderPreferenceFields = ({ value, onChange, disabled, alwaysExpa
       {/* Not a medical history field. Anything clinical belongs in the record, where it is
           protected properly, rather than in a note the care site reads while rostering. */}
       <p className="text-xs text-slate-400">
-        Please do not include medical details here -- your clinician will ask during the call.
+        Please do not include medical details here. Your clinician will ask during the call.
       </p>
     </fieldset>
   );

@@ -104,7 +104,7 @@ const renderDialog = () => {
 
 const openSlotStep = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(await screen.findByText(FACILITY.name));
-  await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
+  await user.click(await screen.findByRole("button", { name: /skip for now/i }));
 };
 
 describe("telemedicine slot picker", () => {

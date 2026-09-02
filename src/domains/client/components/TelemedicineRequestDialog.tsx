@@ -530,12 +530,10 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         )}
 
         {step === TM_STEP_INDEX.preferences && selectedFacility && (
-          <div className="space-y-4">
+          <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
             <div>
-              <p className="font-semibold text-slate-900">Provider preferences</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Optional requests for the care site. You can skip this and choose a time now.
-              </p>
+              <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
+              <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
             </div>
             <ProviderPreferenceFields
               value={preference}
@@ -546,15 +544,15 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 setPreferenceSaveError(null);
               }}
             />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button type="button" onClick={() => setStep(TM_STEP_INDEX.slot)}>
-                Continue to available times
+                Continue to choose a time
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.slot)}>
-                Skip preferences
+              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Skip for now
               </Button>
             </div>
-            <div className="flex justify-start">
+            <div className="flex justify-start border-t border-slate-200 pt-3">
               <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
                 Back
               </Button>

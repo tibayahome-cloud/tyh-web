@@ -138,7 +138,7 @@ const renderDialog = () => {
 const reachConfirmStep = async (user: ReturnType<typeof userEvent.setup>) => {
   renderDialog();
   await user.click(await screen.findByText(FACILITY.name));
-  await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
+  await user.click(await screen.findByRole("button", { name: /skip for now/i }));
   await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
   return screen.findByRole("button", { name: /confirm & pay/i });
 };
@@ -151,9 +151,9 @@ const expressAPreference = async (user: ReturnType<typeof userEvent.setup>) => {
 const reachConfirmStepWithPreference = async (user: ReturnType<typeof userEvent.setup>) => {
   renderDialog();
   await user.click(await screen.findByText(FACILITY.name));
-  await screen.findByText("Provider preferences");
+  await screen.findByRole("combobox", { name: /clinician/i });
   await expressAPreference(user);
-  await user.click(await screen.findByRole("button", { name: /continue to available times/i }));
+  await user.click(await screen.findByRole("button", { name: /continue to choose a time/i }));
   await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
   const payButton = await screen.findByRole("button", { name: /confirm & pay/i });
   return payButton;
@@ -266,7 +266,7 @@ describe("paying for a telemedicine hold", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(await screen.findByText(FACILITY.name));
-      await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
+      await user.click(await screen.findByRole("button", { name: /skip for now/i }));
       await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
 
       expect(await screen.findByText(/waiting for m-pesa confirmation/i)).toBeInTheDocument();
@@ -279,7 +279,7 @@ describe("paying for a telemedicine hold", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(await screen.findByText(FACILITY.name));
-      await user.click(await screen.findByRole("button", { name: /skip preferences/i }));
+      await user.click(await screen.findByRole("button", { name: /skip for now/i }));
       await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
 
       expect(await screen.findByRole("button", { name: /confirm & pay/i })).toBeInTheDocument();
