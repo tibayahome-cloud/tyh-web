@@ -30,6 +30,9 @@ export type RemoteFacility = {
   priceCents: number;
   currency: string;
   estimateDurationMinutes: number | null;
+  // The zone this facility's appointments are scheduled and displayed in. Null when the API
+  // did not send one, so callers fall back explicitly rather than silently assuming a default.
+  timezone: string | null;
 };
 
 export const discoverRemoteFacilities = async (
@@ -58,10 +61,19 @@ export const discoverRemoteFacilities = async (
         priceCents: typeof service.price_cents === "number" ? service.price_cents : 0,
         currency: typeof service.currency === "string" ? service.currency : "KES",
         estimateDurationMinutes:
-          typeof service.estimate_duration_minutes === "number" ? service.estimate_duration_minutes : null
+          typeof service.estimate_duration_minutes === "number" ? service.estimate_duration_minutes : null,
+        timezone: typeof entry.timezone === "string" && entry.timezone ? entry.timezone : null
       } satisfies RemoteFacility;
     })
     .filter((entry): entry is RemoteFacility => Boolean(entry));
+};
+
+export type AvailableSlotsResult = {
+  slots: TelemedicineSlot[];
+  // The facility's scheduling zone, travelling with the instants it explains. start_at and
+  // end_at are UTC; pairing them with the wrong zone is the bug this closes, so the two are
+  // returned together rather than resolved separately by each caller.
+  timezone: string | null;
 };
 
 export const fetchAvailableSlots = async (
@@ -69,7 +81,7 @@ export const fetchAvailableSlots = async (
   facilityServiceId: string,
   startDate: string,
   endDate?: string
-): Promise<TelemedicineSlot[]> => {
+): Promise<AvailableSlotsResult> => {
   const response = await api.get(`/facilities/${facilityId}/telemedicine/available-slots`, {
     params: {
       facility_service_id: facilityServiceId,
@@ -77,7 +89,11 @@ export const fetchAvailableSlots = async (
       end_date: endDate ?? startDate
     }
   });
-  return mapTelemedicineSlots(response.data?.data);
+  const meta = (response.data?.meta ?? {}) as Record<string, unknown>;
+  return {
+    slots: mapTelemedicineSlots(response.data?.data),
+    timezone: typeof meta.timezone === "string" && meta.timezone ? meta.timezone : null
+  };
 };
 
 export const createHold = async (
