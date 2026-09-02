@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Modal } from "../../../shared/components/Modal";
@@ -122,6 +122,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
   const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
+  // Guards against a double-tap sending two M-Pesa prompts; see handlePay.
+  const payInFlightRef = useRef(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(0);
@@ -321,18 +323,30 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     if (mpesaPhoneValidationError(phone)) {
       return;
     }
+    // A ref, not the mutation's isPending: that only turns true after React re-renders, so
+    // two clicks in the same tick would both get through and send two M-Pesa prompts. The
+    // disabled button is the visible half of this; the ref is the half that actually holds.
+    if (payInFlightRef.current || paymentInitiated) {
+      return;
+    }
+    payInFlightRef.current = true;
+
     try {
-      // Saved before payment is requested, so a preference the client took the trouble to
-      // express is recorded even if the M-Pesa prompt is never approved. A failure here must
-      // not block the payment: an unsaved preference is a disappointment, an unpaid booking is
-      // a lost appointment.
+      // Saved before payment is requested, and payment does not proceed without it. Taking
+      // money for a preference we failed to record means the client pays for a consultation
+      // chosen on criteria the facility never sees, and finds out at the appointment. Better
+      // to stop here, where they can retry or clear the preference and continue deliberately.
       if (hold?.bookingId && Object.values(preference).some(Boolean)) {
         try {
           await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
-        } catch {
+        } catch (error) {
+          // A fixed lead sentence, then whatever the server said. The raw message alone is
+          // often "Network Error", which does not tell a client what it means for them.
+          const detail = classifyApiError(error, "").message;
           setPreferenceSaveError(
-            "Your provider preference could not be saved. Payment can continue, but the facility may not see it."
+            `Your provider preference could not be saved.${detail ? ` ${detail}` : ""}`
           );
+          return;
         }
       }
       await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
@@ -342,11 +356,40 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       });
     } catch (error) {
       setSubmitError(classifyApiError(error, "Unable to start payment."));
+    } finally {
+      payInFlightRef.current = false;
+    }
+  };
+
+  /** Continue without the preference, once the client has been told it could not be saved. */
+  const handlePayWithoutPreference = async () => {
+    if (!holdId || payInFlightRef.current || paymentInitiated) return;
+    payInFlightRef.current = true;
+    setPreferenceSaveError(null);
+    // Cleared so a later retry does not silently reattach it: the client has chosen to go
+    // ahead without one, and the form still shows what they had entered.
+    try {
+      await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
+      toast.showToast({
+        title: "Payment initiated",
+        description: "Check your phone to approve the M-Pesa prompt."
+      });
+    } catch (error) {
+      setSubmitError(classifyApiError(error, "Unable to start payment."));
+    } finally {
+      payInFlightRef.current = false;
     }
   };
 
   const phoneError = phoneTouched ? mpesaPhoneValidationError(phone) : null;
-  const paymentInitiated = Boolean(hold?.bookingId) && initiatePaymentMutation.isSuccess;
+  // Derived from the server, not only from this page's mutation state: a reload, or coming
+  // back to a tab, must still show the prompt as outstanding rather than offering to send a
+  // second one. The local flag is kept as well so the UI reacts immediately, before the hold
+  // query refetches.
+  const paymentInitiated =
+    Boolean(hold?.bookingId) && (initiatePaymentMutation.isSuccess || Boolean(hold?.paymentPending));
+  // Any work in flight that a second click would duplicate.
+  const paymentInFlight = initiatePaymentMutation.isPending || savePreference.isPending;
   const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
 
   return (
@@ -582,7 +625,35 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   }}
                   disabled={savePreference.isPending}
                 />
-                {preferenceSaveError && <p className="text-sm text-amber-700">{preferenceSaveError}</p>}
+                {preferenceSaveError && (
+                  <div
+                    role="alert"
+                    className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3"
+                  >
+                    <p className="text-sm text-amber-800">
+                      {preferenceSaveError} Payment has not been taken, so nothing has been
+                      charged yet.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={handlePay}
+                        loading={savePreference.isPending}
+                        disabled={paymentInFlight}
+                      >
+                        Try again
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handlePayWithoutPreference}
+                        disabled={paymentInFlight}
+                      >
+                        Continue without a preference
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -616,8 +687,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 />
                 {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
                 {!paymentInitiated ? (
-                  <Button type="button" loading={initiatePaymentMutation.isPending} onClick={handlePay}>
-                    Confirm & pay
+                  <Button
+                    type="button"
+                    loading={paymentInFlight}
+                    disabled={paymentInFlight || Boolean(preferenceSaveError)}
+                    onClick={handlePay}
+                  >
+                    Confirm &amp; pay
                   </Button>
                 ) : (
                   <div className="space-y-3">
