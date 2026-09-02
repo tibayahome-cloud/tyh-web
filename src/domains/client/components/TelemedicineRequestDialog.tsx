@@ -1,29 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AxiosError } from "axios";
 
 import { Modal } from "../../../shared/components/Modal";
 import { Button } from "../../../shared/components/Button";
 import { Input } from "../../../shared/components/Input";
 import { Stepper } from "../../../shared/components/Stepper";
 import { Loading } from "../../../shared/components/Loading";
+import { useMutation } from "@tanstack/react-query";
+
+import { saveProviderPreference } from "../../../shared/libs/telemedicineOps";
+import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
+import {
+  fetchTelemedicineCatalogServices,
+  fetchTelemedicineCategories,
+  fetchTelemedicineSubcategories
+} from "../../../shared/libs/telemedicineCatalog";
+import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
+import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { RemoteFacility } from "../../../shared/libs/telemedicine";
 import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
+import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
+import { mpesaPhoneValidationError } from "../../../shared/utils/mpesaPhone";
 import {
   useAvailableSlots,
   useCreateHoldMutation,
   useHoldQuery,
   useInitiateHoldPaymentMutation,
   useReleaseHoldMutation,
-  useRemoteFacilities
+  useRemoteFacilities,
+  useTelemedicinePolicy
 } from "../../../shared/hooks/useTelemedicine";
 import { bookingKeys } from "../../../shared/hooks/useBookings";
+import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 
 type TelemedicineRequestDialogProps = {
   open: boolean;
@@ -54,11 +68,13 @@ const TM_STEPS = [
 const formatCurrency = (cents: number, currency = "KES") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
 
-const formatSlotTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+// A slot is a real appointment at the facility's location, not wherever the client's device
+// happens to be set to -- these must show the same instant the backend actually reserved.
+const formatSlotTime = (iso: string, timezone: string | undefined) =>
+  formatTelemedicineDateTime(iso, timezone, { hour: "2-digit", minute: "2-digit" });
 
-const formatSlotDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+const formatSlotDate = (iso: string, timezone: string | undefined) =>
+  formatTelemedicineDateTime(iso, timezone, { weekday: "short", month: "short", day: "numeric" });
 
 const todayISODate = () => new Date().toISOString().slice(0, 10);
 
@@ -90,10 +106,29 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
+  const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
+  const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(0);
 
-  const servicesQuery = useRemoteServiceOptions(open);
+  const policyQuery = useTelemedicinePolicy();
+  const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
+  const categoriesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "categories"],
+    queryFn: fetchTelemedicineCategories,
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+  });
+  const subcategoriesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "subcategories"],
+    queryFn: () => fetchTelemedicineSubcategories(),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+  });
+  const catalogServicesQuery = useQuery({
+    queryKey: ["client", "telemedicine", "services"],
+    queryFn: () => fetchTelemedicineCatalogServices(),
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+  });
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
   });
@@ -112,22 +147,56 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const createHoldMutation = useCreateHoldMutation();
   const releaseHoldMutation = useReleaseHoldMutation();
   const initiatePaymentMutation = useInitiateHoldPaymentMutation();
+  const savePreference = useMutation({
+    mutationFn: ({ bookingId, preference: next }: { bookingId: string; preference: Partial<ProviderPreference> }) =>
+      saveProviderPreference(bookingId, next)
+  });
 
-  const selectedService = servicesQuery.data?.find((service) => service.id === selectedServiceId) ?? null;
+  const catalogServiceOptions = (catalogServicesQuery.data ?? []).map((service) => ({
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    base_price_cents: service.basePriceCents,
+    default_estimate_minutes: service.defaultEstimateMinutes,
+    remote_capable: true,
+    active: true
+  }));
+  const serviceOptions = serviceId ? servicesQuery.data ?? [] : catalogServiceOptions;
+  const selectedService = serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
+  const categoryCards = useMemo(() => {
+    const subcategoriesByCategory = new Map<string, typeof subcategoriesQuery.data>();
+    (subcategoriesQuery.data ?? []).forEach((subcategory) => {
+      const items = subcategoriesByCategory.get(subcategory.categoryId) ?? [];
+      items.push(subcategory);
+      subcategoriesByCategory.set(subcategory.categoryId, items);
+    });
+    const servicesBySubcategory = new Map<string, typeof catalogServicesQuery.data>();
+    (catalogServicesQuery.data ?? []).forEach((service) => {
+      const items = servicesBySubcategory.get(service.subcategoryId) ?? [];
+      items.push(service);
+      servicesBySubcategory.set(service.subcategoryId, items);
+    });
+    return (categoriesQuery.data ?? []).map((category) => ({
+      category,
+      specialties: (subcategoriesByCategory.get(category.id) ?? []).map((subcategory) => ({
+        subcategory,
+        services: servicesBySubcategory.get(subcategory.id) ?? []
+      }))
+    }));
+  }, [categoriesQuery.data, catalogServicesQuery.data, subcategoriesQuery.data]);
 
   useEffect(() => {
-    if (!hold) return;
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    if (!hold) {
+      setRemainingHoldSeconds(0);
+      return;
+    }
+    setRemainingHoldSeconds(hold.remainingSeconds);
+    const timer = window.setInterval(() => {
+      setRemainingHoldSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
     return () => window.clearInterval(timer);
-    // Only restart the ticking interval when the hold identity changes, not on every refetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hold?.id]);
-
-  const remainingHoldSeconds = useMemo(() => {
-    if (!hold) return 0;
-    return Math.max(0, Math.floor((new Date(hold.expiresAt).getTime() - nowMs) / 1000));
-  }, [hold, nowMs]);
+  }, [hold?.id, hold?.remainingSeconds]);
 
   const holdExpired = Boolean(hold) && !hold?.isActive && hold?.bookingStatus !== "telemedicine_paid_pending_assignment";
 
@@ -181,28 +250,46 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       setHoldId(newHold.id);
       setStep(TM_STEP_INDEX.confirm);
     } catch (error) {
-      const message = error instanceof AxiosError ? error.response?.data?.meta?.message ?? error.message : "Please try a different slot.";
-      setSubmitError(message);
+      setSubmitError(classifyApiError(error, "Please try a different slot."));
       setSelectedSlot(null);
     }
   };
 
   const handlePay = async () => {
     if (!holdId) return;
+    setPhoneTouched(true);
     setSubmitError(null);
+    setPreferenceSaveError(null);
+    // Catch an unusable number here, before the STK push is even requested, rather than letting
+    // the client find out only after the backend rejects it.
+    if (mpesaPhoneValidationError(phone)) {
+      return;
+    }
     try {
+      // Saved before payment is requested, so a preference the client took the trouble to
+      // express is recorded even if the M-Pesa prompt is never approved. A failure here must
+      // not block the payment: an unsaved preference is a disappointment, an unpaid booking is
+      // a lost appointment.
+      if (hold?.bookingId && Object.values(preference).some(Boolean)) {
+        try {
+          await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
+        } catch {
+          setPreferenceSaveError(
+            "Your provider preference could not be saved. Payment can continue, but the facility may not see it."
+          );
+        }
+      }
       await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
       toast.showToast({
         title: "Payment initiated",
         description: "Check your phone to approve the M-Pesa prompt."
       });
     } catch (error) {
-      const message =
-        error instanceof AxiosError ? error.response?.data?.meta?.message ?? error.message : "Unable to start payment.";
-      setSubmitError(message);
+      setSubmitError(classifyApiError(error, "Unable to start payment."));
     }
   };
 
+  const phoneError = phoneTouched ? mpesaPhoneValidationError(phone) : null;
   const paymentInitiated = Boolean(hold?.bookingId) && initiatePaymentMutation.isSuccess;
   const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
 
@@ -214,27 +301,65 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         {step === TM_STEP_INDEX.service && (
           <div className="space-y-3">
             {!user?.countryCode && <CountryRequiredBanner onComplete={handleClose} />}
-            {servicesQuery.isLoading && <Loading />}
-            {!servicesQuery.isLoading && (servicesQuery.data ?? []).length === 0 && (
+            {serviceId ? (
+              servicesQuery.isLoading && <Loading />
+            ) : (
+              <>
+                {(categoriesQuery.isLoading || subcategoriesQuery.isLoading || catalogServicesQuery.isLoading) && <Loading />}
+              </>
+            )}
+            {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && categoryCards.length === 0 && (
+              <p className="text-sm text-slate-500">No remote consultations are available right now.</p>
+            )}
+            {serviceId && !servicesQuery.isLoading && serviceOptions.length === 0 && (
               <p className="text-sm text-slate-500">No remote-consultation services are available right now.</p>
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(servicesQuery.data ?? []).map((service) => (
-                <button
-                  key={service.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedServiceId(service.id);
-                    setStep(TM_STEP_INDEX.facility);
-                  }}
-                  className="rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
-                >
-                  <p className="font-semibold text-slate-900">{service.name}</p>
-                  {service.description && <p className="mt-1 text-xs text-slate-500">{service.description}</p>}
-                  <p className="mt-2 text-sm font-medium text-tiba-blue">From {formatCurrency(service.base_price_cents)}</p>
-                </button>
-              ))}
-            </div>
+            {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">Choose a consultation below to see available facilities and times.</p>
+                {categoryCards.map(({ category, specialties }) => (
+                  <section key={category.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3">
+                      <h3 className="text-base font-bold text-slate-900">{category.name}</h3>
+                      {category.description && <p className="mt-1 text-sm text-slate-500">{category.description}</p>}
+                    </div>
+                    {specialties.length === 0 ? (
+                      <p className="text-sm text-slate-500">No consultations are available in this area yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {specialties.map(({ subcategory, services }) => (
+                          <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
+                            <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
+                            {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
+                            {services.length === 0 ? (
+                              <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
+                            ) : (
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                {services.map((service) => (
+                                  <button
+                                    key={service.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedServiceId(service.id);
+                                      setStep(TM_STEP_INDEX.facility);
+                                    }}
+                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
+                                  >
+                                    <p className="text-sm font-semibold text-slate-900">{service.name}</p>
+                                    {service.description && <p className="mt-1 text-xs text-slate-500">{service.description}</p>}
+                                    <p className="mt-2 text-sm font-medium text-tiba-blue">From {formatCurrency(service.basePriceCents, service.currency)}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -287,7 +412,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               onChange={(event) => setSelectedDate(event.target.value)}
             />
             {slotsQuery.isLoading && <Loading />}
-            {submitError && <p className="text-sm text-danger-600">{submitError}</p>}
+            {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
             {!slotsQuery.isLoading && (slotsQuery.data ?? []).length === 0 && (
               <p className="text-sm text-slate-500">No open slots on this date. Try another day.</p>
             )}
@@ -300,8 +425,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   onClick={() => handleSelectSlot(slot)}
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
-                  <span className="block text-xs text-slate-400">{formatSlotDate(slot.startAt)}</span>
-                  {formatSlotTime(slot.startAt)}
+                  <span className="block text-xs text-slate-400">{formatSlotDate(slot.startAt, policyQuery.data?.defaultTimezone)}</span>
+                  {formatSlotTime(slot.startAt, policyQuery.data?.defaultTimezone)}
                 </button>
               ))}
             </div>
@@ -319,12 +444,29 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
               <p className="text-sm text-slate-500">{selectedFacility.name}</p>
               <p className="mt-1 text-sm text-slate-700">
-                {formatSlotDate(selectedSlot.startAt)} at {formatSlotTime(selectedSlot.startAt)}
+                {formatSlotDate(selectedSlot.startAt, policyQuery.data?.defaultTimezone)} at{" "}
+                {formatSlotTime(selectedSlot.startAt, policyQuery.data?.defaultTimezone)}
               </p>
               <p className="mt-2 text-lg font-semibold text-tiba-blue">
                 {formatCurrency(selectedFacility.priceCents, selectedFacility.currency)}
               </p>
             </div>
+
+            {/* Offered here because the booking now exists but no provider is assigned yet,
+                which is exactly the window the backend allows a preference to be set in. */}
+            {!holdExpired && !paymentConfirmed && hold?.bookingId && (
+              <>
+                <ProviderPreferenceFields
+                  value={preference}
+                  onChange={(next) => {
+                    setPreference(next);
+                    setPreferenceSaveError(null);
+                  }}
+                  disabled={savePreference.isPending}
+                />
+                {preferenceSaveError && <p className="text-sm text-amber-700">{preferenceSaveError}</p>}
+              </>
+            )}
 
             {!holdExpired && !paymentConfirmed && (
               <p className="text-xs text-amber-700">
@@ -349,9 +491,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   type="tel"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
+                  onBlur={() => setPhoneTouched(true)}
                   placeholder="+254 700 000000"
+                  error={phoneError ?? undefined}
+                  hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
-                {submitError && <p className="text-sm text-danger-600">{submitError}</p>}
+                {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
                 {!paymentInitiated ? (
                   <Button type="button" loading={initiatePaymentMutation.isPending} onClick={handlePay}>
                     Confirm & pay

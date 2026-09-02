@@ -100,6 +100,10 @@ export const BookingSchema = z.object({
   feedback: z.array(z.any()), // Deep feedback schema opt.
   disputes: z.array(BookingDisputeSchema),
   isTelemedicine: z.boolean(),
+  // Money arrived but the appointment could not be honoured, and an operator is deciding what
+  // happens next. Derived on the backend from an open payment-review dispute, so it does not
+  // depend on booking status.
+  paymentReviewPending: z.boolean(),
   telemedicineSession: TelemedicineSessionSummarySchema.nullable()
 });
 
@@ -308,6 +312,9 @@ export const mapBooking = (payload: unknown): Booking | null => {
       .map((d) => mapBookingDispute(d))
       .filter(Boolean),
     isTelemedicine: coerceBoolean(raw.is_telemedicine) ?? false,
+    // Defaults false when the field is absent, so an older response cannot make a booking look
+    // as though it is under review.
+    paymentReviewPending: coerceBoolean(raw.payment_review_pending) ?? false,
     telemedicineSession: mapTelemedicineSessionSummary(raw.telemedicine_session)
   };
 

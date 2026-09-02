@@ -22,6 +22,7 @@ const normalizeListParams = (params: BookingListParams = {}) => ({
   to: params.to ?? null,
   scheduledFrom: params.scheduledFrom ?? null,
   scheduledTo: params.scheduledTo ?? null,
+  isTelemedicine: params.isTelemedicine ?? null,
   preset: params.preset ?? "card"
 });
 
@@ -153,8 +154,8 @@ export const useCancelBookingMutation = (preset: BookingPresetName = "detail") =
   const storeBooking = useStoreBookingDetail();
   const invalidateLists = useInvalidateBookingLists();
   return useMutation({
-    mutationFn: ({ bookingId, reason }: { bookingId: string; reason?: string }) =>
-      cancelBooking(bookingId, reason, preset),
+    mutationFn: ({ bookingId, reason, adminOverride }: { bookingId: string; reason?: string; adminOverride?: boolean }) =>
+      cancelBooking(bookingId, reason, preset, adminOverride),
     onSuccess: (booking) => {
       storeBooking(booking);
       invalidateLists();

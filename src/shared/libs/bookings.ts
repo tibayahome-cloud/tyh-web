@@ -33,6 +33,7 @@ export type BookingListParams = {
   to?: string;
   scheduledFrom?: string;
   scheduledTo?: string;
+  isTelemedicine?: boolean;
   preset?: BookingPresetName;
 };
 
@@ -57,6 +58,7 @@ export const fetchBookings = async ({
   to,
   scheduledFrom,
   scheduledTo,
+  isTelemedicine,
   preset = "card"
 }: BookingListParams = {}): Promise<BookingListResult> => {
   const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.card;
@@ -92,6 +94,12 @@ export const fetchBookings = async ({
   }
   if (scheduledTo) {
     params["filter[scheduled_to]"] = scheduledTo;
+  }
+  // Remote consultations and home visits share statuses but not flows, so a caller working in
+  // one must be able to exclude the other. Undefined means "no opinion" -- false is a real
+  // filter that asks the server for in-person bookings only, so the check cannot be truthy.
+  if (isTelemedicine !== undefined) {
+    params["filter[is_telemedicine]"] = isTelemedicine;
   }
 
   const response = await api.get("/bookings", { params });
@@ -234,12 +242,13 @@ export const confirmBooking = async (
 export const cancelBooking = async (
   bookingId: string,
   reason?: string,
-  preset: BookingPresetName = "detail"
+  preset: BookingPresetName = "detail",
+  adminOverride?: boolean
 ): Promise<Booking> => {
   const presetConfig = bookingPresetMap[preset] ?? bookingPresetMap.detail;
   const response = await api.post(
     `/bookings/${bookingId}/cancel`,
-    { reason },
+    { reason, ...(adminOverride ? { admin_override: true } : {}) },
     { params: buildFieldParams(presetConfig) }
   );
   const booking = mapBooking(response.data?.data);

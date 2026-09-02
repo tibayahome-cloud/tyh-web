@@ -38,10 +38,6 @@ export const WebsiteHeader = () => {
                         <img src={logo} alt="Tiba Ya Home" className="h-16 w-auto object-contain" />
                     </Link>
 
-                    {/* Desktop Nav - Removed as per single page requirement */}
-                    <nav className="hidden lg:flex items-center gap-8">
-                    </nav>
-
                     {/* CTA Buttons */}
                     <div className="hidden lg:flex items-center gap-4">
                         <a
@@ -72,7 +68,6 @@ export const WebsiteHeader = () => {
             {/* Mobile Menu */}
             {isMobileMenuOpen && (
                 <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-xl p-4 flex flex-col gap-4">
-                    {/* Mobile items removed */}
                     <Link
                         to="/login"
                         className="px-4 py-3 rounded-xl bg-tiba-blue text-white font-medium text-center"

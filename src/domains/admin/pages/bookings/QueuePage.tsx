@@ -423,9 +423,11 @@ const AdminBookingQueuePage = () => {
                         >
                           View
                         </Link>
-                        <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => openReassignModal(booking.id)}>
-                          Reassign
-                        </Button>
+                        {!booking.isTelemedicine && (
+                          <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => openReassignModal(booking.id)}>
+                            Reassign
+                          </Button>
+                        )}
                         <Button
                           variant="secondary"
                           className="border-rose-200 px-3 py-1 text-xs text-rose-600 hover:bg-rose-50"

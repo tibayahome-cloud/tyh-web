@@ -14,6 +14,8 @@ import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { BookingSearchStatus } from "../components/BookingSearchStatus";
+import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
+import { findBookingUnderPaymentReview } from "../utils/paymentReview";
 import { AIRecommendationsCard } from "../components/AIRecommendationsCard";
 import { ClientPageHeader } from "../components/ClientPageHeader";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -38,8 +40,10 @@ import {
   ChevronUp,
   TrendingUp,
   Minus,
-  Calendar
+  Calendar,
+  Video
 } from "lucide-react";
+import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 
 const ACTIVE_STATUSES = [
   "accepted",
@@ -48,6 +52,19 @@ const ACTIVE_STATUSES = [
   "arrived",
   "in_service",
   "completed_by_provider"
+];
+
+// A remote consultation never passes through the in-person dispatch states above. It goes
+// telemedicine_payment_pending -> telemedicine_paid_pending_assignment -> scheduled, so a
+// list of dispatch states alone told a client holding a confirmed consultation that they
+// had "No upcoming care scheduled".
+const UPCOMING_STATUSES = [
+  "requested",
+  "accepted",
+  "broadcasting",
+  "scheduled",
+  "telemedicine_payment_pending",
+  "telemedicine_paid_pending_assignment"
 ];
 
 const HISTORY_STATUSES = [
@@ -115,19 +132,28 @@ const ClientHome = () => {
     {
       statuses: ["broadcasting"],
       clientId: user?.id ?? undefined,
+      // A remote consultation is booked into a fixed slot with a named provider, so nothing is
+      // ever searching nearby providers for one. Filtering server-side rather than trimming the
+      // result keeps the page counts honest.
+      isTelemedicine: false,
       pageSize: 1,
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
   ) as { data?: { bookings?: Booking[] } };
-  const matchingBooking = searchingQuery.data?.bookings?.[0];
+  // Belt and braces behind the server filter: this card announces that a search is underway,
+  // and claiming that over a consultation the client has already booked is worse than showing
+  // nothing at all.
+  const matchingCandidate = searchingQuery.data?.bookings?.[0];
+  const matchingBooking = matchingCandidate?.isTelemedicine ? undefined : matchingCandidate;
+
 
   const upcomingParams = useMemo(() => {
     // Snap to current minute to avoid infinite re-renders while keeping data relatively fresh
     const now = new Date();
     now.setSeconds(0, 0);
     return {
-      statuses: ["requested", "accepted", "broadcasting"],
+      statuses: UPCOMING_STATUSES,
       clientId: user?.id ?? undefined,
       pageSize: 3,
       preset: "card" as const,
@@ -140,6 +166,16 @@ const ClientHome = () => {
     { enabled: Boolean(user?.id) }
   ) as { data?: { bookings?: Booking[] }, isLoading: boolean };
   const upcomingList = upcomingQuery.data;
+
+  // A payment that arrived for an appointment that could not be honoured. Surfaced above
+  // everything else because the client has paid and, without this, has no way of knowing
+  // anything is wrong until nobody joins the call. Declared after upcomingList because it
+  // reads it.
+  const underReview = findBookingUnderPaymentReview([
+    activeBooking,
+    matchingCandidate,
+    ...(upcomingList?.bookings ?? [])
+  ]);
   useEffect(() => {
     if (activeBooking?.status === "completed_by_provider") {
       setCompletionPrompt(activeBooking);
@@ -372,6 +408,12 @@ const ClientHome = () => {
         </section>
 
         <div className="flex flex-col gap-4 px-4 sm:px-6">
+          {underReview && (
+            <PaymentReviewNotice
+              onViewBooking={() => navigate(`/app/bookings/${underReview.id}`)}
+            />
+          )}
+
           {matchingBooking && (
             <BookingSearchStatus
               booking={matchingBooking}
@@ -685,6 +727,17 @@ const BookingCompactCard = ({
 }) => {
   const theme = getBookingStatusTheme(booking.status);
   const showRateButton = onRate && !booking.feedback?.length && (booking.status === "fully_completed" || booking.status === "paid" || booking.status === "client_completed");
+  // Show when the appointment happens, not when it was requested -- on an upcoming list the
+  // booking's creation date is the one date the client does not need. A remote consultation
+  // is anchored to the facility's timezone; an in-person visit stays in the client's own,
+  // since that is where they physically are.
+  const when = booking.scheduledAt
+    ? booking.isTelemedicine
+      ? formatTelemedicineDateTime(booking.scheduledAt)
+      : new Date(booking.scheduledAt).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : booking.createdAt
+      ? new Date(booking.createdAt).toLocaleDateString()
+      : "—";
 
   return (
     <div
@@ -693,7 +746,7 @@ const BookingCompactCard = ({
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-          <Calendar size={16} />
+          {booking.isTelemedicine ? <Video size={16} /> : <Calendar size={16} />}
         </div>
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-slate-900 truncate">
@@ -704,9 +757,7 @@ const BookingCompactCard = ({
               {formatBookingStatus(booking.status)}
             </span>
             <span className="text-slate-300 text-[10px]">•</span>
-            <p className="text-[11px] text-slate-400">
-              {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '—'}
-            </p>
+            <p className="text-[11px] text-slate-400">{when}</p>
           </div>
         </div>
       </div>

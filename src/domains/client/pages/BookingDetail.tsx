@@ -19,15 +19,25 @@ import Drawer from "@mui/material/Drawer";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
-import { useReportNoShowMutation } from "../../../shared/hooks/useTelemedicine";
+import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { useAuth } from "../../../shared/hooks/useAuth";
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
 import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
+import { TechnicalIssueDialog } from "../../../shared/components/TechnicalIssueDialog";
+import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
+import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
-import { isWithinJoinWindow } from "../../../shared/utils/telemedicine";
+import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
+import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
+import {
+  BOOKING_STATUS_TELEMEDICINE_UNATTENDED,
+  TELEMEDICINE_DISPUTE_TYPE_NO_SHOW
+} from "../../../shared/schemas/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
 
@@ -43,11 +53,16 @@ const BookingDetailPage = () => {
   const cancelMutation = useCancelBookingMutation("detail");
   const rerouteMutation = useRerouteBookingMutation("detail");
   const reportNoShowMutation = useReportNoShowMutation();
+  const policyQuery = useTelemedicinePolicy();
+  const { user } = useAuth();
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [noShowDialogOpen, setNoShowDialogOpen] = useState(false);
   const [noShowError, setNoShowError] = useState<string | null>(null);
+  const [cancelAppointmentDialogOpen, setCancelAppointmentDialogOpen] = useState(false);
+  const [cancelAppointmentError, setCancelAppointmentError] = useState<ClassifiedApiError | null>(null);
+  const [technicalIssueDialogOpen, setTechnicalIssueDialogOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
@@ -119,11 +134,23 @@ const BookingDetailPage = () => {
   const mapHeight = Math.round(viewportHeight * 0.66); // 2/3 of screen
 
   const handleCancel = async () => {
-    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    const isUnpaidTelemedicineRequest =
+      booking.isTelemedicine && booking.status === "telemedicine_payment_pending";
+    const message = isUnpaidTelemedicineRequest
+      ? "Remove this unpaid consultation request? The selected slot will be released."
+      : "Are you sure you want to cancel this booking?";
+    if (!window.confirm(message)) return;
     try {
       await cancelMutation.mutateAsync({ bookingId: booking.id, reason: "Cancelled from detail page" });
-      toast.showToast({ title: "Booking cancelled", variant: "info" });
-      setSheetExpanded(true); // Ensure details are visible after cancel
+      toast.showToast({
+        title: isUnpaidTelemedicineRequest ? "Unpaid request removed" : "Booking cancelled",
+        variant: "info"
+      });
+      if (isUnpaidTelemedicineRequest) {
+        navigate("/app/bookings");
+      } else {
+        setSheetExpanded(true); // Ensure details are visible after cancel
+      }
     } catch (error: unknown) {
       toast.showToast({
         title: "Error cancelling booking",
@@ -145,6 +172,24 @@ const BookingDetailPage = () => {
       });
     } catch (error) {
       setNoShowError(error instanceof Error ? error.message : "Please try again.");
+    }
+  };
+
+  const handleCancelAppointment = async () => {
+    setCancelAppointmentError(null);
+    try {
+      const updated = await cancelMutation.mutateAsync({ bookingId: booking.id, reason: "Cancelled by client" });
+      setCancelAppointmentDialogOpen(false);
+      toast.showToast({
+        title: "Appointment cancelled",
+        description:
+          updated.status === "telemedicine_cancelled_payment_review"
+            ? "Your payment is now under review. This is not confirmation of a refund."
+            : "Your appointment has been cancelled.",
+        variant: "info"
+      });
+    } catch (error) {
+      setCancelAppointmentError(classifyApiError(error, "Unable to cancel this appointment."));
     }
   };
 
@@ -170,10 +215,35 @@ const BookingDetailPage = () => {
     }
   };
 
-  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === "telemedicine_no_show");
+  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
+
+  // The cutoff is backend policy (scheduled_at - cancellationCutoffMinutes), not a client
+  // guess -- until the policy loads, cancellation stays hidden rather than optimistically shown.
+  const canCancelAppointment =
+    booking.isTelemedicine &&
+    booking.status === "scheduled" &&
+    Boolean(booking.scheduledAt) &&
+    Boolean(policyQuery.data) &&
+    Date.now() < new Date(booking.scheduledAt as string).getTime() - (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000;
+
+  // Reporting stays open for 24h after the call ends (report_technical_issue on the backend),
+  // well past the call-join window -- these are deliberately different windows.
+  const canReportTechnicalIssue =
+    booking.isTelemedicine &&
+    isWithinTechnicalIssueReportWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), policyQuery.data?.joinWindowBeforeMinutes);
+
+  // Same window as cancellation, and for the same reason: once the consultation is under way
+  // the appointment is no longer a plan to negotiate. The backend refuses either way, so this
+  // only decides whether to offer something that would be rejected.
+  const canReschedule =
+    booking.isTelemedicine &&
+    (booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED || canCancelAppointment);
 
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
+      {booking.paymentReviewPending && (
+        <PaymentReviewNotice />
+      )}
       {/* Header Info */}
       <div className="space-y-3 border-b border-slate-100 pb-4">
         <div className="flex items-center justify-between">
@@ -197,7 +267,16 @@ const BookingDetailPage = () => {
             </span>
             {booking.scheduledAt && (
               <span className="flex items-center gap-1">
-                • {new Date(booking.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {/* A remote appointment is anchored to the facility's timezone, not wherever the
+                    client's device happens to be; an in-person visit is wherever the client is,
+                    so browser-local time is the correct display for that case. */}
+                •{" "}
+                {booking.isTelemedicine
+                  ? formatTelemedicineDateTime(booking.scheduledAt, policyQuery.data?.defaultTimezone, {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })
+                  : new Date(booking.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
@@ -315,10 +394,19 @@ const BookingDetailPage = () => {
       )}
 
       {/* Telemedicine join call */}
-      {booking.isTelemedicine && booking.status === "scheduled" && (
+      {booking.isTelemedicine && (
         <div className="space-y-3">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Video consultation</h4>
-          {isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes) ? (
+          {booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED ? (
+            <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
+              This consultation was unattended. You can propose a new time below.
+            </p>
+          ) : isWithinJoinWindow(
+            booking.scheduledAt,
+            booking.estimateDurationMinutes,
+            Date.now(),
+            policyQuery.data?.joinWindowBeforeMinutes
+          ) ? (
             <Button
               type="button"
               className="w-full h-12 rounded-xl text-xs font-bold"
@@ -329,24 +417,54 @@ const BookingDetailPage = () => {
             </Button>
           ) : (
             <p className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500">
-              The call opens 10 minutes before your appointment time.
+              {policyQuery.data
+                ? `The call opens ${policyQuery.data.joinWindowBeforeMinutes} minutes before your appointment time.`
+                : "The call opens shortly before your appointment time."}
             </p>
           )}
-          {existingNoShowDispute ? (
+          {booking.status === "scheduled" && existingNoShowDispute ? (
             <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
               You reported a problem with this appointment. Admin.ops is reviewing it.
             </p>
           ) : (
-            !NOT_REPORTABLE_STATUSES.includes(booking.status) && (
+            booking.status === "scheduled" && !NOT_REPORTABLE_STATUSES.includes(booking.status) && (
               <Button
                 type="button"
                 variant="ghost"
                 className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
                 onClick={() => setNoShowDialogOpen(true)}
               >
-                Report a problem with this appointment
+                The provider didn't show up
               </Button>
             )
+          )}
+          {booking.isTelemedicine && user?.id && (
+            <ReschedulePanel
+              bookingId={booking.id}
+              currentUserId={String(user.id)}
+              canReschedule={canReschedule}
+            />
+          )}
+
+          {canReportTechnicalIssue && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
+              onClick={() => setTechnicalIssueDialogOpen(true)}
+            >
+              Report a technical issue
+            </Button>
+          )}
+          {canCancelAppointment && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
+              onClick={() => setCancelAppointmentDialogOpen(true)}
+            >
+              Cancel this appointment
+            </Button>
           )}
         </div>
       )}
@@ -379,7 +497,9 @@ const BookingDetailPage = () => {
             onClick={handleCancel}
             loading={cancelMutation.isPending}
           >
-            Cancel Booking Request
+            {booking.isTelemedicine && booking.status === "telemedicine_payment_pending"
+              ? "Remove unpaid request"
+              : "Cancel Booking Request"}
           </Button>
         )}
         <Button
@@ -562,10 +682,43 @@ const BookingDetailPage = () => {
           onConfirm={handleReportNoShow}
           loading={reportNoShowMutation.isPending}
           title="Report a problem"
-          description="Let admin.ops know if the provider didn't join, or you had a technical issue. This flags the appointment for review -- it doesn't request a refund by itself."
+          description="Let admin.ops know if the provider didn't join for this appointment. This flags the appointment for review -- it doesn't request a refund by itself."
           confirmLabel="Report"
           confirmVariant="secondary"
           error={noShowError ?? undefined}
+        />
+
+        <ConfirmDialog
+          open={cancelAppointmentDialogOpen}
+          onClose={() => {
+            if (!cancelMutation.isPending) {
+              setCancelAppointmentDialogOpen(false);
+              setCancelAppointmentError(null);
+            }
+          }}
+          onConfirm={handleCancelAppointment}
+          loading={cancelMutation.isPending}
+          title="Cancel this appointment"
+          description="If you already paid, cancelling puts your payment under review -- it does not confirm a refund. This can't be undone."
+          confirmLabel="Cancel appointment"
+          confirmVariant="secondary"
+        >
+          {cancelAppointmentError && (
+            <ApiErrorBanner category={cancelAppointmentError.category} message={cancelAppointmentError.message} />
+          )}
+        </ConfirmDialog>
+
+        <TechnicalIssueDialog
+          open={technicalIssueDialogOpen}
+          bookingId={booking.id}
+          onClose={() => setTechnicalIssueDialogOpen(false)}
+          onReported={() =>
+            toast.showToast({
+              title: "Reported",
+              description: "Admin.ops will review this technical issue.",
+              variant: "info"
+            })
+          }
         />
       </div>
 

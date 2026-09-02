@@ -90,7 +90,9 @@ export type FacilityProviderOnboardingInput = {
   fullName: string;
   email?: string;
   phone?: string;
+  gender?: string | null;
   serviceIds: string[];
+  telemedicineSubcategoryIds?: string[];
   invitationChannel?: "email" | "sms";
   compensation: ProviderCompensationInput;
   providerFinancialsVisible: boolean | null;
@@ -130,7 +132,9 @@ export type FacilityProviderUpdateInput = {
   fullName?: string;
   email?: string | null;
   phone?: string | null;
+  gender?: string | null;
   serviceIds?: string[];
+  telemedicineSubcategoryIds?: string[];
   providerFinancialsVisible?: boolean | null;
   compensation?: ProviderCompensationInput;
 };
@@ -237,7 +241,7 @@ export const facilityServiceUpdatePayload = (input: Partial<FacilityServiceInput
 };
 
 export const providerCompensationPayload = (input: ProviderCompensationInput): Record<string, unknown> => ({
-  mode: input.mode,
+  compensation_mode: input.mode,
   fixed_payout_cents: input.fixedPayoutCents,
   payout_percentage: input.payoutPercentage
 });
@@ -502,7 +506,11 @@ export const updateFacilityProvider = async (
     ...(input.fullName !== undefined ? { full_name: input.fullName } : {}),
     ...(input.email !== undefined ? { email: input.email } : {}),
     ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    ...(input.gender !== undefined ? { gender: input.gender } : {}),
     ...(input.serviceIds !== undefined ? { service_ids: input.serviceIds } : {}),
+    ...(input.telemedicineSubcategoryIds !== undefined
+      ? { telemedicine_subcategory_ids: input.telemedicineSubcategoryIds }
+      : {}),
     ...(input.providerFinancialsVisible !== undefined
       ? { provider_financials_visible: input.providerFinancialsVisible }
       : {}),
@@ -580,7 +588,11 @@ export const createFacilityProvider = async (
     full_name: input.fullName,
     email: input.email,
     phone: input.phone,
+    ...(input.gender !== undefined ? { gender: input.gender } : {}),
     service_ids: input.serviceIds,
+    ...(input.telemedicineSubcategoryIds !== undefined
+      ? { telemedicine_subcategory_ids: input.telemedicineSubcategoryIds }
+      : {}),
     invitation_channel: input.invitationChannel,
     compensation_mode: input.compensation.mode,
     fixed_payout_cents: input.compensation.fixedPayoutCents,

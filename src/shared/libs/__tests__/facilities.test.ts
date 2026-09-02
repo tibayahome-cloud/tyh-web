@@ -226,7 +226,7 @@ describe("facility API helpers", () => {
     expect(mockPatch).toHaveBeenCalledWith(
       "/facilities/facility-1/providers/provider-user-1/compensation",
       {
-        mode: "percentage",
+        compensation_mode: "percentage",
         fixed_payout_cents: null,
         payout_percentage: 40
       }
@@ -294,7 +294,9 @@ describe("facility API helpers", () => {
     const result = await createFacilityProvider("facility-1", {
       fullName: "Provider One",
       email: "provider@example.com",
+      gender: "female",
       serviceIds: ["service-1"],
+      telemedicineSubcategoryIds: ["subcategory-1"],
       compensation: { mode: "percentage", fixedPayoutCents: null, payoutPercentage: 60 },
       providerFinancialsVisible: false
     });
@@ -303,7 +305,9 @@ describe("facility API helpers", () => {
       full_name: "Provider One",
       email: "provider@example.com",
       phone: undefined,
+      gender: "female",
       service_ids: ["service-1"],
+      telemedicine_subcategory_ids: ["subcategory-1"],
       invitation_channel: undefined,
       compensation_mode: "percentage",
       fixed_payout_cents: null,
@@ -329,7 +333,9 @@ describe("facility API helpers", () => {
       fullName: "Updated Provider",
       email: "updated@example.com",
       phone: "+254700000001",
+      gender: "male",
       serviceIds: ["service-2"],
+      telemedicineSubcategoryIds: ["subcategory-2"],
       providerFinancialsVisible: null,
       compensation: { mode: "fixed", fixedPayoutCents: 150000, payoutPercentage: null }
     });
@@ -338,9 +344,11 @@ describe("facility API helpers", () => {
       full_name: "Updated Provider",
       email: "updated@example.com",
       phone: "+254700000001",
+      gender: "male",
       service_ids: ["service-2"],
+      telemedicine_subcategory_ids: ["subcategory-2"],
       provider_financials_visible: null,
-      mode: "fixed",
+      compensation_mode: "fixed",
       fixed_payout_cents: 150000,
       payout_percentage: null
     });
@@ -464,7 +472,7 @@ describe("facility API helpers", () => {
     expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/providers/user-1/bootstrap", {
       services: ["service-1"],
       compensation: {
-        mode: "employee",
+        compensation_mode: "employee",
         fixed_payout_cents: null,
         payout_percentage: null
       }

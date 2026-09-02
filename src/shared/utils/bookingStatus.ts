@@ -25,7 +25,11 @@ const STATUS_THEMES: Record<
   disputed: { label: "Disputed", className: "bg-amber-200 text-amber-800" },
   // Telemedicine pre-service payment states (see BOOKING_STATUS_TELEMEDICINE_* on the backend).
   telemedicine_payment_pending: { label: "Awaiting Payment", className: "bg-amber-100 text-amber-700" },
-  telemedicine_paid_pending_assignment: { label: "Awaiting Provider", className: "bg-blue-100 text-blue-700" }
+  telemedicine_paid_pending_assignment: { label: "Awaiting Provider", className: "bg-blue-100 text-blue-700" },
+  telemedicine_unattended: { label: "Unattended - reschedule available", className: "bg-amber-100 text-amber-700" },
+  // Cancelled after payment: the linked telemedicine_cancellation_payment_review dispute is
+  // pending admin review, not proof a refund executed -- keep the label review-flavored.
+  telemedicine_cancelled_payment_review: { label: "Cancelled, Payment Under Review", className: "bg-amber-100 text-amber-700" }
 };
 
 // Telemedicine video-session lifecycle states (TelemedicineSession.status), a separate domain
