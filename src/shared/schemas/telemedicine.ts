@@ -22,7 +22,12 @@ export const TelemedicineHoldSchema = z.object({
   expiresAt: z.string(),
   remainingSeconds: z.number().int().nonnegative(),
   bookingId: z.string().nullable(),
-  bookingStatus: z.string().nullable()
+  bookingStatus: z.string().nullable(),
+  // Whether the server already has an outstanding payment attempt for this booking. Booking
+  // status stays payment_pending from before the M-Pesa prompt is sent until after it is
+  // approved, so it cannot answer this on its own -- and a reload during that window would
+  // otherwise offer "Confirm & pay" for a prompt that is already on the client's phone.
+  paymentPending: z.boolean()
 });
 
 export type TelemedicineHold = z.infer<typeof TelemedicineHoldSchema>;
@@ -47,7 +52,10 @@ export const mapTelemedicineHold = (payload: unknown): TelemedicineHold | null =
     expiresAt: coerceDate(raw.expires_at) ?? "",
     remainingSeconds: Math.max(0, Math.floor(coerceNumber(raw.remaining_seconds) ?? 0)),
     bookingId: coerceId(bookingRaw.id) || null,
-    bookingStatus: coerceString(bookingRaw.status)
+    bookingStatus: coerceString(bookingRaw.status),
+    // Absent on an older backend: treated as "no attempt outstanding", which is the
+    // pre-existing behaviour rather than a new failure mode.
+    paymentPending: bookingRaw.payment_pending === true
   };
   const result = TelemedicineHoldSchema.safeParse(normalized);
   if (!result.success) {
