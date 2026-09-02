@@ -75,6 +75,8 @@ describe("homepage calls to action", () => {
 
   describe("when the visitor is signed in", () => {
     it.each([
+      "Talk to a Doctor",
+      "Find a Specialist",
       "Book Home Care",
       "Get Ambulance",
       "View Detailed Care Packages"
@@ -117,5 +119,18 @@ describe("homepage calls to action", () => {
       expect(screen.getByText(LOGIN_PAGE)).toBeInTheDocument();
       expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
     });
+
+    it.each(["Talk to a Doctor", "Find a Specialist", "Video Doctor Consultation"])(
+      "sends %s to login when the visitor is signed out",
+      async (label) => {
+        const user = userEvent.setup();
+        renderHome({ isAuthenticated: false });
+
+        await user.click(screen.getAllByRole("button", { name: new RegExp(label, "i") })[0]);
+
+        expect(screen.getByText(LOGIN_PAGE)).toBeInTheDocument();
+        expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
+      }
+    );
   });
 });

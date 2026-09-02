@@ -17,14 +17,15 @@ import {
     Shield,
     Video,
     Stethoscope,
-    CalendarClock
+    CalendarClock,
+    Search,
+    House
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
 import { useAuth } from "../../../shared/hooks/useAuth";
 
 // Assets
-import heroImage from "../../../assets/images/hero-home.png";
 import appMockup from "../../../assets/images/app-showcase.png";
 import ambulanceImage from "../../../assets/images/service-ambulance.png";
 import doctorImage from "../../../assets/images/service-doctor.png";
@@ -33,6 +34,7 @@ import therapyImage from "../../../assets/images/service-therapy.png";
 import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
 import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
+import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -114,29 +116,54 @@ export const Home = () => {
                             transition={{ duration: 0.6 }}
                             className="flex-1 max-w-2xl"
                         >
-                            <h1 className="leading-tight mb-6">
-                                Care That Comes to You
+                            <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-tiba-gold/40 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-tiba-gold">
+                                <HeartPulse className="h-4 w-4" />
+                                Divine care @ home
+                            </span>
+                            <h1 className="mb-6 text-5xl leading-[1.05] md:text-6xl">
+                                Your Healthcare. One Click Away.
                             </h1>
-                            <p className="text-lg md:text-xl text-slate-700 mb-10 leading-relaxed">
-                                Professional medical care, nursing, therapy, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> – delivered to your home with dignity, safety, and compassion.
+                            <p className="mb-8 max-w-xl text-lg leading-relaxed text-slate-700">
+                                From a doctor on video to a specialist at your fingertips, and professional care delivered to your home. Tiba Ya Home connects you to doctors, specialists, nurses, therapists, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> whenever and wherever you need them.
                             </p>
 
-                            <div className="flex flex-wrap gap-4 mb-10">
+                            <div className="grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
                                 <button
-                                    onClick={handleServiceClick}
-                                    className="btn-primary"
+                                    onClick={handleTelemedicineClick}
+                                    className="btn-primary inline-flex items-center justify-center gap-2"
                                 >
-                                    Book Home Care
+                                    <Video className="w-5 h-5" />
+                                    <span>Talk to a Doctor</span>
                                 </button>
                                 <button
                                     onClick={handleServiceClick}
-                                    className="btn-secondary"
+                                    className="btn-secondary inline-flex items-center justify-center gap-2"
                                 >
+                                    <House className="w-5 h-5" />
+                                    Book Home Care
+                                </button>
+                                <button
+                                    onClick={handleTelemedicineClick}
+                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-tiba-blue px-5 py-3 font-semibold text-tiba-blue transition-colors hover:bg-tiba-blue/5"
+                                >
+                                    <Search className="w-5 h-5" />
+                                    Find a Specialist
+                                </button>
+                                <button
+                                    onClick={handleServiceClick}
+                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-tiba-gold px-5 py-3 font-semibold text-tiba-gold transition-colors hover:bg-tiba-gold/10"
+                                >
+                                    <Siren className="w-5 h-5" />
                                     Get Ambulance
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <p className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-600">
+                                <Video className="h-4 w-4 text-tiba-blue" />
+                                Secure video consultations from wherever you are.
+                            </p>
+
+                            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 {[
                                     { icon: ShieldCheck, text: "Licensed Professionals" },
                                     { icon: Zap, text: "Real-Time Tracking" },
@@ -156,14 +183,27 @@ export const Home = () => {
                             initial={{ opacity: 0, scale: 0.9 }}
                             whileInView={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.8 }}
-                            className="flex-1 relative"
+                            className="relative flex-1"
                         >
                             <img
-                                src={heroImage}
-                                alt="Care at home"
-                                className="w-full h-auto rounded-3xl shadow-2xl relative z-10"
+                                src={doctorImage}
+                                alt="A doctor speaking with a patient during a remote consultation"
+                                className="relative z-10 aspect-[4/5] w-full rounded-3xl object-cover shadow-2xl lg:aspect-square"
                             />
-                            <div className="absolute -bottom-6 -right-6 w-full h-full bg-tiba-gold/10 rounded-3xl -z-10" />
+                            <div className="absolute -bottom-6 -right-6 z-0 h-full w-full rounded-3xl bg-tiba-blue/10" />
+                            <button
+                                onClick={handleTelemedicineClick}
+                                className="absolute bottom-6 left-6 z-20 flex max-w-[calc(100%-3rem)] items-center gap-3 rounded-2xl bg-tiba-blue px-4 py-3 text-left text-white shadow-xl transition hover:bg-tiba-blue/90"
+                            >
+                                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/15">
+                                    <Video className="h-5 w-5" />
+                                </span>
+                                <span>
+                                    <span className="block font-bold">Video Doctor Consultation</span>
+                                    <span className="block text-sm text-blue-100">Talk to a qualified doctor online.</span>
+                                </span>
+                                <ArrowRight className="h-5 w-5 flex-shrink-0" />
+                            </button>
                         </motion.div>
                     </div>
                 </div>
@@ -221,8 +261,8 @@ export const Home = () => {
                             className="flex-1 relative w-full"
                         >
                             <img
-                                src={doctorImage}
-                                alt="A doctor speaking with a patient during a remote consultation"
+                                src={telemedicineImage}
+                                alt="A doctor speaking with a patient during a video consultation"
                                 className="w-full rounded-3xl shadow-lg object-cover aspect-[4/5] lg:aspect-square"
                             />
                             <div className="absolute -bottom-6 -left-6 w-full h-full bg-tiba-blue/10 rounded-3xl -z-10" />
@@ -317,19 +357,22 @@ export const Home = () => {
                 <div className="container mx-auto px-4 md:px-6">
                     <SectionHeader title="Our Services" />
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-8">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:gap-8 lg:grid-cols-12">
                         {[
-                            { name: "Doctor & Nurse Home Visits", img: doctorImage },
-                            { name: "Nursing & Long-Term Care", img: nursingImage },
-                            { name: "Therapy & Rehabilitation", img: therapyImage },
-                            { name: "Elderly & Assisted Living Care", img: elderlyImage },
-                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage },
-                            { name: "Lab Sample Collection", img: labSampleCollectionImage }
+                            { name: "Online Doctor Consultation", img: telemedicineImage, onClick: handleTelemedicineClick },
+                            { name: "Doctor & Nurse Home Visits", img: doctorImage, onClick: handleServiceClick },
+                            { name: "Nursing & Long-Term Care", img: nursingImage, onClick: handleServiceClick },
+                            { name: "Therapy & Rehabilitation", img: therapyImage, onClick: handleServiceClick },
+                            { name: "Elderly & Assisted Living Care", img: elderlyImage, onClick: handleServiceClick },
+                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage, onClick: handleServiceClick },
+                            { name: "Lab Sample Collection", img: labSampleCollectionImage, onClick: handleServiceClick }
                         ].map((service, i) => (
                             <button
                                 key={i}
-                                onClick={handleServiceClick}
-                                className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 text-left"
+                                onClick={service.onClick}
+                                className={`group col-span-1 h-full overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-all hover:shadow-xl sm:col-span-1 lg:col-span-3 ${
+                                    i === 4 ? "lg:col-start-2" : i === 5 ? "lg:col-start-5" : i === 6 ? "lg:col-start-8" : ""
+                                }`}
                             >
                                 <div className="aspect-square relative overflow-hidden bg-slate-100">
                                     <img
