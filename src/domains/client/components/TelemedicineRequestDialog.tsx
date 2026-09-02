@@ -296,7 +296,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         facilityId: selectedFacility.id,
         facilityServiceId: selectedFacility.facilityServiceId,
         startAt: slot.startAt,
-        idempotencyKey: `${selectedFacility.facilityServiceId}:${slot.startAt}`
+        // This key identifies one hold attempt, not the appointment slot forever. Reusing a
+        // slot-derived key would make a later selection return the same expired hold.
+        idempotencyKey: crypto.randomUUID()
       });
       queryClient.setQueryData(["telemedicine", "hold", newHold.id], newHold);
       setHoldId(newHold.id);
@@ -613,7 +615,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
             {holdExpired && !paymentConfirmed && (
               <div className="space-y-3">
-                <p className="text-sm text-danger-600">This hold expired. Pick a new time to continue.</p>
+                <p className="text-sm text-danger-600">
+                  Your payment reservation expired before it was completed. The appointment date has not passed; choose a new time to continue.
+                </p>
                 <Button type="button" onClick={resetToStart}>
                   Choose another slot
                 </Button>
