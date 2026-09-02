@@ -357,7 +357,7 @@ export const Home = () => {
                 <div className="container mx-auto px-4 md:px-6">
                     <SectionHeader title="Our Services" />
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-8">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:gap-8 lg:grid-cols-12">
                         {[
                             { name: "Online Doctor Consultation", img: telemedicineImage, onClick: handleTelemedicineClick },
                             { name: "Doctor & Nurse Home Visits", img: doctorImage, onClick: handleServiceClick },
@@ -370,7 +370,9 @@ export const Home = () => {
                             <button
                                 key={i}
                                 onClick={service.onClick}
-                                className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 text-left"
+                                className={`group col-span-1 h-full overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-all hover:shadow-xl sm:col-span-1 lg:col-span-3 ${
+                                    i === 4 ? "lg:col-start-2" : i === 5 ? "lg:col-start-5" : i === 6 ? "lg:col-start-8" : ""
+                                }`}
                             >
                                 <div className="aspect-square relative overflow-hidden bg-slate-100">
                                     <img
