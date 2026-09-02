@@ -120,7 +120,7 @@ describe("homepage calls to action", () => {
       expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
     });
 
-    it.each(["Talk to a Doctor", "Find a Specialist", "Talk to a Doctor Online"])(
+    it.each(["Talk to a Doctor", "Find a Specialist", "Video Doctor Consultation"])(
       "sends %s to login when the visitor is signed out",
       async (label) => {
         const user = userEvent.setup();
