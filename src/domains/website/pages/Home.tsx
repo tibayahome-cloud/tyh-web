@@ -107,33 +107,33 @@ export const Home = () => {
     return (
         <div className="bg-white overflow-hidden">
             {/* Hero Section */}
-            <section className="relative pt-16 pb-24 md:pt-24 md:pb-32 bg-slate-50">
+            <section className="relative py-8 md:py-12 bg-slate-50">
                 <div className="container mx-auto px-4 md:px-6">
-                    <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24">
+                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-10">
                         <motion.div
                             initial={{ opacity: 0, x: -50 }}
                             whileInView={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="flex-1 max-w-2xl"
+                            className="min-w-0 flex-1 max-w-2xl"
                         >
-                            <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-tiba-gold/40 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-tiba-gold">
+                            <span className="mb-5 hidden lg:inline-flex items-center gap-2 rounded-full border border-tiba-gold/40 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-tiba-gold">
                                 <HeartPulse className="h-4 w-4" />
                                 Divine care @ home
                             </span>
-                            <h1 className="mb-6 text-5xl leading-[1.05] md:text-6xl">
+                            <h1 className="mb-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
                                 Your Healthcare. One Click Away.
                             </h1>
-                            <p className="mb-8 max-w-xl text-lg leading-relaxed text-slate-700">
+                            <p className="mb-6 max-w-xl text-base leading-relaxed text-slate-700">
                                 From a doctor on video to a specialist at your fingertips, and professional care delivered to your home. Tiba Ya Home connects you to doctors, specialists, nurses, therapists, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> whenever and wherever you need them.
                             </p>
 
-                            <div className="grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="grid max-w-xl grid-cols-2 gap-3 [&>button]:px-3 [&>button]:text-sm [&>button>svg]:shrink-0">
                                 <button
                                     onClick={handleTelemedicineClick}
                                     className="btn-primary inline-flex items-center justify-center gap-2"
                                 >
                                     <Video className="w-5 h-5" />
-                                    <span>Talk to a Doctor</span>
+                                    <span>Talk to a Doctor Online</span>
                                 </button>
                                 <button
                                     onClick={handleServiceClick}
@@ -158,49 +158,44 @@ export const Home = () => {
                                 </button>
                             </div>
 
-                            <p className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-600">
-                                <Video className="h-4 w-4 text-tiba-blue" />
-                                Secure video consultations from wherever you are.
-                            </p>
-
-                            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3">
                                 {[
                                     { icon: ShieldCheck, text: "Licensed Professionals" },
                                     { icon: Zap, text: "Real-Time Tracking" },
                                     { icon: Clock, text: "Transparent Pricing" }
                                 ].map((item, i) => (
-                                    <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                                        <item.icon className="w-5 h-5 text-tiba-gold" />
+                                    <div key={i} className="flex items-center gap-2">
+                                        <item.icon className="w-5 h-5 shrink-0 text-tiba-gold" />
                                         <span className="text-sm font-medium text-slate-700">{item.text}</span>
                                     </div>
                                 ))}
                             </div>
 
-                            <p className="mt-8 text-tiba-gold font-medium italic">Divine care, wherever you are.</p>
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             whileInView={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.8 }}
-                            className="relative flex-1"
+                            className="relative order-first lg:order-none min-w-0 w-full flex-1"
                         >
                             <img
-                                src={doctorImage}
-                                alt="A doctor speaking with a patient during a remote consultation"
-                                className="relative z-10 aspect-[4/5] w-full rounded-3xl object-cover shadow-2xl lg:aspect-square"
+                                src={telemedicineImage}
+                                alt="A doctor on a headset consulting a patient visible on her laptop screen"
+                                width={1448}
+                                height={1086}
+                                className="w-full h-auto rounded-lg"
                             />
-                            <div className="absolute -bottom-6 -right-6 z-0 h-full w-full rounded-3xl bg-tiba-blue/10" />
                             <button
                                 onClick={handleTelemedicineClick}
-                                className="absolute bottom-6 left-6 z-20 flex max-w-[calc(100%-3rem)] items-center gap-3 rounded-2xl bg-tiba-blue px-4 py-3 text-left text-white shadow-xl transition hover:bg-tiba-blue/90"
+                                className="mt-3 hidden lg:flex w-full items-center gap-3 border-t border-slate-200 py-3 text-left text-tiba-blue transition hover:text-tiba-blue/80"
                             >
                                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/15">
                                     <Video className="h-5 w-5" />
                                 </span>
                                 <span>
                                     <span className="block font-bold">Video Doctor Consultation</span>
-                                    <span className="block text-sm text-blue-100">Talk to a qualified doctor online.</span>
+                                    <span className="block text-sm text-slate-600">Talk to a qualified doctor online.</span>
                                 </span>
                                 <ArrowRight className="h-5 w-5 flex-shrink-0" />
                             </button>
@@ -263,7 +258,10 @@ export const Home = () => {
                             <img
                                 src={telemedicineImage}
                                 alt="A doctor speaking with a patient during a video consultation"
-                                className="w-full rounded-3xl shadow-lg object-cover aspect-[4/5] lg:aspect-square"
+                                loading="lazy"
+                                width={1448}
+                                height={1086}
+                                className="w-full h-auto rounded-lg"
                             />
                             <div className="absolute -bottom-6 -left-6 w-full h-full bg-tiba-blue/10 rounded-3xl -z-10" />
                         </motion.div>
