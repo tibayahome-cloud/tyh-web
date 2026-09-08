@@ -56,7 +56,7 @@ export const WebsiteFooter = () => {
                             </li>
                             <li className="flex items-center gap-4">
                                 <Mail className="w-6 h-6 text-tiba-gold flex-shrink-0" />
-                                <a href="mailto:clientscare@tibayahome.co.ke" className="hover:text-tiba-gold">clientscare@tibayahome.co.ke</a>
+                                <a href="mailto:clientscare@tibayahome.co.ke" className="min-w-0 break-words hover:text-tiba-gold">clientscare@tibayahome.co.ke</a>
                             </li>
                         </ul>
 
