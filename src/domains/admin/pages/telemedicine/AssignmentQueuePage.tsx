@@ -16,7 +16,11 @@ import {
   useTelemedicinePolicy
 } from "../../../../shared/hooks/useTelemedicine";
 import { useBookingList } from "../../../../shared/hooks/useBookings";
-import { formatTelemedicineDateTime, splitTelemedicineBookings } from "../../../../shared/utils/telemedicine";
+import {
+  facilityLocalToUtcIso,
+  formatTelemedicineDateTime,
+  splitTelemedicineBookings
+} from "../../../../shared/utils/telemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../../shared/utils/bookingStatus";
 import { PreferenceSummary } from "../../components/PreferenceSummary";
 import { classifyApiError, type ClassifiedApiError } from "../../../../shared/utils/errors";
@@ -77,13 +81,17 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
   const proposeMutation = useProposeRebookingMutation();
 
   const handleOffer = async () => {
-    if (!proposedStartAt) return;
+    if (!proposedStartAt || !timezone) return;
     setOfferError(null);
+    // datetime-local carries no zone. Resolving it against the browser's would be right only
+    // for an operator who happens to be in the facility's timezone, and silently wrong -- with
+    // no error to notice -- for one who is not. The zone comes from the telemedicine policy.
+    const isoWithZone = facilityLocalToUtcIso(proposedStartAt, timezone);
+    if (!isoWithZone) {
+      setOfferError({ category: "bad_request", message: "That is not a valid date and time." });
+      return;
+    }
     try {
-      // datetime-local has no zone. The operator is picking a wall-clock time in their own
-      // browser, which is the facility's, so let the runtime attach the offset rather than
-      // inventing one -- sending a naive string would be read as UTC by the API.
-      const isoWithZone = new Date(proposedStartAt).toISOString();
       await proposeMutation.mutateAsync({ bookingId: booking.id, proposedStartAt: isoWithZone });
       toast.showToast({ title: "New time offered to the client", variant: "success" });
     } catch (error) {
@@ -101,12 +109,21 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
           aria-label={`Choose a replacement time for ${booking.serviceName ?? "consultation"} with ${booking.clientFullName ?? "client"}`}
           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
         />
-        <Button size="sm" disabled={!proposedStartAt} loading={proposeMutation.isPending} onClick={handleOffer}>
+        <Button
+          size="sm"
+          // Held back until the policy resolves rather than falling back to the browser's zone:
+          // a guessed timezone books a real appointment at the wrong hour.
+          disabled={!proposedStartAt || !timezone}
+          loading={proposeMutation.isPending}
+          onClick={handleOffer}
+        >
           Offer new time
         </Button>
       </div>
       <p className="text-[11px] text-slate-500 sm:text-right">
-        The client is asked to accept. No new payment is taken.
+        {timezone
+          ? `Times are in the facility's timezone (${timezone}). The client is asked to accept, and is not charged again.`
+          : "Loading the facility's timezone…"}
       </p>
       {offerError && <ApiErrorBanner category={offerError.category} message={offerError.message} />}
     </div>
