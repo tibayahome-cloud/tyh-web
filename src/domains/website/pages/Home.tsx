@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
     ArrowRight,
@@ -21,7 +20,7 @@ import {
     Search,
     House
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
 import { useAuth } from "../../../shared/hooks/useAuth";
 
@@ -48,8 +47,6 @@ export const Home = () => {
     const { data: services, isLoading } = useServices({ active: true });
     const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
-    const [showAppTooltip, setShowAppTooltip] = useState(false);
-
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (isAuthenticated) {
@@ -291,30 +288,15 @@ export const Home = () => {
                                 />
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-tiba-blue/5 rounded-full blur-3xl -z-10" />
 
-                                {/* Tooltip implementation */}
-                                <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 z-20 w-48">
-                                    <button
-                                        onClick={() => {
-                                            setShowAppTooltip(true);
-                                            setTimeout(() => setShowAppTooltip(false), 3000);
-                                        }}
-                                        className="w-[180px] h-12 rounded-lg"
-                                        aria-label="Download App"
-                                    />
-                                    <AnimatePresence>
-                                        {showAppTooltip && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: 10 }}
-                                                className="absolute -top-12 left-1/2 -translate-x-1/2 bg-tiba-gold text-white px-4 py-2 rounded-lg text-sm font-bold shadow-xl whitespace-nowrap"
-                                            >
-                                                Coming soon!
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-tiba-gold" />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                <a
+                                    href="https://play.google.com/store/apps/details?id=co.median.android.eekzzbo"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="absolute bottom-[20%] left-1/2 z-20 flex h-12 w-[180px] -translate-x-1/2 items-center justify-center rounded-lg bg-tiba-blue/90 px-4 text-center text-sm font-bold text-white shadow-lg transition hover:bg-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-gold focus:ring-offset-2"
+                                    aria-label="Get the Tiba Ya Home app on Google Play"
+                                >
+                                    Get it on Google Play
+                                </a>
                             </div>
                         </motion.div>
 
@@ -343,12 +325,12 @@ export const Home = () => {
                             </ul>
 
                             <a
-                                href="https://median.co/share/eekzzbo#apk"
+                                href="https://play.google.com/store/apps/details?id=co.median.android.eekzzbo"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="btn-secondary"
                             >
-                                Download App <ArrowRight className="w-4 h-4" />
+                                Get it on Google Play <ArrowRight className="w-4 h-4" />
                             </a>
                         </div>
                     </div>
