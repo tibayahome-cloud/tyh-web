@@ -25,7 +25,7 @@ import { useServices } from "../../../shared/hooks/useServices";
 import { useAuth } from "../../../shared/hooks/useAuth";
 
 // Assets
-import appMockup from "../../../assets/images/app-showcase.png";
+import appMockup from "../../../assets/images/app-showcase.webp";
 import ambulanceImage from "../../../assets/images/service-ambulance.png";
 import doctorImage from "../../../assets/images/service-doctor.png";
 import nursingImage from "../../../assets/images/nursing.png";
@@ -305,15 +305,17 @@ export const Home = () => {
                                 COMING SOON
                             </div> */}
                             <h2 className="mb-2">The Tiba Ya Home App</h2>
-                            <h3 className="text-slate-800 mb-8">Care at Your Fingertips</h3>
+                            <h3 className="text-slate-800 mb-4">One app for your care</h3>
+                            <p className="mb-8 max-w-xl text-lg leading-relaxed text-slate-600">
+                                Connect with a doctor online, arrange trusted care at home, request urgent help, and manage your appointments in one place.
+                            </p>
 
                             <ul className="space-y-4 mb-10">
                                 {[
-                                    "Book doctor, nurse, therapy, and home care services",
-                                    "Request an ambulance instantly",
-                                    "Track their arrival in real time",
-                                    "Monitor your bookings and visit history",
-                                    "View ratings & reviews of care providers"
+                                    "Talk to a doctor through a secure video consultation",
+                                    "Book doctors, nurses, therapists, and other home care",
+                                    "Request urgent support when you need it",
+                                    "Track bookings, visits, and care history"
                                 ].map((feature, i) => (
                                     <li key={i} className="flex items-start gap-4">
                                         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-tiba-blue/5 flex items-center justify-center mt-1">
