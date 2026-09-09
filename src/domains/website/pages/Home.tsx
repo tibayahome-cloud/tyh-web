@@ -35,6 +35,7 @@ import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
 import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
+import telemedicineHeroImage from "../../../assets/images/telemedicine-hero.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -261,9 +262,11 @@ export const Home = () => {
                             className="flex-1 relative w-full"
                         >
                             <img
-                                src={telemedicineImage}
-                                alt="A doctor speaking with a patient during a video consultation"
-                                className="w-full rounded-3xl shadow-lg object-cover aspect-[4/5] lg:aspect-square"
+                                src={telemedicineHeroImage}
+                                alt="A clinician speaking with a patient during a video consultation"
+                                width={1536}
+                                height={1024}
+                                className="block aspect-[3/2] w-full rounded-3xl object-cover object-center shadow-lg"
                             />
                             <div className="absolute -bottom-6 -left-6 w-full h-full bg-tiba-blue/10 rounded-3xl -z-10" />
                         </motion.div>
@@ -374,11 +377,11 @@ export const Home = () => {
                                     i === 4 ? "lg:col-start-2" : i === 5 ? "lg:col-start-5" : i === 6 ? "lg:col-start-8" : ""
                                 }`}
                             >
-                                <div className="aspect-square relative overflow-hidden bg-slate-100">
+                                <div className="relative aspect-[3/2] overflow-hidden bg-slate-100">
                                     <img
                                         src={service.img}
                                         alt={service.name}
-                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                        className="h-full w-full object-contain transition-transform duration-500"
                                     />
                                     <div className="absolute inset-0 bg-tiba-blue/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
