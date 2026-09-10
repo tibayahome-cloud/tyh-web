@@ -1,5 +1,5 @@
-import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { useWalletAccount } from "../../../shared/hooks/useWallet";
+import { Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { useProviderEarningsSummary } from "../../../shared/hooks/useWallet";
 import { useMemo } from "react";
 
 const formatPrice = (amountCents?: number, currency = "KES") => {
@@ -12,45 +12,20 @@ type RevenueSnapshotProps = {
 };
 
 export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotProps) => {
-    const { data: wallet, isLoading } = useWalletAccount({ enabled: financialsVisible });
+    const { data: earnings, isLoading } = useProviderEarningsSummary({ enabled: financialsVisible });
 
     const metrics = useMemo(() => {
-        if (!wallet) return null;
-
-        // Simulate some trend data since backend doesn't provide it yet
-        // In a real app, we'd calculate this from transactions
-        const transactions = wallet.transactions || [];
-        const recentEarnings = transactions
-            .filter(t => t.transactionType === "earning" || t.transactionType === "booking_payment")
-            .reduce((acc, t) => acc + t.amountCents, 0);
+        if (!earnings) return null;
 
         return {
-            balance: wallet.balanceCents,
-            pending: wallet.pendingWithdrawalCents,
-            growth: 12.5, // Mocked for UI polish
-            recent: recentEarnings,
-            currency: wallet.currency
+            balance: earnings.availableBalanceCents,
+            pending: earnings.pendingEarningsCents,
+            paidOut: earnings.paidOutTotalCents,
+            currency: earnings.currency
         };
-    }, [wallet]);
+    }, [earnings]);
 
-    if (!financialsVisible) {
-        return (
-            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                        <Wallet className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Payouts</p>
-                        <h2 className="mt-1 text-lg font-bold text-slate-900">Facility-managed</h2>
-                        <p className="mt-2 text-xs leading-5 text-slate-500">
-                            Your facility manages service pricing, payouts, and settlement details.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    if (!financialsVisible) return null;
 
     if (isLoading) {
         return (
@@ -60,45 +35,37 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
 
     return (
         <div className="group relative overflow-hidden rounded-[40px] border border-white/80 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 transition-all hover:bg-white/60">
-            <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all group-hover:bg-emerald-500/20" />
-
             <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-200">
                         <Wallet className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Current Balance</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Available to withdraw</p>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-900">
                             {formatPrice(metrics?.balance, metrics?.currency)}
                         </h2>
                     </div>
                 </div>
 
-                <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600 ring-1 ring-emerald-500/10">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        +{metrics?.growth}%
-                    </div>
-                    <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Revenue Velocity</p>
-                </div>
+                <p className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">Wallet summary</p>
             </div>
 
             <div className="mt-8 grid grid-cols-2 gap-4 border-t border-slate-100 pt-6">
                 <div className="flex flex-col">
                     <div className="flex items-center gap-1.5 text-slate-400">
                         <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Recent Gross</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Paid out</span>
                     </div>
                     <p className="mt-1 text-sm font-bold text-slate-900">
-                        {formatPrice(metrics?.recent, metrics?.currency)}
+                        {formatPrice(metrics?.paidOut, metrics?.currency)}
                     </p>
                 </div>
 
                 <div className="flex flex-col">
                     <div className="flex items-center gap-1.5 text-slate-400">
                         <ArrowDownRight className="h-4 w-4 text-amber-500" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">In Transit</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Pending earnings</span>
                     </div>
                     <p className="mt-1 text-sm font-bold text-slate-900">
                         {formatPrice(metrics?.pending, metrics?.currency)}

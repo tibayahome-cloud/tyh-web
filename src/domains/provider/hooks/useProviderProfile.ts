@@ -59,7 +59,7 @@ export const useProviderProfile = (userId: string | undefined) => {
 };
 
 export const providerFinancialsAreVisible = (profile: ProviderProfile | null | undefined): boolean =>
-  profile?.facility?.provider_financials_visible !== false;
+  profile?.compensation_mode !== "employee" && profile?.facility?.provider_financials_visible !== false;
 
 export const useUpdateProviderHomeLocation = (userId: string | undefined) => {
   const queryClient = useQueryClient();

@@ -28,7 +28,7 @@ import {
   updateFacilityStatus
 } from "../../../../shared/libs/facilities";
 import type { Facility, FacilityCreateInput, FacilityStatus } from "../../../../shared/schemas/facility";
-import { FACILITY_TYPES, WEEKDAYS, formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
+import { FACILITY_TYPES, HOSPITAL_LEVELS, WEEKDAYS, formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import LocationPickerMap from "../../../../shared/components/LocationPickerMap";
 import { SUPPORTED_COUNTRIES } from "../../../../shared/constants/region";
@@ -36,6 +36,7 @@ import { SUPPORTED_COUNTRIES } from "../../../../shared/constants/region";
 type CreateFormState = {
   name: string;
   facilityType: FacilityCreateInput["facilityType"];
+  hospitalLevel: string;
   address: string;
   county: string;
   countryCode: string;
@@ -63,6 +64,7 @@ type AdminDialogState = {
 const initialFormState: CreateFormState = {
   name: "",
   facilityType: "hospital",
+  hospitalLevel: "",
   address: "",
   county: "",
   countryCode: "",
@@ -118,6 +120,7 @@ const buildOperatingHours = (form: CreateFormState): FacilityCreateInput["operat
 export const buildFacilityCreateInput = (form: CreateFormState): FacilityCreateInput => ({
   name: form.name.trim(),
   facilityType: form.facilityType,
+  hospitalLevel: form.facilityType === "hospital" ? Number(form.hospitalLevel) : null,
   address: form.address.trim(),
   county: form.county.trim(),
   countryCode: form.countryCode || null,
@@ -139,6 +142,9 @@ export const validateCreateForm = (form: CreateFormState): string | null => {
   }
   if (!form.initialAdminEmail.trim()) {
     return "Initial admin email is required.";
+  }
+  if (form.facilityType === "hospital" && !HOSPITAL_LEVELS.includes(Number(form.hospitalLevel) as (typeof HOSPITAL_LEVELS)[number])) {
+    return "Select a hospital level from Level 1 to Level 6.";
   }
   if (!form.is24Hours && (!form.openTime || !form.closeTime)) {
     return "Opening and closing time are required unless the facility is 24/7.";
@@ -190,7 +196,9 @@ const FacilityCard = ({
               {formatLabel(facility.status)}
             </span>
           </div>
-          <p className="mt-1 text-sm text-slate-600">{formatLabel(facility.facilityType)} in {facility.county}</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {formatLabel(facility.facilityType)}{facility.hospitalLevel ? ` · Level ${facility.hospitalLevel}` : ""} in {facility.county}
+          </p>
           <p className="mt-1 text-sm text-slate-500">{facility.address}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -557,6 +565,22 @@ const FacilityManagementPage = () => {
                 ))}
               </select>
             </label>
+            {form.facilityType === "hospital" && (
+              <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
+                <span>Hospital level</span>
+                <select
+                  required
+                  value={form.hospitalLevel}
+                  onChange={(event) => updateForm("hospitalLevel", event.target.value)}
+                  className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+                >
+                  <option value="">Select level</option>
+                  {HOSPITAL_LEVELS.map((level) => (
+                    <option key={level} value={level}>Level {level}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <Input label="County" value={form.county} onChange={(event) => updateForm("county", event.target.value)} />
             <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
               <span>Country</span>

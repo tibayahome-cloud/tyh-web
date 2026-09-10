@@ -56,7 +56,7 @@ export const WebsiteFooter = () => {
                             </li>
                             <li className="flex items-center gap-4">
                                 <Mail className="w-6 h-6 text-tiba-gold flex-shrink-0" />
-                                <a href="mailto:clientscare@tibayahome.co.ke" className="hover:text-tiba-gold">clientscare@tibayahome.co.ke</a>
+                                <a href="mailto:clientscare@tibayahome.co.ke" className="min-w-0 break-words hover:text-tiba-gold">clientscare@tibayahome.co.ke</a>
                             </li>
                         </ul>
 
@@ -65,12 +65,12 @@ export const WebsiteFooter = () => {
                                 <h5 className="text-white font-bold mb-1">Download App</h5>
                                 <p className="text-sm text-slate-400">Book faster on the go.</p>
                                 <a
-                                    href="https://median.co/share/eekzzbo#apk"
+                                    href="https://play.google.com/store/apps/details?id=co.median.android.eekzzbo"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-2 text-tiba-gold text-sm font-bold mt-3 group-hover:gap-3 transition-all"
                                 >
-                                    Get App <ArrowRight className="w-4 h-4" />
+                                    Get it on Google Play <ArrowRight className="w-4 h-4" />
                                 </a>
                             </div>
                         </div>

@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
     ArrowRight,
@@ -21,12 +20,12 @@ import {
     Search,
     House
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
 import { useAuth } from "../../../shared/hooks/useAuth";
 
 // Assets
-import appMockup from "../../../assets/images/app-showcase.png";
+import appMockup from "../../../assets/images/app-showcase.webp";
 import ambulanceImage from "../../../assets/images/service-ambulance.png";
 import doctorImage from "../../../assets/images/service-doctor.png";
 import nursingImage from "../../../assets/images/nursing.png";
@@ -35,6 +34,7 @@ import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
 import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
+import telemedicineHeroImage from "../../../assets/images/telemedicine-hero.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -47,8 +47,6 @@ export const Home = () => {
     const { data: services, isLoading } = useServices({ active: true });
     const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
-    const [showAppTooltip, setShowAppTooltip] = useState(false);
-
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (isAuthenticated) {
@@ -107,33 +105,33 @@ export const Home = () => {
     return (
         <div className="bg-white overflow-hidden">
             {/* Hero Section */}
-            <section className="relative pt-16 pb-24 md:pt-24 md:pb-32 bg-slate-50">
+            <section className="relative py-8 md:py-12 bg-slate-50">
                 <div className="container mx-auto px-4 md:px-6">
-                    <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24">
+                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-10">
                         <motion.div
                             initial={{ opacity: 0, x: -50 }}
                             whileInView={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="flex-1 max-w-2xl"
+                            className="min-w-0 flex-1 max-w-2xl"
                         >
-                            <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-tiba-gold/40 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-tiba-gold">
+                            <span className="mb-5 hidden lg:inline-flex items-center gap-2 rounded-full border border-tiba-gold/40 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-tiba-gold">
                                 <HeartPulse className="h-4 w-4" />
                                 Divine care @ home
                             </span>
-                            <h1 className="mb-6 text-5xl leading-[1.05] md:text-6xl">
+                            <h1 className="mb-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
                                 Your Healthcare. One Click Away.
                             </h1>
-                            <p className="mb-8 max-w-xl text-lg leading-relaxed text-slate-700">
+                            <p className="mb-6 max-w-xl text-base leading-relaxed text-slate-700">
                                 From a doctor on video to a specialist at your fingertips, and professional care delivered to your home. Tiba Ya Home connects you to doctors, specialists, nurses, therapists, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> whenever and wherever you need them.
                             </p>
 
-                            <div className="grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="grid max-w-xl grid-cols-2 gap-3 [&>button]:px-3 [&>button]:text-sm [&>button>svg]:shrink-0">
                                 <button
                                     onClick={handleTelemedicineClick}
                                     className="btn-primary inline-flex items-center justify-center gap-2"
                                 >
                                     <Video className="w-5 h-5" />
-                                    <span>Talk to a Doctor</span>
+                                    <span>Talk to a Doctor Online</span>
                                 </button>
                                 <button
                                     onClick={handleServiceClick}
@@ -158,49 +156,44 @@ export const Home = () => {
                                 </button>
                             </div>
 
-                            <p className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-600">
-                                <Video className="h-4 w-4 text-tiba-blue" />
-                                Secure video consultations from wherever you are.
-                            </p>
-
-                            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3">
                                 {[
                                     { icon: ShieldCheck, text: "Licensed Professionals" },
                                     { icon: Zap, text: "Real-Time Tracking" },
                                     { icon: Clock, text: "Transparent Pricing" }
                                 ].map((item, i) => (
-                                    <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                                        <item.icon className="w-5 h-5 text-tiba-gold" />
+                                    <div key={i} className="flex items-center gap-2">
+                                        <item.icon className="w-5 h-5 shrink-0 text-tiba-gold" />
                                         <span className="text-sm font-medium text-slate-700">{item.text}</span>
                                     </div>
                                 ))}
                             </div>
 
-                            <p className="mt-8 text-tiba-gold font-medium italic">Divine care, wherever you are.</p>
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             whileInView={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.8 }}
-                            className="relative flex-1"
+                            className="relative order-first lg:order-none min-w-0 w-full flex-1"
                         >
                             <img
-                                src={doctorImage}
-                                alt="A doctor speaking with a patient during a remote consultation"
-                                className="relative z-10 aspect-[4/5] w-full rounded-3xl object-cover shadow-2xl lg:aspect-square"
+                                src={telemedicineImage}
+                                alt="A doctor on a headset consulting a patient visible on her laptop screen"
+                                width={1448}
+                                height={1086}
+                                className="w-full h-auto rounded-lg"
                             />
-                            <div className="absolute -bottom-6 -right-6 z-0 h-full w-full rounded-3xl bg-tiba-blue/10" />
                             <button
                                 onClick={handleTelemedicineClick}
-                                className="absolute bottom-6 left-6 z-20 flex max-w-[calc(100%-3rem)] items-center gap-3 rounded-2xl bg-tiba-blue px-4 py-3 text-left text-white shadow-xl transition hover:bg-tiba-blue/90"
+                                className="mt-3 hidden lg:flex w-full items-center gap-3 border-t border-slate-200 py-3 text-left text-tiba-blue transition hover:text-tiba-blue/80"
                             >
                                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/15">
                                     <Video className="h-5 w-5" />
                                 </span>
                                 <span>
                                     <span className="block font-bold">Video Doctor Consultation</span>
-                                    <span className="block text-sm text-blue-100">Talk to a qualified doctor online.</span>
+                                    <span className="block text-sm text-slate-600">Talk to a qualified doctor online.</span>
                                 </span>
                                 <ArrowRight className="h-5 w-5 flex-shrink-0" />
                             </button>
@@ -261,9 +254,11 @@ export const Home = () => {
                             className="flex-1 relative w-full"
                         >
                             <img
-                                src={telemedicineImage}
-                                alt="A doctor speaking with a patient during a video consultation"
-                                className="w-full rounded-3xl shadow-lg object-cover aspect-[4/5] lg:aspect-square"
+                                src={telemedicineHeroImage}
+                                alt="A clinician speaking with a patient during a video consultation"
+                                width={1536}
+                                height={1024}
+                                className="block aspect-[3/2] w-full rounded-3xl object-cover object-center shadow-lg"
                             />
                             <div className="absolute -bottom-6 -left-6 w-full h-full bg-tiba-blue/10 rounded-3xl -z-10" />
                         </motion.div>
@@ -288,30 +283,15 @@ export const Home = () => {
                                 />
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-tiba-blue/5 rounded-full blur-3xl -z-10" />
 
-                                {/* Tooltip implementation */}
-                                <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 z-20 w-48">
-                                    <button
-                                        onClick={() => {
-                                            setShowAppTooltip(true);
-                                            setTimeout(() => setShowAppTooltip(false), 3000);
-                                        }}
-                                        className="w-[180px] h-12 rounded-lg"
-                                        aria-label="Download App"
-                                    />
-                                    <AnimatePresence>
-                                        {showAppTooltip && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: 10 }}
-                                                className="absolute -top-12 left-1/2 -translate-x-1/2 bg-tiba-gold text-white px-4 py-2 rounded-lg text-sm font-bold shadow-xl whitespace-nowrap"
-                                            >
-                                                Coming soon!
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-tiba-gold" />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                <a
+                                    href="https://play.google.com/store/apps/details?id=co.median.android.eekzzbo"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="absolute bottom-[20%] left-1/2 z-20 flex h-12 w-[180px] -translate-x-1/2 items-center justify-center rounded-lg bg-tiba-blue/90 px-4 text-center text-sm font-bold text-white shadow-lg transition hover:bg-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-gold focus:ring-offset-2"
+                                    aria-label="Get the Tiba Ya Home app on Google Play"
+                                >
+                                    Get it on Google Play
+                                </a>
                             </div>
                         </motion.div>
 
@@ -320,15 +300,17 @@ export const Home = () => {
                                 COMING SOON
                             </div> */}
                             <h2 className="mb-2">The Tiba Ya Home App</h2>
-                            <h3 className="text-slate-800 mb-8">Care at Your Fingertips</h3>
+                            <h3 className="text-slate-800 mb-4">One app for your care</h3>
+                            <p className="mb-8 max-w-xl text-lg leading-relaxed text-slate-600">
+                                Connect with a doctor online, arrange trusted care at home, request urgent help, and manage your appointments in one place.
+                            </p>
 
                             <ul className="space-y-4 mb-10">
                                 {[
-                                    "Book doctor, nurse, therapy, and home care services",
-                                    "Request an ambulance instantly",
-                                    "Track their arrival in real time",
-                                    "Monitor your bookings and visit history",
-                                    "View ratings & reviews of care providers"
+                                    "Talk to a doctor through a secure video consultation",
+                                    "Book doctors, nurses, therapists, and other home care",
+                                    "Request urgent support when you need it",
+                                    "Track bookings, visits, and care history"
                                 ].map((feature, i) => (
                                     <li key={i} className="flex items-start gap-4">
                                         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-tiba-blue/5 flex items-center justify-center mt-1">
@@ -340,12 +322,12 @@ export const Home = () => {
                             </ul>
 
                             <a
-                                href="https://median.co/share/eekzzbo#apk"
+                                href="https://play.google.com/store/apps/details?id=co.median.android.eekzzbo"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="btn-secondary"
                             >
-                                Download App <ArrowRight className="w-4 h-4" />
+                                Get it on Google Play <ArrowRight className="w-4 h-4" />
                             </a>
                         </div>
                     </div>
@@ -374,11 +356,11 @@ export const Home = () => {
                                     i === 4 ? "lg:col-start-2" : i === 5 ? "lg:col-start-5" : i === 6 ? "lg:col-start-8" : ""
                                 }`}
                             >
-                                <div className="aspect-square relative overflow-hidden bg-slate-100">
+                                <div className="relative aspect-[3/2] overflow-hidden bg-slate-100">
                                     <img
                                         src={service.img}
                                         alt={service.name}
-                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                        className="h-full w-full object-contain transition-transform duration-500"
                                     />
                                     <div className="absolute inset-0 bg-tiba-blue/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>

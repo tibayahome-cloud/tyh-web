@@ -273,17 +273,22 @@ const ProviderHome = () => {
 
         {/* Intelligence Layer */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          {financialsVisible && (
           <div className="lg:col-span-4">
             <RevenueSnapshot financialsVisible={financialsVisible} />
           </div>
-          <div className="lg:col-span-8">
+          )}
+          <div className={financialsVisible ? "lg:col-span-8" : "lg:col-span-12"}>
             <PerformanceStats />
           </div>
         </div>
 
         {/* Live Operations */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className={classNames(
+          "grid grid-cols-1 gap-4",
+          activeBooking ? "lg:grid-cols-3" : "lg:grid-cols-1"
+        )}>
+          <div className={activeBooking ? "lg:col-span-2" : undefined}>
             {activeBooking ? (
               <Card
                 className="overflow-hidden border-none shadow-lg ring-1 ring-black/5 p-4"
@@ -339,7 +344,9 @@ const ProviderHome = () => {
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className={classNames(
+            activeBooking ? "space-y-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          )}>
             <div className="bg-slate-900 p-4 rounded-xl shadow-lg">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -393,7 +400,7 @@ const ProviderHome = () => {
                   { label: "Bookings", icon: <Calendar className="h-3.5 w-3.5" />, to: "/pro/bookings", color: "bg-emerald-50 text-emerald-600" },
                   { label: "Payments", icon: <CreditCard className="h-3.5 w-3.5" />, to: "/pro/payments", color: "bg-amber-50 text-amber-600" },
                   { label: "Settings", icon: <Settings className="h-3.5 w-3.5" />, to: "/pro/settings", color: "bg-slate-100 text-slate-600" }
-                ].map((link) => (
+                ].filter((link) => financialsVisible || link.label !== "Payments").map((link) => (
                   <button
                     key={link.label}
                     onClick={() => navigate(link.to)}

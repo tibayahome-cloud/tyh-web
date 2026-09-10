@@ -15,6 +15,7 @@ import {
   initiateHoldPayment,
   joinSession,
   leaveSession,
+  proposeRebooking,
   releaseHold,
   reportNoShow,
   reportTechnicalIssue,
@@ -265,6 +266,18 @@ export const useAssignProviderMutation = () => {
   return useMutation({
     mutationFn: ({ bookingId, providerUserId }: { bookingId: string; providerUserId: string }) =>
       assignProvider(bookingId, providerUserId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
+    }
+  });
+};
+
+export const useProposeRebookingMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, proposedStartAt, reason }: { bookingId: string; proposedStartAt: string; reason?: string }) =>
+      proposeRebooking(bookingId, proposedStartAt, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);

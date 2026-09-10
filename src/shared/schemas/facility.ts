@@ -3,6 +3,7 @@ import { z } from "zod";
 import { coerceBoolean, coerceDate, coerceId, coerceNumber, coerceString, toObject } from "./helpers";
 
 export const FACILITY_TYPES = ["hospital", "clinic", "agency", "other"] as const;
+export const HOSPITAL_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 export const FACILITY_STATUSES = ["pending", "active", "suspended"] as const;
 export const PROVIDER_COMPENSATION_MODES = ["employee", "fixed", "percentage"] as const;
 export const BOOKING_REQUEST_MODES = ["selected_facility", "fastest_available"] as const;
@@ -73,6 +74,7 @@ export const FacilitySchema = z.object({
   id: z.string(),
   name: z.string(),
   facilityType: z.enum(FACILITY_TYPES),
+  hospitalLevel: z.number().int().min(1).max(6).nullable(),
   address: z.string(),
   county: z.string(),
   countryCode: z.string().nullable(),
@@ -262,6 +264,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     id,
     name: coerceString(raw.name) ?? "",
     facilityType,
+    hospitalLevel: coerceNumber(raw.hospital_level ?? raw.hospitalLevel),
     address: coerceString(raw.address) ?? "",
     county: coerceString(raw.county) ?? "",
     countryCode: coerceString(raw.country_code ?? raw.countryCode),
@@ -412,6 +415,7 @@ export const canViewProviderFinancials = (
 export type FacilityCreateInput = {
   name: string;
   facilityType: FacilityType;
+  hospitalLevel?: number | null;
   address: string;
   county: string;
   countryCode?: string | null;
@@ -427,6 +431,7 @@ export type FacilityCreateInput = {
 export type FacilityUpdateInput = Partial<{
   name: string;
   facilityType: FacilityType;
+  hospitalLevel?: number | null;
   address: string;
   county: string;
   countryCode: string | null;

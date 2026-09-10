@@ -169,3 +169,64 @@ export const facilityLocalDayLabel = (date: string): { weekday: string; day: str
     day: new Intl.DateTimeFormat(undefined, { timeZone: "UTC", day: "numeric" }).format(instant)
   };
 };
+
+/** How far a zone is ahead of UTC at a given instant, in milliseconds. */
+const zoneOffsetMsAt = (instant: Date, timeZone: string): number => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  })
+    .formatToParts(instant)
+    .reduce<Record<string, string>>((acc, part) => {
+      if (part.type !== "literal") acc[part.type] = part.value;
+      return acc;
+    }, {});
+
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    // Some ICU builds render midnight as "24" under hour12: false.
+    Number(parts.hour) % 24,
+    Number(parts.minute),
+    Number(parts.second)
+  );
+  return asUtc - instant.getTime();
+};
+
+/**
+ * Read a naive `datetime-local` value as a wall-clock time in the facility's zone.
+ *
+ * `new Date("2026-09-10T09:00")` is resolved against whatever timezone the browser happens to
+ * be in. For an operator working from the facility that is right by accident; for one working
+ * anywhere else it silently books a different instant, and there is no error to notice -- the
+ * appointment is simply at the wrong time. The zone has to come from the telemedicine policy,
+ * which is the facility's, not from the machine the operator is sitting at.
+ *
+ * Returns an ISO-8601 instant, or null if the input is not a usable wall-clock value.
+ */
+export const facilityLocalToUtcIso = (wallClock: string, timeZone: string): string | null => {
+  const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(wallClock)
+    ? wallClock.length === 16
+      ? `${wallClock}:00`
+      : wallClock
+    : null;
+  if (!normalized) return null;
+
+  // Read the digits as if they were UTC, then step back by the zone's offset. The offset has to
+  // be sampled at the corrected instant rather than the naive one, because near a DST boundary
+  // those two moments can sit on different sides of the change -- so it is applied twice.
+  const asUtcMs = Date.parse(`${normalized}Z`);
+  if (Number.isNaN(asUtcMs)) return null;
+
+  const firstPass = asUtcMs - zoneOffsetMsAt(new Date(asUtcMs), timeZone);
+  const secondPass = asUtcMs - zoneOffsetMsAt(new Date(firstPass), timeZone);
+  const result = new Date(secondPass);
+  return Number.isNaN(result.getTime()) ? null : result.toISOString();
+};

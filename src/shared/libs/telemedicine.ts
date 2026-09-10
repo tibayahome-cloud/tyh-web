@@ -225,6 +225,23 @@ export const assignProvider = async (
   };
 };
 
+export const proposeRebooking = async (
+  bookingId: string,
+  proposedStartAt: string,
+  reason?: string
+): Promise<{ id: string; proposedStartAt: string; expiresAt: string }> => {
+  const response = await api.post(`/telemedicine/bookings/${bookingId}/rebookings`, {
+    proposed_start_at: proposedStartAt,
+    ...(reason?.trim() ? { reason: reason.trim() } : {})
+  });
+  const data = (response.data?.data ?? {}) as Record<string, unknown>;
+  return {
+    id: typeof data.id === "string" ? data.id : "",
+    proposedStartAt: typeof data.proposed_start_at === "string" ? data.proposed_start_at : proposedStartAt,
+    expiresAt: typeof data.expires_at === "string" ? data.expires_at : ""
+  };
+};
+
 export const reassignProvider = async (
   bookingId: string,
   providerUserId: string,
