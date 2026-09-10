@@ -1,6 +1,11 @@
 import api from "./api";
 import { mapWalletAccount, mapWalletWithdrawal } from "../schemas/wallet";
-import type { WalletAccountResource, WalletWithdrawal } from "../schemas/wallet";
+import {
+  mapProviderEarningsSummary,
+  type ProviderEarningsSummary,
+  type WalletAccountResource,
+  type WalletWithdrawal
+} from "../schemas/wallet";
 import { buildFieldParams, walletAccountPreset } from "./fieldInclude";
 
 const ADMIN_PAYMENTS_BASE = "/admin/payments";
@@ -53,12 +58,35 @@ export const fetchWalletAccount = async (): Promise<WalletAccountResource> => {
   return wallet;
 };
 
-export const requestWithdrawal = async (amountCents: number, reason?: string) => {
+export const fetchProviderEarningsSummary = async (): Promise<ProviderEarningsSummary> => {
+  const response = await api.get("/wallet/earnings-summary");
+  const summary = mapProviderEarningsSummary(response.data?.data);
+  if (!summary) {
+    throw new Error("Earnings summary is unavailable");
+  }
+  return summary;
+};
+
+export const requestWithdrawal = async (amountCents: number, reason?: string, payoutPhoneNumber?: string) => {
   const response = await api.post("/wallet/withdrawals", {
     amount_cents: amountCents,
-    reason
+    reason,
+    payout_phone_number: payoutPhoneNumber || undefined
   });
   return response.data?.data as { id: string; status: string };
+};
+
+export const requestPayoutDestination = async (phoneNumber: string) => {
+  const response = await api.post("/wallet/payout-destinations", { phone_number: phoneNumber });
+  return response.data?.data as { phone_masked: string | null; verified: boolean };
+};
+
+export const verifyPayoutDestination = async (phoneNumber: string, code: string) => {
+  const response = await api.post("/wallet/payout-destinations/verify", {
+    phone_number: phoneNumber,
+    code
+  });
+  return response.data?.data as { phone_masked: string | null; verified: boolean };
 };
 
 export const approveWithdrawal = async (withdrawalId: string) => {

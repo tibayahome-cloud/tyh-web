@@ -108,8 +108,10 @@ describe("facility API helpers", () => {
     expect(mockPost).toHaveBeenCalledWith("/facilities", {
       name: "Nairobi Clinic",
       facility_type: "clinic",
+      hospital_level: null,
       address: "Kilimani",
       county: "Nairobi",
+      country_code: undefined,
       phones: [{ phone: "+254700000000", label: "Reception", is_primary: true }],
       email: "care@nairobi.test",
       lat: -1.2921,

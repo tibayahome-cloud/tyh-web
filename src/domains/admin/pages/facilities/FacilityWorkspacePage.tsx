@@ -1066,6 +1066,9 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <WorkspaceStat label="County" value={facility.county || "-"} />
         <WorkspaceStat label="Facility type" value={facility.facilityType} />
+        {facility.facilityType === "hospital" && (
+          <WorkspaceStat label="Hospital level" value={facility.hospitalLevel ? `Level ${facility.hospitalLevel}` : "Not set"} />
+        )}
         <WorkspaceStat label="Active services" value={String(activeServiceCount)} />
         <WorkspaceStat label="TYH fee" value={`${facility.platformFeePercent}%`} />
       </section>

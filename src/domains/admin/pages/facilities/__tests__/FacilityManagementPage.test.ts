@@ -5,6 +5,7 @@ import { buildFacilityCreateInput, validateCreateForm } from "../FacilityManagem
 const validForm = {
   name: "Nairobi Clinic",
   facilityType: "clinic" as const,
+  hospitalLevel: "",
   address: "Kilimani",
   county: "Nairobi",
   phones: [{ phone: "+254700000000", label: "Reception", isPrimary: true }],
@@ -76,5 +77,13 @@ describe("FacilityManagementPage helpers", () => {
     expect(validateCreateForm({ ...validForm, is24Hours: false, openTime: "" })).toBe(
       "Opening and closing time are required unless the facility is 24/7."
     );
+  });
+
+  it("requires and includes a hospital level for hospitals", () => {
+    expect(validateCreateForm({ ...validForm, facilityType: "hospital", hospitalLevel: "" })).toBe(
+      "Select a hospital level from Level 1 to Level 6."
+    );
+    const payload = buildFacilityCreateInput({ ...validForm, facilityType: "hospital", hospitalLevel: "4" });
+    expect(payload.hospitalLevel).toBe(4);
   });
 });

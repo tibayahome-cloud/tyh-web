@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { approveWithdrawal, fetchAdminWithdrawal, fetchAdminWithdrawals, fetchWalletAccount, rejectWithdrawal, requestWithdrawal } from "../libs/wallet";
+import {
+  approveWithdrawal,
+  fetchAdminWithdrawal,
+  fetchAdminWithdrawals,
+  fetchProviderEarningsSummary,
+  fetchWalletAccount,
+  rejectWithdrawal,
+  requestPayoutDestination,
+  requestWithdrawal,
+  verifyPayoutDestination
+} from "../libs/wallet";
 import type { WithdrawalListResult } from "../libs/wallet";
 
 const normalizeAdminParams = (params: { page?: number; size?: number; status?: string } = {}) => ({
@@ -12,8 +22,17 @@ const normalizeAdminParams = (params: { page?: number; size?: number; status?: s
 export const walletKeys = {
   all: ["wallet"] as const,
   account: () => ["wallet", "account"] as const,
+  earningsSummary: () => ["wallet", "earnings-summary"] as const,
   adminList: (params: ReturnType<typeof normalizeAdminParams>) => ["wallet", "admin", "withdrawals", params] as const,
   adminDetail: (withdrawalId: string) => ["wallet", "admin", "withdrawal", withdrawalId] as const
+};
+
+export const useProviderEarningsSummary = (options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: walletKeys.earningsSummary(),
+    queryFn: fetchProviderEarningsSummary,
+    enabled: options?.enabled ?? true
+  });
 };
 
 export const useWalletAccount = (options?: { enabled?: boolean }) => {
@@ -27,13 +46,18 @@ export const useWalletAccount = (options?: { enabled?: boolean }) => {
 export const useWalletWithdrawalRequest = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ amountCents, reason }: { amountCents: number; reason?: string }) =>
-      requestWithdrawal(amountCents, reason),
+    mutationFn: ({ amountCents, reason, payoutPhoneNumber }: { amountCents: number; reason?: string; payoutPhoneNumber?: string }) =>
+      requestWithdrawal(amountCents, reason, payoutPhoneNumber),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: walletKeys.account() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: walletKeys.earningsSummary() }).catch(() => undefined);
     }
   });
 };
+
+export const usePayoutDestinationRequest = () => useMutation({ mutationFn: requestPayoutDestination });
+
+export const usePayoutDestinationVerification = () => useMutation({ mutationFn: ({ phoneNumber, code }: { phoneNumber: string; code: string }) => verifyPayoutDestination(phoneNumber, code) });
 
 export const useAdminWithdrawals = (
   params: { page?: number; size?: number; status?: string },

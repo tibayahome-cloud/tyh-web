@@ -8,6 +8,7 @@ import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorderOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useProviderProfile } from "../hooks/useProviderProfile";
@@ -83,6 +84,7 @@ export const ProviderShell = () => {
     { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Services", to: "/pro/services", icon: <MiscServicesIcon /> },
     { label: "Care", to: "/pro/selfcare", icon: <FavoriteBorderIcon /> },
+    { label: "Payments", to: "/pro/payments", icon: <PaymentsIcon /> },
     { label: "Inbox", to: "/pro/inbox", icon: <ForumIcon />, badge: conversationUnread },
     { label: "Settings", to: "/pro/settings", icon: <SettingsIcon /> }
   ];

@@ -187,6 +187,7 @@ const phonePayload = (phones: FacilityCreateInput["phones"]) =>
 export const facilityCreatePayload = (input: FacilityCreateInput): Record<string, unknown> => ({
   name: input.name,
   facility_type: input.facilityType,
+  hospital_level: input.hospitalLevel ?? null,
   address: input.address,
   county: input.county,
   country_code: input.countryCode,
@@ -203,6 +204,7 @@ export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string
   const payload: Record<string, unknown> = {};
   if (input.name !== undefined) payload.name = input.name;
   if (input.facilityType !== undefined) payload.facility_type = input.facilityType;
+  if (input.hospitalLevel !== undefined) payload.hospital_level = input.hospitalLevel;
   if (input.address !== undefined) payload.address = input.address;
   if (input.county !== undefined) payload.county = input.county;
   if (input.countryCode !== undefined) payload.country_code = input.countryCode;
