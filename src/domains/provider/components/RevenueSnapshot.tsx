@@ -25,24 +25,7 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
         };
     }, [earnings]);
 
-    if (!financialsVisible) {
-        return (
-            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                        <Wallet className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Payouts</p>
-                        <h2 className="mt-1 text-lg font-bold text-slate-900">Facility-managed</h2>
-                        <p className="mt-2 text-xs leading-5 text-slate-500">
-                            Your facility manages service pricing, payouts, and settlement details.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    if (!financialsVisible) return null;
 
     if (isLoading) {
         return (
