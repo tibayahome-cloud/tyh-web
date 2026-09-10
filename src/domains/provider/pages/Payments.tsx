@@ -53,6 +53,13 @@ const ProviderPayments = () => {
   const wallet = walletQuery.data;
   const transactions = wallet?.transactions ?? [];
   const withdrawals = wallet?.withdrawals ?? [];
+  const availableToWithdrawCents = Math.max(
+    (wallet?.balanceCents ?? 0) - (wallet?.pendingWithdrawalCents ?? 0),
+    0
+  );
+  const paidOutCents = withdrawals
+    .filter((entry) => entry.status.toLowerCase() === "disbursed" || entry.status.toLowerCase() === "succeeded")
+    .reduce((total, entry) => total + entry.amountCents, 0);
 
   const handleWithdraw = () => {
     const amount = Number.parseFloat(withdrawAmount);
@@ -104,7 +111,7 @@ const ProviderPayments = () => {
       <div className="space-y-6">
         <header className="flex flex-col gap-2">
           <h1 className="text-2xl font-semibold text-slate-900">Payments & Wallet</h1>
-          <p className="text-sm text-slate-500">Your facility manages service pricing, payouts, and settlements.</p>
+          <p className="text-sm text-slate-500">Track your available funds and withdrawal history.</p>
         </header>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -126,7 +133,7 @@ const ProviderPayments = () => {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setWithdrawDialogOpen(true)}
-            disabled={!wallet || (wallet.balanceCents ?? 0) <= 0 || withdrawMutation.isLoading}
+            disabled={!wallet || availableToWithdrawCents <= 0 || withdrawMutation.isLoading}
           >
             Request withdrawal
           </Button>
@@ -139,9 +146,9 @@ const ProviderPayments = () => {
           whileHover={{ y: -4 }}
           className="rounded-2xl border border-white/50 bg-white/70 p-6 shadow-card backdrop-blur-md ring-1 ring-black/[0.03] transition-all"
         >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Wallet balance</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Available to withdraw</p>
           <p className="mt-2 text-3xl font-bold text-neutral-900">
-            {formatCurrency(wallet?.balanceCents, wallet?.currency)}
+            {formatCurrency(availableToWithdrawCents, wallet?.currency)}
           </p>
         </motion.article>
 
@@ -149,7 +156,7 @@ const ProviderPayments = () => {
           whileHover={{ y: -4 }}
           className="rounded-2xl border border-white/50 bg-white/70 p-6 shadow-card backdrop-blur-md ring-1 ring-black/[0.03] transition-all"
         >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Pending withdrawals</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">In withdrawal</p>
           <p className="mt-2 text-3xl font-bold text-neutral-900">
             {formatCurrency(wallet?.pendingWithdrawalCents, wallet?.currency)}
           </p>
@@ -159,8 +166,11 @@ const ProviderPayments = () => {
           whileHover={{ y: -4 }}
           className="rounded-2xl border border-white/50 bg-white/70 p-6 shadow-card backdrop-blur-md ring-1 ring-black/[0.03] transition-all"
         >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Account status</p>
-          <p className="mt-2 text-3xl font-bold text-neutral-900 capitalize">{wallet?.status ?? "—"}</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Paid out</p>
+          <p className="mt-2 text-3xl font-bold text-neutral-900">
+            {formatCurrency(paidOutCents, wallet?.currency)}
+          </p>
+          <p className="mt-1 text-xs capitalize text-neutral-500">Wallet {wallet?.status ?? "—"}</p>
         </motion.article>
       </section>
 
@@ -238,7 +248,7 @@ const ProviderPayments = () => {
       <ConfirmDialog
         open={withdrawDialogOpen}
         title="Request withdrawal"
-        description={`Balance: ${formatCurrency(wallet?.balanceCents, wallet?.currency)}`}
+        description={`Available: ${formatCurrency(availableToWithdrawCents, wallet?.currency)}`}
         confirmLabel="Submit"
         onConfirm={handleWithdraw}
         onClose={() => setWithdrawDialogOpen(false)}
