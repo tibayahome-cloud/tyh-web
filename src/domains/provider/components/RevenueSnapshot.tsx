@@ -1,5 +1,5 @@
 import { Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { useWalletAccount } from "../../../shared/hooks/useWallet";
+import { useProviderEarningsSummary } from "../../../shared/hooks/useWallet";
 import { useMemo } from "react";
 
 const formatPrice = (amountCents?: number, currency = "KES") => {
@@ -12,25 +12,18 @@ type RevenueSnapshotProps = {
 };
 
 export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotProps) => {
-    const { data: wallet, isLoading } = useWalletAccount({ enabled: financialsVisible });
+    const { data: earnings, isLoading } = useProviderEarningsSummary({ enabled: financialsVisible });
 
     const metrics = useMemo(() => {
-        if (!wallet) return null;
-
-        // Simulate some trend data since backend doesn't provide it yet
-        // In a real app, we'd calculate this from transactions
-        const availableToWithdraw = Math.max(wallet.balanceCents - wallet.pendingWithdrawalCents, 0);
-        const paidOut = wallet.withdrawals
-            .filter((withdrawal) => ["disbursed", "succeeded"].includes(withdrawal.status.toLowerCase()))
-            .reduce((total, withdrawal) => total + withdrawal.amountCents, 0);
+        if (!earnings) return null;
 
         return {
-            balance: availableToWithdraw,
-            pending: wallet.pendingWithdrawalCents,
-            paidOut,
-            currency: wallet.currency
+            balance: earnings.availableBalanceCents,
+            pending: earnings.pendingEarningsCents,
+            paidOut: earnings.paidOutTotalCents,
+            currency: earnings.currency
         };
-    }, [wallet]);
+    }, [earnings]);
 
     if (!financialsVisible) {
         return (
@@ -89,7 +82,7 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
                 <div className="flex flex-col">
                     <div className="flex items-center gap-1.5 text-slate-400">
                         <ArrowDownRight className="h-4 w-4 text-amber-500" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">In Transit</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Pending earnings</span>
                     </div>
                     <p className="mt-1 text-sm font-bold text-slate-900">
                         {formatPrice(metrics?.pending, metrics?.currency)}
