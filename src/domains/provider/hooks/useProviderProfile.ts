@@ -90,7 +90,23 @@ export const useUpdateProviderStatus = (userId: string | undefined) => {
         is_available: isAvailable
       });
     },
-    onSuccess: () => {
+    onMutate: async (isAvailable) => {
+      const queryKey = ["provider", "profile", userId];
+      await queryClient.cancelQueries({ queryKey });
+      const previousProfile = queryClient.getQueryData<ProviderProfile | null>(queryKey);
+
+      queryClient.setQueryData<ProviderProfile | null>(queryKey, (profile) =>
+        profile ? { ...profile, is_available: isAvailable } : profile
+      );
+
+      return { previousProfile };
+    },
+    onError: (_error, _isAvailable, context) => {
+      if (context?.previousProfile !== undefined) {
+        queryClient.setQueryData(["provider", "profile", userId], context.previousProfile);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["provider", "profile", userId] }).catch(() => undefined);
     }
   });
