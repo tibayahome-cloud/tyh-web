@@ -4,11 +4,13 @@ import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
 import { Input } from "../../../shared/components/Input";
 import ConfirmDialog from "../../../shared/components/ConfirmDialog";
+import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useWalletAccount, useWalletWithdrawalRequest } from "../../../shared/hooks/useWallet";
 import { motion, AnimatePresence } from "framer-motion";
 import { prefetchBooking } from "../../../shared/libs/query";
+import { classifyApiError } from "../../../shared/utils/errors";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 
 const formatCurrency = (amountCents: number | undefined, currency = "KES") => {
@@ -126,6 +128,21 @@ const ProviderPayments = () => {
     );
   }
 
+  if (walletQuery.isError) {
+    return (
+      <div className="space-y-6">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold text-slate-900">Payments & Wallet</h1>
+          <p className="text-sm text-slate-500">Track your available funds and withdrawal history.</p>
+        </header>
+        <ApiErrorBanner
+          {...classifyApiError(walletQuery.error, "We could not load your wallet right now.")}
+          onRetry={() => walletQuery.refetch()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -137,7 +154,13 @@ const ProviderPayments = () => {
           >
             Request withdrawal
           </Button>
-          <Button variant="secondary">Wallet history</Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => document.getElementById("withdrawals")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            Wallet history
+          </Button>
         </div>
       </header>
 
@@ -223,7 +246,8 @@ const ProviderPayments = () => {
         )}
       </Card>
 
-      <Card title="Withdrawals">
+      <div id="withdrawals" className="scroll-mt-6">
+        <Card title="Withdrawals">
         {withdrawals.length === 0 ? (
           <p className="text-sm text-slate-500">No withdrawals requested.</p>
         ) : (
@@ -243,7 +267,8 @@ const ProviderPayments = () => {
             ))}
           </div>
         )}
-      </Card>
+        </Card>
+      </div>
 
       <ConfirmDialog
         open={withdrawDialogOpen}
