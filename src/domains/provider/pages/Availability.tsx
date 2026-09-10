@@ -542,7 +542,7 @@ const AvailabilityPage = () => {
           </p>
         </div>
 
-        <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
           <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-card">
             <p className="text-xs text-slate-500">Weekly hours</p>
             <p className="mt-0.5 text-xl font-bold text-slate-900">{availability?.length ?? 0}</p>
@@ -670,39 +670,39 @@ const AvailabilityPage = () => {
                     </div>
 
                     {slots.length > 0 ? (
-                      <div className="mt-6 space-y-3">
-                        {slots.map((slot) => (
-                          <div key={slot.id} className="group relative flex flex-wrap items-center gap-3 rounded-2xl bg-white p-3 ring-1 ring-black/5 shadow-sm transition-all hover:shadow-md">
-                            <div className="flex items-center gap-2">
+                    <div className="mt-6 space-y-3">
+                      {slots.map((slot) => (
+                          <div key={slot.id} className="group relative flex min-w-0 flex-col items-stretch gap-3 rounded-2xl bg-white p-3 ring-1 ring-black/5 shadow-sm transition-all hover:shadow-md sm:flex-row sm:flex-wrap sm:items-center">
+                            <div className="flex min-w-0 items-center gap-2">
                               <input
                                 type="time"
                                 value={slot.start_time}
                                 onChange={(e) => updateRow(slot.id, { start_time: e.target.value })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
+                                className="h-10 min-w-0 flex-1 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue sm:w-auto sm:flex-none"
                               />
                               <span className="text-[10px] font-semibold uppercase text-slate-300">to</span>
                               <input
                                 type="time"
                                 value={slot.end_time}
                                 onChange={(e) => updateRow(slot.id, { end_time: e.target.value })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
+                                className="h-10 min-w-0 flex-1 rounded-xl border-none bg-slate-50 px-3 text-sm font-bold text-slate-900 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue sm:w-auto sm:flex-none"
                               />
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
                               <div className="h-4 w-[1px] bg-slate-100 hidden sm:block" />
                               <input
                                 type="date"
                                 value={slot.effective_from ?? ""}
                                 onChange={(e) => updateRow(slot.id, { effective_from: e.target.value || undefined })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
+                                className="h-10 min-w-0 flex-1 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue sm:w-auto sm:flex-none"
                               />
                               <span className="text-slate-300">→</span>
                               <input
                                 type="date"
                                 value={slot.effective_to ?? ""}
                                 onChange={(e) => updateRow(slot.id, { effective_to: e.target.value || undefined })}
-                                className="h-10 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue"
+                                className="h-10 min-w-0 flex-1 rounded-xl border-none bg-slate-50 px-3 text-[11px] font-bold text-slate-600 ring-1 ring-black/5 focus:ring-2 focus:ring-tiba-blue sm:w-auto sm:flex-none"
                               />
                             </div>
 
@@ -714,7 +714,7 @@ const AvailabilityPage = () => {
                                 message: `Remove this window from ${WEEKDAY_LABELS[weekday]}?`,
                                 confirmLabel: "Remove"
                               })}
-                              className="ml-auto flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600"
+                              className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 sm:ml-auto sm:self-auto"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -866,32 +866,32 @@ const AvailabilityPage = () => {
               {daySlots.length === 0 && <p className="mt-2 text-xs text-slate-500">No hours set for this day yet.</p>}
               <div className="mt-3 space-y-3">
                 {daySlots.map((slot) => (
-                  <div key={slot.id} className="flex flex-wrap items-center gap-2">
+                  <div key={slot.id} className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <input
                       type="time"
                       value={slot.start_time}
                       onChange={(event) => updateRow(slot.id, { start_time: event.target.value })}
-                      className="w-28 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                      className="w-full min-w-0 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 sm:w-28"
                     />
                     <span className="text-xs font-semibold text-slate-500">to</span>
                     <input
                       type="time"
                       value={slot.end_time}
                       onChange={(event) => updateRow(slot.id, { end_time: event.target.value })}
-                      className="w-28 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                      className="w-full min-w-0 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 sm:w-28"
                     />
                     <input
                       type="date"
                       value={slot.effective_from ?? ""}
                       onChange={(event) => updateRow(slot.id, { effective_from: event.target.value || undefined })}
-                      className="w-36 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                      className="w-full min-w-0 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 sm:w-36"
                     />
                     <span className="text-xs font-semibold text-slate-500">→</span>
                     <input
                       type="date"
                       value={slot.effective_to ?? ""}
                       onChange={(event) => updateRow(slot.id, { effective_to: event.target.value || undefined })}
-                      className="w-36 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                      className="w-full min-w-0 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 sm:w-36"
                     />
                     <button
                       type="button"
@@ -903,7 +903,7 @@ const AvailabilityPage = () => {
                           confirmLabel: "Remove"
                         })
                       }
-                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600"
+                      className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 sm:ml-auto sm:self-auto"
                       aria-label="Delete window"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -935,7 +935,7 @@ const AvailabilityPage = () => {
               </div>
               <p className="mt-1 text-[11px] font-bold text-slate-400">Block a one-off time on this day.</p>
 
-              <div className="mt-6 grid grid-cols-2 gap-4">
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-2">
                   <span className="text-xs font-semibold text-slate-500">
                     {isBatch ? "Start time" : "From"}

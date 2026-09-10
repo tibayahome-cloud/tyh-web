@@ -43,6 +43,27 @@ export const WalletAccountResourceSchema = z.object({
 
 export type WalletAccountResource = z.infer<typeof WalletAccountResourceSchema>;
 
+export type ProviderEarningsWithdrawal = {
+  id: string;
+  amountCents: number;
+  status: string;
+  requestedAt: string | null;
+  disbursedAt: string | null;
+  payoutRef: string | null;
+  payoutPhoneMasked: string | null;
+  failureReason: string | null;
+};
+
+export type ProviderEarningsSummary = {
+  currency: string;
+  pendingEarningsCents: number;
+  availableBalanceCents: number;
+  paidOutTotalCents: number;
+  reversedTotalCents: number;
+  nextReleaseAt: string | null;
+  withdrawals: ProviderEarningsWithdrawal[];
+};
+
 const mapTransaction = (payload: unknown): WalletTransaction | null => {
   const raw = toObject(payload);
   const id = coerceId(raw.id);
@@ -108,5 +129,37 @@ export const mapWalletAccount = (payload: unknown): WalletAccountResource | null
     withdrawals: withdrawalsRaw
       .map((entry) => mapWalletWithdrawal(entry))
       .filter((entry): entry is WalletWithdrawal => Boolean(entry))
+  };
+};
+
+export const mapProviderEarningsSummary = (payload: unknown): ProviderEarningsSummary | null => {
+  const raw = toObject(payload);
+  if (!coerceString(raw.currency)) {
+    return null;
+  }
+  const withdrawalsRaw = Array.isArray(raw.withdrawals) ? raw.withdrawals : [];
+  return {
+    currency: coerceString(raw.currency) ?? "KES",
+    pendingEarningsCents: coerceNumber(raw.pending_earnings_cents) ?? 0,
+    availableBalanceCents: coerceNumber(raw.available_balance_cents) ?? 0,
+    paidOutTotalCents: coerceNumber(raw.paid_out_total_cents) ?? 0,
+    reversedTotalCents: coerceNumber(raw.reversed_total_cents) ?? 0,
+    nextReleaseAt: coerceDate(raw.next_release_at),
+    withdrawals: withdrawalsRaw.flatMap((entry) => {
+      const withdrawal = toObject(entry);
+      const id = coerceId(withdrawal.id);
+      return id
+        ? [{
+            id,
+            amountCents: coerceNumber(withdrawal.amount_cents) ?? 0,
+            status: coerceString(withdrawal.status) ?? "requested",
+            requestedAt: coerceDate(withdrawal.requested_at),
+            disbursedAt: coerceDate(withdrawal.disbursed_at),
+            payoutRef: coerceString(withdrawal.payout_ref),
+            payoutPhoneMasked: coerceString(withdrawal.payout_phone_masked),
+            failureReason: coerceString(withdrawal.failure_reason)
+          }]
+        : [];
+    })
   };
 };
