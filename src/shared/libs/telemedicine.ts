@@ -30,6 +30,9 @@ export type RemoteFacility = {
   priceCents: number;
   currency: string;
   estimateDurationMinutes: number | null;
+  // The zone this facility's appointments are scheduled and displayed in. Null when the API
+  // did not send one, so callers fall back explicitly rather than silently assuming a default.
+  timezone: string | null;
 };
 
 export const discoverRemoteFacilities = async (
@@ -58,10 +61,19 @@ export const discoverRemoteFacilities = async (
         priceCents: typeof service.price_cents === "number" ? service.price_cents : 0,
         currency: typeof service.currency === "string" ? service.currency : "KES",
         estimateDurationMinutes:
-          typeof service.estimate_duration_minutes === "number" ? service.estimate_duration_minutes : null
+          typeof service.estimate_duration_minutes === "number" ? service.estimate_duration_minutes : null,
+        timezone: typeof entry.timezone === "string" && entry.timezone ? entry.timezone : null
       } satisfies RemoteFacility;
     })
     .filter((entry): entry is RemoteFacility => Boolean(entry));
+};
+
+export type AvailableSlotsResult = {
+  slots: TelemedicineSlot[];
+  // The facility's scheduling zone, travelling with the instants it explains. start_at and
+  // end_at are UTC; pairing them with the wrong zone is the bug this closes, so the two are
+  // returned together rather than resolved separately by each caller.
+  timezone: string | null;
 };
 
 export const fetchAvailableSlots = async (
@@ -69,7 +81,7 @@ export const fetchAvailableSlots = async (
   facilityServiceId: string,
   startDate: string,
   endDate?: string
-): Promise<TelemedicineSlot[]> => {
+): Promise<AvailableSlotsResult> => {
   const response = await api.get(`/facilities/${facilityId}/telemedicine/available-slots`, {
     params: {
       facility_service_id: facilityServiceId,
@@ -77,7 +89,11 @@ export const fetchAvailableSlots = async (
       end_date: endDate ?? startDate
     }
   });
-  return mapTelemedicineSlots(response.data?.data);
+  const meta = (response.data?.meta ?? {}) as Record<string, unknown>;
+  return {
+    slots: mapTelemedicineSlots(response.data?.data),
+    timezone: typeof meta.timezone === "string" && meta.timezone ? meta.timezone : null
+  };
 };
 
 export const createHold = async (
@@ -116,11 +132,22 @@ export const releaseHold = async (holdId: string): Promise<TelemedicineHold> => 
 
 export const initiateHoldPayment = async (
   holdId: string,
-  options: { phone?: string; method?: string } = {}
+  options: {
+    phone?: string;
+    method?: string;
+    preference?: { preferredGender?: string | null; preferredLanguage?: string | null; note?: string | null };
+  } = {}
 ): Promise<{ hold: TelemedicineHold; paymentId?: string; paymentStatus?: string }> => {
   const response = await api.post(`/telemedicine/holds/${holdId}/payment`, {
     phone: options.phone,
-    method: options.method
+    method: options.method,
+    ...(options.preference ? {
+      preference: {
+        preferred_gender: options.preference.preferredGender ?? null,
+        preferred_language: options.preference.preferredLanguage ?? null,
+        note: options.preference.note ?? null
+      }
+    } : {})
   });
   const hold = mapTelemedicineHold(response.data?.data);
   if (!hold) {
@@ -195,6 +222,23 @@ export const assignProvider = async (
     id: typeof data.id === "string" ? data.id : bookingId,
     status: typeof data.status === "string" ? data.status : "",
     providerUserId: typeof data.provider_user_id === "string" ? data.provider_user_id : null
+  };
+};
+
+export const proposeRebooking = async (
+  bookingId: string,
+  proposedStartAt: string,
+  reason?: string
+): Promise<{ id: string; proposedStartAt: string; expiresAt: string }> => {
+  const response = await api.post(`/telemedicine/bookings/${bookingId}/rebookings`, {
+    proposed_start_at: proposedStartAt,
+    ...(reason?.trim() ? { reason: reason.trim() } : {})
+  });
+  const data = (response.data?.data ?? {}) as Record<string, unknown>;
+  return {
+    id: typeof data.id === "string" ? data.id : "",
+    proposedStartAt: typeof data.proposed_start_at === "string" ? data.proposed_start_at : proposedStartAt,
+    expiresAt: typeof data.expires_at === "string" ? data.expires_at : ""
   };
 };
 

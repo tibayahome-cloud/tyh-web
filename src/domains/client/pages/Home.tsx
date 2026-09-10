@@ -41,6 +41,7 @@ import {
   TrendingUp,
   Minus,
   Calendar,
+  House,
   Video
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
@@ -367,12 +368,6 @@ const ClientHome = () => {
       )}
 
       <div className="flex flex-col gap-4 pb-20">
-        <LocationPermissionBanner
-          status={locationAccess.status}
-          error={locationAccess.error}
-          onRetry={locationAccess.requestAccess}
-        />
-
         <ClientPageHeader
           showGreeting
           title=""
@@ -448,26 +443,38 @@ const ClientHome = () => {
                 </div>
                 <ChevronRight className="text-slate-500" size={20} />
               </button>
-            ) : (
-              <button
-                onClick={() => openBookingDialog()}
-                className="group relative w-full flex items-center justify-between overflow-hidden rounded-2xl bg-tiba-blue p-5 text-left text-white shadow-lg transition-all active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
-                    <Heart size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-white">Request Care Now</h2>
-                    <p className="text-sm text-white/70">Connect with medical professionals</p>
-                  </div>
-                </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-tiba-blue transition-transform group-hover:translate-x-1">
-                  <ArrowRight size={20} />
-                </div>
-              </button>
-            )}
+            ) : null}
           </section>
+
+          <section aria-label="Choose your care" className="border-y border-slate-200 py-4">
+            <h2 className="mb-3 text-base font-semibold text-slate-900">How would you like to receive care?</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <button type="button" onClick={() => navigate("/app/telemedicine")}
+                className="flex min-w-0 items-center gap-3 rounded-lg bg-tiba-blue p-4 text-left text-white transition hover:bg-tiba-blue/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                <Video className="h-6 w-6 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold">Talk to a Doctor Online</span>
+                  <span className="mt-1 block text-sm text-white/90">A video consultation. No home visit needed.</span>
+                </span>
+                <ArrowRight className="h-5 w-5 shrink-0" />
+              </button>
+              <button type="button" onClick={() => openBookingDialog()}
+                className="flex min-w-0 items-center gap-3 rounded-lg border border-tiba-gold bg-white p-4 text-left text-slate-900 transition hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                <House className="h-6 w-6 shrink-0 text-tiba-gold" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold">Book Home Care</span>
+                  <span className="mt-1 block text-sm text-slate-600">A healthcare professional visits your home.</span>
+                </span>
+                <ArrowRight className="h-5 w-5 shrink-0 text-tiba-gold" />
+              </button>
+            </div>
+          </section>
+
+          <LocationPermissionBanner
+            status={locationAccess.status}
+            error={locationAccess.error}
+            onRetry={locationAccess.requestAccess}
+          />
 
           {/* MAIN CONTENT GRID */}
           <div className="grid gap-4 lg:grid-cols-3">

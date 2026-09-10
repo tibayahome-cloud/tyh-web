@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Modal } from "../../../shared/components/Modal";
@@ -6,9 +6,6 @@ import { Button } from "../../../shared/components/Button";
 import { Input } from "../../../shared/components/Input";
 import { Stepper } from "../../../shared/components/Stepper";
 import { Loading } from "../../../shared/components/Loading";
-import { useMutation } from "@tanstack/react-query";
-
-import { saveProviderPreference } from "../../../shared/libs/telemedicineOps";
 import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
 import {
   fetchTelemedicineCatalogServices,
@@ -37,7 +34,14 @@ import {
   useTelemedicinePolicy
 } from "../../../shared/hooks/useTelemedicine";
 import { bookingKeys } from "../../../shared/hooks/useBookings";
-import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
+import {
+  facilityLocalDateRange,
+  facilityLocalDayLabel,
+  facilityToday,
+  formatTelemedicineDateTime,
+  groupSlotsByFacilityLocalDate,
+  TELEMEDICINE_DEFAULT_TIMEZONE
+} from "../../../shared/utils/telemedicine";
 
 type TelemedicineRequestDialogProps = {
   open: boolean;
@@ -56,11 +60,12 @@ type RemoteServiceOption = {
   active?: boolean;
 };
 
-const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, confirm: 3 } as const;
+const TM_STEP_INDEX = { service: 0, facility: 1, preferences: 2, slot: 3, confirm: 4 } as const;
 
 const TM_STEPS = [
   { title: "Service", description: "What kind of consultation?" },
   { title: "Facility", description: "Choose a care site" },
+  { title: "Preferences", description: "Optional requests" },
   { title: "Slot", description: "Pick a time" },
   { title: "Confirm", description: "Review & pay" }
 ];
@@ -76,7 +81,14 @@ const formatSlotTime = (iso: string, timezone: string | undefined) =>
 const formatSlotDate = (iso: string, timezone: string | undefined) =>
   formatTelemedicineDateTime(iso, timezone, { weekday: "short", month: "short", day: "numeric" });
 
-const todayISODate = () => new Date().toISOString().slice(0, 10);
+// Deliberately not new Date().toISOString(), which yields the UTC date: between 21:00 and
+// midnight in Nairobi that already names tomorrow, so the picker opened on the wrong day and
+// the "min" bound blocked a date that was still today for the client.
+const WEEK_LENGTH = 7;
+
+// Mirrors MAX_SLOT_LOOKAHEAD_DAYS in app/services/telemedicine_service.py. Asking beyond it
+// is refused, so the picker stops offering weeks it knows the API will reject.
+const MAX_LOOKAHEAD_DAYS = 30;
 
 const useRemoteServiceOptions = (enabled: boolean) =>
   useQuery({
@@ -102,12 +114,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
-  const [selectedDate, setSelectedDate] = useState(todayISODate());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
-  const [preferenceSaveError, setPreferenceSaveError] = useState<string | null>(null);
+  // Guards against a double-tap sending two M-Pesa prompts; see handlePay.
+  const payInFlightRef = useRef(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(0);
@@ -132,13 +145,54 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
   });
+  // The facility's own zone decides which calendar the client is picking from. The policy
+  // default is a fallback for a facility the API sent no timezone for -- it is one value for
+  // the whole platform, so it is only correct while every facility shares it.
+  const facilityTimezone =
+    selectedFacility?.timezone ?? policyQuery.data?.defaultTimezone ?? TELEMEDICINE_DEFAULT_TIMEZONE;
+
+  // The first day the client may pick, in the facility's calendar rather than the device's.
+  const earliestDate = facilityToday(facilityTimezone);
+
+  // Which week is on screen, kept separate from which day is chosen. Deriving the week from
+  // the selection made the strip slide forward on every click, so picking the last day threw
+  // away the earlier ones and there was no way back.
+  const [weekOffset, setWeekOffset] = useState(0);
+  const weekStart = useMemo(
+    () => facilityLocalDateRange(earliestDate, weekOffset * WEEK_LENGTH + 1).at(-1) ?? earliestDate,
+    [earliestDate, weekOffset]
+  );
+  const weekDates = useMemo(() => facilityLocalDateRange(weekStart, WEEK_LENGTH), [weekStart]);
+  const canGoBack = weekOffset > 0;
+  // The API refuses a range wider than its lookahead, so the last week we may show is the one
+  // that still ends inside it.
+  const canGoForward = (weekOffset + 1) * WEEK_LENGTH < MAX_LOOKAHEAD_DAYS;
+
+  // One request for the whole visible week. The backend cost is the same as a single day --
+  // the fan-out was per provider, not per date -- so a week of counts is effectively free,
+  // and the client stops guessing dates blind.
   const slotsQuery = useAvailableSlots(
     selectedFacility?.id ?? null,
     selectedFacility?.facilityServiceId ?? null,
-    selectedDate,
-    undefined,
+    weekStart,
+    weekDates[weekDates.length - 1],
     { enabled: open && step === TM_STEP_INDEX.slot && Boolean(selectedFacility) }
   );
+
+  // Prefer the zone the slots themselves arrived with: it travels with the instants it
+  // explains, so it cannot drift from them the way a separately-fetched value can.
+  const slotTimezone = slotsQuery.data?.timezone ?? facilityTimezone;
+  const slotsByDate = useMemo(
+    () => groupSlotsByFacilityLocalDate(slotsQuery.data?.slots ?? [], slotTimezone),
+    [slotsQuery.data, slotTimezone]
+  );
+  const activeDate = selectedDate ?? weekStart;
+  const weekRangeLabel = useMemo(() => {
+    const first = facilityLocalDayLabel(weekDates[0] ?? weekStart);
+    const last = facilityLocalDayLabel(weekDates[weekDates.length - 1] ?? weekStart);
+    return `${first.weekday} ${first.day} \u2013 ${last.weekday} ${last.day}`;
+  }, [weekDates, weekStart]);
+  const slotsForActiveDate = slotsByDate.get(activeDate) ?? [];
   const holdQuery = useHoldQuery(holdId, {
     enabled: Boolean(holdId),
     refetchInterval: holdId ? 4000 : false
@@ -147,10 +201,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const createHoldMutation = useCreateHoldMutation();
   const releaseHoldMutation = useReleaseHoldMutation();
   const initiatePaymentMutation = useInitiateHoldPaymentMutation();
-  const savePreference = useMutation({
-    mutationFn: ({ bookingId, preference: next }: { bookingId: string; preference: Partial<ProviderPreference> }) =>
-      saveProviderPreference(bookingId, next)
-  });
 
   const catalogServiceOptions = (catalogServicesQuery.data ?? []).map((service) => ({
     id: service.id,
@@ -229,8 +279,10 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
     setSelectedFacility(null);
+    setSelectedDate(null);
     setSelectedSlot(null);
     setHoldId(null);
+    setPreference({});
     setSubmitError(null);
     onClose();
   };
@@ -244,7 +296,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         facilityId: selectedFacility.id,
         facilityServiceId: selectedFacility.facilityServiceId,
         startAt: slot.startAt,
-        idempotencyKey: `${selectedFacility.facilityServiceId}:${slot.startAt}`
+        // This key identifies one hold attempt, not the appointment slot forever. Reusing a
+        // slot-derived key would make a later selection return the same expired hold.
+        idempotencyKey: crypto.randomUUID()
       });
       queryClient.setQueryData(["telemedicine", "hold", newHold.id], newHold);
       setHoldId(newHold.id);
@@ -259,38 +313,46 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     if (!holdId) return;
     setPhoneTouched(true);
     setSubmitError(null);
-    setPreferenceSaveError(null);
     // Catch an unusable number here, before the STK push is even requested, rather than letting
     // the client find out only after the backend rejects it.
     if (mpesaPhoneValidationError(phone)) {
       return;
     }
+    // A ref, not the mutation's isPending: that only turns true after React re-renders, so
+    // two clicks in the same tick would both get through and send two M-Pesa prompts. The
+    // disabled button is the visible half of this; the ref is the half that actually holds.
+    if (payInFlightRef.current || paymentInitiated) {
+      return;
+    }
+    payInFlightRef.current = true;
+
     try {
-      // Saved before payment is requested, so a preference the client took the trouble to
-      // express is recorded even if the M-Pesa prompt is never approved. A failure here must
-      // not block the payment: an unsaved preference is a disappointment, an unpaid booking is
-      // a lost appointment.
-      if (hold?.bookingId && Object.values(preference).some(Boolean)) {
-        try {
-          await savePreference.mutateAsync({ bookingId: hold.bookingId, preference });
-        } catch {
-          setPreferenceSaveError(
-            "Your provider preference could not be saved. Payment can continue, but the facility may not see it."
-          );
-        }
-      }
-      await initiatePaymentMutation.mutateAsync({ holdId, phone: phone.trim() || undefined });
+      const hasPreference = Object.values(preference).some(Boolean);
+      await initiatePaymentMutation.mutateAsync({
+        holdId,
+        phone: phone.trim() || undefined,
+        ...(hasPreference ? { preference } : {})
+      });
       toast.showToast({
         title: "Payment initiated",
         description: "Check your phone to approve the M-Pesa prompt."
       });
     } catch (error) {
       setSubmitError(classifyApiError(error, "Unable to start payment."));
+    } finally {
+      payInFlightRef.current = false;
     }
   };
 
   const phoneError = phoneTouched ? mpesaPhoneValidationError(phone) : null;
-  const paymentInitiated = Boolean(hold?.bookingId) && initiatePaymentMutation.isSuccess;
+  // Derived from the server, not only from this page's mutation state: a reload, or coming
+  // back to a tab, must still show the prompt as outstanding rather than offering to send a
+  // second one. The local flag is kept as well so the UI reacts immediately, before the hold
+  // query refetches.
+  const paymentInitiated =
+    Boolean(hold?.bookingId) && (initiatePaymentMutation.isSuccess || Boolean(hold?.paymentPending));
+  // Any work in flight that a second click would duplicate.
+  const paymentInFlight = initiatePaymentMutation.isPending;
   const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
 
   return (
@@ -382,7 +444,11 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       type="button"
                       onClick={() => {
                         setSelectedFacility(facility);
-                        setStep(TM_STEP_INDEX.slot);
+                        // Clear the day: another facility may keep a different calendar, so
+                        // the same date string would not mean the same window.
+                        setSelectedDate(null);
+                        setPreference({});
+                        setStep(TM_STEP_INDEX.preferences);
                       }}
                       className="w-full rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
                     >
@@ -402,22 +468,110 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
           </div>
         )}
 
+        {step === TM_STEP_INDEX.preferences && selectedFacility && (
+          <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            <div>
+              <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
+              <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
+            </div>
+            <ProviderPreferenceFields
+              value={preference}
+              alwaysExpanded
+              onChange={(next) => {
+                setPreference(next);
+              }}
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button type="button" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Continue to choose a time
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(TM_STEP_INDEX.slot)}>
+                Skip for now
+              </Button>
+            </div>
+            <div className="flex justify-start border-t border-slate-200 pt-3">
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
+                Back
+              </Button>
+            </div>
+          </div>
+        )}
+
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
-            <Input
-              label="Date"
-              type="date"
-              min={todayISODate()}
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-            />
+            {/* Week navigation, separate from day selection: choosing a day must not move
+                the window the client is looking at. */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setWeekOffset((current) => Math.max(0, current - 1))}
+                disabled={!canGoBack}
+                aria-label="Previous week"
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                &lsaquo;
+              </button>
+              <span className="text-xs font-medium text-slate-600">{weekRangeLabel}</span>
+              <button
+                type="button"
+                onClick={() => setWeekOffset((current) => current + 1)}
+                disabled={!canGoForward}
+                aria-label="Next week"
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                &rsaquo;
+              </button>
+            </div>
+            {/* A week of days with their counts, so the client can see where the openings are
+                instead of picking dates one at a time and being told there are none. */}
+            <div className="grid grid-cols-7 gap-1" role="group" aria-label="Choose a day">
+              {weekDates.map((date) => {
+                const label = facilityLocalDayLabel(date);
+                const count = (slotsByDate.get(date) ?? []).length;
+                const isActive = date === activeDate;
+                const isEmpty = !slotsQuery.isLoading && count === 0;
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    aria-pressed={isActive}
+                    disabled={isEmpty}
+                    onClick={() => setSelectedDate(date)}
+                    className={`flex flex-col items-center rounded-xl border px-1 py-2 transition ${
+                      isActive
+                        ? "border-tiba-blue bg-tiba-blue/5 text-tiba-blue"
+                        : "border-slate-200 text-slate-700 hover:border-tiba-blue"
+                    } ${isEmpty ? "cursor-not-allowed opacity-40" : ""}`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wide">{label.weekday}</span>
+                    <span className="text-base font-semibold">{label.day}</span>
+                    <span className="text-[10px] text-slate-500">
+                      {slotsQuery.isLoading ? "\u00a0" : count > 0 ? `${count} open` : "\u2014"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             {slotsQuery.isLoading && <Loading />}
-            {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
-            {!slotsQuery.isLoading && (slotsQuery.data ?? []).length === 0 && (
-              <p className="text-sm text-slate-500">No open slots on this date. Try another day.</p>
+            {slotsQuery.isError && (
+              <p className="text-sm text-slate-500">
+                We could not load appointment times. Close this and try again.
+              </p>
             )}
+            {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
+            {!slotsQuery.isLoading && !slotsQuery.isError && (slotsQuery.data?.slots ?? []).length === 0 && (
+              <p className="text-sm text-slate-500">
+                No open appointments in the next {WEEK_LENGTH} days at this facility.
+              </p>
+            )}
+            {!slotsQuery.isLoading && !slotsQuery.isError && slotsForActiveDate.length === 0 &&
+              (slotsQuery.data?.slots ?? []).length > 0 && (
+                <p className="text-sm text-slate-500">
+                  Nothing open on this day. Pick a day above with times available.
+                </p>
+              )}
             <div className="grid gap-2 sm:grid-cols-3">
-              {(slotsQuery.data ?? []).map((slot) => (
+              {slotsForActiveDate.map((slot) => (
                 <button
                   key={slot.startAt}
                   type="button"
@@ -425,13 +579,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   onClick={() => handleSelectSlot(slot)}
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
-                  <span className="block text-xs text-slate-400">{formatSlotDate(slot.startAt, policyQuery.data?.defaultTimezone)}</span>
-                  {formatSlotTime(slot.startAt, policyQuery.data?.defaultTimezone)}
+                  {formatSlotTime(slot.startAt, slotTimezone)} &ndash;{" "}
+                  {formatSlotTime(slot.endAt, slotTimezone)}
                 </button>
               ))}
             </div>
             <div className="flex justify-start">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.preferences)}>
                 Back
               </Button>
             </div>
@@ -444,29 +598,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
               <p className="text-sm text-slate-500">{selectedFacility.name}</p>
               <p className="mt-1 text-sm text-slate-700">
-                {formatSlotDate(selectedSlot.startAt, policyQuery.data?.defaultTimezone)} at{" "}
-                {formatSlotTime(selectedSlot.startAt, policyQuery.data?.defaultTimezone)}
+                {formatSlotDate(selectedSlot.startAt, slotTimezone)} at{" "}
+                {formatSlotTime(selectedSlot.startAt, slotTimezone)}
               </p>
               <p className="mt-2 text-lg font-semibold text-tiba-blue">
                 {formatCurrency(selectedFacility.priceCents, selectedFacility.currency)}
               </p>
             </div>
-
-            {/* Offered here because the booking now exists but no provider is assigned yet,
-                which is exactly the window the backend allows a preference to be set in. */}
-            {!holdExpired && !paymentConfirmed && hold?.bookingId && (
-              <>
-                <ProviderPreferenceFields
-                  value={preference}
-                  onChange={(next) => {
-                    setPreference(next);
-                    setPreferenceSaveError(null);
-                  }}
-                  disabled={savePreference.isPending}
-                />
-                {preferenceSaveError && <p className="text-sm text-amber-700">{preferenceSaveError}</p>}
-              </>
-            )}
 
             {!holdExpired && !paymentConfirmed && (
               <p className="text-xs text-amber-700">
@@ -477,7 +615,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
             {holdExpired && !paymentConfirmed && (
               <div className="space-y-3">
-                <p className="text-sm text-danger-600">This hold expired. Pick a new time to continue.</p>
+                <p className="text-sm text-danger-600">
+                  Your payment reservation expired before it was completed. The appointment date has not passed; choose a new time to continue.
+                </p>
                 <Button type="button" onClick={resetToStart}>
                   Choose another slot
                 </Button>
@@ -496,10 +636,19 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   error={phoneError ?? undefined}
                   hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
-                {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
+                {paymentInFlight && (
+                  <p role="status" className="text-sm text-slate-600">
+                    Preparing payment...
+                  </p>
+                )}
                 {!paymentInitiated ? (
-                  <Button type="button" loading={initiatePaymentMutation.isPending} onClick={handlePay}>
-                    Confirm & pay
+                  <Button
+                    type="button"
+                    loading={paymentInFlight}
+                    disabled={paymentInFlight}
+                    onClick={handlePay}
+                  >
+                    Confirm &amp; pay
                   </Button>
                 ) : (
                   <div className="space-y-3">
@@ -510,6 +659,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     />
                   </div>
                 )}
+                {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
               </>
             )}
 

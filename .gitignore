@@ -29,4 +29,10 @@ site/
 
 # Tests
 tests/
+# ...except the Playwright specs, which playwright.config.ts points testDir at. Ignoring the
+# whole directory meant no end-to-end test could ever be committed, so the configured runner
+# had nothing to run.
+!tests/
+!tests/e2e/
+!tests/e2e/**
 test-results/

@@ -8,9 +8,10 @@ import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorderOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 
 import { useAuth } from "../../../shared/hooks/useAuth";
-import { useProviderProfile } from "../hooks/useProviderProfile";
+import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
 import { useBookingStore } from "../../../shared/stores/useBookingStore";
 import { useBroadcastQueue } from "../hooks/useBroadcastQueue";
@@ -27,6 +28,7 @@ export const ProviderShell = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: profile } = useProviderProfile(user?.id);
+  const showPayments = !profile || providerFinancialsAreVisible(profile);
   const toast = useToast();
   const { unreadCount: conversationUnread } = useConversationBadge();
   const activeBookingCount = useBookingStore((state: { active: Record<string, any> }) => Object.keys(state.active).length);
@@ -83,6 +85,7 @@ export const ProviderShell = () => {
     { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Services", to: "/pro/services", icon: <MiscServicesIcon /> },
     { label: "Care", to: "/pro/selfcare", icon: <FavoriteBorderIcon /> },
+    ...(showPayments ? [{ label: "Payments", to: "/pro/payments", icon: <PaymentsIcon /> }] : []),
     { label: "Inbox", to: "/pro/inbox", icon: <ForumIcon />, badge: conversationUnread },
     { label: "Settings", to: "/pro/settings", icon: <SettingsIcon /> }
   ];

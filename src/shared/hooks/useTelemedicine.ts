@@ -15,6 +15,7 @@ import {
   initiateHoldPayment,
   joinSession,
   leaveSession,
+  proposeRebooking,
   releaseHold,
   reportNoShow,
   reportTechnicalIssue,
@@ -145,8 +146,12 @@ export const useReleaseHoldMutation = () => {
 export const useInitiateHoldPaymentMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ holdId, phone, method }: { holdId: string; phone?: string; method?: string }) =>
-      initiateHoldPayment(holdId, { phone, method }),
+    mutationFn: ({ holdId, phone, method, preference }: {
+      holdId: string;
+      phone?: string;
+      method?: string;
+      preference?: { preferredGender?: string | null; preferredLanguage?: string | null; note?: string | null };
+    }) => initiateHoldPayment(holdId, { phone, method, preference }),
     onSuccess: ({ hold }) => {
       queryClient.setQueryData(telemedicineKeys.hold(hold.id), hold);
     }
@@ -261,6 +266,18 @@ export const useAssignProviderMutation = () => {
   return useMutation({
     mutationFn: ({ bookingId, providerUserId }: { bookingId: string; providerUserId: string }) =>
       assignProvider(bookingId, providerUserId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
+    }
+  });
+};
+
+export const useProposeRebookingMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, proposedStartAt, reason }: { bookingId: string; proposedStartAt: string; reason?: string }) =>
+      proposeRebooking(bookingId, proposedStartAt, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: telemedicineKeys.assignments() }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);

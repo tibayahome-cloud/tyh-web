@@ -22,7 +22,12 @@ export const TelemedicineHoldSchema = z.object({
   expiresAt: z.string(),
   remainingSeconds: z.number().int().nonnegative(),
   bookingId: z.string().nullable(),
-  bookingStatus: z.string().nullable()
+  bookingStatus: z.string().nullable(),
+  // Whether the server already has an outstanding payment attempt for this booking. Booking
+  // status stays payment_pending from before the M-Pesa prompt is sent until after it is
+  // approved, so it cannot answer this on its own -- and a reload during that window would
+  // otherwise offer "Confirm & pay" for a prompt that is already on the client's phone.
+  paymentPending: z.boolean()
 });
 
 export type TelemedicineHold = z.infer<typeof TelemedicineHoldSchema>;
@@ -47,7 +52,10 @@ export const mapTelemedicineHold = (payload: unknown): TelemedicineHold | null =
     expiresAt: coerceDate(raw.expires_at) ?? "",
     remainingSeconds: Math.max(0, Math.floor(coerceNumber(raw.remaining_seconds) ?? 0)),
     bookingId: coerceId(bookingRaw.id) || null,
-    bookingStatus: coerceString(bookingRaw.status)
+    bookingStatus: coerceString(bookingRaw.status),
+    // Absent on an older backend: treated as "no attempt outstanding", which is the
+    // pre-existing behaviour rather than a new failure mode.
+    paymentPending: bookingRaw.payment_pending === true
   };
   const result = TelemedicineHoldSchema.safeParse(normalized);
   if (!result.success) {
@@ -97,6 +105,17 @@ export const TelemedicineAssignableProviderSchema = z.object({
 
 export type TelemedicineAssignableProvider = z.infer<typeof TelemedicineAssignableProviderSchema>;
 
+export const TELEMEDICINE_RECOVERY_STATES = ["assignable", "awaiting_client", "needs_rebooking"] as const;
+
+// Anything the backend adds later reads as "assignable" rather than crashing the queue, which
+// is the state the card already handles conservatively: it shows whatever providers came back,
+// and the backend still has the final say on the assign call.
+export const TelemedicineRecoveryStateSchema = z
+  .enum(TELEMEDICINE_RECOVERY_STATES)
+  .catch("assignable");
+
+export type TelemedicineRecoveryState = (typeof TELEMEDICINE_RECOVERY_STATES)[number];
+
 export const TelemedicineAssignmentBookingSchema = z.object({
   id: z.string(),
   facilityId: z.string(),
@@ -107,6 +126,11 @@ export const TelemedicineAssignmentBookingSchema = z.object({
   scheduledAt: z.string().nullable(),
   estimateDurationMinutes: z.number().nullable(),
   status: z.string(),
+  // What the operator can actually do with this booking. A booking whose slot hold lapsed is
+  // still in the queue -- it is still someone's problem -- but assigning it will be refused,
+  // so the card has to offer the recovery action instead.
+  recoveryState: TelemedicineRecoveryStateSchema,
+  paymentReviewPending: z.boolean(),
   assignableProviders: z.array(TelemedicineAssignableProviderSchema)
 });
 
@@ -129,6 +153,8 @@ export const mapTelemedicineAssignmentBooking = (payload: unknown): Telemedicine
     scheduledAt: coerceDate(raw.scheduled_at),
     estimateDurationMinutes: coerceNumber(raw.estimate_duration_minutes),
     status: coerceString(raw.status) ?? "",
+    recoveryState: raw.recovery_state ?? "assignable",
+    paymentReviewPending: raw.payment_review_pending === true,
     assignableProviders: providers.map((entry: unknown) => {
       const providerRaw = toObject(entry);
       return {
