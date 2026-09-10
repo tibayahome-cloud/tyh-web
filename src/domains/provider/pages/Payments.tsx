@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
@@ -52,6 +53,7 @@ const TransactionSkeleton = () => (
 const ProviderPayments = () => {
   const toast = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const profileQuery = useProviderProfile(user?.id);
   const financialsVisible = providerFinancialsAreVisible(profileQuery.data);
   const walletQuery = useWalletAccount({ enabled: !profileQuery.isLoading && financialsVisible });
@@ -77,6 +79,12 @@ const ProviderPayments = () => {
   const paidOutCents = earnings?.paidOutTotalCents ?? withdrawals
     .filter((entry) => entry.status.toLowerCase() === "disbursed" || entry.status.toLowerCase() === "succeeded")
     .reduce((total, entry) => total + entry.amountCents, 0);
+
+  useEffect(() => {
+    if (!profileQuery.isLoading && !financialsVisible) {
+      navigate("/pro/home", { replace: true });
+    }
+  }, [financialsVisible, navigate, profileQuery.isLoading]);
 
   const handleWithdraw = () => {
     const amount = Number.parseFloat(withdrawAmount);
@@ -172,25 +180,7 @@ const ProviderPayments = () => {
     );
   }
 
-  if (!financialsVisible) {
-    return (
-      <div className="space-y-6">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-slate-900">Payments & Wallet</h1>
-          <p className="text-sm text-slate-500">Track your available funds and withdrawal history.</p>
-        </header>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Payout visibility</p>
-          <h2 className="mt-2 text-xl font-bold text-neutral-900">Facility-managed</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
-            Financial details are handled by your facility administrator. Booking work remains visible in your
-            booking history, but wallet balances, payment amounts, commissions, and withdrawal actions are hidden.
-          </p>
-        </section>
-      </div>
-    );
-  }
+  if (!financialsVisible) return null;
 
   if (walletQuery.isError && earningsQuery.isError) {
     return (
