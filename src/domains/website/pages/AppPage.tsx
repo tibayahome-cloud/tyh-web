@@ -1,6 +1,6 @@
 
 import { Smartphone, Shield, Star, Clock, MapPin, History } from "lucide-react";
-import appImage from "../../../assets/images/app-showcase.png";
+import appImage from "../../../assets/images/app-showcase.webp";
 
 export const AppPage = () => {
     return (
