@@ -105,6 +105,17 @@ export const TelemedicineAssignableProviderSchema = z.object({
 
 export type TelemedicineAssignableProvider = z.infer<typeof TelemedicineAssignableProviderSchema>;
 
+export const TELEMEDICINE_RECOVERY_STATES = ["assignable", "awaiting_client", "needs_rebooking"] as const;
+
+// Anything the backend adds later reads as "assignable" rather than crashing the queue, which
+// is the state the card already handles conservatively: it shows whatever providers came back,
+// and the backend still has the final say on the assign call.
+export const TelemedicineRecoveryStateSchema = z
+  .enum(TELEMEDICINE_RECOVERY_STATES)
+  .catch("assignable");
+
+export type TelemedicineRecoveryState = (typeof TELEMEDICINE_RECOVERY_STATES)[number];
+
 export const TelemedicineAssignmentBookingSchema = z.object({
   id: z.string(),
   facilityId: z.string(),
@@ -115,6 +126,11 @@ export const TelemedicineAssignmentBookingSchema = z.object({
   scheduledAt: z.string().nullable(),
   estimateDurationMinutes: z.number().nullable(),
   status: z.string(),
+  // What the operator can actually do with this booking. A booking whose slot hold lapsed is
+  // still in the queue -- it is still someone's problem -- but assigning it will be refused,
+  // so the card has to offer the recovery action instead.
+  recoveryState: TelemedicineRecoveryStateSchema,
+  paymentReviewPending: z.boolean(),
   assignableProviders: z.array(TelemedicineAssignableProviderSchema)
 });
 
@@ -137,6 +153,8 @@ export const mapTelemedicineAssignmentBooking = (payload: unknown): Telemedicine
     scheduledAt: coerceDate(raw.scheduled_at),
     estimateDurationMinutes: coerceNumber(raw.estimate_duration_minutes),
     status: coerceString(raw.status) ?? "",
+    recoveryState: raw.recovery_state ?? "assignable",
+    paymentReviewPending: raw.payment_review_pending === true,
     assignableProviders: providers.map((entry: unknown) => {
       const providerRaw = toObject(entry);
       return {
