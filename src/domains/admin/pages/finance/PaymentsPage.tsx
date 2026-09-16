@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GridColDef } from "@mui/x-data-grid";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
+import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { DataGrid } from "../../../../shared/components/DataGrid";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
@@ -13,9 +14,15 @@ import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
-import { fetchAdminPayments, fetchFacilityPayments } from "../../../../shared/libs/payments";
+import {
+  fetchAdminPayments,
+  fetchFacilityPayments,
+  fetchUnmatchedC2BTransactions,
+  reassignPaymentBooking,
+  reconcileC2BTransaction
+} from "../../../../shared/libs/payments";
 import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schemas/payment";
-import type { PaymentListResult } from "../../../../shared/libs/payments";
+import type { PaymentListResult, UnmatchedC2BTransaction } from "../../../../shared/libs/payments";
 import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +31,10 @@ type PaymentRow = {
   id: string;
   rowNumber: number;
   bookingId: string;
+  bookingLabel: string;
+  clientName: string;
+  providerName: string;
+  facilityName: string;
   amountFormatted: string;
   amountCents: number;
   settlement: PaymentSettlement | null;
@@ -280,6 +291,59 @@ const PaymentsPage = () => {
     },
   });
 
+  // ── C2B reconciliation (super-admin only) ─────────────────────────────────
+  const queryClient = useQueryClient();
+  const [reconcileTxn, setReconcileTxn] = useState<UnmatchedC2BTransaction | null>(null);
+  const [reconcileBookingId, setReconcileBookingId] = useState("");
+  const [reconcileReason, setReconcileReason] = useState("");
+  const [reassignBookingId, setReassignBookingId] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
+  const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
+
+  const unmatchedC2BQuery = useQuery({
+    queryKey: ["admin", "finance", "c2b-unmatched"],
+    queryFn: () => fetchUnmatchedC2BTransactions(25),
+    enabled: canReadGlobalLedger
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: () => reconcileC2BTransaction(reconcileTxn!.id, reconcileBookingId.trim(), reconcileReason.trim()),
+    onSuccess: () => {
+      toast.showToast({ title: "Transaction reconciled", description: "The payment has been linked to the booking.", variant: "success" });
+      setReconcileTxn(null);
+      setReconcileBookingId("");
+      setReconcileReason("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "finance", "c2b-unmatched"] }).catch(() => undefined);
+      paymentsQuery.refetch();
+    },
+    onError: (error: unknown) => {
+      toast.showToast({
+        title: "Reconciliation failed",
+        description: error instanceof Error ? error.message : "Unable to reconcile this transaction.",
+        variant: "error"
+      });
+    }
+  });
+
+  const reassignMutation = useMutation({
+    mutationFn: (paymentId: string) => reassignPaymentBooking(paymentId, reassignBookingId.trim(), reassignReason.trim()),
+    onSuccess: () => {
+      toast.showToast({ title: "Payment reassigned", description: "The payment now belongs to the new booking.", variant: "success" });
+      setReassignDialogOpen(false);
+      setReassignBookingId("");
+      setReassignReason("");
+      setDetailPayment(null);
+      paymentsQuery.refetch();
+    },
+    onError: (error: unknown) => {
+      toast.showToast({
+        title: "Reassignment failed",
+        description: error instanceof Error ? error.message : "Unable to reassign this payment.",
+        variant: "error"
+      });
+    }
+  });
+
   // ── Flatten pages → raw payments ─────────────────────────────────────────
   const allPayments = useMemo<PaymentRecord[]>(
     () => paymentsQuery.data?.pages.flatMap((p) => p.payments) ?? [],
@@ -293,6 +357,10 @@ const PaymentsPage = () => {
         id:              p.id,
         rowNumber:       i + 1,
         bookingId:       p.bookingId,
+        bookingLabel:    p.bookingServiceName ?? "Booking",
+        clientName:      p.clientName ?? "—",
+        providerName:    p.providerName ?? "—",
+        facilityName:    p.facilityName ?? "—",
         amountCents:     p.amountCents,
         amountFormatted: formatKES(p.amountCents),
         settlement:      p.settlement,
@@ -346,13 +414,25 @@ const PaymentsPage = () => {
     () => [
       { field: "rowNumber", headerName: "#", width: 60, sortable: false },
       {
-        field: "bookingId",
-        headerName: "Booking ID",
+        field: "bookingLabel",
+        headerName: "Booking",
         flex: 1.2,
         minWidth: 180,
-        renderCell: ({ value }) => (
-          <span className="font-mono text-xs text-slate-700">{value}</span>
+        renderCell: ({ row }) => (
+          <span className="text-xs font-semibold text-slate-700">{(row as PaymentRow).bookingLabel}</span>
         ),
+      },
+      {
+        field: "clientName",
+        headerName: "Client",
+        flex: 1,
+        minWidth: 140,
+      },
+      {
+        field: "facilityName",
+        headerName: "Facility",
+        flex: 1,
+        minWidth: 140,
       },
       {
         field: "amountFormatted",
@@ -730,16 +810,22 @@ const PaymentsPage = () => {
 
             {/* Fields grid */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <DetailField label="Payment ID"       value={detailPayment.id}               mono />
-              <DetailField label="Booking ID"       value={detailPayment.bookingId}       mono />
-              <DetailField label="Client user ID"   value={detailPayment.clientUserId}   mono />
-              <DetailField label="Provider user ID" value={detailPayment.providerUserId} mono />
+              <DetailField label="Booking / service" value={detailPayment.bookingServiceName ?? "—"} />
+              <DetailField label="Facility"          value={detailPayment.facilityName ?? "—"} />
+              <DetailField label="Client"            value={detailPayment.clientName ?? "—"} />
+              <DetailField label="Provider"          value={detailPayment.providerName ?? "—"} />
               <DetailField label="Method"           value={detailPayment.channel ?? "mpesa"} />
               <DetailField label="Provider ref"     value={detailPayment.providerRef ?? detailPayment.mpesaReceiptNumber}     mono />
               <DetailField label="Initiated"        value={formatDateTime(detailPayment.initiatedAt ?? detailPayment.createdAt)} />
               <DetailField label="Succeeded"        value={formatDateTime(detailPayment.succeededAt ?? detailPayment.completedAt)} />
               {detailPayment.failedAt && (
                 <DetailField label="Failed at" value={formatDateTime(detailPayment.failedAt)} />
+              )}
+              {detailPayment.reviewStatus && (
+                <DetailField
+                  label="Review status"
+                  value={`${detailPayment.reviewStatus.status.replace(/_/g, " ")} (${detailPayment.reviewStatus.disputeType ?? "dispute"})`}
+                />
               )}
             </div>
 
@@ -799,11 +885,130 @@ const PaymentsPage = () => {
                     Retry payment
                   </Button>
                 )}
+                {canReadGlobalLedger && detailPayment.status === "succeeded" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setReassignBookingId("");
+                      setReassignReason("");
+                      setReassignDialogOpen(true);
+                    }}
+                  >
+                    Reassign booking
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         )}
       </Modal>
+
+      {/* ── Reassign payment confirmation ─────────────────────────────────── */}
+      <ConfirmDialog
+        open={reassignDialogOpen}
+        title="Reassign payment to a different booking"
+        description="Only succeeded payments that have not yet been settled can be reassigned. The backend will refuse this if settlement has already started."
+        confirmLabel="Reassign"
+        onConfirm={() => detailPayment && reassignMutation.mutate(detailPayment.id)}
+        onClose={() => setReassignDialogOpen(false)}
+        loading={reassignMutation.isPending}
+      >
+        <Input
+          label="Target booking ID"
+          value={reassignBookingId}
+          onChange={(event) => setReassignBookingId(event.target.value)}
+        />
+        <div className="mt-3">
+          <Input
+            label="Reason"
+            value={reassignReason}
+            onChange={(event) => setReassignReason(event.target.value)}
+          />
+        </div>
+      </ConfirmDialog>
+
+      {/* ── Unmatched C2B transactions (super-admin only) ─────────────────── */}
+      {canReadGlobalLedger && (
+        <Card
+          title="Unmatched C2B transactions"
+          description="Confirmed M-Pesa money that could not be matched to a booking automatically."
+          badge={`${unmatchedC2BQuery.data?.length ?? 0} pending`}
+        >
+          {unmatchedC2BQuery.isLoading ? (
+            <Loading />
+          ) : unmatchedC2BQuery.isError ? (
+            <p className="text-sm text-danger-600">Unable to load unmatched transactions.</p>
+          ) : (unmatchedC2BQuery.data?.length ?? 0) === 0 ? (
+            <p className="text-sm text-slate-500">No unmatched transactions.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2">Transaction ref</th>
+                    <th className="px-3 py-2">Amount</th>
+                    <th className="px-3 py-2">Bill ref</th>
+                    <th className="px-3 py-2">Payer</th>
+                    <th className="px-3 py-2">Failure reason</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {unmatchedC2BQuery.data?.map((txn) => (
+                    <tr key={txn.id}>
+                      <td className="px-3 py-2 font-mono text-xs text-slate-700">{txn.transId ?? "—"}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-900">{formatKES(txn.amountCents)}</td>
+                      <td className="px-3 py-2 text-slate-600">{txn.billRefNumber ?? "—"}</td>
+                      <td className="px-3 py-2 text-slate-600">{txn.payerName ?? txn.msisdn ?? "—"}</td>
+                      <td className="px-3 py-2 text-slate-500">{txn.matchFailureReason ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          variant="secondary"
+                          className="px-3 py-1 text-xs"
+                          onClick={() => {
+                            setReconcileTxn(txn);
+                            setReconcileBookingId("");
+                            setReconcileReason("");
+                          }}
+                        >
+                          Reconcile
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(reconcileTxn)}
+        title="Reconcile unmatched transaction"
+        description={
+          reconcileTxn
+            ? `Link ${formatKES(reconcileTxn.amountCents)} (${reconcileTxn.transId ?? "transaction"}) to the booking it belongs to. This settles it the same way an automatic match would.`
+            : undefined
+        }
+        confirmLabel="Reconcile"
+        onConfirm={() => reconcileMutation.mutate()}
+        onClose={() => setReconcileTxn(null)}
+        loading={reconcileMutation.isPending}
+      >
+        <Input
+          label="Booking ID"
+          value={reconcileBookingId}
+          onChange={(event) => setReconcileBookingId(event.target.value)}
+        />
+        <div className="mt-3">
+          <Input
+            label="Reason"
+            value={reconcileReason}
+            onChange={(event) => setReconcileReason(event.target.value)}
+          />
+        </div>
+      </ConfirmDialog>
     </div>
   );
 };

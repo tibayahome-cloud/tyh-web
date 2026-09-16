@@ -22,11 +22,24 @@ export const PaymentSettlementSchema = z.object({
 
 export type PaymentSettlement = z.infer<typeof PaymentSettlementSchema>;
 
+export const PaymentReviewStatusSchema = z.object({
+  disputeId: z.string(),
+  disputeType: z.string().nullable(),
+  status: z.string()
+});
+
+export type PaymentReviewStatus = z.infer<typeof PaymentReviewStatusSchema>;
+
 export const PaymentRecordSchema = z.object({
   id: z.string(),
   bookingId: z.string(),
+  bookingServiceName: z.string().nullable(),
+  facilityId: z.string().nullable(),
+  facilityName: z.string().nullable(),
   clientUserId: z.string().nullable(),
+  clientName: z.string().nullable(),
   providerUserId: z.string().nullable(),
+  providerName: z.string().nullable(),
   status: z.string(),
   channel: z.string().nullable(),
   providerRef: z.string().nullable(),
@@ -46,6 +59,7 @@ export const PaymentRecordSchema = z.object({
   updatedAt: z.string().nullable(),
   refundStatus: z.string().nullable(),
   refundedAt: z.string().nullable(),
+  reviewStatus: PaymentReviewStatusSchema.nullable(),
   settlement: PaymentSettlementSchema.nullable(),
   attempts: z.array(PaymentAttemptSchema),
   booking: BookingSchema.nullable().optional()
@@ -124,11 +138,26 @@ export const mapPayment = (payload: unknown): PaymentRecord | null => {
   const metadata = toObject(raw.meta_data ?? raw.metaData ?? raw.metadata);
   const settlement = mapPaymentSettlement(raw.b2b_settlement ?? raw.settlement ?? metadata.b2b_settlement);
 
+  const reviewStatusRaw = toObject(raw.review_status);
+  const reviewStatus = coerceId(reviewStatusRaw.dispute_id)
+    ? {
+        disputeId: coerceId(reviewStatusRaw.dispute_id) || "",
+        disputeType: coerceString(reviewStatusRaw.dispute_type),
+        status: coerceString(reviewStatusRaw.status) ?? "open"
+      }
+    : null;
+
   const normalized = {
     ...raw,
     bookingId: coerceId(raw.booking_id) || "",
+    bookingServiceName: coerceString(raw.booking_service_name),
+    facilityId: coerceId(raw.facility_id),
+    facilityName: coerceString(raw.facility_name),
     clientUserId: coerceId(raw.client_user_id),
+    clientName: coerceString(raw.client_name),
     providerUserId: coerceId(raw.provider_user_id),
+    providerName: coerceString(raw.provider_name),
+    reviewStatus,
     channel: coerceString(raw.channel ?? raw.method),
     providerRef: coerceString(raw.provider_ref ?? raw.providerRef),
     amountCents: coerceNumber(raw.amount_cents) ?? 0,

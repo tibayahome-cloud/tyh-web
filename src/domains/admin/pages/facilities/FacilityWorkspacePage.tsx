@@ -57,6 +57,7 @@ import type { Booking } from "../../../../shared/schemas/booking";
 import type { ServiceRequest, ServiceRequestCreateInput } from "../../../../shared/schemas/serviceRequest";
 import { STATUS_LABELS } from "../../../../shared/schemas/serviceRequest";
 import { useRbac } from "../../../../shared/hooks/useRbac";
+import { FacilityFinanceSection } from "./FacilityFinanceSection";
 import {
   fetchTelemedicineAdminCategories,
   fetchTelemedicineAdminServices,
@@ -582,6 +583,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const canManageServices = hasPermission("facility:services.manage");
   const canVerifyProviders = hasPermission("provider:verify");
   const canManageBookings = hasPermission("booking:manage");
+  const canManageFinance = hasPermission("facility:finance.manage");
 
   const [financialsVisible, setFinancialsVisible] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -1072,6 +1074,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         <WorkspaceStat label="Active services" value={String(activeServiceCount)} />
         <WorkspaceStat label="TYH fee" value={`${facility.platformFeePercent}%`} />
       </section>
+
+      {canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
+        <FacilityFinanceSection facilityId={String(facilityId)} canManage />
+      )}
 
       <Card title="Facility settings">
         {canManageFacility && (

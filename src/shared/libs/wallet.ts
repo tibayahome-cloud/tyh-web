@@ -1,7 +1,9 @@
 import api from "./api";
 import { mapWalletAccount, mapWalletWithdrawal } from "../schemas/wallet";
 import {
+  mapFacilityEarningsSummary,
   mapProviderEarningsSummary,
+  type FacilityEarningsSummary,
   type ProviderEarningsSummary,
   type WalletAccountResource,
   type WalletWithdrawal
@@ -140,6 +142,37 @@ export const fetchFacilityWithdrawals = async (
     .filter((entry): entry is WalletWithdrawal => Boolean(entry));
   const meta = mapListMeta(payload.meta, { total: withdrawals.length, page, size, totalPages: 1 });
   return { withdrawals, meta, raw: payload };
+};
+
+export const fetchFacilityEarningsSummary = async (facilityId: string): Promise<FacilityEarningsSummary> => {
+  const response = await api.get(`/facilities/${facilityId}/wallet`);
+  const summary = mapFacilityEarningsSummary(response.data?.data);
+  if (!summary) {
+    throw new Error("Facility earnings summary is unavailable");
+  }
+  return summary;
+};
+
+export const requestFacilityWithdrawal = async (facilityId: string, amountCents: number) => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/withdrawals`, {
+    amount_cents: amountCents
+  });
+  return response.data?.data as { id: string; status: string; payoutId: string; payoutPhoneMasked: string | null };
+};
+
+export const requestFacilityPayoutDestination = async (facilityId: string, phoneNumber: string) => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations`, {
+    phone_number: phoneNumber
+  });
+  return response.data?.data as { phone_masked: string | null; verified: boolean; active: boolean };
+};
+
+export const verifyFacilityPayoutDestination = async (facilityId: string, phoneNumber: string, code: string) => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations/verify`, {
+    phone_number: phoneNumber,
+    code
+  });
+  return response.data?.data as { phone_masked: string | null; verified: boolean; active: boolean };
 };
 
 export const fetchAdminWithdrawal = async (withdrawalId: string): Promise<WalletWithdrawal> => {
