@@ -67,13 +67,23 @@ const ReviewFlagRow = ({ issue }: { issue: TelemedicineTechnicalIssue }) => {
 type TechnicalIssueReviewListProps = {
   issues: TelemedicineTechnicalIssue[];
   isLoading: boolean;
+  isError?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
   emptyLabel?: string;
 };
 
 // Shared between the facility-scoped admin.ops queue and the platform-wide super-admin view --
 // the backend scopes GET /telemedicine/technical-issues per caller role, so the same list UI
 // works for both; only which issues are fetched differs.
-export const TechnicalIssueReviewList = ({ issues, isLoading, emptyLabel = "No open reports." }: TechnicalIssueReviewListProps) => {
+export const TechnicalIssueReviewList = ({
+  issues,
+  isLoading,
+  isError = false,
+  error,
+  onRetry,
+  emptyLabel = "No open reports."
+}: TechnicalIssueReviewListProps) => {
   const openIssues = issues.filter((issue) => issue.status !== "resolved");
 
   if (isLoading) {
@@ -81,6 +91,14 @@ export const TechnicalIssueReviewList = ({ issues, isLoading, emptyLabel = "No o
       <div className="py-12 text-center">
         <Loading label="Loading review flags…" />
       </div>
+    );
+  }
+  if (isError) {
+    return (
+      <ApiErrorBanner
+        {...classifyApiError(error, "We couldn't load technical issue reports right now.")}
+        onRetry={onRetry}
+      />
     );
   }
   if (openIssues.length === 0) {

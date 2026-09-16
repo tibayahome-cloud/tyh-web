@@ -104,6 +104,32 @@ describe("AssignmentQueuePage recovery states", () => {
   });
 });
 
+describe("assignment queue error state", () => {
+  it("shows a retryable error banner instead of the empty-queue message when the queue fails to load", async () => {
+    // Only isLoading was checked before; a fetch failure fell through to the same "No
+    // consultations waiting for assignment" copy as a genuinely empty queue.
+    const refetch = vi.fn();
+    hooks.useAssignmentQueue.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error(),
+      isFetching: false,
+      dataUpdatedAt: 0,
+      refetch
+    });
+
+    render(<AssignmentQueuePage />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText(/couldn't load the assignment queue/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no consultations waiting for assignment/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("offering a replacement time from outside the facility's timezone", () => {
   // Node re-reads process.env.TZ on assignment, so this moves the ambient zone the way sitting
   // at a machine in New York would. The submitted instant must not depend on it.
