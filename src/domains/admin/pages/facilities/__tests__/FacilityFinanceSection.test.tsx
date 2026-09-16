@@ -67,7 +67,10 @@ describe("FacilityFinanceSection", () => {
     fetchFacilityEarningsSummaryMock.mockResolvedValue(walletFixture());
     renderSection();
 
-    expect(await screen.findAllByText((_, node) => (node?.textContent ?? "").replace(/ /g, " ") === "KES 200.00")).not.toHaveLength(0);
+    const normalizeSpaces = (value: string) => value.split(String.fromCharCode(160)).join(" ");
+    expect(
+      await screen.findAllByText((_, node) => normalizeSpaces(node?.textContent ?? "") === "KES 200.00")
+    ).not.toHaveLength(0);
     expect(screen.getByText("07** ***123")).toBeInTheDocument();
     expect(screen.getByText("Verified")).toBeInTheDocument();
   });
