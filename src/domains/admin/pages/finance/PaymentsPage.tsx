@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GridColDef } from "@mui/x-data-grid";
 
@@ -23,7 +23,9 @@ import {
 } from "../../../../shared/libs/payments";
 import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schemas/payment";
 import type { PaymentListResult, UnmatchedC2BTransaction } from "../../../../shared/libs/payments";
+import { fetchFacilities, fetchFacility } from "../../../../shared/libs/facilities";
 import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
+import { FacilityFinancePanel } from "./FacilityFinancePanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -207,10 +209,58 @@ const DetailField = ({
 
 const PaymentsPage = () => {
   const toast = useToast();
-  const { roles } = useRbac();
+  const { roles, hasPermission } = useRbac();
+  const canManageFacilityFunds = hasPermission("facility:finance.manage");
   const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
   const facilityScopeQuery = useAdminFacilityScope(!canReadGlobalLedger);
-  const facilityId = facilityScopeQuery.facility?.id;
+  const scopedFacilityId = facilityScopeQuery.facility?.id;
+
+  // ── Facility selector (super-admin only) ──────────────────────────────────
+  // Facility admins are auto-scoped to their own facility above; a super admin instead
+  // opts into one facility's finance view, either via ?facilityId= (deep-linked from the
+  // facility workspace page's "Manage funds" button) or the search picker below.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(
+    () => searchParams.get("facilityId")
+  );
+  const [selectedFacilityName, setSelectedFacilityName] = useState<string | null>(null);
+  const [facilitySearch, setFacilitySearch] = useState("");
+  const [facilityPickerOpen, setFacilityPickerOpen] = useState(false);
+
+  const effectiveFacilityId = scopedFacilityId ?? (canReadGlobalLedger ? selectedFacilityId ?? undefined : undefined);
+
+  const facilityLookupQuery = useQuery({
+    queryKey: ["admin", "finance", "facility-lookup", selectedFacilityId],
+    queryFn: () => fetchFacility(selectedFacilityId as string),
+    enabled: canReadGlobalLedger && Boolean(selectedFacilityId) && !selectedFacilityName
+  });
+
+  const effectiveFacilityName =
+    facilityScopeQuery.facility?.name ?? selectedFacilityName ?? facilityLookupQuery.data?.name ?? null;
+
+  const facilitySearchQuery = useQuery({
+    queryKey: ["admin", "finance", "facility-search", facilitySearch],
+    queryFn: () => fetchFacilities({ search: facilitySearch.trim(), pageSize: 8 }),
+    enabled: canReadGlobalLedger && facilityPickerOpen && facilitySearch.trim().length > 1
+  });
+
+  const selectFacility = (id: string, name: string) => {
+    setSelectedFacilityId(id);
+    setSelectedFacilityName(name);
+    setFacilityPickerOpen(false);
+    setFacilitySearch("");
+    const next = new URLSearchParams(searchParams);
+    next.set("facilityId", id);
+    setSearchParams(next, { replace: true });
+  };
+
+  const clearFacilitySelection = () => {
+    setSelectedFacilityId(null);
+    setSelectedFacilityName(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("facilityId");
+    setSearchParams(next, { replace: true });
+  };
 
   // ── Committed filter state ────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState("all");
@@ -251,10 +301,10 @@ const PaymentsPage = () => {
 
   // ── Infinite query ────────────────────────────────────────────────────────
   const paymentsQuery = useInfiniteQuery({
-    queryKey: ["admin", "finance", "payments", { facilityId, statusFilter, methodFilter, bookingFilter, dateFrom, dateTo }],
+    queryKey: ["admin", "finance", "payments", { facilityId: effectiveFacilityId, statusFilter, methodFilter, bookingFilter, dateFrom, dateTo }],
     queryFn: ({ pageParam }) =>
       fetchPayments({
-        facilityId,
+        facilityId: effectiveFacilityId,
         pageParam,
         status:    statusFilter !== "all" ? statusFilter : undefined,
         method:    canReadGlobalLedger && methodFilter !== "all" ? methodFilter : undefined,
@@ -262,16 +312,16 @@ const PaymentsPage = () => {
         dateFrom:  canReadGlobalLedger ? dateFrom || undefined : undefined,
         dateTo:    canReadGlobalLedger ? dateTo || undefined : undefined,
     }),
-    initialPageParam: canReadGlobalLedger ? undefined : 1,
+    initialPageParam: effectiveFacilityId ? 1 : undefined,
     getNextPageParam: (lastPage) => {
-      if (facilityId) {
+      if (effectiveFacilityId) {
         return lastPage.meta.page.number < lastPage.meta.page.totalPages
           ? lastPage.meta.page.number + 1
           : undefined;
       }
       return lastPage.meta.next_cursor ?? undefined;
     },
-    enabled: canReadGlobalLedger || Boolean(facilityId)
+    enabled: canReadGlobalLedger || Boolean(scopedFacilityId)
   });
 
   // ── Retry mutation ────────────────────────────────────────────────────────
@@ -635,7 +685,7 @@ const PaymentsPage = () => {
     if (facilityScopeQuery.isLoading) {
       return <FinanceScopeNotice title="Payments" description="Resolving your facility scope..." detail="Payment records will appear once the facility scope is available." />;
     }
-    if (!facilityId) {
+    if (!scopedFacilityId) {
       return <FinanceScopeNotice title="Payments" description="Your facility scope could not be resolved." detail="Payment data is hidden until the account is linked to exactly one facility." />;
     }
   }
@@ -650,6 +700,73 @@ const PaymentsPage = () => {
           Inspect facility transactions and review backend-calculated B2B settlement splits.
         </p>
       </div>
+
+      {/* ── Facility scope bar (whose funds are being viewed) ─────────────── */}
+      {canReadGlobalLedger ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          {effectiveFacilityId ? (
+            <>
+              <span className="text-sm text-slate-600">
+                Viewing <span className="font-semibold text-slate-900">{effectiveFacilityName ?? "selected facility"}</span>
+              </span>
+              <Button type="button" variant="ghost" size="sm" onClick={clearFacilitySelection}>
+                Clear (view platform-wide)
+              </Button>
+            </>
+          ) : (
+            <div className="relative w-full sm:w-80">
+              <Input
+                label="Filter by facility"
+                placeholder="Search facility name…"
+                value={facilitySearch}
+                onFocus={() => setFacilityPickerOpen(true)}
+                onChange={(event) => {
+                  setFacilitySearch(event.target.value);
+                  setFacilityPickerOpen(true);
+                }}
+              />
+              {facilityPickerOpen && facilitySearch.trim().length > 1 && (
+                <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-elevated">
+                  {facilitySearchQuery.isLoading ? (
+                    <div className="p-3"><Loading /></div>
+                  ) : (facilitySearchQuery.data?.facilities.length ?? 0) === 0 ? (
+                    <p className="p-3 text-sm text-slate-500">No facilities match.</p>
+                  ) : (
+                    <ul className="max-h-64 overflow-y-auto py-1">
+                      {facilitySearchQuery.data?.facilities.map((facility) => (
+                        <li key={facility.id}>
+                          <button
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                            onClick={() => selectFacility(facility.id, facility.name)}
+                          >
+                            {facility.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        effectiveFacilityName && (
+          <p className="text-sm text-slate-600">
+            Your facility: <span className="font-semibold text-slate-900">{effectiveFacilityName}</span>
+          </p>
+        )
+      )}
+
+      {/* ── Facility finance workspace ──────────────────────────────────── */}
+      {effectiveFacilityId && (
+        <FacilityFinancePanel
+          facilityId={effectiveFacilityId}
+          facilityName={effectiveFacilityName}
+          canManageFunds={canManageFacilityFunds}
+        />
+      )}
 
       {/* ── Analytics cards ─────────────────────────────────────────────── */}
       {paymentsQuery.isLoading ? (

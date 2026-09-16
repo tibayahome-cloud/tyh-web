@@ -57,7 +57,7 @@ import type { Booking } from "../../../../shared/schemas/booking";
 import type { ServiceRequest, ServiceRequestCreateInput } from "../../../../shared/schemas/serviceRequest";
 import { STATUS_LABELS } from "../../../../shared/schemas/serviceRequest";
 import { useRbac } from "../../../../shared/hooks/useRbac";
-import { FacilityFinanceSection } from "./FacilityFinanceSection";
+import { FacilityFinanceSummaryCard } from "./FacilityFinanceSummaryCard";
 import {
   fetchTelemedicineAdminCategories,
   fetchTelemedicineAdminServices,
@@ -1076,7 +1076,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       </section>
 
       {canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
-        <FacilityFinanceSection facilityId={String(facilityId)} canManage />
+        <FacilityFinanceSummaryCard facilityId={String(facilityId)} />
       )}
 
       <Card title="Facility settings">
