@@ -12,6 +12,7 @@ import { useRbac } from "../../../../shared/hooks/useRbac";
 import { fetchAdminWithdrawals, fetchFacilityWithdrawals } from "../../../../shared/libs/wallet";
 import type { WalletWithdrawal } from "../../../../shared/schemas/wallet";
 import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
+import { getWithdrawalStatusLabel, getWithdrawalStatusTone } from "./paymentStatus";
 
 const STATUS_OPTIONS = [
   { label: "All statuses", value: "all" },
@@ -30,22 +31,6 @@ const formatCurrency = (valueCents: number, currency = "KES") =>
 
 const formatDateTime = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
-
-const statusTone = (status: string) => {
-  switch (status) {
-    case "disbursed":
-      return "bg-emerald-100 text-emerald-700";
-    case "requested":
-    case "approved":
-    case "disbursing":
-      return "bg-amber-100 text-amber-700";
-    case "rejected":
-    case "failed":
-      return "bg-rose-100 text-rose-700";
-    default:
-      return "bg-slate-200 text-slate-600";
-  }
-};
 
 const WithdrawalsPage = () => {
   const { roles } = useRbac();
@@ -285,8 +270,8 @@ const WithdrawalsPage = () => {
                         {formatCurrency(withdrawal.amountCents, withdrawal.currency)}
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusTone(withdrawal.status)}`}>
-                          {withdrawal.status.replace(/_/g, " ")}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getWithdrawalStatusTone(withdrawal.status)}`}>
+                          {getWithdrawalStatusLabel(withdrawal.status)}
                         </span>
                         {withdrawal.reason && (
                           <p className="mt-1 text-xs text-slate-500">Reason: {withdrawal.reason}</p>
@@ -345,7 +330,11 @@ const WithdrawalsPage = () => {
             <div className="grid gap-4 sm:grid-cols-2">
               <DetailField label="Request ID" value={selectedWithdrawal.id} />
               <DetailField label="Provider ID" value={selectedWithdrawal.requestedByUserId ?? "—"} />
-              <DetailField label="Status" value={selectedWithdrawal.status} tone={statusTone(selectedWithdrawal.status)} />
+              <DetailField
+                label="Status"
+                value={getWithdrawalStatusLabel(selectedWithdrawal.status)}
+                tone={getWithdrawalStatusTone(selectedWithdrawal.status)}
+              />
               <DetailField
                 label="Amount"
                 value={formatCurrency(selectedWithdrawal.amountCents, selectedWithdrawal.currency)}

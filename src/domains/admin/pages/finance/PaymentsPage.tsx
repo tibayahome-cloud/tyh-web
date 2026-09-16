@@ -10,10 +10,12 @@ import { DataGrid } from "../../../../shared/components/DataGrid";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
+import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
+import { classifyApiError } from "../../../../shared/utils/errors";
 import {
   fetchAdminPayments,
   fetchFacilityPayments,
@@ -25,6 +27,7 @@ import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schema
 import type { PaymentListResult, UnmatchedC2BTransaction } from "../../../../shared/libs/payments";
 import { fetchFacilities, fetchFacility } from "../../../../shared/libs/facilities";
 import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
+import { getPaymentStatusLabel, getPaymentStatusTone, STATUS_LABEL } from "./paymentStatus";
 import { FacilityFinancePanel } from "./FacilityFinancePanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,12 +56,12 @@ type PaymentRow = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS = [
-  { label: "All statuses", value: "all" },
-  { label: "Pending",      value: "pending" },
-  { label: "Succeeded",    value: "succeeded" },
-  { label: "Failed",       value: "failed" },
-  { label: "Refunded",     value: "refunded" },
-  { label: "Cancelled",    value: "cancelled" },
+  { label: "All statuses",        value: "all" },
+  { label: STATUS_LABEL.pending,   value: "pending" },
+  { label: STATUS_LABEL.succeeded, value: "succeeded" },
+  { label: STATUS_LABEL.failed,    value: "failed" },
+  { label: STATUS_LABEL.refunded,  value: "refunded" },
+  { label: STATUS_LABEL.cancelled, value: "cancelled" },
 ];
 
 const METHOD_OPTIONS = [
@@ -92,16 +95,6 @@ const formatDateTime = (iso: string | null | undefined) =>
     : "—";
 
 // ─── Status styling ───────────────────────────────────────────────────────────
-
-const statusTone = (status: string) => {
-  switch (status) {
-    case "succeeded": return "bg-emerald-100 text-emerald-700";
-    case "pending":   return "bg-amber-100 text-amber-700";
-    case "failed":    return "bg-rose-100 text-rose-700";
-    case "refunded":  return "bg-indigo-100 text-indigo-700";
-    default:          return "bg-slate-200 text-slate-600";
-  }
-};
 
 const SettlementCell = ({ settlement }: { settlement: PaymentSettlement | null }) => {
   if (!settlement) {
@@ -504,8 +497,8 @@ const PaymentsPage = () => {
         headerName: "Status",
         minWidth: 130,
         renderCell: ({ value }) => (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusTone(value as string)}`}>
-            {(value as string).replace(/_/g, " ")}
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getPaymentStatusTone(value as string)}`}>
+            {getPaymentStatusLabel(value as string)}
           </span>
         ),
       },
@@ -768,138 +761,148 @@ const PaymentsPage = () => {
         />
       )}
 
-      {/* ── Analytics cards ─────────────────────────────────────────────── */}
-      {paymentsQuery.isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
-          ))}
-        </div>
+      {/* ── Payments query error ────────────────────────────────────────── */}
+      {paymentsQuery.isError ? (
+        <ApiErrorBanner
+          {...classifyApiError(paymentsQuery.error, "We couldn't load payments right now.")}
+          onRetry={() => paymentsQuery.refetch()}
+        />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Total volume (succeeded)"
-            primary={formatKES(analytics.succeededVol)}
-            secondary={`${numberFormatter.format(analytics.succeededCount)} transactions`}
-            accent="emerald"
-          />
-          <MetricCard
-            label="Pending"
-            primary={formatKES(analytics.pendingVol)}
-            secondary={`${numberFormatter.format(analytics.pendingCount)} awaiting settlement`}
-            accent="amber"
-          />
-          <MetricCard
-            label="Failed"
-            primary={numberFormatter.format(analytics.failedCount)}
-            secondary={`Failure rate ${analytics.failureRate}% • avg ${analytics.avgRetries} retries`}
-            accent="rose"
-          />
-          <MetricCard
-            label="Refunded"
-            primary={formatKES(analytics.refundedVol)}
-            secondary={`${numberFormatter.format(analytics.refundedCount)} refunds issued`}
-            accent="indigo"
-          />
-        </div>
-      )}
-
-      {/* ── Filters row ─────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-
-        {/* Left — record count + active chips */}
-        <div className="flex flex-col gap-2">
-          {!paymentsQuery.isLoading && (
-            <p className="text-sm text-slate-500">
-              {numberFormatter.format(analytics.total)} payments loaded
-              {paymentsQuery.hasNextPage && " (more available)"}
-            </p>
+        <>
+          {/* ── Analytics cards ─────────────────────────────────────────── */}
+          {paymentsQuery.isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-20 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Total volume (succeeded)"
+                primary={formatKES(analytics.succeededVol)}
+                secondary={`${numberFormatter.format(analytics.succeededCount)} transactions`}
+                accent="emerald"
+              />
+              <MetricCard
+                label="Pending"
+                primary={formatKES(analytics.pendingVol)}
+                secondary={`${numberFormatter.format(analytics.pendingCount)} awaiting settlement`}
+                accent="amber"
+              />
+              <MetricCard
+                label="Failed"
+                primary={numberFormatter.format(analytics.failedCount)}
+                secondary={`Failure rate ${analytics.failureRate}% • avg ${analytics.avgRetries} retries`}
+                accent="rose"
+              />
+              <MetricCard
+                label="Refunded"
+                primary={formatKES(analytics.refundedVol)}
+                secondary={`${numberFormatter.format(analytics.refundedCount)} refunds issued`}
+                accent="indigo"
+              />
+            </div>
           )}
-          <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-            {filterSummaryChips.length > 0
-              ? filterSummaryChips.map((chip) => (
-                  <span key={chip} className="rounded-full bg-slate-200 px-3 py-1">{chip}</span>
-                ))
-              : <span className="text-slate-400">Showing all payments</span>
-            }
-          </div>
-        </div>
 
-        {/* Right — filter button */}
-        <div ref={filterMenuRef} className="relative">
-          <Button
-            variant={hasActiveFilters ? "primary" : "secondary"}
-            onClick={openFilters}
-            className="inline-flex items-center gap-2"
-          >
-            <span>Filters</span>
-            {hasActiveFilters && (
-              <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                {filterSummaryChips.length}
-              </span>
-            )}
-          </Button>
+          {/* ── Filters row ──────────────────────────────────────────────── */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
 
-          {filtersOpen && (
-            isMobileFilters ? (
-              <>
-                <div className="fixed inset-0 z-40 bg-slate-900/40" onClick={() => setFiltersOpen(false)} />
-                <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-base font-semibold text-slate-900">Filters</p>
-                    <button type="button" onClick={() => setFiltersOpen(false)} className="text-sm font-medium text-slate-500">
-                      Close
-                    </button>
-                  </div>
-                  {filterPanel}
-                </div>
-              </>
-            ) : (
-              <div className="absolute right-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
-                {filterPanel}
-              </div>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* ── Data table ──────────────────────────────────────────────────── */}
-      <Card padding="none">
-        {paymentsQuery.isLoading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Loading />
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="px-6 py-12 text-center text-sm text-slate-500">
-            No payments match the selected filters.
-          </div>
-        ) : (
-          <>
-            <DataGrid
-              rows={rows}
-              columns={columns}
-              loading={paymentsQuery.isFetchingNextPage}
-            />
-
-            <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
-              {paymentsQuery.hasNextPage ? (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => paymentsQuery.fetchNextPage()}
-                  loading={paymentsQuery.isFetchingNextPage}
-                >
-                  Load more payments
-                </Button>
-              ) : (
-                <p className="text-center text-xs text-slate-400">
-                  All payments loaded — {numberFormatter.format(rows.length)} total
+            {/* Left — record count + active chips */}
+            <div className="flex flex-col gap-2">
+              {!paymentsQuery.isLoading && (
+                <p className="text-sm text-slate-500">
+                  {numberFormatter.format(analytics.total)} payments loaded
+                  {paymentsQuery.hasNextPage && " (more available)"}
                 </p>
               )}
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                {filterSummaryChips.length > 0
+                  ? filterSummaryChips.map((chip) => (
+                      <span key={chip} className="rounded-full bg-slate-200 px-3 py-1">{chip}</span>
+                    ))
+                  : <span className="text-slate-400">Showing all payments</span>
+                }
+              </div>
             </div>
-          </>
-        )}
-      </Card>
+
+            {/* Right — filter button */}
+            <div ref={filterMenuRef} className="relative">
+              <Button
+                variant={hasActiveFilters ? "primary" : "secondary"}
+                onClick={openFilters}
+                className="inline-flex items-center gap-2"
+              >
+                <span>Filters</span>
+                {hasActiveFilters && (
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {filterSummaryChips.length}
+                  </span>
+                )}
+              </Button>
+
+              {filtersOpen && (
+                isMobileFilters ? (
+                  <>
+                    <div className="fixed inset-0 z-40 bg-slate-900/40" onClick={() => setFiltersOpen(false)} />
+                    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-base font-semibold text-slate-900">Filters</p>
+                        <button type="button" onClick={() => setFiltersOpen(false)} className="text-sm font-medium text-slate-500">
+                          Close
+                        </button>
+                      </div>
+                      {filterPanel}
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute right-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+                    {filterPanel}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* ── Data table ───────────────────────────────────────────────── */}
+          <Card padding="none">
+            {paymentsQuery.isLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loading />
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="px-6 py-12 text-center text-sm text-slate-500">
+                No payments match the selected filters.
+              </div>
+            ) : (
+              <>
+                <DataGrid
+                  rows={rows}
+                  columns={columns}
+                  loading={paymentsQuery.isFetchingNextPage}
+                />
+
+                <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+                  {paymentsQuery.hasNextPage ? (
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => paymentsQuery.fetchNextPage()}
+                      loading={paymentsQuery.isFetchingNextPage}
+                    >
+                      Load more payments
+                    </Button>
+                  ) : (
+                    <p className="text-center text-xs text-slate-400">
+                      All payments loaded — {numberFormatter.format(rows.length)} total
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </Card>
+        </>
+      )}
 
       {/* ── Detail modal ─────────────────────────────────────────────────── */}
       <Modal
@@ -912,8 +915,8 @@ const PaymentsPage = () => {
 
             {/* Status / amount banner */}
             <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusTone(detailPayment.status)}`}>
-                {detailPayment.status.replace(/_/g, " ")}
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${getPaymentStatusTone(detailPayment.status)}`}>
+                {getPaymentStatusLabel(detailPayment.status)}
               </span>
               <span className="text-lg font-semibold text-slate-900">
                 {formatKES(detailPayment.amountCents)}
@@ -967,8 +970,7 @@ const PaymentsPage = () => {
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-slate-500">
-                  Settlement metadata was not returned for this payment. Facility wallet and automatic facility payout
-                  flows should remain hidden until backend support exists.
+                  A settlement breakdown isn't available for this payment yet. Check back once it's been processed.
                 </p>
               )}
             </div>

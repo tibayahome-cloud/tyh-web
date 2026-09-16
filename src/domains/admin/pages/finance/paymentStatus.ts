@@ -78,3 +78,74 @@ export const describeRefund = (status: string | null) => {
   if (status === "failed") return { label: "Refund failed", tone: "bg-rose-100 text-rose-700" };
   return { label: "Refund pending", tone: "bg-amber-100 text-amber-700" };
 };
+
+const FALLBACK_TONE = "bg-slate-200 text-slate-600";
+
+/** A status value the backend can send that isn't in our vocabulary yet: fall back to the raw text. */
+const humanizeUnknown = (status: string) => status.replace(/_/g, " ");
+
+/** Safe accessors for `status` fields typed as `string` on the wire, not the narrower literal union. */
+export const getPaymentStatusLabel = (status: string): string =>
+  STATUS_LABEL[status as PaymentStatusValue] ?? humanizeUnknown(status);
+
+export const getPaymentStatusTone = (status: string): string =>
+  STATUS_TONE[status as PaymentStatusValue] ?? FALLBACK_TONE;
+
+/**
+ * Withdrawal status vocabulary, kept separate from payment status.
+ *
+ * A withdrawal moves through its own lifecycle (requested -> approved -> disbursing ->
+ * disbursed) that doesn't map onto payment states, but three pages were each re-describing it
+ * inline with slightly different status sets. This is the one place it's described.
+ */
+export type WithdrawalStatusValue =
+  | "requested"
+  | "approved"
+  | "pending"
+  | "disbursing"
+  | "processing"
+  | "disbursed"
+  | "paid"
+  | "completed"
+  | "succeeded"
+  | "rejected"
+  | "failed"
+  | "reversed";
+
+export const WITHDRAWAL_STATUS_LABEL: Record<WithdrawalStatusValue, string> = {
+  requested: "Requested",
+  approved: "Approved",
+  pending: "Pending",
+  disbursing: "Disbursing",
+  processing: "Processing",
+  disbursed: "Disbursed",
+  paid: "Paid",
+  completed: "Completed",
+  succeeded: "Succeeded",
+  rejected: "Rejected",
+  failed: "Failed",
+  reversed: "Reversed"
+};
+
+export const WITHDRAWAL_STATUS_TONE: Record<WithdrawalStatusValue, string> = {
+  requested: "bg-amber-100 text-amber-700",
+  approved: "bg-amber-100 text-amber-700",
+  pending: "bg-amber-100 text-amber-700",
+  disbursing: "bg-amber-100 text-amber-700",
+  processing: "bg-amber-100 text-amber-700",
+  disbursed: "bg-emerald-100 text-emerald-700",
+  paid: "bg-emerald-100 text-emerald-700",
+  completed: "bg-emerald-100 text-emerald-700",
+  succeeded: "bg-emerald-100 text-emerald-700",
+  rejected: "bg-rose-100 text-rose-700",
+  failed: "bg-rose-100 text-rose-700",
+  reversed: "bg-rose-100 text-rose-700"
+};
+
+const normalizeWithdrawalStatus = (status: string) => status.trim().toLowerCase() as WithdrawalStatusValue;
+
+export const getWithdrawalStatusLabel = (status: string): string =>
+  WITHDRAWAL_STATUS_LABEL[normalizeWithdrawalStatus(status)] ?? humanizeUnknown(status);
+
+export const getWithdrawalStatusTone = (status: string): string =>
+  WITHDRAWAL_STATUS_TONE[normalizeWithdrawalStatus(status)] ?? FALLBACK_TONE;

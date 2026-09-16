@@ -128,9 +128,37 @@ describe("FacilityFinancePanel", () => {
     renderPanel();
 
     await user.click(await screen.findByRole("button", { name: /withdrawal history/i }));
-    expect(await screen.findByText("disbursed")).toBeInTheDocument();
+    expect(await screen.findByText("Disbursed", { selector: "span" })).toBeInTheDocument();
     expect(
       await screen.findAllByText((_, node) => (node?.textContent ?? "").includes("50.00"))
     ).not.toHaveLength(0);
+  });
+
+  it("shows why a withdrawal was rejected instead of leaving the admin to guess", async () => {
+    // The wallet schema always carried `failureReason` on a withdrawal, but this history table
+    // never rendered it -- a rejected withdrawal showed only "rejected", with no way to see why
+    // without leaving the page.
+    fetchFacilityEarningsSummaryMock.mockResolvedValue(
+      walletFixture({
+        withdrawals: [
+          {
+            id: "w2",
+            amountCents: 3000,
+            status: "rejected",
+            requestedAt: "2026-07-30T10:00:00Z",
+            disbursedAt: null,
+            payoutRef: null,
+            payoutPhoneMasked: "07** ***123",
+            failureReason: "Payout number could not be verified"
+          }
+        ]
+      })
+    );
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByRole("button", { name: /withdrawal history/i }));
+    expect(await screen.findByText("Rejected")).toBeInTheDocument();
+    expect(screen.getByText("Payout number could not be verified")).toBeInTheDocument();
   });
 });

@@ -18,6 +18,7 @@ import {
   requestFacilityWithdrawal,
   verifyFacilityPayoutDestination
 } from "../../../../shared/libs/wallet";
+import { getWithdrawalStatusLabel, getWithdrawalStatusTone } from "./paymentStatus";
 
 const formatKES = (cents: number | undefined | null) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "KES", maximumFractionDigits: 2 }).format(
@@ -25,14 +26,6 @@ const formatKES = (cents: number | undefined | null) =>
   );
 
 const formatDateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : "—");
-
-const statusTone = (status: string) => {
-  const normalized = status.toLowerCase();
-  if (["succeeded", "disbursed", "paid", "completed"].includes(normalized)) return "bg-emerald-50 text-emerald-700";
-  if (["pending", "requested", "disbursing", "processing"].includes(normalized)) return "bg-amber-50 text-amber-700";
-  if (["failed", "rejected", "reversed"].includes(normalized)) return "bg-rose-50 text-rose-700";
-  return "bg-slate-100 text-slate-600";
-};
 
 const WalletStat = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -332,9 +325,12 @@ export const FacilityFinancePanel = ({
                   <tr key={entry.id}>
                     <td className="px-3 py-2 font-semibold text-slate-900">{formatKES(entry.amountCents)}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusTone(entry.status)}`}>
-                        {entry.status}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getWithdrawalStatusTone(entry.status)}`}>
+                        {getWithdrawalStatusLabel(entry.status)}
                       </span>
+                      {entry.failureReason && (
+                        <p className="mt-1 max-w-xs text-xs text-rose-600">{entry.failureReason}</p>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-slate-500">{formatDateTime(entry.requestedAt)}</td>
                     <td className="px-3 py-2 text-slate-500">{formatDateTime(entry.disbursedAt)}</td>
