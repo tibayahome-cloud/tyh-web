@@ -14,11 +14,10 @@ import { classifyApiError } from "../../../../shared/utils/errors";
 import { fetchReviewQueue } from "../../../../shared/libs/telemedicineOps";
 import {
   fetchFacilityEarningsSummary,
-  requestFacilityPayoutDestination,
-  requestFacilityWithdrawal,
-  verifyFacilityPayoutDestination
+  requestFacilityWithdrawal
 } from "../../../../shared/libs/wallet";
 import { getWithdrawalStatusLabel, getWithdrawalStatusTone } from "./paymentStatus";
+import { FacilityPayoutDestinationChangeVerifier } from "./FacilityPayoutDestinationChangeVerifier";
 
 const formatKES = (cents: number | undefined | null) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "KES", maximumFractionDigits: 2 }).format(
@@ -55,9 +54,6 @@ export const FacilityFinancePanel = ({
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [destinationModalOpen, setDestinationModalOpen] = useState(false);
-  const [destinationPhone, setDestinationPhone] = useState("");
-  const [destinationCode, setDestinationCode] = useState("");
-  const [destinationRequested, setDestinationRequested] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const walletQuery = useQuery({
@@ -94,43 +90,12 @@ export const FacilityFinancePanel = ({
     }
   });
 
-  const destinationRequestMutation = useMutation({
-    mutationFn: (phoneNumber: string) => requestFacilityPayoutDestination(facilityId, phoneNumber),
-    onSuccess: (result) => {
-      setDestinationRequested(true);
-      toast.showToast({
-        title: result.verified ? "Number already verified" : "Verification code sent",
-        description: result.verified
-          ? "This number can be used for facility withdrawals."
-          : `Check ${result.phone_masked ?? "the number"} for the one-time code.`,
-        variant: "success"
-      });
-    },
-    onError: (error: unknown) =>
-      toast.showToast({
-        title: "Unable to send code",
-        description: error instanceof Error ? error.message : "Try again later.",
-        variant: "error"
-      })
-  });
-
-  const destinationVerifyMutation = useMutation({
-    mutationFn: () => verifyFacilityPayoutDestination(facilityId, destinationPhone.trim(), destinationCode.trim()),
-    onSuccess: () => {
-      toast.showToast({ title: "Payout number verified", description: "This is now the active payout destination.", variant: "success" });
-      setDestinationPhone("");
-      setDestinationCode("");
-      setDestinationRequested(false);
-      setDestinationModalOpen(false);
-      invalidateWallet();
-    },
-    onError: (error: unknown) =>
-      toast.showToast({
-        title: "Code not accepted",
-        description: error instanceof Error ? error.message : "Try again.",
-        variant: "error"
-      })
-  });
+  const handleDestinationVerified = (result: { verified: boolean }) => {
+    if (!result.verified) return;
+    toast.showToast({ title: "Payout number verified", description: "This is now the active payout destination.", variant: "success" });
+    setDestinationModalOpen(false);
+    invalidateWallet();
+  };
 
   const wallet = walletQuery.data;
   const availableCents = Math.max(wallet?.availableBalanceCents ?? 0, 0);
@@ -240,48 +205,13 @@ export const FacilityFinancePanel = ({
         onClose={() => setDestinationModalOpen(false)}
         title="Set or change payout number"
       >
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Input
-              label="M-Pesa payout number"
-              type="tel"
-              placeholder="07xx xxx xxx"
-              value={destinationPhone}
-              onChange={(event) => {
-                setDestinationPhone(event.target.value);
-                setDestinationRequested(false);
-                setDestinationCode("");
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!destinationPhone.trim()}
-              loading={destinationRequestMutation.isPending}
-              onClick={() => destinationRequestMutation.mutate(destinationPhone.trim())}
-            >
-              Send code
-            </Button>
-          </div>
-          {destinationRequested && (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <Input
-                label="Verification code"
-                inputMode="numeric"
-                value={destinationCode}
-                onChange={(event) => setDestinationCode(event.target.value)}
-              />
-              <Button
-                type="button"
-                disabled={!destinationCode.trim()}
-                loading={destinationVerifyMutation.isPending}
-                onClick={() => destinationVerifyMutation.mutate()}
-              >
-                Verify
-              </Button>
-            </div>
-          )}
-        </div>
+        <FacilityPayoutDestinationChangeVerifier
+          facilityId={facilityId}
+          open={destinationModalOpen}
+          onCompleted={() => {
+            handleDestinationVerified({ verified: true });
+          }}
+        />
       </Modal>
 
       {/* ── Withdrawal request confirmation ───────────────────────────────── */}
