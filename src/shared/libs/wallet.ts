@@ -192,6 +192,7 @@ export type FacilityPayoutDestinationChange = {
   authorized: boolean;
   completed: boolean;
   failureReason: string | null;
+  resendAvailableAt: string | null;
 };
 
 const mapFacilityPayoutDestinationChange = (data: Record<string, unknown>): FacilityPayoutDestinationChange => ({
@@ -204,7 +205,8 @@ const mapFacilityPayoutDestinationChange = (data: Record<string, unknown>): Faci
   newPhoneMasked: String(data.new_phone_masked ?? ""),
   authorized: Boolean(data.authorized),
   completed: Boolean(data.completed),
-  failureReason: typeof data.failure_reason === "string" ? data.failure_reason : null
+  failureReason: typeof data.failure_reason === "string" ? data.failure_reason : null,
+  resendAvailableAt: typeof data.resend_available_at === "string" ? data.resend_available_at : null
 });
 
 export const fetchFacilityPayoutTrustedMethods = async (

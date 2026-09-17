@@ -34,6 +34,7 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
   const [challenge, setChallenge] = useState<FacilityPayoutDestinationChange | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const methodsQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId, "payout-trusted-methods"],
@@ -61,6 +62,12 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
   useEffect(() => {
     if (pendingQuery.data) setChallenge(pendingQuery.data);
   }, [pendingQuery.data]);
+
+  useEffect(() => {
+    if (!challenge?.resendAvailableAt) return undefined;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [challenge?.resendAvailableAt]);
 
   useEffect(() => {
     if (!selectedMethod && methodsQuery.data?.length) {
@@ -176,6 +183,11 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
 
   const authorized = challenge.status === "authorized";
   const purpose = authorized ? POSSESSION_PURPOSE : AUTHORIZATION_PURPOSE;
+  const resendWaitSeconds = Math.max(
+    0,
+    Math.ceil((new Date(challenge.resendAvailableAt ?? 0).getTime() - nowMs) / 1000)
+  );
+  const resendWaitLabel = `${Math.floor(resendWaitSeconds / 60).toString().padStart(2, "0")}:${(resendWaitSeconds % 60).toString().padStart(2, "0")}`;
   const alternateMethods = (methodsQuery.data ?? []).filter(
     (method) => method.optionId !== challenge.authorizationOptionId
   );
@@ -202,10 +214,10 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
         <Button
           type="button"
           variant="ghost"
-          disabled={busy}
+          disabled={busy || resendWaitSeconds > 0}
           onClick={() => void run(() => resendFacilityPayoutDestinationCode(facilityId, challenge.changeId, purpose), "A new code was sent")}
         >
-          Resend code
+          {resendWaitSeconds > 0 ? `Resend code (${resendWaitLabel})` : "Resend code"}
         </Button>
       </div>
       {!authorized && alternateMethods.length > 0 && (
@@ -229,7 +241,7 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
             <Button
               type="button"
               variant="outline"
-              disabled={!alternateMethod || busy}
+              disabled={!alternateMethod || busy || resendWaitSeconds > 0}
               loading={busy}
               onClick={() => void run(
                 () => resendFacilityPayoutDestinationCode(
@@ -241,7 +253,7 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
                 "A replacement code was sent"
               )}
             >
-              Send another way
+              {resendWaitSeconds > 0 ? `Try another contact (${resendWaitLabel})` : "Try another contact"}
             </Button>
           </div>
         </div>

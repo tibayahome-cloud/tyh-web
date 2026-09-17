@@ -46,13 +46,17 @@ const challenge = (overrides: Record<string, unknown> = {}) => ({
   authorized: false,
   completed: false,
   failureReason: null,
+  resendAvailableAt: null,
   ...overrides
 });
 
 describe("FacilityPayoutDestinationChangeVerifier", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fetchTrustedMethodsMock.mockResolvedValue([{ optionId: "method-1", channel: "admin_phone", label: "Trusted phone ending 123" }]);
+    fetchTrustedMethodsMock.mockResolvedValue([
+      { optionId: "method-1", channel: "admin_phone", label: "Trusted phone ending 123" },
+      { optionId: "method-2", channel: "admin_email", label: "Trusted email s***@example.com" }
+    ]);
     fetchPendingChangeMock.mockResolvedValue(null);
   });
 
@@ -99,5 +103,19 @@ describe("FacilityPayoutDestinationChangeVerifier", () => {
 
     expect(await screen.findByText(/ask a super-admin to recover the destination/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send authorization code/i })).toBeDisabled();
+  });
+
+  it("disables alternate delivery during the server-provided resend cooldown", async () => {
+    startChangeMock.mockResolvedValue(challenge({
+      resendAvailableAt: new Date(Date.now() + 45_000).toISOString()
+    }));
+    const user = userEvent.setup();
+    renderVerifier();
+
+    await user.type(await screen.findByLabelText(/new m-pesa payout number/i), "0712345678");
+    await user.click(screen.getByRole("button", { name: /send authorization code/i }));
+
+    const alternate = await screen.findByRole("button", { name: /try another contact \(00:[0-5][0-9]\)/i });
+    expect(alternate).toBeDisabled();
   });
 });
