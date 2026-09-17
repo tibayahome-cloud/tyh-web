@@ -124,3 +124,58 @@ export const fetchAdminPayment = async (
 export const retryPayment = async (paymentId: string) => {
   await api.post(`${ADMIN_PAYMENTS_BASE}/payments/${paymentId}/retry`);
 };
+
+export type UnmatchedC2BTransaction = {
+  id: string;
+  transId: string | null;
+  transTime: string | null;
+  amountCents: number;
+  billRefNumber: string | null;
+  msisdn: string | null;
+  payerName: string | null;
+  status: string;
+  matchFailureReason: string | null;
+  createdAt: string | null;
+};
+
+const mapUnmatchedC2BTransaction = (raw: Record<string, unknown>): UnmatchedC2BTransaction => {
+  const name = [raw.first_name, raw.middle_name, raw.last_name]
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join(" ");
+  return {
+    id: String(raw.id ?? ""),
+    transId: (raw.trans_id as string) ?? null,
+    transTime: (raw.trans_time as string) ?? null,
+    amountCents: typeof raw.amount_cents === "number" ? raw.amount_cents : 0,
+    billRefNumber: (raw.bill_ref_number as string) ?? null,
+    msisdn: (raw.msisdn as string) ?? null,
+    payerName: name || null,
+    status: (raw.status as string) ?? "unmatched",
+    matchFailureReason: (raw.match_failure_reason as string) ?? null,
+    createdAt: (raw.created_at as string) ?? null
+  };
+};
+
+export const fetchUnmatchedC2BTransactions = async (pageSize = 25): Promise<UnmatchedC2BTransaction[]> => {
+  const response = await api.get(`${ADMIN_PAYMENTS_BASE}/c2b/unmatched`, {
+    params: { "page[size]": pageSize }
+  });
+  const data = Array.isArray(response.data?.data) ? response.data.data : [];
+  return data.map((entry: Record<string, unknown>) => mapUnmatchedC2BTransaction(entry));
+};
+
+export const reconcileC2BTransaction = async (transactionId: string, bookingId: string, reason: string) => {
+  const response = await api.post(`${ADMIN_PAYMENTS_BASE}/c2b/${transactionId}/reconcile`, {
+    booking_id: bookingId,
+    reason
+  });
+  return response.data?.data as { payment_id: string; status: string };
+};
+
+export const reassignPaymentBooking = async (paymentId: string, bookingId: string, reason: string) => {
+  const response = await api.post(`${ADMIN_PAYMENTS_BASE}/payments/${paymentId}/reassign-booking`, {
+    booking_id: bookingId,
+    reason
+  });
+  return response.data?.data as { payment_id: string; booking_id: string };
+};

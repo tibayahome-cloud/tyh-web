@@ -37,13 +37,22 @@ const FacilityOverviewPage = () => {
     enabled: Boolean(facilityId)
   });
 
-  if (facilitiesQuery.isLoading || overviewQuery.isLoading) return <Loading fullHeight />;
-  if (facilitiesQuery.isError || overviewQuery.isError) {
+  // Each guard below reads only the query it names. Folding overviewQuery's own loading gap
+  // into the facilityId check (as this used to) meant a plain "still fetching the overview"
+  // moment briefly rendered as "not linked to a facility" -- overviewQuery.isLoading reports
+  // false for the one render right after it goes from disabled to enabled, before its fetch has
+  // actually started, so `!overviewQuery.data` alone caught that gap and misreported it.
+  if (facilitiesQuery.isLoading) return <Loading fullHeight />;
+  if (facilitiesQuery.isError) {
     return <Card title="Overview" description="The facility overview could not be loaded." />;
   }
-  if (!facilityId || !overviewQuery.data) {
+  if (!facilityId) {
     return <Card title="Overview" description="Your admin.ops account is not linked to exactly one facility." />;
   }
+  if (overviewQuery.isError) {
+    return <Card title="Overview" description="The facility overview could not be loaded." />;
+  }
+  if (overviewQuery.isLoading || !overviewQuery.data) return <Loading fullHeight />;
 
   const { facility, metrics, readiness } = overviewQuery.data;
   const readinessItems = [

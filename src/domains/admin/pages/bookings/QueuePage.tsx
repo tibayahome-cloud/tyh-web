@@ -6,6 +6,8 @@ import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
 import { Input } from "../../../../shared/components/Input";
+import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
+import { classifyApiError } from "../../../../shared/utils/errors";
 import { useBookingList, useCancelBookingMutation } from "../../../../shared/hooks/useBookings";
 import { updateDispute } from "../../../../shared/libs/bookings";
 import { useToast } from "../../../../shared/components/ToastProvider";
@@ -347,6 +349,13 @@ const AdminBookingQueuePage = () => {
         {bookingQuery.isLoading ? (
           <div className="py-12 text-center">
             <Loading label="Loading bookings…" />
+          </div>
+        ) : bookingQuery.isError ? (
+          <div className="p-6">
+            <ApiErrorBanner
+              {...classifyApiError(bookingQuery.error, "We couldn't load the booking queue right now.")}
+              onRetry={() => bookingQuery.refetch()}
+            />
           </div>
         ) : bookings.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500">No bookings in this queue.</p>
