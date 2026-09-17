@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const showToastMock = vi.fn();
 const fetchTrustedMethodsMock = vi.fn();
+const fetchPendingChangeMock = vi.fn();
 const startChangeMock = vi.fn();
 const authorizeChangeMock = vi.fn();
 const verifyNewMock = vi.fn();
@@ -16,6 +17,7 @@ vi.mock("../../../../../shared/components/ToastProvider", () => ({
 
 vi.mock("../../../../../shared/libs/wallet", () => ({
   fetchFacilityPayoutTrustedMethods: (...args: unknown[]) => fetchTrustedMethodsMock(...args),
+  fetchPendingFacilityPayoutDestinationChange: (...args: unknown[]) => fetchPendingChangeMock(...args),
   startFacilityPayoutDestinationChange: (...args: unknown[]) => startChangeMock(...args),
   authorizeFacilityPayoutDestinationChange: (...args: unknown[]) => authorizeChangeMock(...args),
   verifyNewFacilityPayoutDestination: (...args: unknown[]) => verifyNewMock(...args),
@@ -37,6 +39,7 @@ const challenge = (overrides: Record<string, unknown> = {}) => ({
   changeId: "change-1",
   changeType: "change",
   status: "pending_authorization",
+  authorizationOptionId: "method-1",
   authorizationChannel: "admin_phone",
   authorizationTargetMasked: "+254 *** 123",
   newPhoneMasked: "+254 *** 456",
@@ -50,6 +53,7 @@ describe("FacilityPayoutDestinationChangeVerifier", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fetchTrustedMethodsMock.mockResolvedValue([{ optionId: "method-1", channel: "admin_phone", label: "Trusted phone ending 123" }]);
+    fetchPendingChangeMock.mockResolvedValue(null);
   });
 
   it("starts a change with the selected trusted method and an idempotency key", async () => {

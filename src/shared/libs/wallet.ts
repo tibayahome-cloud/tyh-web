@@ -185,6 +185,7 @@ export type FacilityPayoutDestinationChange = {
   changeId: string;
   changeType: string;
   status: string;
+  authorizationOptionId: string;
   authorizationChannel: string;
   authorizationTargetMasked: string;
   newPhoneMasked: string;
@@ -197,6 +198,7 @@ const mapFacilityPayoutDestinationChange = (data: Record<string, unknown>): Faci
   changeId: String(data.change_id ?? ""),
   changeType: String(data.change_type ?? ""),
   status: String(data.status ?? ""),
+  authorizationOptionId: String(data.authorization_option_id ?? ""),
   authorizationChannel: String(data.authorization_channel ?? ""),
   authorizationTargetMasked: String(data.authorization_target_masked ?? ""),
   newPhoneMasked: String(data.new_phone_masked ?? ""),
@@ -229,6 +231,13 @@ export const startFacilityPayoutDestinationChange = async (
   return mapFacilityPayoutDestinationChange(response.data?.data ?? {});
 };
 
+export const fetchPendingFacilityPayoutDestinationChange = async (
+  facilityId: string
+): Promise<FacilityPayoutDestinationChange | null> => {
+  const response = await api.get(`/facilities/${facilityId}/wallet/payout-destinations/change/pending`);
+  return response.data?.data ? mapFacilityPayoutDestinationChange(response.data.data) : null;
+};
+
 export const authorizeFacilityPayoutDestinationChange = async (
   facilityId: string,
   changeId: string,
@@ -256,11 +265,13 @@ export const verifyNewFacilityPayoutDestination = async (
 export const resendFacilityPayoutDestinationCode = async (
   facilityId: string,
   changeId: string,
-  purpose: string
+  purpose: string,
+  optionId?: string
 ): Promise<FacilityPayoutDestinationChange> => {
   const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations/resend`, {
     change_id: changeId,
-    purpose
+    purpose,
+    ...(optionId ? { option_id: optionId } : {})
   });
   return mapFacilityPayoutDestinationChange(response.data?.data ?? {});
 };

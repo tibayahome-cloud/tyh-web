@@ -7,6 +7,7 @@ import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import {
   authorizeFacilityPayoutDestinationChange,
+  fetchPendingFacilityPayoutDestinationChange,
   fetchFacilityPayoutTrustedMethods,
   resendFacilityPayoutDestinationCode,
   startFacilityPayoutDestinationChange,
@@ -28,6 +29,7 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
   const toast = useToast();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [selectedMethod, setSelectedMethod] = useState("");
+  const [alternateMethod, setAlternateMethod] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState<FacilityPayoutDestinationChange | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,15 +41,26 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
     enabled: open
   });
 
+  const pendingQuery = useQuery({
+    queryKey: ["admin", "facilities", facilityId, "payout-destination-change", "pending"],
+    queryFn: () => fetchPendingFacilityPayoutDestinationChange(facilityId),
+    enabled: open
+  });
+
   useEffect(() => {
     if (!open) {
       setPhoneNumber("");
       setSelectedMethod("");
+      setAlternateMethod("");
       setCode("");
       setChallenge(null);
       setError(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (pendingQuery.data) setChallenge(pendingQuery.data);
+  }, [pendingQuery.data]);
 
   useEffect(() => {
     if (!selectedMethod && methodsQuery.data?.length) {
@@ -101,16 +114,22 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
     void run(verifyNewFacilityPayoutDestination.bind(null, facilityId, challenge.changeId, code.trim()));
   };
 
-  if (methodsQuery.isLoading) {
+  if (methodsQuery.isLoading || pendingQuery.isLoading) {
     return <p className="text-sm text-slate-500">Loading trusted verification methods…</p>;
   }
 
-  if (methodsQuery.isError) {
-    const classified = classifyApiError(methodsQuery.error, "We could not load the trusted verification methods.");
+  if (methodsQuery.isError || pendingQuery.isError) {
+    const classified = classifyApiError(
+      methodsQuery.error ?? pendingQuery.error,
+      "We could not load the payout destination verification state."
+    );
     return (
       <ApiErrorBanner
         {...classified}
-        onRetry={() => methodsQuery.refetch()}
+        onRetry={() => {
+          void methodsQuery.refetch();
+          void pendingQuery.refetch();
+        }}
       />
     );
   }
@@ -157,6 +176,9 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
 
   const authorized = challenge.status === "authorized";
   const purpose = authorized ? POSSESSION_PURPOSE : AUTHORIZATION_PURPOSE;
+  const alternateMethods = (methodsQuery.data ?? []).filter(
+    (method) => method.optionId !== challenge.authorizationOptionId
+  );
 
   return (
     <div className="space-y-4">
@@ -186,6 +208,44 @@ export const FacilityPayoutDestinationChangeVerifier = ({ facilityId, open, onCo
           Resend code
         </Button>
       </div>
+      {!authorized && alternateMethods.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-sm font-semibold text-slate-800">Didn&apos;t receive the code?</p>
+          <p className="mt-1 text-xs text-slate-600">Send a replacement code through another verified facility contact.</p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm font-medium text-slate-700">
+              Send replacement to
+              <select
+                className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                value={alternateMethod}
+                onChange={(event) => setAlternateMethod(event.target.value)}
+              >
+                <option value="">Choose a verified contact</option>
+                {alternateMethods.map((method) => (
+                  <option key={method.optionId} value={method.optionId}>{method.label}</option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!alternateMethod || busy}
+              loading={busy}
+              onClick={() => void run(
+                () => resendFacilityPayoutDestinationCode(
+                  facilityId,
+                  challenge.changeId,
+                  AUTHORIZATION_PURPOSE,
+                  alternateMethod
+                ),
+                "A replacement code was sent"
+              )}
+            >
+              Send another way
+            </Button>
+          </div>
+        </div>
+      )}
       {error && <p className="text-sm text-rose-600">{error}</p>}
     </div>
   );
