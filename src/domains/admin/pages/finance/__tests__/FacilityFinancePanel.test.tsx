@@ -14,12 +14,22 @@ const fetchFacilityEarningsSummaryMock = vi.fn();
 const requestFacilityWithdrawalMock = vi.fn();
 const requestFacilityPayoutDestinationMock = vi.fn();
 const verifyFacilityPayoutDestinationMock = vi.fn();
+const fetchFacilityPayoutTrustedMethodsMock = vi.fn();
+const startFacilityPayoutDestinationChangeMock = vi.fn();
+const authorizeFacilityPayoutDestinationChangeMock = vi.fn();
+const verifyNewFacilityPayoutDestinationMock = vi.fn();
+const resendFacilityPayoutDestinationCodeMock = vi.fn();
 
 vi.mock("../../../../../shared/libs/wallet", () => ({
   fetchFacilityEarningsSummary: (...args: unknown[]) => fetchFacilityEarningsSummaryMock(...args),
   requestFacilityWithdrawal: (...args: unknown[]) => requestFacilityWithdrawalMock(...args),
   requestFacilityPayoutDestination: (...args: unknown[]) => requestFacilityPayoutDestinationMock(...args),
-  verifyFacilityPayoutDestination: (...args: unknown[]) => verifyFacilityPayoutDestinationMock(...args)
+  verifyFacilityPayoutDestination: (...args: unknown[]) => verifyFacilityPayoutDestinationMock(...args),
+  fetchFacilityPayoutTrustedMethods: (...args: unknown[]) => fetchFacilityPayoutTrustedMethodsMock(...args),
+  startFacilityPayoutDestinationChange: (...args: unknown[]) => startFacilityPayoutDestinationChangeMock(...args),
+  authorizeFacilityPayoutDestinationChange: (...args: unknown[]) => authorizeFacilityPayoutDestinationChangeMock(...args),
+  verifyNewFacilityPayoutDestination: (...args: unknown[]) => verifyNewFacilityPayoutDestinationMock(...args),
+  resendFacilityPayoutDestinationCode: (...args: unknown[]) => resendFacilityPayoutDestinationCodeMock(...args)
 }));
 
 const fetchReviewQueueMock = vi.fn();

@@ -175,6 +175,96 @@ export const verifyFacilityPayoutDestination = async (facilityId: string, phoneN
   return response.data?.data as { phone_masked: string | null; verified: boolean; active: boolean };
 };
 
+export type FacilityPayoutTrustedMethod = {
+  optionId: string;
+  channel: string;
+  label: string;
+};
+
+export type FacilityPayoutDestinationChange = {
+  changeId: string;
+  changeType: string;
+  status: string;
+  authorizationChannel: string;
+  authorizationTargetMasked: string;
+  newPhoneMasked: string;
+  authorized: boolean;
+  completed: boolean;
+  failureReason: string | null;
+};
+
+const mapFacilityPayoutDestinationChange = (data: Record<string, unknown>): FacilityPayoutDestinationChange => ({
+  changeId: String(data.change_id ?? ""),
+  changeType: String(data.change_type ?? ""),
+  status: String(data.status ?? ""),
+  authorizationChannel: String(data.authorization_channel ?? ""),
+  authorizationTargetMasked: String(data.authorization_target_masked ?? ""),
+  newPhoneMasked: String(data.new_phone_masked ?? ""),
+  authorized: Boolean(data.authorized),
+  completed: Boolean(data.completed),
+  failureReason: typeof data.failure_reason === "string" ? data.failure_reason : null
+});
+
+export const fetchFacilityPayoutTrustedMethods = async (
+  facilityId: string
+): Promise<FacilityPayoutTrustedMethod[]> => {
+  const response = await api.get(`/facilities/${facilityId}/wallet/payout-destinations/trusted-methods`);
+  const data = Array.isArray(response.data?.data) ? response.data.data : [];
+  return data.map((entry: Record<string, unknown>) => ({
+    optionId: String(entry.option_id ?? ""),
+    channel: String(entry.channel ?? ""),
+    label: String(entry.label ?? "")
+  }));
+};
+
+export const startFacilityPayoutDestinationChange = async (
+  facilityId: string,
+  payload: { newPhoneNumber: string; optionId: string; idempotencyKey: string }
+): Promise<FacilityPayoutDestinationChange> => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations/change`, {
+    new_phone_number: payload.newPhoneNumber,
+    option_id: payload.optionId,
+    idempotency_key: payload.idempotencyKey
+  });
+  return mapFacilityPayoutDestinationChange(response.data?.data ?? {});
+};
+
+export const authorizeFacilityPayoutDestinationChange = async (
+  facilityId: string,
+  changeId: string,
+  code: string
+): Promise<FacilityPayoutDestinationChange> => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations/authorize`, {
+    change_id: changeId,
+    code
+  });
+  return mapFacilityPayoutDestinationChange(response.data?.data ?? {});
+};
+
+export const verifyNewFacilityPayoutDestination = async (
+  facilityId: string,
+  changeId: string,
+  code: string
+): Promise<FacilityPayoutDestinationChange> => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations/verify-new`, {
+    change_id: changeId,
+    code
+  });
+  return mapFacilityPayoutDestinationChange(response.data?.data ?? {});
+};
+
+export const resendFacilityPayoutDestinationCode = async (
+  facilityId: string,
+  changeId: string,
+  purpose: string
+): Promise<FacilityPayoutDestinationChange> => {
+  const response = await api.post(`/facilities/${facilityId}/wallet/payout-destinations/resend`, {
+    change_id: changeId,
+    purpose
+  });
+  return mapFacilityPayoutDestinationChange(response.data?.data ?? {});
+};
+
 export const fetchAdminWithdrawal = async (withdrawalId: string): Promise<WalletWithdrawal> => {
   const response = await api.get(`${ADMIN_PAYMENTS_BASE}/wallet/withdrawals/${withdrawalId}`);
   const withdrawal = mapWalletWithdrawal(response.data?.data);

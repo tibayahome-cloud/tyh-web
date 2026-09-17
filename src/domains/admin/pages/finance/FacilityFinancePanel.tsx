@@ -9,17 +9,15 @@ import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
 import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
-import { PayoutDestinationVerifier } from "../../../../shared/components/PayoutDestinationVerifier";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import { fetchReviewQueue } from "../../../../shared/libs/telemedicineOps";
 import {
   fetchFacilityEarningsSummary,
-  requestFacilityPayoutDestination,
-  requestFacilityWithdrawal,
-  verifyFacilityPayoutDestination
+  requestFacilityWithdrawal
 } from "../../../../shared/libs/wallet";
 import { getWithdrawalStatusLabel, getWithdrawalStatusTone } from "./paymentStatus";
+import { FacilityPayoutDestinationChangeVerifier } from "./FacilityPayoutDestinationChangeVerifier";
 
 const formatKES = (cents: number | undefined | null) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "KES", maximumFractionDigits: 2 }).format(
@@ -207,10 +205,12 @@ export const FacilityFinancePanel = ({
         onClose={() => setDestinationModalOpen(false)}
         title="Set or change payout number"
       >
-        <PayoutDestinationVerifier
-          requestCode={(phoneNumber) => requestFacilityPayoutDestination(facilityId, phoneNumber)}
-          verifyCode={(phoneNumber, code) => verifyFacilityPayoutDestination(facilityId, phoneNumber, code)}
-          onVerified={handleDestinationVerified}
+        <FacilityPayoutDestinationChangeVerifier
+          facilityId={facilityId}
+          open={destinationModalOpen}
+          onCompleted={() => {
+            handleDestinationVerified({ verified: true });
+          }}
         />
       </Modal>
 
