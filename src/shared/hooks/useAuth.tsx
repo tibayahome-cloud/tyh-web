@@ -387,7 +387,13 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     (resetSession = false) => {
       setUserState(null);
       rememberRef.current = false;
-      queryClient.removeQueries({ queryKey: ["me"], exact: false });
+      // The QueryClient is a single instance for the app's whole lifetime, not recreated per
+      // login -- clearing only ["me"] left every other cached query (facility scope, payments,
+      // provider lists, ...) sitting in cache under its old data. A second account signing in
+      // on the same tab, or a re-login after expiry, would see that stale response the instant
+      // its own query mounted with the same key, before its own fetch had a chance to correct
+      // it. Wiping the whole cache here means a new session always starts from nothing.
+      queryClient.clear();
       setTokens(() => {
         const next: AuthTokens = { accessToken: null, refreshToken: null, persist: false };
         writeStoredTokens(next);

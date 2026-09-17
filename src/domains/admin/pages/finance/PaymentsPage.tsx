@@ -1,22 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GridColDef } from "@mui/x-data-grid";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
+import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { DataGrid } from "../../../../shared/components/DataGrid";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
+import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useMediaQuery } from "../../../../shared/hooks/useMediaQuery";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
-import { fetchAdminPayments, fetchFacilityPayments } from "../../../../shared/libs/payments";
+import { classifyApiError } from "../../../../shared/utils/errors";
+import {
+  fetchAdminPayments,
+  fetchFacilityPayments,
+  fetchUnmatchedC2BTransactions,
+  reassignPaymentBooking,
+  reconcileC2BTransaction
+} from "../../../../shared/libs/payments";
 import type { PaymentRecord, PaymentSettlement } from "../../../../shared/schemas/payment";
-import type { PaymentListResult } from "../../../../shared/libs/payments";
+import type { PaymentListResult, UnmatchedC2BTransaction } from "../../../../shared/libs/payments";
+import { fetchFacilities, fetchFacility } from "../../../../shared/libs/facilities";
 import { canUseGlobalPaymentLedger, FinanceScopeNotice, useAdminFacilityScope } from "./paymentAccess";
+import { getPaymentStatusLabel, getPaymentStatusTone, STATUS_LABEL } from "./paymentStatus";
+import { FacilityFinancePanel } from "./FacilityFinancePanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +36,10 @@ type PaymentRow = {
   id: string;
   rowNumber: number;
   bookingId: string;
+  bookingLabel: string;
+  clientName: string;
+  providerName: string;
+  facilityName: string;
   amountFormatted: string;
   amountCents: number;
   settlement: PaymentSettlement | null;
@@ -40,12 +56,12 @@ type PaymentRow = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS = [
-  { label: "All statuses", value: "all" },
-  { label: "Pending",      value: "pending" },
-  { label: "Succeeded",    value: "succeeded" },
-  { label: "Failed",       value: "failed" },
-  { label: "Refunded",     value: "refunded" },
-  { label: "Cancelled",    value: "cancelled" },
+  { label: "All statuses",        value: "all" },
+  { label: STATUS_LABEL.pending,   value: "pending" },
+  { label: STATUS_LABEL.succeeded, value: "succeeded" },
+  { label: STATUS_LABEL.failed,    value: "failed" },
+  { label: STATUS_LABEL.refunded,  value: "refunded" },
+  { label: STATUS_LABEL.cancelled, value: "cancelled" },
 ];
 
 const METHOD_OPTIONS = [
@@ -79,16 +95,6 @@ const formatDateTime = (iso: string | null | undefined) =>
     : "—";
 
 // ─── Status styling ───────────────────────────────────────────────────────────
-
-const statusTone = (status: string) => {
-  switch (status) {
-    case "succeeded": return "bg-emerald-100 text-emerald-700";
-    case "pending":   return "bg-amber-100 text-amber-700";
-    case "failed":    return "bg-rose-100 text-rose-700";
-    case "refunded":  return "bg-indigo-100 text-indigo-700";
-    default:          return "bg-slate-200 text-slate-600";
-  }
-};
 
 const SettlementCell = ({ settlement }: { settlement: PaymentSettlement | null }) => {
   if (!settlement) {
@@ -196,10 +202,58 @@ const DetailField = ({
 
 const PaymentsPage = () => {
   const toast = useToast();
-  const { roles } = useRbac();
+  const { roles, hasPermission } = useRbac();
+  const canManageFacilityFunds = hasPermission("facility:finance.manage");
   const canReadGlobalLedger = canUseGlobalPaymentLedger(roles);
   const facilityScopeQuery = useAdminFacilityScope(!canReadGlobalLedger);
-  const facilityId = facilityScopeQuery.facility?.id;
+  const scopedFacilityId = facilityScopeQuery.facility?.id;
+
+  // ── Facility selector (super-admin only) ──────────────────────────────────
+  // Facility admins are auto-scoped to their own facility above; a super admin instead
+  // opts into one facility's finance view, either via ?facilityId= (deep-linked from the
+  // facility workspace page's "Manage funds" button) or the search picker below.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(
+    () => searchParams.get("facilityId")
+  );
+  const [selectedFacilityName, setSelectedFacilityName] = useState<string | null>(null);
+  const [facilitySearch, setFacilitySearch] = useState("");
+  const [facilityPickerOpen, setFacilityPickerOpen] = useState(false);
+
+  const effectiveFacilityId = scopedFacilityId ?? (canReadGlobalLedger ? selectedFacilityId ?? undefined : undefined);
+
+  const facilityLookupQuery = useQuery({
+    queryKey: ["admin", "finance", "facility-lookup", selectedFacilityId],
+    queryFn: () => fetchFacility(selectedFacilityId as string),
+    enabled: canReadGlobalLedger && Boolean(selectedFacilityId) && !selectedFacilityName
+  });
+
+  const effectiveFacilityName =
+    facilityScopeQuery.facility?.name ?? selectedFacilityName ?? facilityLookupQuery.data?.name ?? null;
+
+  const facilitySearchQuery = useQuery({
+    queryKey: ["admin", "finance", "facility-search", facilitySearch],
+    queryFn: () => fetchFacilities({ search: facilitySearch.trim(), pageSize: 8 }),
+    enabled: canReadGlobalLedger && facilityPickerOpen && facilitySearch.trim().length > 1
+  });
+
+  const selectFacility = (id: string, name: string) => {
+    setSelectedFacilityId(id);
+    setSelectedFacilityName(name);
+    setFacilityPickerOpen(false);
+    setFacilitySearch("");
+    const next = new URLSearchParams(searchParams);
+    next.set("facilityId", id);
+    setSearchParams(next, { replace: true });
+  };
+
+  const clearFacilitySelection = () => {
+    setSelectedFacilityId(null);
+    setSelectedFacilityName(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("facilityId");
+    setSearchParams(next, { replace: true });
+  };
 
   // ── Committed filter state ────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState("all");
@@ -240,10 +294,10 @@ const PaymentsPage = () => {
 
   // ── Infinite query ────────────────────────────────────────────────────────
   const paymentsQuery = useInfiniteQuery({
-    queryKey: ["admin", "finance", "payments", { facilityId, statusFilter, methodFilter, bookingFilter, dateFrom, dateTo }],
+    queryKey: ["admin", "finance", "payments", { facilityId: effectiveFacilityId, statusFilter, methodFilter, bookingFilter, dateFrom, dateTo }],
     queryFn: ({ pageParam }) =>
       fetchPayments({
-        facilityId,
+        facilityId: effectiveFacilityId,
         pageParam,
         status:    statusFilter !== "all" ? statusFilter : undefined,
         method:    canReadGlobalLedger && methodFilter !== "all" ? methodFilter : undefined,
@@ -251,16 +305,16 @@ const PaymentsPage = () => {
         dateFrom:  canReadGlobalLedger ? dateFrom || undefined : undefined,
         dateTo:    canReadGlobalLedger ? dateTo || undefined : undefined,
     }),
-    initialPageParam: canReadGlobalLedger ? undefined : 1,
+    initialPageParam: effectiveFacilityId ? 1 : undefined,
     getNextPageParam: (lastPage) => {
-      if (facilityId) {
+      if (effectiveFacilityId) {
         return lastPage.meta.page.number < lastPage.meta.page.totalPages
           ? lastPage.meta.page.number + 1
           : undefined;
       }
       return lastPage.meta.next_cursor ?? undefined;
     },
-    enabled: canReadGlobalLedger || Boolean(facilityId)
+    enabled: canReadGlobalLedger || Boolean(scopedFacilityId)
   });
 
   // ── Retry mutation ────────────────────────────────────────────────────────
@@ -280,6 +334,59 @@ const PaymentsPage = () => {
     },
   });
 
+  // ── C2B reconciliation (super-admin only) ─────────────────────────────────
+  const queryClient = useQueryClient();
+  const [reconcileTxn, setReconcileTxn] = useState<UnmatchedC2BTransaction | null>(null);
+  const [reconcileBookingId, setReconcileBookingId] = useState("");
+  const [reconcileReason, setReconcileReason] = useState("");
+  const [reassignBookingId, setReassignBookingId] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
+  const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
+
+  const unmatchedC2BQuery = useQuery({
+    queryKey: ["admin", "finance", "c2b-unmatched"],
+    queryFn: () => fetchUnmatchedC2BTransactions(25),
+    enabled: canReadGlobalLedger
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: () => reconcileC2BTransaction(reconcileTxn!.id, reconcileBookingId.trim(), reconcileReason.trim()),
+    onSuccess: () => {
+      toast.showToast({ title: "Transaction reconciled", description: "The payment has been linked to the booking.", variant: "success" });
+      setReconcileTxn(null);
+      setReconcileBookingId("");
+      setReconcileReason("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "finance", "c2b-unmatched"] }).catch(() => undefined);
+      paymentsQuery.refetch();
+    },
+    onError: (error: unknown) => {
+      toast.showToast({
+        title: "Reconciliation failed",
+        description: error instanceof Error ? error.message : "Unable to reconcile this transaction.",
+        variant: "error"
+      });
+    }
+  });
+
+  const reassignMutation = useMutation({
+    mutationFn: (paymentId: string) => reassignPaymentBooking(paymentId, reassignBookingId.trim(), reassignReason.trim()),
+    onSuccess: () => {
+      toast.showToast({ title: "Payment reassigned", description: "The payment now belongs to the new booking.", variant: "success" });
+      setReassignDialogOpen(false);
+      setReassignBookingId("");
+      setReassignReason("");
+      setDetailPayment(null);
+      paymentsQuery.refetch();
+    },
+    onError: (error: unknown) => {
+      toast.showToast({
+        title: "Reassignment failed",
+        description: error instanceof Error ? error.message : "Unable to reassign this payment.",
+        variant: "error"
+      });
+    }
+  });
+
   // ── Flatten pages → raw payments ─────────────────────────────────────────
   const allPayments = useMemo<PaymentRecord[]>(
     () => paymentsQuery.data?.pages.flatMap((p) => p.payments) ?? [],
@@ -293,6 +400,10 @@ const PaymentsPage = () => {
         id:              p.id,
         rowNumber:       i + 1,
         bookingId:       p.bookingId,
+        bookingLabel:    p.bookingServiceName ?? "Booking",
+        clientName:      p.clientName ?? "—",
+        providerName:    p.providerName ?? "—",
+        facilityName:    p.facilityName ?? "—",
         amountCents:     p.amountCents,
         amountFormatted: formatKES(p.amountCents),
         settlement:      p.settlement,
@@ -346,13 +457,25 @@ const PaymentsPage = () => {
     () => [
       { field: "rowNumber", headerName: "#", width: 60, sortable: false },
       {
-        field: "bookingId",
-        headerName: "Booking ID",
+        field: "bookingLabel",
+        headerName: "Booking",
         flex: 1.2,
         minWidth: 180,
-        renderCell: ({ value }) => (
-          <span className="font-mono text-xs text-slate-700">{value}</span>
+        renderCell: ({ row }) => (
+          <span className="text-xs font-semibold text-slate-700">{(row as PaymentRow).bookingLabel}</span>
         ),
+      },
+      {
+        field: "clientName",
+        headerName: "Client",
+        flex: 1,
+        minWidth: 140,
+      },
+      {
+        field: "facilityName",
+        headerName: "Facility",
+        flex: 1,
+        minWidth: 140,
       },
       {
         field: "amountFormatted",
@@ -374,8 +497,8 @@ const PaymentsPage = () => {
         headerName: "Status",
         minWidth: 130,
         renderCell: ({ value }) => (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusTone(value as string)}`}>
-            {(value as string).replace(/_/g, " ")}
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getPaymentStatusTone(value as string)}`}>
+            {getPaymentStatusLabel(value as string)}
           </span>
         ),
       },
@@ -555,7 +678,7 @@ const PaymentsPage = () => {
     if (facilityScopeQuery.isLoading) {
       return <FinanceScopeNotice title="Payments" description="Resolving your facility scope..." detail="Payment records will appear once the facility scope is available." />;
     }
-    if (!facilityId) {
+    if (!scopedFacilityId) {
       return <FinanceScopeNotice title="Payments" description="Your facility scope could not be resolved." detail="Payment data is hidden until the account is linked to exactly one facility." />;
     }
   }
@@ -571,138 +694,215 @@ const PaymentsPage = () => {
         </p>
       </div>
 
-      {/* ── Analytics cards ─────────────────────────────────────────────── */}
-      {paymentsQuery.isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Total volume (succeeded)"
-            primary={formatKES(analytics.succeededVol)}
-            secondary={`${numberFormatter.format(analytics.succeededCount)} transactions`}
-            accent="emerald"
-          />
-          <MetricCard
-            label="Pending"
-            primary={formatKES(analytics.pendingVol)}
-            secondary={`${numberFormatter.format(analytics.pendingCount)} awaiting settlement`}
-            accent="amber"
-          />
-          <MetricCard
-            label="Failed"
-            primary={numberFormatter.format(analytics.failedCount)}
-            secondary={`Failure rate ${analytics.failureRate}% • avg ${analytics.avgRetries} retries`}
-            accent="rose"
-          />
-          <MetricCard
-            label="Refunded"
-            primary={formatKES(analytics.refundedVol)}
-            secondary={`${numberFormatter.format(analytics.refundedCount)} refunds issued`}
-            accent="indigo"
-          />
-        </div>
-      )}
-
-      {/* ── Filters row ─────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-
-        {/* Left — record count + active chips */}
-        <div className="flex flex-col gap-2">
-          {!paymentsQuery.isLoading && (
-            <p className="text-sm text-slate-500">
-              {numberFormatter.format(analytics.total)} payments loaded
-              {paymentsQuery.hasNextPage && " (more available)"}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-            {filterSummaryChips.length > 0
-              ? filterSummaryChips.map((chip) => (
-                  <span key={chip} className="rounded-full bg-slate-200 px-3 py-1">{chip}</span>
-                ))
-              : <span className="text-slate-400">Showing all payments</span>
-            }
-          </div>
-        </div>
-
-        {/* Right — filter button */}
-        <div ref={filterMenuRef} className="relative">
-          <Button
-            variant={hasActiveFilters ? "primary" : "secondary"}
-            onClick={openFilters}
-            className="inline-flex items-center gap-2"
-          >
-            <span>Filters</span>
-            {hasActiveFilters && (
-              <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                {filterSummaryChips.length}
+      {/* ── Facility scope bar (whose funds are being viewed) ─────────────── */}
+      {canReadGlobalLedger ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          {effectiveFacilityId ? (
+            <>
+              <span className="text-sm text-slate-600">
+                Viewing <span className="font-semibold text-slate-900">{effectiveFacilityName ?? "selected facility"}</span>
               </span>
-            )}
-          </Button>
-
-          {filtersOpen && (
-            isMobileFilters ? (
-              <>
-                <div className="fixed inset-0 z-40 bg-slate-900/40" onClick={() => setFiltersOpen(false)} />
-                <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-base font-semibold text-slate-900">Filters</p>
-                    <button type="button" onClick={() => setFiltersOpen(false)} className="text-sm font-medium text-slate-500">
-                      Close
-                    </button>
-                  </div>
-                  {filterPanel}
+              <Button type="button" variant="ghost" size="sm" onClick={clearFacilitySelection}>
+                Clear (view platform-wide)
+              </Button>
+            </>
+          ) : (
+            <div className="relative w-full sm:w-80">
+              <Input
+                label="Filter by facility"
+                placeholder="Search facility name…"
+                value={facilitySearch}
+                onFocus={() => setFacilityPickerOpen(true)}
+                onChange={(event) => {
+                  setFacilitySearch(event.target.value);
+                  setFacilityPickerOpen(true);
+                }}
+              />
+              {facilityPickerOpen && facilitySearch.trim().length > 1 && (
+                <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-elevated">
+                  {facilitySearchQuery.isLoading ? (
+                    <div className="p-3"><Loading /></div>
+                  ) : (facilitySearchQuery.data?.facilities.length ?? 0) === 0 ? (
+                    <p className="p-3 text-sm text-slate-500">No facilities match.</p>
+                  ) : (
+                    <ul className="max-h-64 overflow-y-auto py-1">
+                      {facilitySearchQuery.data?.facilities.map((facility) => (
+                        <li key={facility.id}>
+                          <button
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                            onClick={() => selectFacility(facility.id, facility.name)}
+                          >
+                            {facility.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              </>
-            ) : (
-              <div className="absolute right-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
-                {filterPanel}
-              </div>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* ── Data table ──────────────────────────────────────────────────── */}
-      <Card padding="none">
-        {paymentsQuery.isLoading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Loading />
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="px-6 py-12 text-center text-sm text-slate-500">
-            No payments match the selected filters.
-          </div>
-        ) : (
-          <>
-            <DataGrid
-              rows={rows}
-              columns={columns}
-              loading={paymentsQuery.isFetchingNextPage}
-            />
-
-            <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
-              {paymentsQuery.hasNextPage ? (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => paymentsQuery.fetchNextPage()}
-                  loading={paymentsQuery.isFetchingNextPage}
-                >
-                  Load more payments
-                </Button>
-              ) : (
-                <p className="text-center text-xs text-slate-400">
-                  All payments loaded — {numberFormatter.format(rows.length)} total
-                </p>
               )}
             </div>
-          </>
-        )}
-      </Card>
+          )}
+        </div>
+      ) : (
+        effectiveFacilityName && (
+          <p className="text-sm text-slate-600">
+            Your facility: <span className="font-semibold text-slate-900">{effectiveFacilityName}</span>
+          </p>
+        )
+      )}
+
+      {/* ── Facility finance workspace ──────────────────────────────────── */}
+      {effectiveFacilityId && (
+        <FacilityFinancePanel
+          facilityId={effectiveFacilityId}
+          facilityName={effectiveFacilityName}
+          canManageFunds={canManageFacilityFunds}
+        />
+      )}
+
+      {/* ── Payments query error ────────────────────────────────────────── */}
+      {paymentsQuery.isError ? (
+        <ApiErrorBanner
+          {...classifyApiError(paymentsQuery.error, "We couldn't load payments right now.")}
+          onRetry={() => paymentsQuery.refetch()}
+        />
+      ) : (
+        <>
+          {/* ── Analytics cards ─────────────────────────────────────────── */}
+          {paymentsQuery.isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-20 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Total volume (succeeded)"
+                primary={formatKES(analytics.succeededVol)}
+                secondary={`${numberFormatter.format(analytics.succeededCount)} transactions`}
+                accent="emerald"
+              />
+              <MetricCard
+                label="Pending"
+                primary={formatKES(analytics.pendingVol)}
+                secondary={`${numberFormatter.format(analytics.pendingCount)} awaiting settlement`}
+                accent="amber"
+              />
+              <MetricCard
+                label="Failed"
+                primary={numberFormatter.format(analytics.failedCount)}
+                secondary={`Failure rate ${analytics.failureRate}% • avg ${analytics.avgRetries} retries`}
+                accent="rose"
+              />
+              <MetricCard
+                label="Refunded"
+                primary={formatKES(analytics.refundedVol)}
+                secondary={`${numberFormatter.format(analytics.refundedCount)} refunds issued`}
+                accent="indigo"
+              />
+            </div>
+          )}
+
+          {/* ── Filters row ──────────────────────────────────────────────── */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+
+            {/* Left — record count + active chips */}
+            <div className="flex flex-col gap-2">
+              {!paymentsQuery.isLoading && (
+                <p className="text-sm text-slate-500">
+                  {numberFormatter.format(analytics.total)} payments loaded
+                  {paymentsQuery.hasNextPage && " (more available)"}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                {filterSummaryChips.length > 0
+                  ? filterSummaryChips.map((chip) => (
+                      <span key={chip} className="rounded-full bg-slate-200 px-3 py-1">{chip}</span>
+                    ))
+                  : <span className="text-slate-400">Showing all payments</span>
+                }
+              </div>
+            </div>
+
+            {/* Right — filter button */}
+            <div ref={filterMenuRef} className="relative">
+              <Button
+                variant={hasActiveFilters ? "primary" : "secondary"}
+                onClick={openFilters}
+                className="inline-flex items-center gap-2"
+              >
+                <span>Filters</span>
+                {hasActiveFilters && (
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {filterSummaryChips.length}
+                  </span>
+                )}
+              </Button>
+
+              {filtersOpen && (
+                isMobileFilters ? (
+                  <>
+                    <div className="fixed inset-0 z-40 bg-slate-900/40" onClick={() => setFiltersOpen(false)} />
+                    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-base font-semibold text-slate-900">Filters</p>
+                        <button type="button" onClick={() => setFiltersOpen(false)} className="text-sm font-medium text-slate-500">
+                          Close
+                        </button>
+                      </div>
+                      {filterPanel}
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute right-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+                    {filterPanel}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* ── Data table ───────────────────────────────────────────────── */}
+          <Card padding="none">
+            {paymentsQuery.isLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loading />
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="px-6 py-12 text-center text-sm text-slate-500">
+                No payments match the selected filters.
+              </div>
+            ) : (
+              <>
+                <DataGrid
+                  rows={rows}
+                  columns={columns}
+                  loading={paymentsQuery.isFetchingNextPage}
+                />
+
+                <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+                  {paymentsQuery.hasNextPage ? (
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => paymentsQuery.fetchNextPage()}
+                      loading={paymentsQuery.isFetchingNextPage}
+                    >
+                      Load more payments
+                    </Button>
+                  ) : (
+                    <p className="text-center text-xs text-slate-400">
+                      All payments loaded — {numberFormatter.format(rows.length)} total
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </Card>
+        </>
+      )}
 
       {/* ── Detail modal ─────────────────────────────────────────────────── */}
       <Modal
@@ -715,8 +915,8 @@ const PaymentsPage = () => {
 
             {/* Status / amount banner */}
             <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusTone(detailPayment.status)}`}>
-                {detailPayment.status.replace(/_/g, " ")}
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${getPaymentStatusTone(detailPayment.status)}`}>
+                {getPaymentStatusLabel(detailPayment.status)}
               </span>
               <span className="text-lg font-semibold text-slate-900">
                 {formatKES(detailPayment.amountCents)}
@@ -730,16 +930,22 @@ const PaymentsPage = () => {
 
             {/* Fields grid */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <DetailField label="Payment ID"       value={detailPayment.id}               mono />
-              <DetailField label="Booking ID"       value={detailPayment.bookingId}       mono />
-              <DetailField label="Client user ID"   value={detailPayment.clientUserId}   mono />
-              <DetailField label="Provider user ID" value={detailPayment.providerUserId} mono />
+              <DetailField label="Booking / service" value={detailPayment.bookingServiceName ?? "—"} />
+              <DetailField label="Facility"          value={detailPayment.facilityName ?? "—"} />
+              <DetailField label="Client"            value={detailPayment.clientName ?? "—"} />
+              <DetailField label="Provider"          value={detailPayment.providerName ?? "—"} />
               <DetailField label="Method"           value={detailPayment.channel ?? "mpesa"} />
               <DetailField label="Provider ref"     value={detailPayment.providerRef ?? detailPayment.mpesaReceiptNumber}     mono />
               <DetailField label="Initiated"        value={formatDateTime(detailPayment.initiatedAt ?? detailPayment.createdAt)} />
               <DetailField label="Succeeded"        value={formatDateTime(detailPayment.succeededAt ?? detailPayment.completedAt)} />
               {detailPayment.failedAt && (
                 <DetailField label="Failed at" value={formatDateTime(detailPayment.failedAt)} />
+              )}
+              {detailPayment.reviewStatus && (
+                <DetailField
+                  label="Review status"
+                  value={`${detailPayment.reviewStatus.status.replace(/_/g, " ")} (${detailPayment.reviewStatus.disputeType ?? "dispute"})`}
+                />
               )}
             </div>
 
@@ -764,8 +970,7 @@ const PaymentsPage = () => {
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-slate-500">
-                  Settlement metadata was not returned for this payment. Facility wallet and automatic facility payout
-                  flows should remain hidden until backend support exists.
+                  A settlement breakdown isn't available for this payment yet. Check back once it's been processed.
                 </p>
               )}
             </div>
@@ -799,11 +1004,130 @@ const PaymentsPage = () => {
                     Retry payment
                   </Button>
                 )}
+                {canReadGlobalLedger && detailPayment.status === "succeeded" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setReassignBookingId("");
+                      setReassignReason("");
+                      setReassignDialogOpen(true);
+                    }}
+                  >
+                    Reassign booking
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         )}
       </Modal>
+
+      {/* ── Reassign payment confirmation ─────────────────────────────────── */}
+      <ConfirmDialog
+        open={reassignDialogOpen}
+        title="Reassign payment to a different booking"
+        description="Only succeeded payments that have not yet been settled can be reassigned. The backend will refuse this if settlement has already started."
+        confirmLabel="Reassign"
+        onConfirm={() => detailPayment && reassignMutation.mutate(detailPayment.id)}
+        onClose={() => setReassignDialogOpen(false)}
+        loading={reassignMutation.isPending}
+      >
+        <Input
+          label="Target booking ID"
+          value={reassignBookingId}
+          onChange={(event) => setReassignBookingId(event.target.value)}
+        />
+        <div className="mt-3">
+          <Input
+            label="Reason"
+            value={reassignReason}
+            onChange={(event) => setReassignReason(event.target.value)}
+          />
+        </div>
+      </ConfirmDialog>
+
+      {/* ── Unmatched C2B transactions (super-admin only) ─────────────────── */}
+      {canReadGlobalLedger && (
+        <Card
+          title="Unmatched C2B transactions"
+          description="Confirmed M-Pesa money that could not be matched to a booking automatically."
+          badge={`${unmatchedC2BQuery.data?.length ?? 0} pending`}
+        >
+          {unmatchedC2BQuery.isLoading ? (
+            <Loading />
+          ) : unmatchedC2BQuery.isError ? (
+            <p className="text-sm text-danger-600">Unable to load unmatched transactions.</p>
+          ) : (unmatchedC2BQuery.data?.length ?? 0) === 0 ? (
+            <p className="text-sm text-slate-500">No unmatched transactions.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2">Transaction ref</th>
+                    <th className="px-3 py-2">Amount</th>
+                    <th className="px-3 py-2">Bill ref</th>
+                    <th className="px-3 py-2">Payer</th>
+                    <th className="px-3 py-2">Failure reason</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {unmatchedC2BQuery.data?.map((txn) => (
+                    <tr key={txn.id}>
+                      <td className="px-3 py-2 font-mono text-xs text-slate-700">{txn.transId ?? "—"}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-900">{formatKES(txn.amountCents)}</td>
+                      <td className="px-3 py-2 text-slate-600">{txn.billRefNumber ?? "—"}</td>
+                      <td className="px-3 py-2 text-slate-600">{txn.payerName ?? txn.msisdn ?? "—"}</td>
+                      <td className="px-3 py-2 text-slate-500">{txn.matchFailureReason ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          variant="secondary"
+                          className="px-3 py-1 text-xs"
+                          onClick={() => {
+                            setReconcileTxn(txn);
+                            setReconcileBookingId("");
+                            setReconcileReason("");
+                          }}
+                        >
+                          Reconcile
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(reconcileTxn)}
+        title="Reconcile unmatched transaction"
+        description={
+          reconcileTxn
+            ? `Link ${formatKES(reconcileTxn.amountCents)} (${reconcileTxn.transId ?? "transaction"}) to the booking it belongs to. This settles it the same way an automatic match would.`
+            : undefined
+        }
+        confirmLabel="Reconcile"
+        onConfirm={() => reconcileMutation.mutate()}
+        onClose={() => setReconcileTxn(null)}
+        loading={reconcileMutation.isPending}
+      >
+        <Input
+          label="Booking ID"
+          value={reconcileBookingId}
+          onChange={(event) => setReconcileBookingId(event.target.value)}
+        />
+        <div className="mt-3">
+          <Input
+            label="Reason"
+            value={reconcileReason}
+            onChange={(event) => setReconcileReason(event.target.value)}
+          />
+        </div>
+      </ConfirmDialog>
     </div>
   );
 };

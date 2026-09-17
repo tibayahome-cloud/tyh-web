@@ -118,7 +118,13 @@ const TelemedicinePlatformPage = () => {
         <p className="text-sm text-slate-500">Technical-issue reports across every facility.</p>
       </div>
       <Card padding="none" className="p-4 sm:p-6">
-        <TechnicalIssueReviewList issues={issuesQuery.data ?? []} isLoading={issuesQuery.isLoading} />
+        <TechnicalIssueReviewList
+          issues={issuesQuery.data ?? []}
+          isLoading={issuesQuery.isLoading}
+          isError={issuesQuery.isError}
+          error={issuesQuery.error}
+          onRetry={() => issuesQuery.refetch()}
+        />
       </Card>
     </div>
   );

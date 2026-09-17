@@ -57,6 +57,7 @@ import type { Booking } from "../../../../shared/schemas/booking";
 import type { ServiceRequest, ServiceRequestCreateInput } from "../../../../shared/schemas/serviceRequest";
 import { STATUS_LABELS } from "../../../../shared/schemas/serviceRequest";
 import { useRbac } from "../../../../shared/hooks/useRbac";
+import { FacilityFinanceSummaryCard } from "./FacilityFinanceSummaryCard";
 import {
   fetchTelemedicineAdminCategories,
   fetchTelemedicineAdminServices,
@@ -330,6 +331,31 @@ export const validateBulkServiceRows = (rows: BulkServiceRow[]): string | null =
 export const buildBulkFacilityServiceInputs = (rows: BulkServiceRow[]): FacilityServiceInput[] =>
   rows.map((row) => buildFacilityServiceInput(row));
 
+export const SERVICES_PAGE_SIZE = 10;
+
+/** Facilities can carry dozens of services; a name search keeps a long list scannable. */
+export const filterFacilityServicesBySearch = (
+  services: FacilityService[],
+  search: string
+): FacilityService[] => {
+  const query = search.trim().toLowerCase();
+  if (!query) return services;
+  return services.filter((service) => (service.service?.name ?? "").toLowerCase().includes(query));
+};
+
+/** Clamps `page` into range so a shrinking result set (a new search, a disabled service) never
+ * strands the view on a now-empty trailing page. */
+export const paginateFacilityServices = (
+  services: FacilityService[],
+  page: number,
+  pageSize: number = SERVICES_PAGE_SIZE
+): { items: FacilityService[]; page: number; totalPages: number } => {
+  const totalPages = Math.max(1, Math.ceil(services.length / pageSize));
+  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  const start = (clampedPage - 1) * pageSize;
+  return { items: services.slice(start, start + pageSize), page: clampedPage, totalPages };
+};
+
 const mapExistingFacilityServiceInput = (service: FacilityService): FacilityServiceInput => ({
   serviceId: service.serviceId,
   priceCents: service.priceCents,
@@ -582,6 +608,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const canManageServices = hasPermission("facility:services.manage");
   const canVerifyProviders = hasPermission("provider:verify");
   const canManageBookings = hasPermission("booking:manage");
+  const canManageFinance = hasPermission("facility:finance.manage");
 
   const [financialsVisible, setFinancialsVisible] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -600,6 +627,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [serviceRequestModalOpen, setServiceRequestModalOpen] = useState(false);
   const [serviceRequestForm, setServiceRequestForm] = useState<ServiceRequestFormState>(initialServiceRequestForm);
   const [serviceRequestFormError, setServiceRequestFormError] = useState<string | null>(null);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [servicePage, setServicePage] = useState(1);
   const [providerSearch, setProviderSearch] = useState("");
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
@@ -682,6 +711,18 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
   const facility = facilityQuery.data;
   const facilityServices = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
+  const filteredFacilityServices = useMemo(
+    () => filterFacilityServicesBySearch(facilityServices, serviceSearch),
+    [facilityServices, serviceSearch]
+  );
+  const {
+    items: paginatedFacilityServices,
+    page: clampedServicePage,
+    totalPages: serviceTotalPages
+  } = useMemo(
+    () => paginateFacilityServices(filteredFacilityServices, servicePage),
+    [filteredFacilityServices, servicePage]
+  );
   const providers = useMemo(() => providersQuery.data?.providers ?? [], [providersQuery.data?.providers]);
   const facilityBookings = bookingsQuery.data?.bookings ?? [];
   const assignableProviders = useMemo(
@@ -1073,6 +1114,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         <WorkspaceStat label="TYH fee" value={`${facility.platformFeePercent}%`} />
       </section>
 
+      {canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
+        <FacilityFinanceSummaryCard facilityId={String(facilityId)} />
+      )}
+
       <Card title="Facility settings">
         {canManageFacility && (
           <div className="mb-4 flex justify-end">
@@ -1222,25 +1267,71 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           )}
         </div>
 
+        {facilityServices.length > 0 && (
+          <div className="mb-4">
+            <Input
+              label="Search services"
+              value={serviceSearch}
+              onChange={(event) => {
+                setServiceSearch(event.target.value);
+                setServicePage(1);
+              }}
+              placeholder="Filter by service name"
+            />
+          </div>
+        )}
+
         {servicesQuery.isLoading ? (
           <Loading />
         ) : facilityServices.length === 0 ? (
           <p className="text-sm text-slate-600">No facility services configured.</p>
+        ) : filteredFacilityServices.length === 0 ? (
+          <p className="text-sm text-slate-600">No services match "{serviceSearch}".</p>
         ) : (
-          <div className="grid gap-3">
-            {facilityServices.map((service) => (
-              <ServiceRow
-                key={service.id}
-                service={service}
-                canManage={canManageServices}
-                onEdit={openServiceModal}
-                onDisable={(target) => {
-                  setMutationError(null);
-                  setPendingDisable(target);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-3">
+              {paginatedFacilityServices.map((service) => (
+                <ServiceRow
+                  key={service.id}
+                  service={service}
+                  canManage={canManageServices}
+                  onEdit={openServiceModal}
+                  onDisable={(target) => {
+                    setMutationError(null);
+                    setPendingDisable(target);
+                  }}
+                />
+              ))}
+            </div>
+
+            {serviceTotalPages > 1 && (
+              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Showing {(clampedServicePage - 1) * SERVICES_PAGE_SIZE + 1}-
+                  {Math.min(clampedServicePage * SERVICES_PAGE_SIZE, filteredFacilityServices.length)} of{" "}
+                  {filteredFacilityServices.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={clampedServicePage <= 1}
+                    onClick={() => setServicePage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={clampedServicePage >= serviceTotalPages}
+                    onClick={() => setServicePage((page) => Math.min(serviceTotalPages, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {canManageServices && (

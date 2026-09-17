@@ -34,11 +34,12 @@ vi.mock("../../libs/api", () => ({
 
 const createWrapper = () => {
   const client = new QueryClient();
-  return ({ children }: { children: ReactNode }) => (
+  const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>
       <AuthProvider>{children}</AuthProvider>
     </QueryClientProvider>
   );
+  return { wrapper, client };
 };
 
 describe("useAuth", () => {
@@ -81,7 +82,7 @@ describe("useAuth", () => {
       }
     });
 
-    const wrapper = createWrapper();
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => useAuth(), { wrapper });
     let loginResult;
 
@@ -153,7 +154,7 @@ describe("useAuth", () => {
       }
     });
 
-    const wrapper = createWrapper();
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
@@ -187,7 +188,7 @@ describe("useAuth", () => {
       }
     });
 
-    const wrapper = createWrapper();
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     let challengeResult;
@@ -234,6 +235,38 @@ describe("useAuth", () => {
     expect(result.current.refreshToken).toBe("refresh-2fa");
   });
 
+  it("clears the entire query cache on logout, not just the session's own data", async () => {
+    // The QueryClient outlives login/logout -- it's created once for the app's lifetime, not
+    // per session. Leaving unrelated cached queries (a facility-scope lookup, a payments list,
+    // ...) in place after logout means the next login on this tab can render that stale,
+    // wrong-account data the instant its own component mounts, before its own fetch corrects it.
+    mockPost.mockResolvedValueOnce({
+      data: {
+        data: {
+          tokens: { access_token: "access-1", refresh_token: "refresh-1" },
+          user: { id: "1", attributes: { full_name: "Jane Client", roles: ["client"], permissions: [] } }
+        }
+      }
+    });
+
+    const { wrapper, client } = createWrapper();
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await act(async () => {
+      await result.current.loginClientProvider({ emailOrPhone: "jane@example.com", password: "secret123" });
+    });
+
+    client.setQueryData(["admin", "facility-scope"], { facilities: [] });
+    expect(client.getQueryData(["admin", "facility-scope"])).toEqual({ facilities: [] });
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(client.getQueryData(["admin", "facility-scope"])).toBeUndefined();
+    expect(client.getQueryData(["me"])).toBeUndefined();
+  });
+
   it("throws backend error message when login fails", async () => {
     mockPost.mockRejectedValueOnce({
       isAxiosError: true,
@@ -244,7 +277,7 @@ describe("useAuth", () => {
       }
     });
 
-    const wrapper = createWrapper();
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
