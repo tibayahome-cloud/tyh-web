@@ -24,6 +24,7 @@ import type { RemoteFacility } from "../../../shared/libs/telemedicine";
 import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import { mpesaPhoneValidationError } from "../../../shared/utils/mpesaPhone";
+import { sortSpecialistFirst } from "../../../shared/utils/telemedicineCatalogOrdering";
 import {
   useAvailableSlots,
   useCreateHoldMutation,
@@ -227,7 +228,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       items.push(service);
       servicesBySubcategory.set(service.subcategoryId, items);
     });
-    return (categoriesQuery.data ?? []).map((category) => ({
+    return sortSpecialistFirst(categoriesQuery.data ?? []).map((category) => ({
       category,
       specialties: (subcategoriesByCategory.get(category.id) ?? []).map((subcategory) => ({
         subcategory,
