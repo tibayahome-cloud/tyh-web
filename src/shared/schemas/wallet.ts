@@ -132,6 +132,63 @@ export const mapWalletAccount = (payload: unknown): WalletAccountResource | null
   };
 };
 
+export type PayoutDestination = {
+  phoneMasked: string | null;
+  verified: boolean;
+};
+
+export type FacilityEarningsSummary = {
+  currency: string;
+  pendingEarningsCents: number;
+  availableBalanceCents: number;
+  paidOutTotalCents: number;
+  reversedTotalCents: number;
+  nextReleaseAt: string | null;
+  withdrawals: ProviderEarningsWithdrawal[];
+  payoutDestination: PayoutDestination | null;
+};
+
+export const mapFacilityEarningsSummary = (payload: unknown): FacilityEarningsSummary | null => {
+  const raw = toObject(payload);
+  if (!coerceString(raw.currency)) {
+    return null;
+  }
+  const withdrawalsRaw = Array.isArray(raw.withdrawals) ? raw.withdrawals : [];
+  const destinationRaw = raw.payout_destination && typeof raw.payout_destination === "object"
+    ? toObject(raw.payout_destination)
+    : null;
+  return {
+    currency: coerceString(raw.currency) ?? "KES",
+    pendingEarningsCents: coerceNumber(raw.pending_earnings_cents) ?? 0,
+    availableBalanceCents: coerceNumber(raw.available_balance_cents) ?? 0,
+    paidOutTotalCents: coerceNumber(raw.paid_out_total_cents) ?? 0,
+    reversedTotalCents: coerceNumber(raw.reversed_total_cents) ?? 0,
+    nextReleaseAt: coerceDate(raw.next_release_at),
+    withdrawals: withdrawalsRaw.flatMap((entry) => {
+      const withdrawal = toObject(entry);
+      const id = coerceId(withdrawal.id);
+      return id
+        ? [{
+            id,
+            amountCents: coerceNumber(withdrawal.amount_cents) ?? 0,
+            status: coerceString(withdrawal.status) ?? "requested",
+            requestedAt: coerceDate(withdrawal.requested_at),
+            disbursedAt: coerceDate(withdrawal.disbursed_at),
+            payoutRef: coerceString(withdrawal.payout_ref),
+            payoutPhoneMasked: coerceString(withdrawal.payout_phone_masked),
+            failureReason: coerceString(withdrawal.failure_reason)
+          }]
+        : [];
+    }),
+    payoutDestination: destinationRaw
+      ? {
+          phoneMasked: coerceString(destinationRaw.phone_masked),
+          verified: destinationRaw.verified === true
+        }
+      : null
+  };
+};
+
 export const mapProviderEarningsSummary = (payload: unknown): ProviderEarningsSummary | null => {
   const raw = toObject(payload);
   if (!coerceString(raw.currency)) {

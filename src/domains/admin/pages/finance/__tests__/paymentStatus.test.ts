@@ -4,8 +4,13 @@ import {
   NEXT_ACTION,
   REVIEW_BADGE,
   STATUS_LABEL,
+  STATUS_TONE,
   describeRefund,
-  describeSettlement
+  describeSettlement,
+  getPaymentStatusLabel,
+  getPaymentStatusTone,
+  getWithdrawalStatusLabel,
+  getWithdrawalStatusTone
 } from "../paymentStatus";
 
 describe("payment status labels", () => {
@@ -69,5 +74,35 @@ describe("next actions", () => {
   it("only suggests one where there is something to do", () => {
     expect(NEXT_ACTION.succeeded).toBeUndefined();
     expect(NEXT_ACTION.failed).toBeTruthy();
+  });
+});
+
+describe("getPaymentStatusLabel / getPaymentStatusTone", () => {
+  it("resolves the human label and tone for a known payment status", () => {
+    expect(getPaymentStatusLabel("awaiting_callback")).toBe(STATUS_LABEL.awaiting_callback);
+    expect(getPaymentStatusTone("succeeded")).toBe(STATUS_TONE.succeeded);
+  });
+
+  it("falls back to a humanized string instead of throwing on an unknown status", () => {
+    expect(getPaymentStatusLabel("some_future_status")).toBe("some future status");
+    expect(getPaymentStatusTone("some_future_status")).toBe("bg-slate-200 text-slate-600");
+  });
+});
+
+describe("getWithdrawalStatusLabel / getWithdrawalStatusTone", () => {
+  it("describes the withdrawal lifecycle distinctly from payment status", () => {
+    expect(getWithdrawalStatusLabel("disbursing")).toBe("Disbursing");
+    expect(getWithdrawalStatusLabel("rejected")).toBe("Rejected");
+    expect(getWithdrawalStatusTone("disbursed")).toMatch(/emerald/);
+    expect(getWithdrawalStatusTone("rejected")).toMatch(/rose/);
+  });
+
+  it("is case-insensitive since backends don't always agree on casing", () => {
+    expect(getWithdrawalStatusLabel("DISBURSED")).toBe("Disbursed");
+  });
+
+  it("falls back to a humanized string instead of throwing on an unknown status", () => {
+    expect(getWithdrawalStatusLabel("some_future_status")).toBe("some future status");
+    expect(getWithdrawalStatusTone("some_future_status")).toBe("bg-slate-200 text-slate-600");
   });
 });

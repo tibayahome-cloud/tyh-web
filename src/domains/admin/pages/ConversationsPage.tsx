@@ -5,6 +5,8 @@ import { Plus, Search, MessageSquare, Shield } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Loading } from "../../../shared/components/Loading";
+import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
+import { classifyApiError } from "../../../shared/utils/errors";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import {
@@ -18,6 +20,34 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { ConversationList, type Conversation } from "../../../shared/components/messaging/ConversationList";
 import { MessageThread, type Message } from "../../../shared/components/messaging/MessageThread";
+import type { Thread } from "../../../shared/schemas/messaging";
+
+/**
+ * Client-side filter over already-loaded threads (the threads endpoint takes no search param,
+ * and this stays within the existing API contract rather than adding one). Matches the fields
+ * an admin would actually search by: the thread's own title, its booking id, and each
+ * participant's name/email/phone -- not just whichever participant happened to become the
+ * conversation's display title.
+ */
+export const filterThreadsBySearch = (threads: Thread[], search: string): Thread[] => {
+  const query = search.trim().toLowerCase();
+  if (!query) {
+    return threads;
+  }
+  return threads.filter((thread) => {
+    if (thread.title?.toLowerCase().includes(query)) return true;
+    if (thread.bookingId?.toLowerCase().includes(query)) return true;
+    return thread.participants.some((participant) => {
+      const person = participant.user;
+      if (!person) return false;
+      return (
+        (person.fullName ?? "").toLowerCase().includes(query) ||
+        (person.email ?? "").toLowerCase().includes(query) ||
+        (person.phone ?? "").toLowerCase().includes(query)
+      );
+    });
+  });
+};
 
 const AdminConversationsPage = () => {
   const { threadId } = useParams();
@@ -27,9 +57,14 @@ const AdminConversationsPage = () => {
   const queryClient = useQueryClient();
   const socket = useSocket();
 
+  const [search, setSearch] = useState("");
+
   const {
     data: threadsData,
     isLoading: threadsLoading,
+    isError: threadsIsError,
+    error: threadsError,
+    refetch: refetchThreads,
     fetchNextPage: fetchNextThreads,
     hasNextPage: hasNextThreads,
   } = useThreads();
@@ -61,8 +96,15 @@ const AdminConversationsPage = () => {
     };
   }, [socket, threadId, queryClient]);
 
+  const rawThreads: Thread[] = useMemo(
+    () => (threadsData?.pages.flatMap((page: any) => page.data) ?? []) as Thread[],
+    [threadsData]
+  );
+
+  const filteredThreads = useMemo(() => filterThreadsBySearch(rawThreads, search), [rawThreads, search]);
+
   const threads: Conversation[] = useMemo(() => {
-    return (threadsData?.pages.flatMap((page: any) => page.data) ?? []).map((t: any) => {
+    return filteredThreads.map((t: any) => {
       const other = t.participants.find((p: any) => p.userId !== user?.id);
       return {
         id: t.id,
@@ -77,7 +119,7 @@ const AdminConversationsPage = () => {
         avatarUrl: other?.user?.avatarUrl
       };
     });
-  }, [threadsData, user?.id]);
+  }, [filteredThreads, user?.id]);
 
   const messages: Message[] = useMemo(() => {
     const raw = messagesData?.pages.flatMap((page: any) => page.data) ?? [];
@@ -118,6 +160,9 @@ const AdminConversationsPage = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
                 <input
                   placeholder="Filter by user or booking..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  aria-label="Filter conversations by user or booking"
                   className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-100 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-tiba-blue/10 transition-all shadow-sm"
                 />
               </div>
@@ -125,6 +170,17 @@ const AdminConversationsPage = () => {
             <div className="flex-1 overflow-hidden">
               {threadsLoading && !threads.length ? (
                 <div className="p-12 text-center"><Loading /></div>
+              ) : threadsIsError ? (
+                <div className="p-6">
+                  <ApiErrorBanner
+                    {...classifyApiError(threadsError, "We couldn't load conversations right now.")}
+                    onRetry={() => refetchThreads()}
+                  />
+                </div>
+              ) : threads.length === 0 && search.trim() ? (
+                <div className="flex flex-col items-center justify-center h-48 px-6 text-center">
+                  <p className="text-slate-400 text-sm">No conversations match &quot;{search.trim()}&quot;.</p>
+                </div>
               ) : (
                 <ConversationList
                   conversations={threads}
@@ -132,7 +188,7 @@ const AdminConversationsPage = () => {
                   onSelect={(id) => navigate(`/admin/conversations/${id}`)}
                 />
               )}
-              {hasNextThreads && (
+              {!threadsIsError && hasNextThreads && (
                 <button
                   onClick={() => fetchNextThreads()}
                   className="w-full py-4 text-xs font-bold text-slate-400 hover:text-tiba-blue transition-colors"

@@ -24,6 +24,7 @@ import type { RemoteFacility } from "../../../shared/libs/telemedicine";
 import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import { mpesaPhoneValidationError } from "../../../shared/utils/mpesaPhone";
+import { sortSpecialistFirst } from "../../../shared/utils/telemedicineCatalogOrdering";
 import {
   useAvailableSlots,
   useCreateHoldMutation,
@@ -124,6 +125,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [submitError, setSubmitError] = useState<ClassifiedApiError | null>(null);
   const [remainingHoldSeconds, setRemainingHoldSeconds] = useState(0);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState("all");
 
   const policyQuery = useTelemedicinePolicy();
   const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
@@ -227,7 +230,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       items.push(service);
       servicesBySubcategory.set(service.subcategoryId, items);
     });
-    return (categoriesQuery.data ?? []).map((category) => ({
+    return sortSpecialistFirst(categoriesQuery.data ?? []).map((category) => ({
       category,
       specialties: (subcategoriesByCategory.get(category.id) ?? []).map((subcategory) => ({
         subcategory,
@@ -235,6 +238,32 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       }))
     }));
   }, [categoriesQuery.data, catalogServicesQuery.data, subcategoriesQuery.data]);
+  const visibleCategoryCards = useMemo(() => {
+    const query = catalogSearch.trim().toLowerCase();
+
+    return categoryCards
+      .filter(({ category }) => catalogCategoryFilter === "all" || category.id === catalogCategoryFilter)
+      .map(({ category, specialties }) => {
+        const categoryText = `${category.name} ${category.key} ${category.description ?? ""}`.toLowerCase();
+        const categoryMatches = !query || categoryText.includes(query);
+        const visibleSpecialties = specialties
+          .map(({ subcategory, services }) => {
+            const subcategoryText = `${subcategory.name} ${subcategory.key} ${subcategory.description ?? ""}`.toLowerCase();
+            const subcategoryMatches = categoryMatches || subcategoryText.includes(query);
+            const visibleServices = subcategoryMatches
+              ? services
+              : services.filter((service) =>
+                  `${service.name} ${service.key} ${service.description ?? ""}`.toLowerCase().includes(query)
+                );
+
+            return { subcategory, services: visibleServices };
+          })
+          .filter(({ services }) => services.length > 0);
+
+        return { category, specialties: visibleSpecialties };
+      })
+      .filter(({ specialties }) => specialties.length > 0);
+  }, [catalogCategoryFilter, catalogSearch, categoryCards]);
 
   useEffect(() => {
     if (!hold) {
@@ -284,6 +313,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setHoldId(null);
     setPreference({});
     setSubmitError(null);
+    setCatalogSearch("");
+    setCatalogCategoryFilter("all");
     onClose();
   };
 
@@ -379,7 +410,35 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">Choose a consultation below to see available facilities and times.</p>
-                {categoryCards.map(({ category, specialties }) => (
+                <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                  <Input
+                    type="search"
+                    label="Search consultations"
+                    value={catalogSearch}
+                    onChange={(event) => setCatalogSearch(event.target.value)}
+                    placeholder="Search services, specialties, or care areas"
+                  />
+                  <label className="block text-sm font-medium text-slate-700">
+                    <span className="mb-1 block">Care area</span>
+                    <select
+                      value={catalogCategoryFilter}
+                      onChange={(event) => setCatalogCategoryFilter(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-tiba-blue focus:ring-2 focus:ring-tiba-blue/20 sm:min-w-52"
+                    >
+                      <option value="all">All care areas</option>
+                      {categoryCards.map(({ category }) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {visibleCategoryCards.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                    No consultations match your search or filter.
+                  </p>
+                ) : visibleCategoryCards.map(({ category, specialties }) => (
                   <section key={category.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-3">
                       <h3 className="text-base font-bold text-slate-900">{category.name}</h3>

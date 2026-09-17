@@ -268,6 +268,11 @@ const AssignmentQueuePage = () => {
           <div className="py-12 text-center">
             <Loading label="Loading assignment queue…" />
           </div>
+        ) : queueQuery.isError ? (
+          <ApiErrorBanner
+            {...classifyApiError(queueQuery.error, "We couldn't load the assignment queue right now.")}
+            onRetry={() => queueQuery.refetch()}
+          />
         ) : bookings.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500">No consultations waiting for assignment.</p>
         ) : (
@@ -323,7 +328,13 @@ const AssignmentQueuePage = () => {
         <p className="text-sm text-slate-500">No-show and technical-issue reports for this facility.</p>
       </div>
       <Card padding="none" className="p-4 sm:p-6">
-        <TechnicalIssueReviewList issues={issuesQuery.data ?? []} isLoading={issuesQuery.isLoading} />
+        <TechnicalIssueReviewList
+          issues={issuesQuery.data ?? []}
+          isLoading={issuesQuery.isLoading}
+          isError={issuesQuery.isError}
+          error={issuesQuery.error}
+          onRetry={() => issuesQuery.refetch()}
+        />
       </Card>
     </div>
   );

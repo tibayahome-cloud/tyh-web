@@ -9,6 +9,7 @@ import type { PaymentRecord } from "../../../../shared/schemas/payment";
 import type { WalletWithdrawal } from "../../../../shared/schemas/wallet";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { canUseGlobalPaymentLedger, FinanceScopeNotice } from "./paymentAccess";
+import { getPaymentStatusLabel, getPaymentStatusTone, getWithdrawalStatusLabel, getWithdrawalStatusTone } from "./paymentStatus";
 
 const formatCurrency = (valueCents: number, currency = "KES") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency }).format((valueCents ?? 0) / 100);
@@ -26,23 +27,6 @@ const linkButtonClasses = (variant: "primary" | "secondary" | "ghost" = "primary
     return `${base} text-primary-600 hover:text-primary-700 hover:bg-primary-50`;
   }
   return `${base} bg-primary-500 text-white hover:bg-primary-600`;
-};
-
-const statusTone = (status: string) => {
-  switch (status) {
-    case "succeeded":
-    case "disbursed":
-      return "bg-emerald-100 text-emerald-700";
-    case "pending":
-    case "requested":
-    case "disbursing":
-      return "bg-amber-100 text-amber-700";
-    case "failed":
-    case "rejected":
-      return "bg-rose-100 text-rose-700";
-    default:
-      return "bg-slate-200 text-slate-600";
-  }
 };
 
 const FinanceOverviewPage = () => {
@@ -182,8 +166,8 @@ const FinanceOverviewPage = () => {
                         <p className="text-xs text-slate-500">{payment.channel ?? "mpesa"}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusTone(payment.status)}`}>
-                          {payment.status.replace(/_/g, " ")}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getPaymentStatusTone(payment.status)}`}>
+                          {getPaymentStatusLabel(payment.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-500">{formatDateTime(payment.completedAt ?? payment.updatedAt)}</td>
@@ -236,8 +220,8 @@ const FinanceOverviewPage = () => {
                         {formatCurrency(withdrawal.amountCents, withdrawal.currency)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusTone(withdrawal.status)}`}>
-                          {withdrawal.status.replace(/_/g, " ")}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getWithdrawalStatusTone(withdrawal.status)}`}>
+                          {getWithdrawalStatusLabel(withdrawal.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-500">{formatDateTime(withdrawal.processedAt)}</td>

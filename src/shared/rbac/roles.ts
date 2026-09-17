@@ -16,6 +16,7 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "facility:read",
     "facility:manage",
     "facility:services.manage",
+    "facility:finance.manage",
     "provider:verify",
     "booking:manage"
   ]

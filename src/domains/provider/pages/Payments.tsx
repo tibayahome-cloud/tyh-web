@@ -6,6 +6,7 @@ import { Card } from "../../../shared/components/Card";
 import { Input } from "../../../shared/components/Input";
 import ConfirmDialog from "../../../shared/components/ConfirmDialog";
 import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
+import { PayoutDestinationVerifier } from "../../../shared/components/PayoutDestinationVerifier";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import {
@@ -63,10 +64,8 @@ const ProviderPayments = () => {
   const destinationVerificationMutation = usePayoutDestinationVerification();
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [payoutPhoneNumber, setPayoutPhoneNumber] = useState("");
-  const [destinationCode, setDestinationCode] = useState("");
-  const [destinationVerified, setDestinationVerified] = useState(false);
-  const [destinationMasked, setDestinationMasked] = useState<string | null>(null);
+  const [useAlternateNumber, setUseAlternateNumber] = useState(false);
+  const [alternateDestination, setAlternateDestination] = useState<{ phoneNumber: string; verified: boolean } | null>(null);
   const wallet = walletQuery.data;
   const earnings = earningsQuery.data;
   const transactions = wallet?.transactions ?? [];
@@ -96,7 +95,7 @@ const ProviderPayments = () => {
       });
       return;
     }
-    if (payoutPhoneNumber.trim() && !destinationVerified) {
+    if (useAlternateNumber && !alternateDestination?.verified) {
       toast.showToast({
         title: "Verify the payout number",
         description: "Verify the alternate M-Pesa number before submitting this withdrawal.",
@@ -107,7 +106,7 @@ const ProviderPayments = () => {
     withdrawMutation
       .mutateAsync({
         amountCents: Math.round(amount * 100),
-        payoutPhoneNumber: payoutPhoneNumber.trim() || undefined
+        payoutPhoneNumber: useAlternateNumber ? alternateDestination?.phoneNumber : undefined
       })
       .then(() => {
         toast.showToast({
@@ -116,10 +115,8 @@ const ProviderPayments = () => {
           variant: "success"
         });
         setWithdrawAmount("");
-        setPayoutPhoneNumber("");
-        setDestinationCode("");
-        setDestinationVerified(false);
-        setDestinationMasked(null);
+        setUseAlternateNumber(false);
+        setAlternateDestination(null);
         setWithdrawDialogOpen(false);
       })
       .catch((error) => {
@@ -129,40 +126,6 @@ const ProviderPayments = () => {
           variant: "error"
         });
       });
-  };
-
-  const handleRequestDestinationCode = () => {
-    const phoneNumber = payoutPhoneNumber.trim();
-    if (!phoneNumber) {
-      toast.showToast({ title: "Enter a payout number", description: "Add the M-Pesa number to verify.", variant: "error" });
-      return;
-    }
-    destinationRequestMutation.mutate(phoneNumber, {
-      onSuccess: (result) => {
-        setDestinationMasked(result.phone_masked);
-        setDestinationVerified(result.verified);
-        toast.showToast({
-          title: result.verified ? "Number already verified" : "Verification code sent",
-          description: result.verified ? "You can use this number for the withdrawal." : "Check the number for the one-time code.",
-          variant: "success"
-        });
-      },
-      onError: (error) => toast.showToast({ title: "Unable to verify number", description: error instanceof Error ? error.message : "Try again later.", variant: "error" })
-    });
-  };
-
-  const handleVerifyDestination = () => {
-    destinationVerificationMutation.mutate(
-      { phoneNumber: payoutPhoneNumber.trim(), code: destinationCode.trim() },
-      {
-        onSuccess: (result) => {
-          setDestinationMasked(result.phone_masked);
-          setDestinationVerified(result.verified);
-          toast.showToast({ title: "Payout number verified", description: "This number can be used for the withdrawal.", variant: "success" });
-        },
-        onError: (error) => toast.showToast({ title: "Code not accepted", description: error instanceof Error ? error.message : "Try again.", variant: "error" })
-      }
-    );
   };
 
   if (profileQuery.isLoading || ((walletQuery.isLoading || earningsQuery.isLoading) && !wallet && !earnings && financialsVisible)) {
@@ -345,7 +308,7 @@ const ProviderPayments = () => {
       <ConfirmDialog
         open={withdrawDialogOpen}
         title="Request withdrawal"
-        description={`Available: ${formatCurrency(availableToWithdrawCents, earnings?.currency ?? wallet?.currency)}. Leave the number blank to use your registered M-Pesa number.`}
+        description={`Available: ${formatCurrency(availableToWithdrawCents, earnings?.currency ?? wallet?.currency)}. By default this goes to your registered M-Pesa number.`}
         confirmLabel="Submit"
         onConfirm={handleWithdraw}
         onClose={() => setWithdrawDialogOpen(false)}
@@ -360,39 +323,27 @@ const ProviderPayments = () => {
           onChange={(event) => setWithdrawAmount(event.target.value)}
         />
         <div className="mt-4 space-y-3">
-          <Input
-            label="Different M-Pesa number (optional)"
-            type="tel"
-            placeholder="07xx xxx xxx"
-            value={payoutPhoneNumber}
-            onChange={(event) => {
-              setPayoutPhoneNumber(event.target.value);
-              setDestinationVerified(false);
-              setDestinationCode("");
-              setDestinationMasked(null);
-            }}
-          />
-          {payoutPhoneNumber.trim() && (
-            <>
-              <Button type="button" size="sm" variant="outline" onClick={handleRequestDestinationCode} loading={destinationRequestMutation.isLoading}>
-                Send verification code
-              </Button>
-              {destinationMasked && <p className="text-xs text-slate-500">Code sent to {destinationMasked}.</p>}
-              {!destinationVerified && destinationMasked && (
-                <div className="flex items-end gap-2">
-                  <Input
-                    label="Verification code"
-                    inputMode="numeric"
-                    value={destinationCode}
-                    onChange={(event) => setDestinationCode(event.target.value)}
-                  />
-                  <Button type="button" size="sm" onClick={handleVerifyDestination} loading={destinationVerificationMutation.isLoading}>
-                    Verify
-                  </Button>
-                </div>
-              )}
-              {destinationVerified && <p className="text-xs font-semibold text-emerald-700">Payout number verified.</p>}
-            </>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+              checked={useAlternateNumber}
+              onChange={(event) => {
+                setUseAlternateNumber(event.target.checked);
+                setAlternateDestination(null);
+              }}
+            />
+            Send this withdrawal to a different M-Pesa number
+          </label>
+          {useAlternateNumber && (
+            <PayoutDestinationVerifier
+              label="Different M-Pesa number"
+              requestCode={(phoneNumber) => destinationRequestMutation.mutateAsync(phoneNumber)}
+              verifyCode={(phoneNumber, code) => destinationVerificationMutation.mutateAsync({ phoneNumber, code })}
+              onVerified={(response, phoneNumber) =>
+                setAlternateDestination(response.verified ? { phoneNumber, verified: true } : null)
+              }
+            />
           )}
         </div>
       </ConfirmDialog>
