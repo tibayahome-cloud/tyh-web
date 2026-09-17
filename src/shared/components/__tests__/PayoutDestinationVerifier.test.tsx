@@ -160,6 +160,27 @@ describe("PayoutDestinationVerifier", () => {
     expect(await screen.findByLabelText(/verification code/i)).toBeInTheDocument();
   });
 
+  it("never implies a name was checked or absent for a bare verified_safaricom outcome", async () => {
+    // Per tyh-api (2026-09-17): verified_safaricom means only "this is a Safaricom number" --
+    // today's real response carries no name field at all, distinct from name_unavailable
+    // ("a name lookup was attempted and found nothing"), which no confirmed contract produces.
+    const user = userEvent.setup();
+    const lookupDestination = vi.fn().mockResolvedValue({
+      outcome: "verified_safaricom",
+      phone_masked: "07** ***678",
+      account_name: null
+    });
+    const requestCode = vi.fn().mockResolvedValue({ phone_masked: "07** ***678", verified: false });
+
+    render(<PayoutDestinationVerifier requestCode={requestCode} verifyCode={vi.fn()} lookupDestination={lookupDestination} />);
+    await typePhone(user, "0712345678");
+    await user.click(screen.getByRole("button", { name: /send code/i }));
+
+    await screen.findByText(/safaricom number confirmed/i);
+    expect(screen.queryByText(/account name/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't confirm an account name/i)).not.toBeInTheDocument();
+  });
+
   it("shows the unsupported-network outcome without blocking the flow", async () => {
     const user = userEvent.setup();
     const lookupDestination = vi.fn().mockResolvedValue({

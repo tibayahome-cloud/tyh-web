@@ -21,8 +21,17 @@
 export const MPESA_DESTINATION_LOOKUP_ENABLED =
   String(import.meta.env.VITE_MPESA_DESTINATION_LOOKUP_ENABLED ?? "false").toLowerCase() === "true";
 
-/** Outcome names match tyh-api's planned PayoutDestinationVerifier abstraction 1:1, so the two
- * sides need no translation layer whenever a real lookup endpoint ships. */
+/**
+ * Outcome names match tyh-api's PayoutDestinationVerifier abstraction 1:1 (see tyh-api PR #91),
+ * so the two sides need no translation layer.
+ *
+ * `verified_safaricom` and `name_unavailable` are deliberately distinct, per tyh-api
+ * (2026-09-17): `verified_safaricom` means only "this is a Safaricom number" -- today's actual
+ * response carries no name-related field at all, so it implies nothing about a name having been
+ * looked up. `name_unavailable` is reserved for an explicit "a name lookup was attempted and
+ * found nothing" signal, which no confirmed contract produces yet. The UI must never render
+ * `verified_safaricom` as if it settled the name question one way or the other.
+ */
 export type PayoutLookupOutcome =
   | "verified_safaricom"
   | "unsupported_network"
