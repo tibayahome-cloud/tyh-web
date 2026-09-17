@@ -1058,7 +1058,20 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     );
   }
 
-  if (isFacilityAdmin && (facilityScopeQuery.isLoading || facilityScopeQuery.isError || !hasFacilityScope)) {
+  // Checked separately from the "not assigned" branch below: while facilityScopeQuery is still
+  // fetching, hasFacilityScope is false by default (scopedFacilities defaults to []), so folding
+  // isLoading into the same condition rendered this facility-admin's *own* facility as "not
+  // assigned to your admin ops account" -- in red -- for the duration of every single page load,
+  // not just an occasional race.
+  if (isFacilityAdmin && facilityScopeQuery.isLoading) {
+    return (
+      <Card>
+        <Loading />
+      </Card>
+    );
+  }
+
+  if (isFacilityAdmin && (facilityScopeQuery.isError || !hasFacilityScope)) {
     return (
       <Card>
         <p className="text-sm text-danger-600">
