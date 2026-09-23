@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { BootstrapFailedNotice } from "./BootstrapFailedNotice";
@@ -16,6 +16,9 @@ export const LegalConsentGate = ({ children }: LegalConsentGateProps) => {
     useBoundedBootstrap();
   const location = useLocation();
   const navigate = useNavigate();
+  // Coalesces a burst of simultaneous 428s (several requests failing at once) into one shared
+  // /auth/me refresh instead of one bootstrapMe() call per event.
+  const pendingRefreshRef = useRef<ReturnType<typeof bootstrapMe> | null>(null);
 
   useEffect(() => {
     const handler = () => {
@@ -28,8 +31,22 @@ export const LegalConsentGate = ({ children }: LegalConsentGateProps) => {
       // that just 428'd -- an infinite loop between the two routes. bootstrapMe() re-fetches
       // /auth/me, which computes legal_consent with the exact same consent_summary() the backend
       // used to raise this 428, so by the time LegalConsentPage mounts it sees the true state.
-      void bootstrapMe().finally(() => {
-        navigate("/legal/consent", { replace: true, state: { from: location } });
+      const refresh =
+        pendingRefreshRef.current ??
+        bootstrapMe().finally(() => {
+          pendingRefreshRef.current = null;
+        });
+      pendingRefreshRef.current = refresh;
+
+      refresh.then((result) => {
+        // Only navigate once the refresh confirms consent is genuinely still required. A
+        // failed refresh (bootstrapMe swallows its own errors and resolves null -- see
+        // useAuth.tsx) must not navigate using the stale cached value, and a refresh that
+        // resolves complete (consent was already handled, or wasn't actually required) must
+        // not send the user to a page with nothing to do.
+        if (result && !legalConsentIsComplete(result.legalConsent)) {
+          navigate("/legal/consent", { replace: true, state: { from: location } });
+        }
       });
     };
     window.addEventListener("tiba:legal-consent-required", handler);
