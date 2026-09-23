@@ -4,12 +4,13 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
+import { BootstrapFailedNotice } from "./BootstrapFailedNotice";
 import { Button } from "../shared/components/Button";
 import { Loading } from "../shared/components/Loading";
 import { Modal } from "../shared/components/Modal";
 import api from "../shared/libs/api";
 import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
-import { useAuth } from "../shared/hooks/useAuth";
+import { useBoundedBootstrap } from "../shared/hooks/useBoundedBootstrap";
 import { legalConsentIsComplete } from "../shared/schemas/legal";
 import type { LegalDocumentManifestEntry, LegalDocumentType } from "../shared/constants/legal";
 
@@ -41,7 +42,11 @@ const resolveError = (error: unknown) => {
 };
 
 export const LegalConsentPage = () => {
-  const { user, isAuthenticated, isBootstrapping, bootstrapMe, logout } = useAuth();
+  // Bounded bootstrap-retry mechanism shared with LegalConsentGate: both screens gate on the
+  // same user.legalConsent bootstrap, so this page gets identical retry/failure behavior
+  // instead of a separately maintained (and previously unbounded) copy of the same effect.
+  const { user, isAuthenticated, isBootstrapping, bootstrapMe, logout, checking, bootstrapFailed, retryBootstrap } =
+    useBoundedBootstrap();
   const location = useLocation();
   const navigate = useNavigate();
   const [accepted, setAccepted] = useState<Record<LegalDocumentType, boolean>>({
@@ -49,7 +54,6 @@ export const LegalConsentPage = () => {
     privacy: false
   });
   const [submitting, setSubmitting] = useState(false);
-  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewDocument, setPreviewDocument] = useState<LegalDocumentManifestEntry | null>(null);
 
@@ -67,15 +71,10 @@ export const LegalConsentPage = () => {
   }, [user?.legalConsent]);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.legalConsent || isBootstrapping) {
-      return;
-    }
-    setChecking(true);
-    bootstrapMe().finally(() => setChecking(false));
-  }, [bootstrapMe, isAuthenticated, isBootstrapping, user?.legalConsent]);
-
-  useEffect(() => {
-    if (user?.legalConsent && legalConsentIsComplete(user.legalConsent)) {
+    // null is a resolved answer too: legalConsentIsComplete(null) is `true` by design, so an
+    // account with no consent summary belongs back at returnPath, not stuck on this page's
+    // document checklist (which would otherwise render with nothing actually missing).
+    if (user?.legalConsent !== undefined && legalConsentIsComplete(user.legalConsent)) {
       navigate(returnPath, { replace: true });
     }
   }, [navigate, returnPath, user?.legalConsent]);
@@ -84,7 +83,15 @@ export const LegalConsentPage = () => {
     return <NavigateToLogin />;
   }
 
-  if (isBootstrapping || checking || !user?.legalConsent) {
+  if (bootstrapFailed) {
+    return (
+      <AuthLayout title="Account requirements" subtitle="We couldn't verify your account.">
+        <BootstrapFailedNotice onRetry={retryBootstrap} />
+      </AuthLayout>
+    );
+  }
+
+  if (isBootstrapping || checking || user?.legalConsent === undefined) {
     return (
       <AuthLayout title="Account requirements" subtitle="Checking your account status.">
         <Loading label="Loading legal documents" />

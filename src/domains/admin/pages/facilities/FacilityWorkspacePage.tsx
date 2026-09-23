@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { Link, useParams } from "react-router-dom";
@@ -23,7 +23,6 @@ import {
   createFacilityService,
   deleteFacilityService,
   assignFacilityBookingProvider,
-  fetchFacilities,
   fetchFacility,
   fetchFacilityBookings,
   fetchFacilityProviders,
@@ -34,6 +33,7 @@ import {
   updateFacilityProviderCompensation,
   updateFacilityService
 } from "../../../../shared/libs/facilities";
+import { useAdminFacilityScope } from "../finance/paymentAccess";
 import {
   cancelFacilityServiceRequest,
   createFacilityServiceRequest,
@@ -536,19 +536,35 @@ const ProviderRow = ({
   </article>
 );
 
-export const FacilityBookingRow = ({
+// Owns its own tick so the once-a-second countdown only rerenders this small block, not the
+// whole booking row (or, before that, the whole page) that every other row's tick used to.
+const FacilityResponseCountdown = memo(({ dueAt }: { dueAt: string | null | undefined }) => {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!dueAt) {
+      return;
+    }
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [dueAt]);
+
+  const countdown = formatFacilityResponseCountdown(dueAt, nowMs);
+  const countdownTone = facilityResponseCountdownTone(dueAt, nowMs);
+
+  return <p className={`mt-1 font-semibold ${countdownTone}`}>{countdown}</p>;
+});
+FacilityResponseCountdown.displayName = "FacilityResponseCountdown";
+
+export const FacilityBookingRow = memo(({
   booking,
   onAssign,
-  canAssign,
-  nowMs
+  canAssign
 }: {
   booking: Booking;
   onAssign: (booking: Booking) => void;
   canAssign: boolean;
-  nowMs: number;
 }) => {
-  const countdown = formatFacilityResponseCountdown(booking.facilityResponseDueAt, nowMs);
-  const countdownTone = facilityResponseCountdownTone(booking.facilityResponseDueAt, nowMs);
   return (
   <article className="rounded-xl border border-slate-200 bg-white p-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -574,9 +590,7 @@ export const FacilityBookingRow = ({
       </div>
       <div>
         <p className="text-xs font-semibold uppercase text-slate-500">Response window</p>
-        <p className={`mt-1 font-semibold ${countdownTone}`}>
-          {countdown}
-        </p>
+        <FacilityResponseCountdown dueAt={booking.facilityResponseDueAt} />
         <p className="text-xs text-slate-500">
           {booking.facilityResponseDueAt ? new Date(booking.facilityResponseDueAt).toLocaleTimeString() : "-"}
         </p>
@@ -596,7 +610,8 @@ export const FacilityBookingRow = ({
     )}
   </article>
   );
-};
+});
+FacilityBookingRow.displayName = "FacilityBookingRow";
 
 const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorkspacePageProps) => {
   const { facilityId } = useParams();
@@ -638,13 +653,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>({ providerUserId: "", reason: "" });
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
 
-  const facilityScopeQuery = useQuery({
-    queryKey: ["admin", "facility-scope"],
-    queryFn: () => fetchFacilities({ pageSize: 2 }),
-    enabled: isFacilityAdmin && canReadFacilities
-  });
+  const facilityScopeQuery = useAdminFacilityScope(isFacilityAdmin && canReadFacilities);
   const scopedFacilities = facilityScopeQuery.data?.facilities ?? [];
   const hasFacilityScope = canAdminOpsAccessFacility(String(facilityId), roles, scopedFacilities);
 
@@ -735,11 +745,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       setFinancialsVisible(facility.providerFinancialsVisible);
     }
   }, [facility]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const availableCatalogServices = useMemo(() => {
     return catalogQuery.data ?? [];
@@ -1513,7 +1518,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                 key={booking.id}
                 booking={booking}
                 canAssign={canManageBookings && canVerifyProviders}
-                nowMs={nowMs}
                 onAssign={openAssignmentModal}
               />
             ))}

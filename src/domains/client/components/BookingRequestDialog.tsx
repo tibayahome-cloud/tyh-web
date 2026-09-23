@@ -770,7 +770,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                           <span className="text-xs font-bold text-tiba-blue">
                             From {formatCurrency(service.base_price_cents)}
                           </span>
-                          <span className="text-[10px] text-slate-400">{service.default_estimate_minutes}m</span>
+                          <span className="text-[10px] text-slate-400">{service.default_estimate_minutes} min</span>
                         </div>
                       </button>
                     ))}
@@ -981,7 +981,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                                   {formatCurrency(facility.service.priceCents)}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                  {facility.service.estimateDurationMinutes ?? selectedService?.default_estimate_minutes ?? "-"}m
+                                  {facility.service.estimateDurationMinutes ?? selectedService?.default_estimate_minutes ?? "-"} min
                                 </p>
                               </div>
                             </div>
