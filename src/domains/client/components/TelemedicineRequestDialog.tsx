@@ -21,7 +21,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { RemoteFacility } from "../../../shared/libs/telemedicine";
-import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
+import type { TelemedicineHold, TelemedicineSlot } from "../../../shared/schemas/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import { mpesaPhoneValidationError } from "../../../shared/utils/mpesaPhone";
 import { sortSpecialistFirst } from "../../../shared/utils/telemedicineCatalogOrdering";
@@ -91,6 +91,14 @@ const WEEK_LENGTH = 7;
 // is refused, so the picker stops offering weeks it knows the API will reject.
 const MAX_LOOKAHEAD_DAYS = 30;
 
+// Shared by the hold query's refetchInterval (which only sees query.state.data) and the
+// component's own derived state below, so the two can never drift out of sync.
+const isHoldPaymentConfirmed = (hold: Pick<TelemedicineHold, "bookingStatus"> | null | undefined): boolean =>
+  Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
+
+const isHoldExpired = (hold: Pick<TelemedicineHold, "isActive" | "bookingStatus"> | null | undefined): boolean =>
+  Boolean(hold) && !hold?.isActive && hold?.bookingStatus !== "telemedicine_paid_pending_assignment";
+
 const useRemoteServiceOptions = (enabled: boolean) =>
   useQuery({
     queryKey: ["client", "services", "telemedicine-booking-form"],
@@ -130,20 +138,28 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   const policyQuery = useTelemedicinePolicy();
   const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
+  // Matches useTelemedicinePolicy's own staleTime convention: this catalog (categories,
+  // subcategories, services) changes about as rarely as the policy does, but previously had no
+  // staleTime at all (default 0), so every dialog reopen within the same session silently
+  // refetched all three in the background even though nothing had changed.
+  const TELEMEDICINE_CATALOG_STALE_TIME = 5 * 60_000;
   const categoriesQuery = useQuery({
     queryKey: ["client", "telemedicine", "categories"],
     queryFn: fetchTelemedicineCategories,
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId,
+    staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
   const subcategoriesQuery = useQuery({
     queryKey: ["client", "telemedicine", "subcategories"],
     queryFn: () => fetchTelemedicineSubcategories(),
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId,
+    staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
   const catalogServicesQuery = useQuery({
     queryKey: ["client", "telemedicine", "services"],
     queryFn: () => fetchTelemedicineCatalogServices(),
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId,
+    staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
@@ -198,7 +214,18 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const slotsForActiveDate = slotsByDate.get(activeDate) ?? [];
   const holdQuery = useHoldQuery(holdId, {
     enabled: Boolean(holdId),
-    refetchInterval: holdId ? 4000 : false
+    // Once payment is confirmed or the hold has reached a terminal state, nothing will change
+    // again -- keep polling only while payment is genuinely still pending.
+    refetchInterval: (query) => {
+      if (!holdId) {
+        return false;
+      }
+      const data = query.state.data;
+      if (isHoldPaymentConfirmed(data) || isHoldExpired(data)) {
+        return false;
+      }
+      return 4000;
+    }
   });
 
   const createHoldMutation = useCreateHoldMutation();
@@ -277,7 +304,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     return () => window.clearInterval(timer);
   }, [hold?.id, hold?.remainingSeconds]);
 
-  const holdExpired = Boolean(hold) && !hold?.isActive && hold?.bookingStatus !== "telemedicine_paid_pending_assignment";
+  const holdExpired = isHoldExpired(hold);
 
   // Once payment succeeds and admin.ops hasn't assigned yet, the booking is created -- treat
   // that as done from the client's point of view; assignment happens asynchronously.
@@ -384,7 +411,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     Boolean(hold?.bookingId) && (initiatePaymentMutation.isSuccess || Boolean(hold?.paymentPending));
   // Any work in flight that a second click would duplicate.
   const paymentInFlight = initiatePaymentMutation.isPending;
-  const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
+  const paymentConfirmed = isHoldPaymentConfirmed(hold);
 
   return (
     <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth="md">

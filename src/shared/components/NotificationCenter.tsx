@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import classNames from "classnames";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { useNotifications } from "../hooks/useNotifications";
+import { NOTIFICATION_CENTER_PAGE_SIZE, useNotifications } from "../hooks/useNotifications";
 import type { Notification } from "../schemas/notification";
 import { Button } from "./Button";
 import { Loading } from "./Loading";
@@ -48,7 +48,7 @@ type NotificationCenterProps = {
   pageSize?: number;
 };
 
-export const NotificationCenter = ({ pageSize = 10 }: NotificationCenterProps) => {
+export const NotificationCenter = ({ pageSize = NOTIFICATION_CENTER_PAGE_SIZE }: NotificationCenterProps) => {
   const {
     notifications,
     meta,
