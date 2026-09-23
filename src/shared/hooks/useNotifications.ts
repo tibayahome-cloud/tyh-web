@@ -20,6 +20,15 @@ type UseNotificationsParams = {
   enabled?: boolean;
 };
 
+/**
+ * The page size NotificationCenter fetches by default. useNotificationBadge shares this value
+ * so both consumers hit the identical query key and React Query serves them from one cached
+ * request instead of two -- pageSize is part of the cache key (see notificationKeys.list below),
+ * so any drift between the two reintroduces the duplicate-request bug this constant exists to
+ * prevent.
+ */
+export const NOTIFICATION_CENTER_PAGE_SIZE = 10;
+
 type NotificationListData = Awaited<ReturnType<typeof fetchNotifications>>;
 
 const notificationKeys = {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 
@@ -45,6 +45,23 @@ export const formatFacilityResponseWindow = (dueAt: string | null, nowMs = Date.
   return `${Math.floor(remainingSeconds / 60)}m ${String(remainingSeconds % 60).padStart(2, "0")}s`;
 };
 
+// Owns its own tick so the once-a-second update only rerenders this cell, not the whole
+// table (every row, filters, dialogs) the way a shared nowMs state on the page did.
+const FacilityResponseCountdown = memo(({ dueAt }: { dueAt: string | null }) => {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!dueAt) {
+      return;
+    }
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [dueAt]);
+
+  return <>{formatFacilityResponseWindow(dueAt, nowMs)}</>;
+});
+FacilityResponseCountdown.displayName = "FacilityResponseCountdown";
+
 const AdminBookingQueuePage = () => {
   const [tab, setTab] = useState<(typeof TABS)[number]>(TABS[0]);
   const [reassignOpen, setReassignOpen] = useState(false);
@@ -67,7 +84,6 @@ const AdminBookingQueuePage = () => {
     to: ""
   });
   const [draftFilters, setDraftFilters] = useState(appliedFilters);
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const toast = useToast();
   const queryClient = useQueryClient();
   const cancelMutation = useCancelBookingMutation("detail");
@@ -92,11 +108,6 @@ const AdminBookingQueuePage = () => {
     },
     { enabled: true, refetchInterval: 30_000 }
   );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const bookings = useMemo(() => {
     const rows = bookingQuery.data?.bookings ?? [];
@@ -418,7 +429,7 @@ const AdminBookingQueuePage = () => {
                       <span className={booking.facilityStatus === "expired" ? "font-semibold text-rose-600" : "text-slate-600"}>
                         {booking.facilityStatus === "expired"
                           ? booking.requestMode === "selected_facility" ? "Reroute confirmation required" : "Rerouted or awaiting next facility"
-                          : formatFacilityResponseWindow(booking.facilityResponseDueAt, nowMs)}
+                          : <FacilityResponseCountdown dueAt={booking.facilityResponseDueAt} />}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-500">
