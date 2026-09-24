@@ -5,9 +5,12 @@ import {
   Bone,
   BrainCircuit,
   CalendarClock,
+  ClipboardList,
   ClipboardPlus,
+  FileHeart,
   HandHeart,
   Heart,
+  HeartHandshake,
   HeartPulse,
   LayoutGrid,
   Leaf,
@@ -130,14 +133,33 @@ const SPECIALTY_ASSETS: Record<string, TelemedicineVisualAsset> = {
 };
 
 // Neutral, not one of the five brand tints -- an unrecognized or newly-created category must
-// read as "unstyled yet," not as a sixth category with its own identity.
-const FALLBACK_ASSET: TelemedicineVisualAsset = {
-  key: "fallback",
-  label: "Consultation",
-  Icon: ClipboardPlus,
-  bgClass: "bg-slate-100",
-  iconClass: "text-slate-500"
+// read as "unstyled yet," not as a sixth category with its own identity. A single fixed fallback
+// looked fine against the restored dev DB's five categories, but production has categories
+// created ad hoc through the admin catalog editor (e.g. "General Medicine", "Mental Health") that
+// aren't in CATEGORY_ASSETS at all -- with one fallback, every one of those collapses onto the
+// same icon and tint, so two visibly different categories become indistinguishable from each
+// other in the tile row. A small neutral palette, picked deterministically from the category's
+// own key, keeps unknown categories visually distinct from each other (and stable across
+// reloads) without claiming a specific identity the way a real CATEGORY_ASSETS entry would.
+const FALLBACK_PALETTE: TelemedicineVisualAsset[] = [
+  { key: "fallback-clipboard", label: "Consultation", Icon: ClipboardPlus, bgClass: "bg-slate-100", iconClass: "text-slate-500" },
+  { key: "fallback-file-heart", label: "Consultation", Icon: FileHeart, bgClass: "bg-zinc-100", iconClass: "text-zinc-500" },
+  { key: "fallback-clipboard-list", label: "Consultation", Icon: ClipboardList, bgClass: "bg-stone-100", iconClass: "text-stone-500" },
+  { key: "fallback-heart-handshake", label: "Consultation", Icon: HeartHandshake, bgClass: "bg-neutral-100", iconClass: "text-neutral-500" }
+];
+
+// A small, stable string hash -- not cryptographic, just needs to spread short category-key
+// strings evenly across FALLBACK_PALETTE and return the same index every time for the same key.
+const hashKey = (value: string): number => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
 };
+
+const fallbackAssetForKey = (key: string | null | undefined): TelemedicineVisualAsset =>
+  key ? FALLBACK_PALETTE[hashKey(key) % FALLBACK_PALETTE.length] : FALLBACK_PALETTE[0];
 
 // The "All services" tile is deliberately not one of the five category assets -- it isn't a
 // category, and reusing e.g. FirstCare's icon for it would misrepresent it as one.
@@ -150,13 +172,22 @@ export const TELEMEDICINE_ALL_SERVICES_ASSET: TelemedicineVisualAsset = {
 };
 
 export const getTelemedicineCategoryAsset = (key: string | null | undefined): TelemedicineVisualAsset =>
-  (key && CATEGORY_ASSETS[key]) || FALLBACK_ASSET;
+  (key && CATEGORY_ASSETS[key]) || fallbackAssetForKey(key);
 
 // A service card's visual: prefer a specific specialty icon when this subcategory is one of the
 // well-known ones above, otherwise fall back to its parent category's asset (never a generic
 // icon while a real category is known -- that would throw away information the card already has).
+// Only when neither is known does this reach for the hashed fallback, keyed on whichever of the
+// two is present -- the subcategory key is more specific, so it wins when both are unknown.
 export const getTelemedicineSpecialtyAsset = (
   subcategoryKey: string | null | undefined,
   categoryKey: string | null | undefined
-): TelemedicineVisualAsset =>
-  (subcategoryKey && SPECIALTY_ASSETS[subcategoryKey]) || getTelemedicineCategoryAsset(categoryKey);
+): TelemedicineVisualAsset => {
+  if (subcategoryKey && SPECIALTY_ASSETS[subcategoryKey]) {
+    return SPECIALTY_ASSETS[subcategoryKey];
+  }
+  if (categoryKey && CATEGORY_ASSETS[categoryKey]) {
+    return CATEGORY_ASSETS[categoryKey];
+  }
+  return fallbackAssetForKey(subcategoryKey ?? categoryKey);
+};
