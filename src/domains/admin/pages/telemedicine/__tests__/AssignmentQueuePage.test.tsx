@@ -228,6 +228,17 @@ describe("offering a replacement time from outside the facility's timezone", () 
   });
 });
 
+describe("page header", () => {
+  it("describes the whole workspace, not just assignment -- the queue also covers rebookings", () => {
+    renderQueue([booking()]);
+
+    expect(screen.getByText("Manage assignments, rebookings, consultations, and review flags.")).toBeInTheDocument();
+    // The old copy specifically named only "awaiting an eligible provider", which undersold the
+    // needs-rebooking, awaiting-client, consultations, and review-flags parts of this page.
+    expect(screen.queryByText(/awaiting an eligible provider/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("workspace navigation", () => {
   it("defaults to the Action queue view with the queue tab marked active", () => {
     renderQueue([booking()]);
