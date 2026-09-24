@@ -36,4 +36,20 @@ describe("TechnicalIssueReviewList", () => {
     expect(screen.getByText(/loading review flags/i)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("uses the spacious empty-state padding by default, for the platform-wide page this list is the whole content of", () => {
+    render(<TechnicalIssueReviewList issues={[]} isLoading={false} />);
+
+    expect(screen.getByText("No open reports.")).toHaveClass("py-8");
+  });
+
+  it("uses tighter empty/loading-state padding when a caller opts into compact, without changing the message", () => {
+    const { rerender } = render(<TechnicalIssueReviewList issues={[]} isLoading={false} compact />);
+
+    expect(screen.getByText("No open reports.")).toHaveClass("py-2");
+    expect(screen.getByText("No open reports.")).not.toHaveClass("py-8");
+
+    rerender(<TechnicalIssueReviewList issues={[]} isLoading compact />);
+    expect(screen.getByText(/loading review flags/i)).toBeInTheDocument();
+  });
 });

@@ -368,7 +368,7 @@ const AssignmentQueuePage = () => {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Telemedicine assignment</h1>
-          <p className="text-sm text-slate-500">Paid remote-consultation appointments awaiting an eligible provider.</p>
+          <p className="text-sm text-slate-500">Manage assignments, rebookings, consultations, and review flags.</p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <Button type="button" size="sm" variant="ghost" onClick={() => queueQuery.refetch()} disabled={queueQuery.isFetching}>
@@ -524,13 +524,14 @@ const AssignmentQueuePage = () => {
 
       {activeTab === "review" && (
         <div id="workspace-panel-review" role="tabpanel" aria-labelledby="workspace-tab-review">
-          <Card padding="none" className="p-4 sm:p-6">
+          <Card padding="none" className="p-3 sm:p-4">
             <TechnicalIssueReviewList
               issues={issuesQuery.data ?? []}
               isLoading={issuesQuery.isLoading}
               isError={issuesQuery.isError}
               error={issuesQuery.error}
               onRetry={() => issuesQuery.refetch()}
+              compact
             />
           </Card>
         </div>

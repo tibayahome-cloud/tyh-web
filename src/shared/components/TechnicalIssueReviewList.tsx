@@ -71,6 +71,11 @@ type TechnicalIssueReviewListProps = {
   error?: unknown;
   onRetry?: () => void;
   emptyLabel?: string;
+  // The platform-wide Reviews page (PlatformPage.tsx) is this list's whole page, so a spacious
+  // empty state reads fine there; embedded in a tab panel of a denser workspace, the same
+  // padding renders as one big empty card. Defaults to the original spacing so that page is
+  // unaffected -- only a caller that explicitly opts in gets the tighter one.
+  compact?: boolean;
 };
 
 // Shared between the facility-scoped admin.ops queue and the platform-wide super-admin view --
@@ -82,13 +87,14 @@ export const TechnicalIssueReviewList = ({
   isError = false,
   error,
   onRetry,
-  emptyLabel = "No open reports."
+  emptyLabel = "No open reports.",
+  compact = false
 }: TechnicalIssueReviewListProps) => {
   const openIssues = issues.filter((issue) => issue.status !== "resolved");
 
   if (isLoading) {
     return (
-      <div className="py-12 text-center">
+      <div className={compact ? "py-4 text-center" : "py-12 text-center"}>
         <Loading label="Loading review flags…" />
       </div>
     );
@@ -102,7 +108,7 @@ export const TechnicalIssueReviewList = ({
     );
   }
   if (openIssues.length === 0) {
-    return <p className="py-8 text-center text-sm text-slate-500">{emptyLabel}</p>;
+    return <p className={compact ? "py-2 text-center text-sm text-slate-500" : "py-8 text-center text-sm text-slate-500"}>{emptyLabel}</p>;
   }
   return (
     <div className="space-y-3">
