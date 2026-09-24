@@ -22,23 +22,37 @@ describe("getTelemedicineCategoryAsset", () => {
     expect(new Set(icons).size).toBe(KNOWN_CATEGORY_KEYS.length);
   });
 
-  it("falls back to the neutral asset for an unknown category key", () => {
+  it("falls back to a neutral (not brand-colored) asset for an unknown category key", () => {
     const asset = getTelemedicineCategoryAsset("some-brand-new-category-2027");
-    expect(asset.key).toBe("fallback");
-    expect(asset.bgClass).toBe("bg-slate-100");
-    expect(asset.iconClass).toBe("text-slate-500");
+    expect(asset.key).toMatch(/^fallback-/);
+    expect(asset.bgClass).toMatch(/-100$/);
   });
 
-  it("falls back to the neutral asset for a null or undefined key", () => {
-    expect(getTelemedicineCategoryAsset(null).key).toBe("fallback");
-    expect(getTelemedicineCategoryAsset(undefined).key).toBe("fallback");
+  it("falls back to the same neutral asset for a null or undefined key", () => {
+    expect(getTelemedicineCategoryAsset(null).key).toMatch(/^fallback-/);
+    expect(getTelemedicineCategoryAsset(undefined).key).toMatch(/^fallback-/);
   });
 
-  it("does not reuse the fallback asset's icon for any real category", () => {
-    const fallbackIcon = getTelemedicineCategoryAsset("unknown").Icon;
+  it("does not reuse a fallback icon for any real category", () => {
+    const fallbackIcon = getTelemedicineCategoryAsset("some-unknown-key").Icon;
     KNOWN_CATEGORY_KEYS.forEach((key) => {
       expect(getTelemedicineCategoryAsset(key).Icon).not.toBe(fallbackIcon);
     });
+  });
+
+  it("is deterministic: the same unknown key always resolves the same fallback", () => {
+    const first = getTelemedicineCategoryAsset("General Medicine");
+    const second = getTelemedicineCategoryAsset("General Medicine");
+    expect(second.key).toBe(first.key);
+  });
+
+  it("gives visually distinct fallbacks to different unrecognized categories -- the actual production gap", () => {
+    // Regression for real prod data: "General Medicine" and "Mental Health" are both admin-created
+    // categories with no entry in CATEGORY_ASSETS. A single fixed fallback made them render as the
+    // same icon and tint, indistinguishable from each other in the tile row.
+    const generalMedicine = getTelemedicineCategoryAsset("General Medicine");
+    const mentalHealth = getTelemedicineCategoryAsset("Mental Health");
+    expect(generalMedicine.key).not.toBe(mentalHealth.key);
   });
 });
 
@@ -53,9 +67,9 @@ describe("getTelemedicineSpecialtyAsset", () => {
     expect(asset.key).toBe("wellnesscare");
   });
 
-  it("falls back to the neutral asset when neither the specialty nor the category is known", () => {
+  it("falls back to a neutral asset when neither the specialty nor the category is known", () => {
     const asset = getTelemedicineSpecialtyAsset("some-new-specialty", "some-brand-new-category");
-    expect(asset.key).toBe("fallback");
+    expect(asset.key).toMatch(/^fallback-/);
   });
 
   it("falls back to the parent category when the subcategory key is missing", () => {
