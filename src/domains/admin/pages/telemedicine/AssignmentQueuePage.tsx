@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { ClipboardList, Flag, RefreshCw, Video } from "lucide-react";
 
 import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
 import { ApiErrorBanner } from "../../../../shared/components/ApiErrorBanner";
+import { StickyFilterBar } from "../../../../shared/components/StickyFilterBar";
 import { TechnicalIssueReviewList } from "../../../../shared/components/TechnicalIssueReviewList";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import {
@@ -24,6 +25,7 @@ import {
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../../shared/utils/bookingStatus";
 import { PreferenceSummary } from "../../components/PreferenceSummary";
 import { classifyApiError, type ClassifiedApiError } from "../../../../shared/utils/errors";
+import type { Booking } from "../../../../shared/schemas/booking";
 import type { TelemedicineAssignmentBooking } from "../../../../shared/schemas/telemedicine";
 
 const AssignProviderAction = ({ booking }: { booking: TelemedicineAssignmentBooking }) => {
@@ -130,44 +132,54 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
   );
 };
 
-const AssignmentCard = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
-  // One action per card, chosen by the backend rather than guessed here. A booking whose slot
-  // lapsed used to render an Assign button the API would always reject -- the operator saw a
-  // provider they could pick and an error every time they picked one.
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="font-semibold text-slate-900">{booking.serviceName ?? "Consultation"}</p>
-          <p className="text-xs text-slate-500">{booking.id}</p>
-          <p className="mt-1 text-sm text-slate-700">{booking.clientFullName ?? booking.clientUserId}</p>
-          <p className="text-xs text-slate-500">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
-          {booking.recoveryState !== "assignable" && (
-            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              {booking.recoveryState === "awaiting_client"
-                ? "A replacement time has been offered. Waiting for the client to accept."
-                : "This appointment's slot was released before a provider was assigned. Offer the client another time, or refund the payment from the review queue."}
-            </p>
-          )}
-          <PreferenceSummary bookingId={booking.id} />
-          <Link
-            to={`/admin/bookings/${booking.id}`}
-            className="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline"
-          >
-            View consultation details
-          </Link>
-        </div>
-        {booking.recoveryState === "assignable" && <AssignProviderAction booking={booking} />}
-        {booking.recoveryState === "needs_rebooking" && <OfferNewTimeAction booking={booking} timezone={timezone} />}
-        {booking.recoveryState === "awaiting_client" && (
-          <span className="text-xs font-semibold text-slate-500">Awaiting client</span>
-        )}
-      </div>
-    </div>
-  );
+// The descriptive half of an assignment-queue row, shared by the desktop grid layout and the
+// mobile stack so each booking (and its PreferenceSummary fetch) mounts exactly once -- CSS
+// reflows this between a table-like two-column row and a stacked card, no duplicate DOM tree.
+const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => (
+  <div className="min-w-0">
+    <p className="font-semibold text-slate-900">{booking.serviceName ?? "Consultation"}</p>
+    <p className="text-xs text-slate-400">{booking.id}</p>
+    <p className="text-sm text-slate-700">{booking.clientFullName ?? booking.clientUserId}</p>
+    <p className="text-xs text-slate-500">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
+    {booking.recoveryState !== "assignable" && (
+      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        {booking.recoveryState === "awaiting_client"
+          ? "A replacement time has been offered. Waiting for the client to accept."
+          : "This appointment's slot was released before a provider was assigned. Offer the client another time, or refund the payment from the review queue."}
+      </p>
+    )}
+    <PreferenceSummary bookingId={booking.id} />
+    <Link
+      to={`/admin/bookings/${booking.id}`}
+      className="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline"
+    >
+      View consultation details
+    </Link>
+  </div>
+);
+
+// One action per row, chosen by the backend rather than guessed here. A booking whose slot
+// lapsed used to render an Assign button the API would always reject -- the operator saw a
+// provider they could pick and an error every time they picked one.
+const AssignmentRowAction = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+  if (booking.recoveryState === "assignable") return <AssignProviderAction booking={booking} />;
+  if (booking.recoveryState === "needs_rebooking") return <OfferNewTimeAction booking={booking} timezone={timezone} />;
+  if (booking.recoveryState === "awaiting_client") {
+    return <span className="text-xs font-semibold text-slate-500">Awaiting client</span>;
+  }
+  return null;
 };
 
-const ConsultationRow = ({ booking, timezone }: { booking: import("../../../../shared/schemas/booking").Booking; timezone: string | undefined }) => {
+const AssignmentQueueRow = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => (
+  <div className="grid grid-cols-1 gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-x-6">
+    <AssignmentRowDetails booking={booking} timezone={timezone} />
+    <div className="flex md:justify-end">
+      <AssignmentRowAction booking={booking} timezone={timezone} />
+    </div>
+  </div>
+);
+
+const ConsultationRow = ({ booking, timezone }: { booking: Booking; timezone: string | undefined }) => {
   const bookingTheme = getBookingStatusTheme(booking.status);
   const sessionTheme = booking.telemedicineSession?.status
     ? getSessionStatusTheme(booking.telemedicineSession.status)
@@ -176,14 +188,14 @@ const ConsultationRow = ({ booking, timezone }: { booking: import("../../../../s
   return (
     <Link
       to={`/admin/bookings/${booking.id}`}
-      className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-primary-300 hover:shadow-md"
+      className="block rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-primary-300 hover:shadow-sm"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="font-semibold text-slate-900">{booking.service?.name ?? "Consultation"}</p>
-          <p className="mt-1 text-sm text-slate-700">Client: {booking.client?.fullName || "Unknown client"}</p>
+          <p className="mt-0.5 text-sm text-slate-700">Client: {booking.client?.fullName || "Unknown client"}</p>
           <p className="text-sm text-slate-700">Provider: {booking.provider?.fullName || "Unassigned"}</p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-500">
             {formatTelemedicineDateTime(booking.scheduledAt, timezone)}
             {booking.estimateDurationMinutes ? ` · ${booking.estimateDurationMinutes} min` : ""}
           </p>
@@ -208,6 +220,69 @@ const ConsultationRow = ({ booking, timezone }: { booking: import("../../../../s
   );
 };
 
+// A live video session, not just "not historical yet" -- refines splitTelemedicineBookings'
+// upcoming set using the same telemedicineSession.status field ConsultationRow already reads
+// (no new field, no new request). There is no backend "active" booking status of its own.
+const isConsultationInSession = (booking: Booking): boolean => {
+  const sessionStatus = booking.telemedicineSession?.status;
+  return sessionStatus === "joined" || sessionStatus === "in_progress";
+};
+
+type WorkspaceTabKey = "queue" | "consultations" | "review";
+
+const WORKSPACE_TABS: { key: WorkspaceTabKey; label: string; icon: typeof ClipboardList }[] = [
+  { key: "queue", label: "Action queue", icon: ClipboardList },
+  { key: "consultations", label: "Consultations", icon: Video },
+  { key: "review", label: "Review flags", icon: Flag }
+];
+
+type ConsultationFilterKey = "upcoming" | "active" | "history";
+
+const CONSULTATION_FILTERS: { key: ConsultationFilterKey; label: string }[] = [
+  { key: "upcoming", label: "Upcoming" },
+  { key: "active", label: "Active" },
+  { key: "history", label: "History" }
+];
+
+const SummaryStat = ({
+  label,
+  value,
+  tone
+}: {
+  label: string;
+  value: number;
+  tone: "blue" | "amber" | "slate" | "rose";
+}) => {
+  const toneClass =
+    tone === "blue"
+      ? "border-blue-100 bg-blue-50 text-blue-900"
+      : tone === "amber"
+        ? "border-amber-100 bg-amber-50 text-amber-900"
+        : tone === "rose"
+          ? "border-rose-100 bg-rose-50 text-rose-900"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return (
+    // role="group" (not a bare div) with one combined phrase for assistive tech
+    // ("5 Awaiting assignment") instead of a lone number; the visual label/number pair
+    // underneath is hidden from the accessibility tree so it is not announced a second time.
+    // Not a live region: these update on a background poll, not a user action, and announcing
+    // every poll tick would be noise, not information.
+    <div
+      role="group"
+      className={`rounded-xl border px-3 py-2 ${toneClass}`}
+      aria-label={`${value} ${label}`}
+    >
+      <p aria-hidden="true" className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
+        {label}
+      </p>
+      <p aria-hidden="true" className="text-xl font-bold tabular-nums">
+        {value}
+      </p>
+    </div>
+  );
+};
+
 const AssignmentQueuePage = () => {
   const toast = useToast();
   const queueQuery = useAssignmentQueue({ refetchInterval: 30_000 });
@@ -217,9 +292,26 @@ const AssignmentQueuePage = () => {
     { isTelemedicine: true, pageSize: 50, preset: "card" },
     { refetchInterval: 60_000 }
   );
+  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>("queue");
+  const [consultationFilter, setConsultationFilter] = useState<ConsultationFilterKey>("upcoming");
+
   const bookings = queueQuery.data ?? [];
   const consultations = (consultationsQuery.data?.bookings ?? []).filter((booking) => booking.isTelemedicine);
-  const { upcoming: upcomingConsultations, history: consultationHistory } = splitTelemedicineBookings(consultations);
+  const { upcoming: notYetHistoricalConsultations, history: consultationHistory } = splitTelemedicineBookings(consultations);
+  const activeConsultations = notYetHistoricalConsultations.filter(isConsultationInSession);
+  const upcomingConsultations = notYetHistoricalConsultations.filter((booking) => !isConsultationInSession(booking));
+
+  const openIssues = (issuesQuery.data ?? []).filter((issue) => issue.status !== "resolved");
+
+  // Every count here comes from data the page already fetched for its own views -- no request
+  // exists solely to power the summary strip or tab badges. The queue is small enough that
+  // recomputing these filters each render is cheaper than the bookkeeping a memo would need.
+  const summary = {
+    awaitingAssignment: bookings.filter((booking) => booking.recoveryState === "assignable").length,
+    needsRebooking: bookings.filter((booking) => booking.recoveryState === "needs_rebooking").length,
+    awaitingClient: bookings.filter((booking) => booking.recoveryState === "awaiting_client").length,
+    reviewFlags: openIssues.length
+  };
 
   // Client-side alert for a fast-moving queue: no backend notification producer exists yet
   // (see Backend V1.2 Phase 6), so this catches "a new paid booking is waiting" as soon as the
@@ -243,8 +335,36 @@ const AssignmentQueuePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queueQuery.data]);
 
+  // Roving-tabindex tab list: arrow keys must both select the new tab and move DOM focus onto
+  // it (not just update aria-selected/tabIndex and leave focus behind on the old button) --
+  // every tab button is already mounted (only its styling/tabIndex is conditional), so its ref
+  // exists before the key ever needs to move.
+  const tabButtonRefs = useRef<Partial<Record<WorkspaceTabKey, HTMLButtonElement | null>>>({});
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = WORKSPACE_TABS.findIndex((tab) => tab.key === activeTab);
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const nextIndex = (currentIndex + direction + WORKSPACE_TABS.length) % WORKSPACE_TABS.length;
+      const nextKey = WORKSPACE_TABS[nextIndex].key;
+      setActiveTab(nextKey);
+      tabButtonRefs.current[nextKey]?.focus();
+    }
+  };
+
+  const visibleConsultations =
+    consultationFilter === "upcoming" ? upcomingConsultations : consultationFilter === "active" ? activeConsultations : consultationHistory;
+
+  const consultationEmptyLabel =
+    consultationFilter === "upcoming"
+      ? "No upcoming consultations."
+      : consultationFilter === "active"
+        ? "No consultations in an active session right now."
+        : "No consultation history.";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Telemedicine assignment</h1>
@@ -263,79 +383,158 @@ const AssignmentQueuePage = () => {
         </div>
       </div>
 
-      <Card padding="none" className="p-4 sm:p-6">
-        {queueQuery.isLoading ? (
-          <div className="py-12 text-center">
-            <Loading label="Loading assignment queue…" />
-          </div>
-        ) : queueQuery.isError ? (
-          <ApiErrorBanner
-            {...classifyApiError(queueQuery.error, "We couldn't load the assignment queue right now.")}
-            onRetry={() => queueQuery.refetch()}
-          />
-        ) : bookings.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500">No consultations waiting for assignment.</p>
-        ) : (
-          <div className="space-y-3">
-            {bookings.map((booking) => (
-              <AssignmentCard key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Consultations</h2>
-          <p className="text-sm text-slate-500">Review scheduled, active, completed, and closed remote appointments.</p>
-        </div>
-        {consultationsQuery.isLoading ? (
-          <Card><Loading label="Loading consultations…" /></Card>
-        ) : consultationsQuery.isError ? (
-          <Card><ApiErrorBanner category="unknown" message="Unable to load telemedicine consultations." /></Card>
-        ) : (
-          <div className="space-y-5">
-            <div>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Upcoming and active</h3>
-              {upcomingConsultations.length === 0 ? (
-                <Card><p className="text-sm text-slate-500">No upcoming or active consultations.</p></Card>
-              ) : (
-                <div className="space-y-3">
-                  {upcomingConsultations.map((booking) => (
-                    <ConsultationRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">History</h3>
-              {consultationHistory.length === 0 ? (
-                <Card><p className="text-sm text-slate-500">No consultation history.</p></Card>
-              ) : (
-                <div className="space-y-3">
-                  {consultationHistory.map((booking) => (
-                    <ConsultationRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">Review flags</h2>
-        <p className="text-sm text-slate-500">No-show and technical-issue reports for this facility.</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <SummaryStat label="Awaiting assignment" value={summary.awaitingAssignment} tone="blue" />
+        <SummaryStat label="Needs rebooking" value={summary.needsRebooking} tone="amber" />
+        <SummaryStat label="Awaiting client" value={summary.awaitingClient} tone="slate" />
+        <SummaryStat label="Review flags" value={summary.reviewFlags} tone="rose" />
       </div>
-      <Card padding="none" className="p-4 sm:p-6">
-        <TechnicalIssueReviewList
-          issues={issuesQuery.data ?? []}
-          isLoading={issuesQuery.isLoading}
-          isError={issuesQuery.isError}
-          error={issuesQuery.error}
-          onRetry={() => issuesQuery.refetch()}
-        />
-      </Card>
+
+      <StickyFilterBar>
+        <div
+          role="tablist"
+          aria-label="Telemedicine workspace sections"
+          className="flex w-full gap-1 rounded-xl bg-slate-100 p-1 sm:w-auto"
+        >
+          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => {
+            const isActive = activeTab === key;
+            // "Consultations" must count everything that tab can show (Upcoming + Active +
+            // History), not just the default Upcoming filter -- otherwise the badge silently
+            // undercounts the moment there's an active or historical consultation.
+            const count = key === "queue" ? bookings.length : key === "consultations" ? consultations.length : summary.reviewFlags;
+            return (
+              <button
+                key={key}
+                ref={(element) => {
+                  tabButtonRefs.current[key] = element;
+                }}
+                type="button"
+                role="tab"
+                id={`workspace-tab-${key}`}
+                aria-selected={isActive}
+                aria-controls={`workspace-panel-${key}`}
+                tabIndex={isActive ? 0 : -1}
+                onKeyDown={handleTabKeyDown}
+                onClick={() => setActiveTab(key)}
+                className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:flex-none ${
+                  isActive ? "bg-white text-tiba-blue shadow-sm" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Icon size={14} aria-hidden="true" />
+                {label}
+                {count > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                      isActive ? "bg-tiba-blue/10 text-tiba-blue" : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </StickyFilterBar>
+
+      {activeTab === "queue" && (
+        <div id="workspace-panel-queue" role="tabpanel" aria-labelledby="workspace-tab-queue">
+          <Card padding="none">
+            {queueQuery.isLoading ? (
+              <div className="py-12 text-center">
+                <Loading label="Loading assignment queue…" />
+              </div>
+            ) : queueQuery.isError ? (
+              <div className="p-4 sm:p-6">
+                <ApiErrorBanner
+                  {...classifyApiError(queueQuery.error, "We couldn't load the assignment queue right now.")}
+                  onRetry={() => queueQuery.refetch()}
+                />
+              </div>
+            ) : bookings.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-500">No consultations waiting for assignment.</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {/* Column header only where there's room for the action column to read as a
+                    column; the mobile stack below md doesn't need one repeated per row. */}
+                <div className="hidden bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:gap-x-6">
+                  <span>Consultation</span>
+                  <span className="text-right">Action</span>
+                </div>
+                {bookings.map((booking) => (
+                  <AssignmentQueueRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {activeTab === "consultations" && (
+        <div id="workspace-panel-consultations" role="tabpanel" aria-labelledby="workspace-tab-consultations" className="space-y-3">
+          <div
+            role="tablist"
+            aria-label="Consultation filter"
+            className="inline-flex gap-1 rounded-lg bg-slate-100 p-1"
+          >
+            {CONSULTATION_FILTERS.map(({ key, label }) => {
+              const isActive = consultationFilter === key;
+              const count = key === "upcoming" ? upcomingConsultations.length : key === "active" ? activeConsultations.length : consultationHistory.length;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setConsultationFilter(key)}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                    isActive ? "bg-white text-tiba-blue shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {label}
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? "bg-tiba-blue/10 text-tiba-blue" : "bg-slate-200 text-slate-700"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {consultationsQuery.isLoading ? (
+            <Card>
+              <Loading label="Loading consultations…" />
+            </Card>
+          ) : consultationsQuery.isError ? (
+            <Card>
+              <ApiErrorBanner category="unknown" message="Unable to load telemedicine consultations." />
+            </Card>
+          ) : visibleConsultations.length === 0 ? (
+            <Card>
+              <p className="text-sm text-slate-500">{consultationEmptyLabel}</p>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {visibleConsultations.map((booking) => (
+                <ConsultationRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "review" && (
+        <div id="workspace-panel-review" role="tabpanel" aria-labelledby="workspace-tab-review">
+          <Card padding="none" className="p-4 sm:p-6">
+            <TechnicalIssueReviewList
+              issues={issuesQuery.data ?? []}
+              isLoading={issuesQuery.isLoading}
+              isError={issuesQuery.isError}
+              error={issuesQuery.error}
+              onRetry={() => issuesQuery.refetch()}
+            />
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
