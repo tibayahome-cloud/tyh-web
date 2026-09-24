@@ -12,6 +12,11 @@ import {
   fetchTelemedicineCategories,
   fetchTelemedicineSubcategories
 } from "../../../shared/libs/telemedicineCatalog";
+import {
+  getTelemedicineCategoryAsset,
+  getTelemedicineSpecialtyAsset,
+  TELEMEDICINE_ALL_SERVICES_ASSET
+} from "../../../shared/libs/telemedicineCategoryAssets";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
@@ -413,8 +418,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const paymentInFlight = initiatePaymentMutation.isPending;
   const paymentConfirmed = isHoldPaymentConfirmed(hold);
 
+  // Only the service picker benefits from extra width -- category tiles and richer service
+  // cards need room to breathe; every later step is still a single-column form/list that "md"
+  // already fits. One Modal, one DOM tree; this is a prop value, not a second layout branch.
+  const isServiceStep = step === TM_STEP_INDEX.service && !serviceId;
+
   return (
-    <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth="md">
+    <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth={isServiceStep ? "lg" : "md"}>
       <div className="space-y-6">
         <Stepper steps={TM_STEPS} current={step} />
 
@@ -437,29 +447,47 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">Choose a consultation below to see available facilities and times.</p>
-                <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                  <Input
-                    type="search"
-                    label="Search consultations"
-                    value={catalogSearch}
-                    onChange={(event) => setCatalogSearch(event.target.value)}
-                    placeholder="Search services, specialties, or care areas"
-                  />
-                  <label className="block text-sm font-medium text-slate-700">
-                    <span className="mb-1 block">Care area</span>
-                    <select
-                      value={catalogCategoryFilter}
-                      onChange={(event) => setCatalogCategoryFilter(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-tiba-blue focus:ring-2 focus:ring-tiba-blue/20 sm:min-w-52"
-                    >
-                      <option value="all">All care areas</option>
-                      {categoryCards.map(({ category }) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <Input
+                  type="search"
+                  label="Search consultations"
+                  value={catalogSearch}
+                  onChange={(event) => setCatalogSearch(event.target.value)}
+                  placeholder="Search services, specialties, or care areas"
+                />
+                {/* Visual replacement for the old "Care area" <select> -- same catalogCategoryFilter
+                    state, same values ("all" or a category id), just a richer control. */}
+                <div
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+                  role="group"
+                  aria-label="Filter by care area"
+                >
+                  {[
+                    { id: "all", name: TELEMEDICINE_ALL_SERVICES_ASSET.label, asset: TELEMEDICINE_ALL_SERVICES_ASSET },
+                    ...categoryCards.map(({ category }) => ({
+                      id: category.id,
+                      name: category.name,
+                      asset: getTelemedicineCategoryAsset(category.key)
+                    }))
+                  ].map(({ id, name, asset }) => {
+                    const isActive = catalogCategoryFilter === id;
+                    const Icon = asset.Icon;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => setCatalogCategoryFilter(id)}
+                        className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition ${
+                          isActive ? "border-tiba-blue bg-tiba-blue/5" : "border-slate-200 bg-white hover:border-tiba-blue"
+                        }`}
+                      >
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${asset.bgClass}`}>
+                          <Icon className={`h-5 w-5 ${asset.iconClass}`} aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 text-sm font-semibold leading-tight text-slate-800">{name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {visibleCategoryCards.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
@@ -475,33 +503,70 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       <p className="text-sm text-slate-500">No consultations are available in this area yet.</p>
                     ) : (
                       <div className="space-y-3">
-                        {specialties.map(({ subcategory, services }) => (
-                          <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
-                            <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
-                            {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
-                            {services.length === 0 ? (
-                              <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
-                            ) : (
-                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                {services.map((service) => (
-                                  <button
-                                    key={service.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedServiceId(service.id);
-                                      setStep(TM_STEP_INDEX.facility);
-                                    }}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
-                                  >
-                                    <p className="text-sm font-semibold text-slate-900">{service.name}</p>
-                                    {service.description && <p className="mt-1 text-xs text-slate-500">{service.description}</p>}
-                                    <p className="mt-2 text-sm font-medium text-tiba-blue">From {formatCurrency(service.basePriceCents, service.currency)}</p>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        {specialties.map(({ subcategory, services }) => {
+                          const specialtyAsset = getTelemedicineSpecialtyAsset(subcategory.key, category.key);
+                          const SpecialtyIcon = specialtyAsset.Icon;
+                          return (
+                            <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
+                              <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
+                              {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
+                              {services.length === 0 ? (
+                                <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
+                              ) : (
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  {services.map((service) => (
+                                    <button
+                                      key={service.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedServiceId(service.id);
+                                        setStep(TM_STEP_INDEX.facility);
+                                      }}
+                                      className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
+                                    >
+                                      <span
+                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${specialtyAsset.bgClass}`}
+                                      >
+                                        <SpecialtyIcon className={`h-5 w-5 ${specialtyAsset.iconClass}`} aria-hidden="true" />
+                                      </span>
+                                      <span className="min-w-0 flex-1">
+                                        <span className="flex items-start justify-between gap-2">
+                                          <span className="text-sm font-semibold text-slate-900">{service.name}</span>
+                                          {service.isEmergencyCapable && (
+                                            <span className="shrink-0 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase text-danger-600">
+                                              Urgent care
+                                            </span>
+                                          )}
+                                        </span>
+                                        {service.description && (
+                                          <span className="mt-1 block text-xs text-slate-500">{service.description}</span>
+                                        )}
+                                        <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                          <span className="text-sm font-medium text-tiba-blue">
+                                            From {formatCurrency(service.basePriceCents, service.currency)}
+                                          </span>
+                                          <span className="text-xs text-slate-500">{service.defaultEstimateMinutes} min</span>
+                                        </span>
+                                        {service.tags.length > 0 && (
+                                          <span className="mt-2 flex flex-wrap gap-1">
+                                            {service.tags.map((tag) => (
+                                              <span
+                                                key={tag}
+                                                className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                                              >
+                                                {tag}
+                                              </span>
+                                            ))}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </section>
