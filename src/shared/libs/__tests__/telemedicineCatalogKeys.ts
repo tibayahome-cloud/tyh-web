@@ -1,0 +1,53 @@
+// The approved telemedicine catalog's stable keys (6 categories, 37 subcategories, 77 services),
+// used to prove the image resolver covers every real service. Keys only -- no names, prices or ids.
+export const APPROVED_CATALOG_KEYS: Record<string, Record<string, string[]>> = {
+  careconnect: {
+    "home-based-care": ["home-care-assessment", "home-care-coordination"],
+    "hospital-referrals": ["facility-care-navigation", "hospital-referral-coordination"],
+    "imaging-diagnostics": ["diagnostic-report-review", "imaging-referral-guidance"],
+    "laboratory-services": ["laboratory-results-review", "laboratory-test-guidance"],
+    "pharmacy": ["medication-guidance-consultation", "prescription-review"],
+    "surgery-coordination": ["surgery-referral-consultation", "surgical-care-coordination"],
+  },
+  continucare: {
+    "chronic-disease-follow-up": ["chronic-disease-follow-up", "multi-condition-care-review"],
+    "long-term-care-coordination": ["care-coordination-follow-up", "long-term-care-planning"],
+    "medication-follow-up": ["medication-follow-up-consultation", "medication-side-effect-review"],
+    "post-hospitalisation-follow-up": ["discharge-plan-review", "post-hospitalisation-review"],
+    "post-operative-follow-up": ["post-operative-review", "post-operative-wound-guidance"],
+    "second-medical-opinions": ["second-medical-opinion", "specialist-second-opinion"],
+    "specialist-follow-up": ["specialist-follow-up-consultation", "specialist-treatment-review"],
+    "treatment-monitoring": ["recovery-monitoring-consultation", "treatment-progress-review"],
+  },
+  firstcare: {
+    "clinical-officers": ["clinical-follow-up-consultation", "clinical-officer-consultation"],
+    "general-practitioners": ["first-medical-consultation", "follow-up-medical-consultation", "medical-advice-referral"],
+  },
+  "mental-health": {
+    psychiatry: ["psychiatric-consultation", "psychiatric-follow-up"],
+    "psychology-counselling": ["counselling-session", "mental-health-assessment"],
+  },
+  specialistcare: {
+    "cardiology": ["cardiac-report-review", "cardiology-consultation"],
+    "dermatology": ["dermatology-follow-up", "skin-condition-consultation"],
+    "ent": ["ent-consultation", "ent-follow-up"],
+    "endocrinology": ["complex-diabetes-review", "endocrinology-consultation"],
+    "gastroenterology": ["digestive-health-consultation", "endoscopy-report-review"],
+    "internal-medicine": ["diabetes-hypertension-review", "internal-medicine-consultation"],
+    "nephrology": ["chronic-kidney-disease-follow-up", "kidney-health-consultation"],
+    "neurology": ["neurological-report-review", "neurology-consultation"],
+    "obstetrics-gynaecology": ["antenatal-consultation", "post-delivery-follow-up", "womens-health-consultation"],
+    "oncology": ["cancer-consultation", "cancer-second-opinion", "oncology-treatment-follow-up"],
+    "orthopaedics": ["injury-imaging-review", "orthopaedic-consultation"],
+    "paediatrics": ["child-growth-development-review", "childrens-health-consultation"],
+    "urology": ["urology-consultation", "urology-follow-up"],
+  },
+  wellnesscare: {
+    "chronic-disease-education": ["chronic-disease-education-session", "diabetes-self-management-education"],
+    "lifestyle-wellness": ["lifestyle-wellness-consultation", "wellness-follow-up"],
+    "nutrition-dietetics": ["nutrition-assessment", "personalised-nutrition-plan"],
+    "occupational-therapy": ["occupational-therapy-assessment", "occupational-therapy-follow-up"],
+    "physiotherapy": ["physiotherapy-assessment", "physiotherapy-follow-up"],
+    "speech-language-therapy": ["speech-therapy-follow-up", "speech-language-assessment"],
+  },
+};
