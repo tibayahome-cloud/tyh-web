@@ -84,6 +84,7 @@ export const FacilitySchema = z.object({
   lng: z.number().nullable(),
   platformFeePercent: z.number(),
   providerFinancialsVisible: z.boolean(),
+  fastResponseEnabled: z.boolean(),
   approvedAt: z.string().nullable(),
   suspendedAt: z.string().nullable(),
   phones: z.array(FacilityPhoneSchema),
@@ -274,6 +275,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     lng: coerceNumber(raw.lng),
     platformFeePercent: coerceNumber(raw.platform_fee_percent ?? raw.platformFeePercent) ?? 0,
     providerFinancialsVisible: toBoolean(raw.provider_financials_visible ?? raw.providerFinancialsVisible, true),
+    fastResponseEnabled: toBoolean(raw.fast_response_enabled ?? raw.fastResponseEnabled),
     approvedAt: coerceDate(raw.approved_at ?? raw.approvedAt),
     suspendedAt: coerceDate(raw.suspended_at ?? raw.suspendedAt),
     phones: (Array.isArray(raw.phones) ? raw.phones : [])
@@ -426,6 +428,7 @@ export type FacilityCreateInput = {
   operatingHours: Array<Omit<FacilityOperatingHour, "id">>;
   initialAdminEmail: string;
   platformFeePercent: number;
+  fastResponseEnabled?: boolean;
 };
 
 export type FacilityUpdateInput = Partial<{
@@ -442,6 +445,7 @@ export type FacilityUpdateInput = Partial<{
   operatingHours: Array<Omit<FacilityOperatingHour, "id">>;
   platformFeePercent: number;
   providerFinancialsVisible: boolean;
+  fastResponseEnabled: boolean;
 }>;
 
 export type FacilityServiceInput = {

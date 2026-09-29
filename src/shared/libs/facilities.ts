@@ -34,6 +34,7 @@ export type FacilityListParams = {
 export type FacilityListResult = {
   facilities: Facility[];
   meta: BookingListMeta;
+  statusCounts: Record<FacilityStatus, number>;
   raw?: Record<string, unknown>;
 };
 
@@ -197,7 +198,8 @@ export const facilityCreatePayload = (input: FacilityCreateInput): Record<string
   lng: input.lng,
   operating_hours: operatingHoursPayload(input.operatingHours),
   initial_admin_email: input.initialAdminEmail,
-  platform_fee_percent: input.platformFeePercent
+  platform_fee_percent: input.platformFeePercent,
+  fast_response_enabled: input.fastResponseEnabled ?? false
 });
 
 export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string, unknown> => {
@@ -217,6 +219,7 @@ export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string
   if (input.providerFinancialsVisible !== undefined) {
     payload.provider_financials_visible = input.providerFinancialsVisible;
   }
+  if (input.fastResponseEnabled !== undefined) payload.fast_response_enabled = input.fastResponseEnabled;
   return payload;
 };
 
@@ -267,7 +270,16 @@ export const fetchFacilities = async ({
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const data = Array.isArray(payload.data) ? payload.data : [];
   const facilities = mapFacilities(data);
-  return { facilities, meta: mapListMeta(payload.meta, page, pageSize, facilities.length), raw: payload };
+  const rawMeta = payload.meta && typeof payload.meta === "object" ? payload.meta as Record<string, unknown> : {};
+  const rawStatusCounts = rawMeta.status_counts && typeof rawMeta.status_counts === "object"
+    ? rawMeta.status_counts as Record<string, unknown>
+    : {};
+  const statusCounts = {
+    pending: Number(rawStatusCounts.pending) || 0,
+    active: Number(rawStatusCounts.active) || 0,
+    suspended: Number(rawStatusCounts.suspended) || 0
+  } satisfies Record<FacilityStatus, number>;
+  return { facilities, meta: mapListMeta(payload.meta, page, pageSize, facilities.length), statusCounts, raw: payload };
 };
 
 export const fetchFacility = async (facilityId: string): Promise<Facility> => {

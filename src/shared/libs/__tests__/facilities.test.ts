@@ -126,7 +126,8 @@ describe("facility API helpers", () => {
         }
       ],
       initial_admin_email: "admin@nairobi.test",
-      platform_fee_percent: 10
+      platform_fee_percent: 10,
+      fast_response_enabled: false
     });
   });
 
