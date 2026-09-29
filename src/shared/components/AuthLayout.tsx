@@ -7,6 +7,8 @@ type AuthLayoutProps = {
     subtitle?: string;
     footer?: ReactNode;
     maxWidth?: string;
+    // Tighter vertical rhythm for short forms (sign in) so the primary action stays on screen.
+    compact?: boolean;
 };
 
 export const AuthLayout = ({
@@ -14,7 +16,8 @@ export const AuthLayout = ({
     title,
     subtitle,
     footer,
-    maxWidth = "max-w-md"
+    maxWidth = "max-w-md",
+    compact = false
 }: PropsWithChildren<AuthLayoutProps>) => {
     return (
         <div className="relative min-h-screen overflow-hidden bg-slate-50 selection:bg-brand-100 selection:text-brand-900">
@@ -22,15 +25,15 @@ export const AuthLayout = ({
             <div className="pointer-events-none fixed inset-0 z-0 bg-brand-radial" aria-hidden="true" />
 
             {/* Main container */}
-            <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
+            <div className={classNames("relative z-10 flex min-h-screen flex-col items-center justify-center px-4", compact ? "py-8" : "py-12")}>
                 <div className={classNames("w-full transition-all duration-500", maxWidth)}>
                     {/* Logo Section */}
-                    <div className="mb-10 flex flex-col items-center">
+                    <div className={classNames("flex flex-col items-center", compact ? "mb-6" : "mb-10")}>
                         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-card ring-1 ring-slate-100/50">
                             <img src={logoImage} alt="Tiba Ya Home" className="h-10 w-10 object-contain" />
                         </div>
                         {title && (
-                            <h1 className="type-h1 mt-8 text-center text-tiba-blue">
+                            <h1 className={classNames("type-h1 text-center text-tiba-blue", compact ? "mt-5" : "mt-8")}>
                                 {title}
                             </h1>
                         )}
@@ -42,13 +45,13 @@ export const AuthLayout = ({
                     </div>
 
                     {/* Form Content Wrapper */}
-                    <div className="relative overflow-hidden rounded-[2rem] border border-white/60 bg-white/70 p-6 shadow-elevated backdrop-blur-xl sm:p-10">
+                    <div className={classNames("relative overflow-hidden rounded-[2rem] border border-white/60 bg-white/70 p-6 shadow-elevated backdrop-blur-xl", compact ? "sm:p-8" : "sm:p-10")}>
                         {children}
                     </div>
 
                     {/* Footer Section */}
                     {footer && (
-                        <div className="mt-8 text-center">
+                        <div className={classNames("text-center", compact ? "mt-4" : "mt-8")}>
                             {footer}
                         </div>
                     )}

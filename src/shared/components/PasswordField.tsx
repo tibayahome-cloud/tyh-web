@@ -17,7 +17,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
         <Input {...rest} ref={ref} type={visible ? "text" : "password"} label={label} error={error} />
         <button
           type="button"
-          className="absolute right-3 top-9 text-xs font-semibold text-primary-600 transition hover:text-primary-700 focus:outline-none"
+          className="absolute right-1 top-[27px] flex h-11 min-w-11 items-center justify-center rounded-lg px-3 text-xs font-semibold text-primary-600 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
           aria-pressed={visible}
           onClick={() => setVisible((prev) => !prev)}
         >
