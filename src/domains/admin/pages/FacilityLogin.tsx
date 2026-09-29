@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { ShieldCheck } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import { Button } from "../../../shared/components/Button";
 import { AuthLayout } from "../../../shared/components/AuthLayout";
+import { AuthPortalSwitch } from "../../../shared/components/AuthPortalSwitch";
 import { FormField } from "../../../shared/components/FormField";
 import { Input } from "../../../shared/components/Input";
 import { PasswordField } from "../../../shared/components/PasswordField";
@@ -14,6 +15,7 @@ import { Loading } from "../../../shared/components/Loading";
 import type { AdminLoginSchema } from "../../../shared/schemas/auth";
 import { adminLoginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { isSystemAdminRole } from "../../../shared/rbac/portalRoles";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -27,12 +29,16 @@ const defaultValues: AdminLoginSchema = {
   remember: true
 };
 
-const AdminLoginPage = () => {
-  const { loginAdmin } = useAuth();
+// Deliberately identical to the wrong-password message: this page must not confirm that an
+// account exists elsewhere, or name any other kind of administrator.
+const GENERIC_SIGN_IN_ERROR = "We could not sign you in. Check your details and try again.";
+
+const FacilityLoginPage = () => {
+  const { loginAdmin, logout } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectedFromApp = (location.state as { redirected?: string } | null)?.redirected === "admin-role";
+  const redirectedFromPersonal = (location.state as { redirected?: string } | null)?.redirected === "facility-role";
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
 
@@ -44,11 +50,6 @@ const AdminLoginPage = () => {
     resolver: zodResolver(adminLoginSchema),
     defaultValues
   });
-
-  const handlePostAuth = useCallback(() => {
-    setRedirecting(true);
-    navigate("/admin/dashboard", { replace: true });
-  }, [navigate]);
 
   const submit = handleSubmit(async (values) => {
     setError(null);
@@ -70,11 +71,23 @@ const AdminLoginPage = () => {
         navigate("/two-factor", { replace: true });
         return;
       }
-      handlePostAuth();
+
+      // System administrators have their own sign-in. If one authenticates here, end the session
+      // and answer exactly as for a failed sign-in rather than telling them where to go.
+      if (isSystemAdminRole(result.user?.roles?.[0])) {
+        try {
+          await logout();
+        } catch {
+          // ignore logout failure
+        }
+        setError(GENERIC_SIGN_IN_ERROR);
+        return;
+      }
+
+      setRedirecting(true);
+      navigate("/admin/dashboard", { replace: true });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "We could not sign you in. Check your details and try again."
-      );
+      setError(err instanceof Error ? err.message : GENERIC_SIGN_IN_ERROR);
     }
   });
 
@@ -93,22 +106,19 @@ const AdminLoginPage = () => {
     <AuthLayout
       compact
       eyebrow={
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-          Restricted access
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-tiba-blue/10 px-3 py-1 text-xs font-semibold text-tiba-blue">
+          <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
+          Facility portal
         </span>
       }
-      title="System administration"
-      subtitle={redirectedFromApp ? t("auth.adminRedirectNotice") : "Authorised platform administrators only."}
-      footer={
-        <Link
-          to="/login"
-          className="inline-flex min-h-11 items-center rounded px-2 text-xs text-slate-500 underline-offset-4 hover:text-tiba-blue hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
-        >
-          {t("auth.switchUser")}
-        </Link>
+      title="Facility admin sign in"
+      subtitle={
+        redirectedFromPersonal
+          ? "This account is a facility admin account. Please sign in here."
+          : "Manage your facility's services, providers, bookings and payouts."
       }
     >
+      <AuthPortalSwitch active="facility" />
       <form className="space-y-4" onSubmit={submit} noValidate>
         <FormField
           control={control}
@@ -154,8 +164,8 @@ const AdminLoginPage = () => {
         />
 
         {error && (
-          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center" role="alert">
-            <p className="type-caption text-red-600">{error}</p>
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3" role="alert">
+            <p className="type-caption text-center text-red-600">{error}</p>
           </div>
         )}
 
@@ -173,4 +183,4 @@ const AdminLoginPage = () => {
   );
 };
 
-export default AdminLoginPage;
+export default FacilityLoginPage;

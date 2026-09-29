@@ -3,6 +3,8 @@ import classNames from "classnames";
 import logoImage from "../../assets/images/logo.jpeg";
 
 type AuthLayoutProps = {
+    // Small label above the title that names the portal (e.g. "Facility portal").
+    eyebrow?: ReactNode;
     title?: string;
     subtitle?: string;
     footer?: ReactNode;
@@ -13,6 +15,7 @@ type AuthLayoutProps = {
 
 export const AuthLayout = ({
     children,
+    eyebrow,
     title,
     subtitle,
     footer,
@@ -32,6 +35,7 @@ export const AuthLayout = ({
                         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-card ring-1 ring-slate-100/50">
                             <img src={logoImage} alt="Tiba Ya Home" className="h-10 w-10 object-contain" />
                         </div>
+                        {eyebrow && <div className="mt-5">{eyebrow}</div>}
                         {title && (
                             <h1 className={classNames("type-h1 text-center text-tiba-blue", compact ? "mt-5" : "mt-8")}>
                                 {title}

@@ -106,15 +106,23 @@ describe("client sign-in page", () => {
       expect(screen.getByText(/New to Tiba Ya Home\?/)).toBeInTheDocument();
     });
 
-    it("shows the admin entry as a small tertiary link after account creation", () => {
+    it("offers exactly two ways in -- personal account and facility admin -- with personal selected", () => {
       renderLogin();
 
-      const admin = screen.getByRole("link", { name: "Admin sign in" });
-      expect(admin).toHaveAttribute("href", "/admin/login");
-      expect(admin.className).toContain("text-xs");
+      const nav = screen.getByRole("navigation", { name: "Choose how you sign in" });
+      const links = within(nav).getAllByRole("link");
+      expect(links.map((link) => link.textContent)).toEqual(["Personal account", "Facility admin"]);
+      expect(links.map((link) => link.getAttribute("href"))).toEqual(["/login", "/facility/login"]);
+      expect(within(nav).getByRole("link", { name: "Personal account" })).toHaveAttribute("aria-current", "page");
+      expect(within(nav).getByRole("link", { name: "Facility admin" })).not.toHaveAttribute("aria-current");
+    });
 
-      const signup = screen.getByRole("link", { name: "Create account" });
-      expect(signup.compareDocumentPosition(admin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    it("never links to, or mentions, system administration", () => {
+      const { container } = renderLogin();
+
+      expect(container.querySelector('a[href="/admin/login"]')).toBeNull();
+      expect(screen.queryByText(/admin sign in/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/system|portal/i)).not.toBeInTheDocument();
     });
 
     it("no longer renders the oversized sign-up panel", () => {
@@ -127,7 +135,7 @@ describe("client sign-in page", () => {
     it("keeps every interactive control at least 44px tall", () => {
       renderLogin();
 
-      for (const name of ["Create account", "Admin sign in", "Forgot password?"]) {
+      for (const name of ["Create account", "Forgot password?", "Personal account", "Facility admin"]) {
         expect(screen.getByRole("link", { name }).className, name).toContain("min-h-11");
       }
       const remember = screen.getByLabelText("Remember me").closest("label") as HTMLElement;
@@ -159,14 +167,15 @@ describe("client sign-in page", () => {
       renderLogin();
 
       const order = [
+        screen.getByRole("link", { name: "Personal account" }),
+        screen.getByRole("link", { name: "Facility admin" }),
         screen.getByLabelText("Email or phone"),
         screen.getByLabelText("Password"),
         screen.getByRole("button", { name: "Show" }),
         screen.getByLabelText("Remember me"),
         screen.getByRole("link", { name: "Forgot password?" }),
         screen.getByRole("button", { name: "Sign in" }),
-        screen.getByRole("link", { name: "Create account" }),
-        screen.getByRole("link", { name: "Admin sign in" })
+        screen.getByRole("link", { name: "Create account" })
       ];
       for (const element of order) {
         await user.tab();
@@ -219,9 +228,9 @@ describe("client sign-in page", () => {
       await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
     });
 
-    it("signs an admin out and redirects them to the admin portal instead", async () => {
+    it("signs a system admin out and sends them to their own sign-in instead", async () => {
       const user = userEvent.setup();
-      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin"] } });
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin.super"] } });
       renderLogin();
 
       await fillAndSubmit(user);
@@ -229,6 +238,19 @@ describe("client sign-in page", () => {
       await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/login"));
       expect(logoutMock).toHaveBeenCalledTimes(1);
       expect(screen.getByTestId("where").getAttribute("data-state")).toContain("admin-role");
+    });
+
+    it("signs a facility admin out and sends them to the facility sign-in, never the system one", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin.ops"] } });
+      renderLogin();
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/facility/login"));
+      expect(screen.getByTestId("where")).not.toHaveTextContent("/admin/login");
+      expect(logoutMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("where").getAttribute("data-state")).toContain("facility-role");
     });
 
     it("hands off to two-factor verification with the challenge saved", async () => {

@@ -14,7 +14,9 @@ import type { LoginSchema } from "../../../shared/schemas/auth";
 import { loginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import type { AuthUser } from "../../../shared/schemas/user";
-import { ROLE_ADMIN, ROLE_ADMIN_SUPER, ROLE_PROVIDER } from "../../../shared/rbac/roles";
+import { ROLE_PROVIDER } from "../../../shared/rbac/roles";
+import { isFacilityAdminRole, isSystemAdminRole } from "../../../shared/rbac/portalRoles";
+import { AuthPortalSwitch } from "../../../shared/components/AuthPortalSwitch";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -37,14 +39,20 @@ const ClientLoginPage = () => {
 
   const handlePostAuth = useCallback(async (authUser: AuthUser | null) => {
     const primaryRole = authUser?.roles?.[0];
-    if (primaryRole === ROLE_ADMIN || primaryRole === ROLE_ADMIN_SUPER) {
+    if (isFacilityAdminRole(primaryRole) || isSystemAdminRole(primaryRole)) {
       setRedirecting(true);
       try {
         await logout();
       } catch {
         // ignore logout failure
       }
-      navigate("/admin/login", { replace: true, state: { redirected: "admin-role" } });
+      // Each admin audience is sent to its own sign-in; a facility admin is never pointed at the
+      // system administration page.
+      if (isFacilityAdminRole(primaryRole)) {
+        navigate("/facility/login", { replace: true, state: { redirected: "facility-role" } });
+      } else {
+        navigate("/admin/login", { replace: true, state: { redirected: "admin-role" } });
+      }
       return;
     }
 
@@ -113,29 +121,19 @@ const ClientLoginPage = () => {
       title={t("auth.loginTitle")}
       subtitle="Welcome back! Please enter your details to continue."
       footer={
-        <div className="space-y-1">
-          {/* Secondary: discoverable, but a quiet text link so Sign in stays the only filled action. */}
-          <p className="text-sm text-slate-600">
-            New to Tiba Ya Home?{" "}
-            <Link
-              to="/signup"
-              className="inline-flex min-h-11 items-center rounded px-1 font-semibold text-tiba-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
-            >
-              {t("auth.signUp")}
-            </Link>
-          </p>
-          {/* Tertiary: staff entry point, deliberately understated. */}
-          <p>
-            <Link
-              to="/admin/login"
-              className="inline-flex min-h-11 items-center rounded px-2 text-xs text-slate-500 underline-offset-4 hover:text-tiba-blue hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
-            >
-              Admin sign in
-            </Link>
-          </p>
-        </div>
+        // Secondary: discoverable, but a quiet text link so Sign in stays the only filled action.
+        <p className="text-sm text-slate-600">
+          New to Tiba Ya Home?{" "}
+          <Link
+            to="/signup"
+            className="inline-flex min-h-11 items-center rounded px-1 font-semibold text-tiba-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+          >
+            {t("auth.signUp")}
+          </Link>
+        </p>
       }
     >
+      <AuthPortalSwitch active="personal" />
       <form className="space-y-4" onSubmit={submitClient} noValidate>
         <FormField
           control={control}
