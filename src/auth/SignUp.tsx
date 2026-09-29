@@ -142,6 +142,7 @@ export const SignUp = () => {
   if (step === "success") {
     return (
       <AuthLayout
+        split
         title="Account Verified!"
         subtitle="Your account is ready to use."
         footer={null}
@@ -164,6 +165,7 @@ export const SignUp = () => {
   if (step === "verify") {
     return (
       <AuthLayout
+        split
         title="Verify Your Phone"
         subtitle={`We sent a code to ${registeredPhone}`}
         footer={
@@ -232,6 +234,7 @@ export const SignUp = () => {
 
   return (
     <AuthLayout
+      split
       title={t("auth.signUpTitle")}
       subtitle="Join our community for a premium care experience."
       footer={
@@ -252,7 +255,7 @@ export const SignUp = () => {
           )}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <FormField
             control={control}
             name="email"

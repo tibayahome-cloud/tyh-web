@@ -117,7 +117,7 @@ const ClientLoginPage = () => {
 
   return (
     <AuthLayout
-      compact
+      split
       title={t("auth.loginTitle")}
       subtitle="Welcome back! Please enter your details to continue."
       footer={

@@ -104,7 +104,7 @@ const FacilityLoginPage = () => {
 
   return (
     <AuthLayout
-      compact
+      split
       eyebrow={
         <span className="inline-flex items-center gap-1.5 rounded-full bg-tiba-blue/10 px-3 py-1 text-xs font-semibold text-tiba-blue">
           <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
