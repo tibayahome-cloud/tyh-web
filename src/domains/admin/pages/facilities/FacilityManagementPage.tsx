@@ -49,6 +49,7 @@ type CreateFormState = {
   is24Hours: boolean;
   openTime: string;
   closeTime: string;
+  fastResponseEnabled: boolean;
 };
 
 type StatusDialogState = {
@@ -76,8 +77,11 @@ const initialFormState: CreateFormState = {
   platformFeePercent: "10",
   is24Hours: true,
   openTime: "08:00",
-  closeTime: "17:00"
+  closeTime: "17:00",
+  fastResponseEnabled: false
 };
+
+const FACILITY_PAGE_SIZE = 25;
 
 const statusTone: Record<FacilityStatus, string> = {
   pending: "bg-warning-50 text-warning-500 ring-warning-100",
@@ -130,7 +134,8 @@ export const buildFacilityCreateInput = (form: CreateFormState): FacilityCreateI
   lat: parseOptionalNumber(form.lat),
   lng: parseOptionalNumber(form.lng),
   operatingHours: buildOperatingHours(form),
-  platformFeePercent: Number(form.platformFeePercent)
+  platformFeePercent: Number(form.platformFeePercent),
+  fastResponseEnabled: form.fastResponseEnabled
 });
 
 export const validateCreateForm = (form: CreateFormState): string | null => {
@@ -271,6 +276,8 @@ const FacilityManagementPage = () => {
   const canManageAdmins = isSuperAdmin && hasPermission("facility:admins.manage");
 
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [page, setPage] = useState(1);
   const [status, setStatus] = useState<FacilityStatus | "all">("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [form, setForm] = useState<CreateFormState>(initialFormState);
@@ -286,41 +293,35 @@ const FacilityManagementPage = () => {
   } | null>(null);
 
   const facilitiesQuery = useQuery({
-    queryKey: ["admin", "facilities", { status, search }],
+    queryKey: ["admin", "facilities", { status, search, page }],
     queryFn: () =>
       fetchFacilities({
+        page,
+        pageSize: FACILITY_PAGE_SIZE,
         status: status === "all" ? undefined : status,
-        search: search.trim() || undefined
+        search: search || undefined
       }),
-    enabled: canReadFacilities
+    enabled: canReadFacilities,
+    placeholderData: (previousData) => previousData
   });
 
   const facilities = useMemo(() => facilitiesQuery.data?.facilities ?? [], [facilitiesQuery.data?.facilities]);
+  const pageInfo = facilitiesQuery.data?.meta.page;
   const invitationStatusQuery = useQuery({
     queryKey: ["admin", "facility-admin-invitation", invitationNotice?.facilityId, invitationNotice?.userId],
     queryFn: () => fetchFacilityAdminInvitationStatus(invitationNotice!.facilityId, invitationNotice!.userId),
     enabled: Boolean(invitationNotice)
   });
-  const visibleFacilities = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return facilities.filter((facility) => {
-      const statusMatches = status === "all" || facility.status === status;
-      if (!term) {
-        return statusMatches;
-      }
-      const text = `${facility.name} ${facility.email} ${facility.county} ${facility.address}`.toLowerCase();
-      return statusMatches && text.includes(term);
-    });
-  }, [facilities, search, status]);
+  const visibleFacilities = facilities;
 
   const metrics = useMemo(
     () => ({
-      total: facilities.length,
-      active: facilities.filter((facility) => facility.status === "active").length,
-      pending: facilities.filter((facility) => facility.status === "pending").length,
-      suspended: facilities.filter((facility) => facility.status === "suspended").length
+      total: pageInfo?.total ?? facilities.length,
+      active: facilitiesQuery.data?.statusCounts.active ?? 0,
+      pending: facilitiesQuery.data?.statusCounts.pending ?? 0,
+      suspended: facilitiesQuery.data?.statusCounts.suspended ?? 0
     }),
-    [facilities]
+    [facilities.length, facilitiesQuery.data?.statusCounts, pageInfo?.total]
   );
 
   useEffect(() => {
@@ -328,6 +329,14 @@ const FacilityManagementPage = () => {
       setFormError(null);
     }
   }, [isCreateOpen]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const invalidateFacilities = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities"] });
@@ -488,14 +497,17 @@ const FacilityManagementPage = () => {
           <Input
             label="Search"
             placeholder="Facility, county, address, or email"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
           />
           <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
             <span>Status</span>
             <select
               value={status}
-              onChange={(event) => setStatus(event.target.value as FacilityStatus | "all")}
+              onChange={(event) => {
+                setStatus(event.target.value as FacilityStatus | "all");
+                setPage(1);
+              }}
               className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
             >
               <option value="all">All statuses</option>
@@ -539,6 +551,32 @@ const FacilityManagementPage = () => {
             />
           ))}
         </section>
+      )}
+
+      {pageInfo && pageInfo.totalPages > 1 && (
+        <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Page {pageInfo.number} of {pageInfo.totalPages} · {pageInfo.total} facilities
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pageInfo.number <= 1 || facilitiesQuery.isFetching}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pageInfo.number >= pageInfo.totalPages || facilitiesQuery.isFetching}
+              onClick={() => setPage((current) => Math.min(pageInfo.totalPages, current + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
 
       <Modal
@@ -628,6 +666,20 @@ const FacilityManagementPage = () => {
               value={form.platformFeePercent}
               onChange={(event) => updateForm("platformFeePercent", event.target.value)}
             />
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-700 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={form.fastResponseEnabled}
+                onChange={(event) => updateForm("fastResponseEnabled", event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+              />
+              <span>
+                <span className="block font-semibold text-slate-800">Fast-response candidate</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  Include this facility in internal response benchmarking. Client-facing ranking remains disabled until the benchmark is reviewed.
+                </span>
+              </span>
+            </label>
             <label className="md:col-span-2">
               <span className="mb-1 block text-sm font-medium text-slate-700">Address</span>
               <textarea
