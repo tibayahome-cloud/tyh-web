@@ -156,15 +156,24 @@ describe("TelemedicineRequestDialog service imagery", () => {
     );
   });
 
-  it("uses a neutral icon, never a picture, for referral services and unknown new services", async () => {
+  it("gives referral services a non-emergency care-navigation picture", async () => {
     renderDialog();
     await screen.findByText("Hospital Referral Coordination");
 
-    for (const name of ["Hospital Referral Coordination", "Brand New Service"]) {
-      expect(visualOf(name)).toHaveAttribute("data-visual-source", "icon");
-      expect(card(name).querySelector("img")).toBeNull();
-      expect(visualOf(name).querySelector("svg")).toHaveAttribute("aria-hidden", "true");
-    }
+    const visual = visualOf("Hospital Referral Coordination");
+    expect(visual).toHaveAttribute("data-visual-source", "image");
+    const source = visual.querySelector("img")?.getAttribute("src") ?? "";
+    expect(source).toContain("care-navigation");
+    expect(source).not.toMatch(/ambulance|emergency/i);
+  });
+
+  it("uses a neutral icon, never a picture, for a service added to the catalog later", async () => {
+    renderDialog();
+    await screen.findByText("Brand New Service");
+
+    expect(visualOf("Brand New Service")).toHaveAttribute("data-visual-source", "icon");
+    expect(card("Brand New Service").querySelector("img")).toBeNull();
+    expect(visualOf("Brand New Service").querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("marks pictures decorative and gives them fixed dimensions so nothing shifts on load", async () => {

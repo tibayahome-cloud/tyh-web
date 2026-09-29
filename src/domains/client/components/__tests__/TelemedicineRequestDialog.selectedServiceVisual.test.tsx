@@ -105,7 +105,8 @@ const CATEGORIES = [
 ];
 const SUBCATEGORIES = [
   { id: "sub-psych", categoryId: "cat-wellness", key: "psychology-counselling", name: "Psychology and Counselling", description: null, status: "active", displayOrder: 0 },
-  { id: "sub-referral", categoryId: "cat-connect", key: "hospital-referrals", name: "Hospital Referrals", description: null, status: "active", displayOrder: 0 }
+  { id: "sub-referral", categoryId: "cat-connect", key: "hospital-referrals", name: "Hospital Referrals", description: null, status: "active", displayOrder: 0 },
+  { id: "sub-unknown", categoryId: "cat-connect", key: "some-future-group", name: "Future Group", description: null, status: "active", displayOrder: 1 }
 ];
 const catalogService = (id: string, subcategoryId: string, key: string, name: string) => ({
   id,
@@ -122,7 +123,8 @@ const catalogService = (id: string, subcategoryId: string, key: string, name: st
 });
 const SERVICES = [
   catalogService("svc-mental", "sub-psych", "mental-health-assessment", "Mental Health Assessment"),
-  catalogService("svc-referral", "sub-referral", "hospital-referral-coordination", "Hospital Referral Coordination")
+  catalogService("svc-referral", "sub-referral", "hospital-referral-coordination", "Hospital Referral Coordination"),
+  catalogService("svc-future", "sub-unknown", "brand-new-service", "Brand New Service")
 ];
 
 const reachConfirmStep = async (user: ReturnType<typeof userEvent.setup>, serviceName: string) => {
@@ -164,11 +166,20 @@ describe("confirm step selected-service visual", () => {
     expect(fetchCatalogServicesMock).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a neutral icon, not a picture, for a service with no fitting artwork", async () => {
+  it("shows the non-emergency care-navigation picture for a referral service", async () => {
     const user = userEvent.setup();
     await reachConfirmStep(user, "Hospital Referral Coordination");
 
     const summary = screen.getByText("Hospital Referral Coordination").closest(".rounded-2xl") as HTMLElement;
+    expect(summary.querySelector("[data-visual-source]")).toHaveAttribute("data-visual-source", "image");
+    expect(summary.querySelector("img")?.getAttribute("src")).toContain("care-navigation");
+  });
+
+  it("shows a neutral icon, not a picture, for a service added to the catalog later", async () => {
+    const user = userEvent.setup();
+    await reachConfirmStep(user, "Brand New Service");
+
+    const summary = screen.getByText("Brand New Service").closest(".rounded-2xl") as HTMLElement;
     expect(summary.querySelector("[data-visual-source]")).toHaveAttribute("data-visual-source", "icon");
     expect(summary.querySelector("img")).toBeNull();
   });
