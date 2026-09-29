@@ -30,6 +30,8 @@ export type RemoteFacility = {
   priceCents: number;
   currency: string;
   estimateDurationMinutes: number | null;
+  earliestAvailableAt: string | null;
+  availableSlotCount: number;
   // The zone this facility's appointments are scheduled and displayed in. Null when the API
   // did not send one, so callers fall back explicitly rather than silently assuming a default.
   timezone: string | null;
@@ -37,10 +39,15 @@ export type RemoteFacility = {
 
 export const discoverRemoteFacilities = async (
   serviceId: string,
-  countryCode?: string
+  countryCode?: string,
+  options: { ranking?: "earliest_slot" } = {}
 ): Promise<RemoteFacility[]> => {
   const response = await api.get("/facilities/discover-remote", {
-    params: { service_id: serviceId, ...(countryCode ? { country_code: countryCode } : {}) }
+    params: {
+      service_id: serviceId,
+      ...(countryCode ? { country_code: countryCode } : {}),
+      ...(options.ranking ? { ranking: options.ranking } : {})
+    }
   });
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const data = Array.isArray(payload.data) ? payload.data : [];
@@ -62,6 +69,8 @@ export const discoverRemoteFacilities = async (
         currency: typeof service.currency === "string" ? service.currency : "KES",
         estimateDurationMinutes:
           typeof service.estimate_duration_minutes === "number" ? service.estimate_duration_minutes : null,
+        earliestAvailableAt: typeof entry.earliest_available_at === "string" ? entry.earliest_available_at : null,
+        availableSlotCount: typeof entry.available_slot_count === "number" ? entry.available_slot_count : 0,
         timezone: typeof entry.timezone === "string" && entry.timezone ? entry.timezone : null
       } satisfies RemoteFacility;
     })
