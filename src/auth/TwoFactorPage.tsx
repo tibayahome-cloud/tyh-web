@@ -8,7 +8,8 @@ import { Input } from "../shared/components/Input";
 import { useAuth } from "../shared/hooks/useAuth";
 import api from "../shared/libs/api";
 import { useToast } from "../shared/components/ToastProvider";
-import { ROLE_ADMIN, ROLE_ADMIN_SUPER, ROLE_PROVIDER } from "../shared/rbac/roles";
+import { isAdminPortalRole, ROLE_PROVIDER } from "../shared/rbac/roles";
+import { adminPortalHome } from "../shared/rbac/portalRoles";
 import {
   readTwofaChallenge,
   clearTwofaChallenge,
@@ -59,8 +60,8 @@ export const TwoFactorPage = () => {
 
   const handleSuccessRedirect = (roles: string[] | undefined) => {
     const effectiveRoles = roles && roles.length ? roles : authRoles;
-    if (effectiveRoles?.includes(ROLE_ADMIN) || effectiveRoles?.includes(ROLE_ADMIN_SUPER)) {
-      navigate("/admin/dashboard", { replace: true });
+    if (effectiveRoles?.some(isAdminPortalRole)) {
+      navigate(adminPortalHome(effectiveRoles), { replace: true });
       return;
     }
     if (effectiveRoles?.includes(ROLE_PROVIDER)) {
