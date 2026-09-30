@@ -6,7 +6,7 @@ import {
   TELEMEDICINE_ALL_SERVICES_ASSET
 } from "../telemedicineCategoryAssets";
 
-const KNOWN_CATEGORY_KEYS = ["firstcare", "specialistcare", "wellnesscare", "careconnect", "continucare"];
+const KNOWN_CATEGORY_KEYS = ["firstcare", "mental-health", "specialistcare", "wellnesscare", "careconnect", "continucare"];
 
 describe("getTelemedicineCategoryAsset", () => {
   it.each(KNOWN_CATEGORY_KEYS)("resolves a distinct asset for the known category key %s", (key) => {
