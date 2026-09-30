@@ -124,6 +124,17 @@ export type FacilityAdminInvitationResendResult = {
   invitationExpiresAt: string | null;
 };
 
+export type FacilityAdminAccess = {
+  id: string;
+  facilityId: string;
+  userId: string;
+  email: string;
+  userStatus: string;
+  roleKey: string;
+  active: boolean;
+  invitation: FacilityAdminInvitationStatus;
+};
+
 export type FacilityCreateResult = {
   facility: Facility;
   adminInvitation: FacilityAdminInvitation | null;
@@ -365,6 +376,33 @@ export const assignFacilityAdmin = async (facilityId: string, email: string): Pr
     throw new Error("Failed to assign facility admin");
   }
   return admin;
+};
+
+export const fetchFacilityAdminAccess = async (facilityId: string): Promise<FacilityAdminAccess[]> => {
+  const response = await api.get(`/facilities/${facilityId}/admins`);
+  const data = payloadData(response.data);
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data.map((entry) => {
+    const raw = entry as Record<string, unknown>;
+    const invitation = (raw.invitation ?? {}) as Record<string, unknown>;
+    return {
+      id: String(raw.id ?? ""),
+      facilityId: String(raw.facility_id ?? ""),
+      userId: String(raw.user_id ?? ""),
+      email: String(raw.email ?? ""),
+      userStatus: String(raw.user_status ?? "pending"),
+      roleKey: String(raw.role_key ?? "admin.ops"),
+      active: Boolean(raw.active),
+      invitation: {
+        status: String(invitation.status ?? "not_issued") as FacilityAdminInvitationStatus["status"],
+        resetId: invitation.reset_id ? String(invitation.reset_id) : null,
+        expiresAt: invitation.expires_at ? String(invitation.expires_at) : null,
+        redeemedAt: invitation.redeemed_at ? String(invitation.redeemed_at) : null
+      }
+    };
+  });
 };
 
 export const fetchFacilityAdminInvitationStatus = async (
