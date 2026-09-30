@@ -17,7 +17,6 @@ import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
 import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { Input } from "../../../../shared/components/Input";
-import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
 import {
   assignFacilityAdmin,
@@ -30,6 +29,7 @@ import {
 import type { Facility, FacilityCreateInput, FacilityStatus } from "../../../../shared/schemas/facility";
 import { FACILITY_TYPES, HOSPITAL_LEVELS, WEEKDAYS, formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
 import { useRbac } from "../../../../shared/hooks/useRbac";
+import { classifyApiError } from "../../../../shared/utils/errors";
 import LocationPickerMap from "../../../../shared/components/LocationPickerMap";
 import { SUPPORTED_COUNTRIES } from "../../../../shared/constants/region";
 
@@ -111,6 +111,33 @@ const extractErrorMessage = (error: unknown): string => {
   }
   return error instanceof Error ? error.message : "Request failed";
 };
+
+// What to tell someone when the facility list could not be loaded. A timeout, no connection and a
+// server fault each say what happened and that trying again is reasonable; anything else shows
+// the API's own explanation.
+export const describeFacilityListError = (error: unknown): string => {
+  const { category, message } = classifyApiError(error, extractErrorMessage(error));
+  if (category === "timeout") {
+    return "The server took too long to respond. Check your connection and try again.";
+  }
+  if (category === "unavailable") {
+    return message && message !== "Network Error" && isAxiosError(error) && error.response
+      ? "Something went wrong on our side. Try again in a moment."
+      : "We could not reach the server. Check your connection and try again.";
+  }
+  if (category === "forbidden") {
+    return "You do not have permission to view facilities.";
+  }
+  return message || "We could not load facilities.";
+};
+
+const FacilityListSkeleton = () => (
+  <div className="grid gap-4" role="status" aria-label="Loading facilities">
+    {[0, 1, 2].map((index) => (
+      <div key={index} className="h-32 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" aria-hidden="true" />
+    ))}
+  </div>
+);
 
 const buildOperatingHours = (form: CreateFormState): FacilityCreateInput["operatingHours"] =>
   WEEKDAYS.map((weekday) => ({
@@ -519,20 +546,64 @@ const FacilityManagementPage = () => {
         </div>
       </Card>
 
+      {facilitiesQuery.isError && facilitiesQuery.data && (
+        <div
+          className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <span>{describeFacilityListError(facilitiesQuery.error)} Showing the last results that loaded.</span>
+          <Button size="sm" variant="outline" loading={facilitiesQuery.isFetching} onClick={() => void facilitiesQuery.refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
+
       {facilitiesQuery.isLoading ? (
+        <FacilityListSkeleton />
+      ) : facilitiesQuery.isError && !facilitiesQuery.data ? (
         <Card>
-          <Loading />
-        </Card>
-      ) : facilitiesQuery.isError ? (
-        <Card>
-          <p className="text-sm text-danger-600">{extractErrorMessage(facilitiesQuery.error)}</p>
+          <p className="text-sm text-danger-600" role="alert">
+            {describeFacilityListError(facilitiesQuery.error)}
+          </p>
+          <Button
+            className="mt-3"
+            variant="outline"
+            size="sm"
+            loading={facilitiesQuery.isFetching}
+            onClick={() => void facilitiesQuery.refetch()}
+          >
+            Try again
+          </Button>
         </Card>
       ) : visibleFacilities.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-600">No facilities match the current filters.</p>
+          {search || status !== "all" ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-600">No facilities match the current filters.</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearch("");
+                  setStatus("all");
+                  setPage(1);
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600">
+              No facilities yet.{canCreateFacilities ? " Use Add facility to onboard the first one." : ""}
+            </p>
+          )}
         </Card>
       ) : (
-        <section className="grid gap-4">
+        <section
+          className={`grid gap-4 transition-opacity ${facilitiesQuery.isPlaceholderData ? "opacity-60" : ""}`}
+          aria-busy={facilitiesQuery.isPlaceholderData}
+        >
           {visibleFacilities.map((facility) => (
             <FacilityCard
               key={facility.id}
@@ -551,6 +622,12 @@ const FacilityManagementPage = () => {
             />
           ))}
         </section>
+      )}
+
+      {facilitiesQuery.isPlaceholderData && (
+        <p className="text-xs text-slate-500" role="status">
+          Updating the list...
+        </p>
       )}
 
       {pageInfo && pageInfo.totalPages > 1 && (
