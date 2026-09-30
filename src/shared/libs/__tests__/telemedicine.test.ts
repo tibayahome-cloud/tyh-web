@@ -13,7 +13,7 @@ vi.mock("../api", () => ({
   }
 }));
 
-import { fetchJitsiHealth, reassignProvider } from "../telemedicine";
+import { discoverRemoteFacilities, fetchJitsiHealth, reassignProvider } from "../telemedicine";
 import { mapTelemedicineHold } from "../../schemas/telemedicine";
 
 describe("telemedicine client", () => {
@@ -98,5 +98,56 @@ describe("telemedicine client", () => {
       latencyMs: 42,
       errorCategory: null
     });
+  });
+});
+
+describe("remote facility discovery", () => {
+  const entry = {
+    id: "facility-1",
+    name: "Kilimani Clinic",
+    facility_type: "clinic",
+    address: "Kilimani",
+    county: "Nairobi",
+    timezone: "Africa/Nairobi",
+    service: { facility_service_id: "fs-1", price_cents: 150000, currency: "KES", estimate_duration_minutes: 30 }
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps the default request and ordering unchanged: no ranking parameter", async () => {
+    mockGet.mockResolvedValue({ data: { data: [entry] } });
+
+    const result = await discoverRemoteFacilities("service-1", "KE");
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/discover-remote", {
+      params: { service_id: "service-1", country_code: "KE" }
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "facility-1", earliestAvailableAt: null, availableSlotCount: 0 });
+  });
+
+  it("only asks for earliest-slot ranking when explicitly opted in, and maps the slot preview", async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [{ ...entry, earliest_available_at: "2026-10-01T06:00:00Z", available_slot_count: 4 }] }
+    });
+
+    const result = await discoverRemoteFacilities("service-1", undefined, { ranking: "earliest_slot" });
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/discover-remote", {
+      params: { service_id: "service-1", ranking: "earliest_slot" }
+    });
+    expect(result[0]).toMatchObject({ earliestAvailableAt: "2026-10-01T06:00:00Z", availableSlotCount: 4 });
+  });
+
+  it("ignores malformed slot preview values instead of trusting them", async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [{ ...entry, earliest_available_at: 12345, available_slot_count: "four" }] }
+    });
+
+    const result = await discoverRemoteFacilities("service-1", "KE", { ranking: "earliest_slot" });
+
+    expect(result[0]).toMatchObject({ earliestAvailableAt: null, availableSlotCount: 0 });
   });
 });

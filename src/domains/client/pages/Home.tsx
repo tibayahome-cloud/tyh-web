@@ -28,6 +28,8 @@ import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
 import { useWalletAccount } from "../../../shared/hooks/useWallet";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
+import { HomeCarePaymentActions } from "../components/HomeCarePaymentActions";
+import { formatMsisdn } from "../utils/payerPhone";
 import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
 import {
   Plus,
@@ -105,14 +107,9 @@ const ClientHome = () => {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
-  const [stkPhone, setStkPhone] = useState("");
-  const [stkPhoneError, setStkPhoneError] = useState("");
-
-  useEffect(() => {
-    if (user?.phone) {
-      setStkPhone(user.phone.replace(/^\+254/, "0"));
-    }
-  }, [user?.phone]);
+  // The number the M-Pesa request went to, kept so the follow-up step can say where to look.
+  const [chargedTo, setChargedTo] = useState<string | null>(null);
+  const [paymentFailed, setPaymentFailed] = useState(false);
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
@@ -181,10 +178,8 @@ const ClientHome = () => {
     if (activeBooking?.status === "completed_by_provider") {
       setCompletionPrompt(activeBooking);
       setCompletionError(null);
-      setStkPhone(user.phone.replace(/^\+254/, "0") ?? "");  
-      setStkPhoneError("");             // ← add this
     }
-  }, [activeBooking, user?.phone]);
+  }, [activeBooking]);
 
   const { data: historyList } = useBookingList(
     {
@@ -231,6 +226,8 @@ const ClientHome = () => {
   const closeCompletionPrompt = () => {
     setCompletionError(null);
     setShowMpesaManual(false);
+    setPaymentFailed(false);
+    setChargedTo(null);
   };
 
   const closeCancelPrompt = () => {
@@ -239,31 +236,30 @@ const ClientHome = () => {
     setCancelError(null);
   };
 
-  const handleConfirmCompletion = async () => {
+  // `phone` arrives validated and normalised from the payment form; a different number is used for
+  // this request only and is never saved to the client's profile.
+  const handleConfirmCompletion = async (phone: string) => {
     if (!completionPrompt) return;
 
-    // validate phone
-    if (!/^(07|01)\d{8}$|^(\+?254)(7|1)\d{8}$/.test(stkPhone.trim())) {
-      setStkPhoneError("Enter a valid Safaricom number e.g. 0712345678");
-      return;
-    }
-    setStkPhoneError("");
     setCompletionError(null);
+    setPaymentFailed(false);
 
     try {
       await confirmCompletion.mutateAsync({
         bookingId: completionPrompt.id,
         decision: "confirm",
-        phone: stkPhone.trim()   // ← pass phone
+        phone
       });
       toast.showToast({
         title: "Payment requested",
-        description: "Please complete the STK push to finalize your booking.",
+        description: `Check ${formatMsisdn(phone)} to approve the M-Pesa payment.`,
         variant: "success"
       });
+      setChargedTo(formatMsisdn(phone));
       setShowMpesaManual(true);
       setCompletionError(null);
     } catch (error) {
+      setPaymentFailed(true);
       setCompletionError(error instanceof Error ? error.message : "Unable to confirm completion. Try again.");
     }
   };
@@ -596,8 +592,10 @@ const ClientHome = () => {
           <div className="w-full">
             {showMpesaManual ? (
               <div className="space-y-4">
-                <p className="text-xs font-medium text-slate-500 text-center animate-pulse">
-                  Waiting for STK Push... If it doesn't appear, use manual payment:
+                <p className="text-xs font-medium text-slate-500 text-center animate-pulse" role="status">
+                  {chargedTo
+                    ? `We sent the payment request to ${chargedTo}. If it does not appear, pay manually:`
+                    : "Waiting for the M-Pesa request. If it does not appear, pay manually:"}
                 </p>
                 <MpesaPaymentInstructions
                   amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
@@ -612,51 +610,15 @@ const ClientHome = () => {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* Editable phone for STK push */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pl-1">
-                    M-Pesa Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={stkPhone}
-                    onChange={(e) => {
-                      setStkPhone(e.target.value);
-                      setStkPhoneError("");
-                    }}
-                    placeholder="e.g. 0712345678"
-                    disabled={confirmCompletion.isPending}
-                    className={classNames(
-                      "w-full rounded-xl border px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-colors",
-                      "placeholder:text-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500",
-                      stkPhoneError ? "border-red-400 bg-red-50" : "border-slate-200 bg-slate-50"
-                    )}
-                  />
-                  {stkPhoneError && (
-                    <p className="text-[11px] text-red-500 font-medium pl-1">{stkPhoneError}</p>
-                  )}
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    className="flex-1 rounded-xl h-12"
-                    onClick={handleDeclineCompletion}
-                    loading={confirmCompletion.isPending}
-                  >
-                    Decline
-                  </Button>
-                  <Button
-                    className="flex-1 rounded-xl h-12 shadow-lg shadow-brand-100"
-                    onClick={handleConfirmCompletion}
-                    loading={confirmCompletion.isPending}
-                  >
-                    Confirm & Pay
-                  </Button>
-                </div>
-              </div>
+              <HomeCarePaymentActions
+                savedPhone={user?.phone}
+                amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
+                isPending={confirmCompletion.isPending}
+                failed={paymentFailed}
+                resetKey={completionPrompt?.id ?? null}
+                onConfirm={handleConfirmCompletion}
+                onDecline={handleDeclineCompletion}
+              />
             )}
           </div>
         </DialogActions>

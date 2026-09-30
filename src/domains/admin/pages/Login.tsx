@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
+import { ShieldCheck } from "lucide-react";
 
 import { Button } from "../../../shared/components/Button";
 import { AuthLayout } from "../../../shared/components/AuthLayout";
@@ -13,6 +14,7 @@ import { Loading } from "../../../shared/components/Loading";
 import type { AdminLoginSchema } from "../../../shared/schemas/auth";
 import { adminLoginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { adminPortalHome } from "../../../shared/rbac/portalRoles";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -44,10 +46,13 @@ const AdminLoginPage = () => {
     defaultValues
   });
 
-  const handlePostAuth = useCallback(() => {
-    setRedirecting(true);
-    navigate("/admin/dashboard", { replace: true });
-  }, [navigate]);
+  const handlePostAuth = useCallback(
+    (roles: readonly string[] | undefined) => {
+      setRedirecting(true);
+      navigate(adminPortalHome(roles), { replace: true });
+    },
+    [navigate]
+  );
 
   const submit = handleSubmit(async (values) => {
     setError(null);
@@ -69,7 +74,7 @@ const AdminLoginPage = () => {
         navigate("/two-factor", { replace: true });
         return;
       }
-      handlePostAuth();
+      handlePostAuth(result.user?.roles);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "We could not sign you in. Check your details and try again."
@@ -86,24 +91,26 @@ const AdminLoginPage = () => {
     }
   }, [navigate]);
 
-  const isBusy = isSubmitting || redirecting;
   const disableSubmit = isSubmitting || redirecting;
 
   return (
     <AuthLayout
-      title={t("auth.adminLoginTitle")}
-      subtitle={redirectedFromApp ? t("auth.adminRedirectNotice") : "Portal access for system administrators."}
+      compact
+      eyebrow={
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+          Restricted access
+        </span>
+      }
+      title="System administration"
+      subtitle={redirectedFromApp ? t("auth.adminRedirectNotice") : "Authorised platform administrators only."}
       footer={
-        <p className="type-caption text-slate-500">
-          Not an admin?{" "}
-          <button
-            type="button"
-            className="font-semibold text-tiba-blue hover:underline"
-            onClick={() => navigate("/login")}
-          >
-            {t("auth.switchUser")}
-          </button>
-        </p>
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center rounded px-2 text-xs text-slate-500 underline-offset-4 hover:text-tiba-blue hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+        >
+          {t("auth.switchUser")}
+        </Link>
       }
     >
       <form className="space-y-4" onSubmit={submit} noValidate>
@@ -138,10 +145,10 @@ const AdminLoginPage = () => {
           control={control}
           name="remember"
           render={({ field }) => (
-            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-600">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-600">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                className="h-5 w-5 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
                 checked={field.value ?? false}
                 onChange={(event) => field.onChange(event.target.checked)}
               />
@@ -151,12 +158,12 @@ const AdminLoginPage = () => {
         />
 
         {error && (
-          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center" role="alert">
             <p className="type-caption text-red-600">{error}</p>
           </div>
         )}
 
-        <Button type="submit" className="w-full h-11" loading={isSubmitting} disabled={disableSubmit}>
+        <Button type="submit" size="lg" fullWidth className="min-h-12" loading={isSubmitting} disabled={disableSubmit}>
           {t("auth.submit")}
         </Button>
       </form>

@@ -14,9 +14,11 @@ import {
 } from "../../../shared/libs/telemedicineCatalog";
 import {
   getTelemedicineCategoryAsset,
-  getTelemedicineSpecialtyAsset,
-  TELEMEDICINE_ALL_SERVICES_ASSET
+  getTelemedicineServiceAsset,
+  TELEMEDICINE_ALL_SERVICES_ASSET,
+  type TelemedicineServiceAssetKeys
 } from "../../../shared/libs/telemedicineCategoryAssets";
+import { TelemedicineServiceVisual } from "../../../shared/components/TelemedicineServiceVisual";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
@@ -249,6 +251,25 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const serviceOptions = serviceId ? servicesQuery.data ?? [] : catalogServiceOptions;
   const selectedService = serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
+  // Stable catalog keys per service id, derived from the three catalog queries already loaded --
+  // lets the confirm summary reuse the resolver without another request or an API change.
+  const catalogServiceAssetKeys = useMemo(() => {
+    const categoriesById = new Map((categoriesQuery.data ?? []).map((category) => [category.id, category]));
+    const subcategoriesById = new Map((subcategoriesQuery.data ?? []).map((subcategory) => [subcategory.id, subcategory]));
+    const keysByServiceId = new Map<string, TelemedicineServiceAssetKeys>();
+    (catalogServicesQuery.data ?? []).forEach((service) => {
+      const subcategory = subcategoriesById.get(service.subcategoryId);
+      const category = subcategory ? categoriesById.get(subcategory.categoryId) : undefined;
+      keysByServiceId.set(service.id, {
+        serviceKey: service.key,
+        subcategoryKey: subcategory?.key,
+        categoryKey: category?.key
+      });
+    });
+    return keysByServiceId;
+  }, [categoriesQuery.data, catalogServicesQuery.data, subcategoriesQuery.data]);
+  const selectedServiceAssetKeys =
+    selectedService && !serviceId ? catalogServiceAssetKeys.get(selectedService.id) : undefined;
   const categoryCards = useMemo(() => {
     const subcategoriesByCategory = new Map<string, typeof subcategoriesQuery.data>();
     (subcategoriesQuery.data ?? []).forEach((subcategory) => {
@@ -504,8 +525,6 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     ) : (
                       <div className="space-y-3">
                         {specialties.map(({ subcategory, services }) => {
-                          const specialtyAsset = getTelemedicineSpecialtyAsset(subcategory.key, category.key);
-                          const SpecialtyIcon = specialtyAsset.Icon;
                           return (
                             <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
                               <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
@@ -514,54 +533,57 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                                 <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
                               ) : (
                                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                  {services.map((service) => (
-                                    <button
-                                      key={service.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedServiceId(service.id);
-                                        setStep(TM_STEP_INDEX.facility);
-                                      }}
-                                      className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
-                                    >
-                                      <span
-                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${specialtyAsset.bgClass}`}
+                                  {services.map((service) => {
+                                    const serviceAsset = getTelemedicineServiceAsset({
+                                      serviceKey: service.key,
+                                      subcategoryKey: subcategory.key,
+                                      categoryKey: category.key
+                                    });
+                                    return (
+                                      <button
+                                        key={service.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedServiceId(service.id);
+                                          setStep(TM_STEP_INDEX.facility);
+                                        }}
+                                        className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
                                       >
-                                        <SpecialtyIcon className={`h-5 w-5 ${specialtyAsset.iconClass}`} aria-hidden="true" />
-                                      </span>
-                                      <span className="min-w-0 flex-1">
-                                        <span className="flex items-start justify-between gap-2">
-                                          <span className="text-sm font-semibold text-slate-900">{service.name}</span>
-                                          {service.isEmergencyCapable && (
-                                            <span className="shrink-0 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase text-danger-600">
-                                              Urgent care
+                                        <TelemedicineServiceVisual asset={serviceAsset} />
+                                        <span className="min-w-0 flex-1">
+                                          <span className="flex items-start justify-between gap-2">
+                                            <span className="text-sm font-semibold text-slate-900">{service.name}</span>
+                                            {service.isEmergencyCapable && (
+                                              <span className="shrink-0 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase text-danger-600">
+                                                Urgent care
+                                              </span>
+                                            )}
+                                          </span>
+                                          {service.description && (
+                                            <span className="mt-1 block text-xs text-slate-500">{service.description}</span>
+                                          )}
+                                          <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                            <span className="text-sm font-medium text-tiba-blue">
+                                              From {formatCurrency(service.basePriceCents, service.currency)}
+                                            </span>
+                                            <span className="text-xs text-slate-500">{service.defaultEstimateMinutes} min</span>
+                                          </span>
+                                          {service.tags.length > 0 && (
+                                            <span className="mt-2 flex flex-wrap gap-1">
+                                              {service.tags.map((tag) => (
+                                                <span
+                                                  key={tag}
+                                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                                                >
+                                                  {tag}
+                                                </span>
+                                              ))}
                                             </span>
                                           )}
                                         </span>
-                                        {service.description && (
-                                          <span className="mt-1 block text-xs text-slate-500">{service.description}</span>
-                                        )}
-                                        <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                          <span className="text-sm font-medium text-tiba-blue">
-                                            From {formatCurrency(service.basePriceCents, service.currency)}
-                                          </span>
-                                          <span className="text-xs text-slate-500">{service.defaultEstimateMinutes} min</span>
-                                        </span>
-                                        {service.tags.length > 0 && (
-                                          <span className="mt-2 flex flex-wrap gap-1">
-                                            {service.tags.map((tag) => (
-                                              <span
-                                                key={tag}
-                                                className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
-                                              >
-                                                {tag}
-                                              </span>
-                                            ))}
-                                          </span>
-                                        )}
-                                      </span>
-                                    </button>
-                                  ))}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -746,8 +768,15 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         {step === TM_STEP_INDEX.confirm && selectedFacility && selectedSlot && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
-              <p className="text-sm text-slate-500">{selectedFacility.name}</p>
+              <div className="flex items-center gap-3">
+                {selectedServiceAssetKeys && (
+                  <TelemedicineServiceVisual asset={getTelemedicineServiceAsset(selectedServiceAssetKeys)} size="sm" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
+                  <p className="text-sm text-slate-500">{selectedFacility.name}</p>
+                </div>
+              </div>
               <p className="mt-1 text-sm text-slate-700">
                 {formatSlotDate(selectedSlot.startAt, slotTimezone)} at{" "}
                 {formatSlotTime(selectedSlot.startAt, slotTimezone)}

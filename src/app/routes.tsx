@@ -45,6 +45,7 @@ const AdminRoutes = lazyWithRetry(() => import("../domains/admin/routes"));
 
 const ClientLoginPage = lazyWithRetry(() => import("../domains/client/pages/Login"));
 const AdminLoginPage = lazyWithRetry(() => import("../domains/admin/pages/Login"));
+const FacilityLoginPage = lazyWithRetry(() => import("../domains/admin/pages/FacilityLogin"));
 const SessionExpiredPage = lazyWithRetry(() =>
   import("../auth/SessionExpired").then((mod) => ({ default: mod.SessionExpired }))
 );
@@ -89,6 +90,14 @@ export const router = createBrowserRouter(
           element: (
             <SuspenseWrapper>
               <TwoFactorPage />
+            </SuspenseWrapper>
+          )
+        },
+        {
+          path: "facility/login",
+          element: (
+            <SuspenseWrapper>
+              <FacilityLoginPage />
             </SuspenseWrapper>
           )
         },
