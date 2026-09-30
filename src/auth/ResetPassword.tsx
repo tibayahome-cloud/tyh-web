@@ -1,17 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { AxiosError } from "axios";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
 import { PasswordField } from "../shared/components/PasswordField";
+import { PasswordRequirements } from "../shared/components/PasswordRequirements";
 import { Button } from "../shared/components/Button";
 import api from "../shared/libs/api";
 import type { PasswordResetPerformSchema } from "../shared/schemas/auth";
 import { passwordResetPerformSchema } from "../shared/schemas/auth";
+import { describePasswordSubmitError } from "../shared/utils/passwordErrors";
+import { withPasswordConfirmation } from "../shared/utils/passwordResolver";
+
+const REQUIREMENTS_ID = "reset-password-requirements";
 
 const createDefaults = (token: string | null): PasswordResetPerformSchema => ({
   token: token ?? "",
@@ -27,20 +31,39 @@ export const ResetPassword = () => {
   const isInvitation = searchParams.get("flow") === "invitation";
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [retryable, setRetryable] = useState(false);
 
   const {
     control,
     handleSubmit,
     reset,
-    formState: { isSubmitting }
+    watch,
+    trigger,
+    setError: setFieldError,
+    setFocus,
+    formState: { isSubmitting, submitCount }
   } = useForm<PasswordResetPerformSchema>({
-    resolver: zodResolver(passwordResetPerformSchema),
+    resolver: withPasswordConfirmation(zodResolver(passwordResetPerformSchema)),
+    // Validate as the person types so every rule reports live, not only on submit.
+    mode: "onChange",
     defaultValues: createDefaults(initialToken)
   });
+
+  const password = watch("password");
+  const confirmPassword = watch("confirmPassword");
+
+  // Editing the password can make an already-typed confirmation match (or stop matching).
+  useEffect(() => {
+    if (confirmPassword) {
+      void trigger("confirmPassword");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password]);
 
   const submit = handleSubmit(async (values) => {
     setStatus("idle");
     setError(null);
+    setRetryable(false);
 
     try {
       await api.post("/auth/password-reset/perform", {
@@ -56,12 +79,15 @@ export const ResetPassword = () => {
       }, 1500);
     } catch (err) {
       setStatus("error");
-      if (err instanceof AxiosError) {
-        const message = (err.response?.data as { message?: string })?.message;
-        setError(message ?? t("auth.resetPasswordError"));
-      } else {
-        setError(t("auth.resetPasswordError"));
+      const failure = describePasswordSubmitError(err, t("auth.resetPasswordError"));
+      if (failure.field === "password") {
+        // The server rejected the password itself: say so on the field and put focus there.
+        setFieldError("password", { type: "server", message: failure.message });
+        setFocus("password");
+        return;
       }
+      setError(failure.message);
+      setRetryable(failure.retryable);
     }
   });
 
@@ -100,11 +126,19 @@ export const ResetPassword = () => {
           render={({ field, fieldState }) => (
             <PasswordField
               {...field}
-              label={t("auth.password")}
+              label={isInvitation ? "Create password" : "New password"}
               autoComplete="new-password"
+              aria-describedby={REQUIREMENTS_ID}
               error={fieldState.error?.message}
             />
           )}
+        />
+
+        <PasswordRequirements
+          id={REQUIREMENTS_ID}
+          password={password ?? ""}
+          confirmPassword={confirmPassword ?? ""}
+          showFailures={submitCount > 0}
         />
 
         <FormField
@@ -115,6 +149,7 @@ export const ResetPassword = () => {
               {...field}
               label={t("auth.confirmPassword")}
               autoComplete="new-password"
+              aria-describedby={REQUIREMENTS_ID}
               error={fieldState.error?.message}
             />
           )}
@@ -146,6 +181,9 @@ export const ResetPassword = () => {
             <p className="type-caption text-red-600" role="alert">
               {error}
             </p>
+            {retryable && (
+              <p className="mt-1 text-center text-xs text-red-600">Your password was not changed. You can submit again.</p>
+            )}
           </div>
         )}
 
