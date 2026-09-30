@@ -82,7 +82,7 @@ describe("guards", () => {
     expect(screen.getByText("login-page")).toBeInTheDocument();
   });
 
-  it("redirects to admin login when permission missing", () => {
+  it("redirects to the facility sign-in, not the system one, when permission is missing", () => {
     useAuthMock.mockReturnValue({
       isAuthenticated: true,
       isBootstrapping: false,
@@ -107,10 +107,11 @@ describe("guards", () => {
             }
           />
           <Route path="/admin/login" element={<div>admin-login</div>} />
+          <Route path="/facility/login" element={<div>facility-login</div>} />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText("admin-login")).toBeInTheDocument();
+    expect(screen.getByText("facility-login")).toBeInTheDocument();
   });
 });
