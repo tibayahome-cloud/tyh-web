@@ -20,6 +20,7 @@ import {
 } from "../../../shared/libs/telemedicineCategoryAssets";
 import { TelemedicineServiceVisual } from "../../../shared/components/TelemedicineServiceVisual";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
+import { useFastestFacility } from "../../../shared/hooks/useFastestFacility";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
@@ -132,6 +133,11 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
+  // Set only when the facility was chosen with "Fastest available": which facility, and the
+  // start of the earliest appointment it reported. Choosing a facility by hand clears it.
+  const [fastestPick, setFastestPick] = useState<{ facilityId: string; startAt: string } | null>(null);
+  const [noFastestFound, setNoFastestFound] = useState(false);
+  const fastestFacility = useFastestFacility();
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
@@ -219,6 +225,27 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     return `${first.weekday} ${first.day} \u2013 ${last.weekday} ${last.day}`;
   }, [weekDates, weekStart]);
   const slotsForActiveDate = slotsByDate.get(activeDate) ?? [];
+  // The slot the earliest-time lookup pointed at, found again in the freshly loaded list so a
+  // time that has since been taken is never offered.
+  const earliestSlot = useMemo(() => {
+    if (!fastestPick || fastestPick.facilityId !== selectedFacility?.id) {
+      return null;
+    }
+    const target = new Date(fastestPick.startAt).getTime();
+    return (slotsQuery.data?.slots ?? []).find((slot) => new Date(slot.startAt).getTime() === target) ?? null;
+  }, [fastestPick, selectedFacility?.id, slotsQuery.data]);
+  // Open on the day that has the earliest time, so it is visible in the list as well as in the banner.
+  useEffect(() => {
+    if (!earliestSlot || selectedDate) {
+      return;
+    }
+    for (const [date, daySlots] of slotsByDate) {
+      if (daySlots.some((slot) => slot.startAt === earliestSlot.startAt)) {
+        setSelectedDate(date);
+        return;
+      }
+    }
+  }, [earliestSlot, selectedDate, slotsByDate]);
   const holdQuery = useHoldQuery(holdId, {
     enabled: Boolean(holdId),
     // Once payment is confirmed or the hold has reached a terminal state, nothing will change
@@ -361,6 +388,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
     setSelectedFacility(null);
+    setFastestPick(null);
+    setNoFastestFound(false);
+    fastestFacility.reset();
     setSelectedDate(null);
     setSelectedSlot(null);
     setHoldId(null);
@@ -369,6 +399,28 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
     onClose();
+  };
+
+  const handleChooseFastest = () => {
+    if (!selectedServiceId) return;
+    setNoFastestFound(false);
+    fastestFacility.mutate(
+      { serviceId: selectedServiceId, countryCode: user?.countryCode ?? undefined },
+      {
+        onSuccess: ({ facility, earliestAvailableAt }) => {
+          if (!facility || !earliestAvailableAt) {
+            setNoFastestFound(true);
+            return;
+          }
+          setSelectedFacility(facility);
+          setFastestPick({ facilityId: facility.id, startAt: earliestAvailableAt });
+          // Same reset as choosing a facility by hand: another facility may keep a different calendar.
+          setSelectedDate(null);
+          setPreference({});
+          setStep(TM_STEP_INDEX.preferences);
+        }
+      }
+    );
   };
 
   const handleSelectSlot = async (slot: TelemedicineSlot) => {
@@ -610,6 +662,42 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     No facilities currently offer this service remotely in your country.
                   </p>
                 )}
+                {(facilitiesQuery.data ?? []).length > 0 && (
+                  <section
+                    className="rounded-2xl border border-tiba-blue/30 bg-tiba-blue/5 p-4"
+                    aria-labelledby="fastest-available-heading"
+                  >
+                    <h3 id="fastest-available-heading" className="text-base font-semibold text-slate-900">
+                      Fastest available
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      We check every facility that offers this consultation and pick the one with the earliest open
+                      time. You can still choose a facility yourself below.
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-3 w-full sm:w-auto"
+                      loading={fastestFacility.isPending}
+                      onClick={handleChooseFastest}
+                    >
+                      {fastestFacility.isError ? "Try again" : "Find the earliest time"}
+                    </Button>
+                    {fastestFacility.isError && (
+                      <p className="mt-2 text-sm text-red-600" role="alert">
+                        We could not check availability just now. Try again, or choose a facility below.
+                      </p>
+                    )}
+                    {noFastestFound && (
+                      <p className="mt-2 text-sm text-slate-700" role="status">
+                        No facility has an open time in the next {WEEK_LENGTH} days. Choose a facility below to see
+                        its calendar.
+                      </p>
+                    )}
+                  </section>
+                )}
+                {(facilitiesQuery.data ?? []).length > 0 && (
+                  <p className="pt-1 text-sm font-medium text-slate-600">Or choose a facility yourself</p>
+                )}
                 <div className="space-y-2">
                   {(facilitiesQuery.data ?? []).map((facility) => (
                     <button
@@ -617,6 +705,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       type="button"
                       onClick={() => {
                         setSelectedFacility(facility);
+                        setFastestPick(null);
                         // Clear the day: another facility may keep a different calendar, so
                         // the same date string would not mean the same window.
                         setSelectedDate(null);
@@ -643,6 +732,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.preferences && selectedFacility && (
           <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            {fastestPick && fastestPick.facilityId === selectedFacility.id && (
+              <div className="rounded-xl border border-tiba-blue/30 bg-white px-4 py-3 text-sm text-slate-700" role="status">
+                <span className="font-semibold text-slate-900">Fastest available: {selectedFacility.name}.</span>{" "}
+                Earliest open time {formatSlotDate(fastestPick.startAt, selectedFacility.timezone ?? undefined)} at{" "}
+                {formatSlotTime(fastestPick.startAt, selectedFacility.timezone ?? undefined)}.
+              </div>
+            )}
             <div>
               <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
               <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
@@ -672,6 +768,29 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
+            {fastestPick && fastestPick.facilityId === selectedFacility.id && !slotsQuery.isLoading && !slotsQuery.isError && (
+              earliestSlot ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-tiba-blue/30 bg-tiba-blue/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Earliest available:</span>{" "}
+                    {formatSlotDate(earliestSlot.startAt, slotTimezone)} at {formatSlotTime(earliestSlot.startAt, slotTimezone)}{" "}
+                    at {selectedFacility.name}
+                  </p>
+                  <Button
+                    type="button"
+                    disabled={createHoldMutation.isPending}
+                    loading={createHoldMutation.isPending && selectedSlot?.startAt === earliestSlot.startAt}
+                    onClick={() => handleSelectSlot(earliestSlot)}
+                  >
+                    Book this time
+                  </Button>
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+                  The earliest time we found at {selectedFacility.name} has just been taken. Pick another time below.
+                </p>
+              )
+            )}
             {/* Week navigation, separate from day selection: choosing a day must not move
                 the window the client is looking at. */}
             <div className="flex items-center justify-between gap-2">
