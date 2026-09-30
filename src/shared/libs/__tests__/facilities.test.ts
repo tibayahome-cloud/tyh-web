@@ -28,6 +28,7 @@ import {
   fetchFacilityBookings,
   fetchFacilityProviders,
   fetchFacilityAdminInvitationStatus,
+  fetchFacilityAdminAccess,
   resendFacilityAdminInvitation,
   facilityServiceUpdatePayload,
   updateFacilityStatus,
@@ -212,6 +213,37 @@ describe("facility API helpers", () => {
       userId: "user-1",
       roleKey: "admin.ops",
       active: true
+    });
+  });
+
+  it("loads facility admin access and invitation metadata", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [{
+          id: "admin-link-1",
+          facility_id: "facility-1",
+          user_id: "user-1",
+          email: "admin@example.com",
+          user_status: "pending",
+          role_key: "admin.ops",
+          active: true,
+          invitation: {
+            status: "pending",
+            reset_id: "reset-1",
+            expires_at: "2026-10-01T10:00:00Z"
+          }
+        }]
+      }
+    });
+
+    const result = await fetchFacilityAdminAccess("facility-1");
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/admins");
+    expect(result[0]).toMatchObject({
+      userId: "user-1",
+      email: "admin@example.com",
+      userStatus: "pending",
+      invitation: { status: "pending", resetId: "reset-1" }
     });
   });
 
