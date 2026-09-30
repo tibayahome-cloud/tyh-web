@@ -1,3 +1,4 @@
+import { adminLoginPath } from "../shared/utils/portalMemory";
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 
@@ -188,7 +189,7 @@ export const router = createBrowserRouter(
     {
       path: "/admin/*",
       element: (
-        <LogoutGate redirectTo="/admin/login">
+        <LogoutGate redirectTo={adminLoginPath}>
           <LegalConsentGate>
             <RequirePerm perm={PERMISSION_ADMIN_ACCESS}>
               <SuspenseWrapper>

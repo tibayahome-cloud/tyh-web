@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../shared/components/Button";
 import { Card } from "../shared/components/Card";
 import { useAuth } from "../shared/hooks/useAuth";
+import { sessionLoginPath } from "../shared/utils/portalMemory";
 
 export const SessionExpired = () => {
   const navigate = useNavigate();
@@ -17,7 +18,8 @@ export const SessionExpired = () => {
 
   const handleLogin = () => {
     clearSessionExpired();
-    navigate("/login", { replace: true });
+    // Back to the sign-in for the area the session belonged to, not always the personal one.
+    navigate(sessionLoginPath(), { replace: true });
   };
 
   return (

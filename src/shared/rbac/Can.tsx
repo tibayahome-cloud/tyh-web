@@ -1,3 +1,4 @@
+import { adminLoginPath } from "../utils/portalMemory";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -67,7 +68,7 @@ type RequirePermProps = {
   perm: PermissionValue;
   children: ReactNode;
   requireAll?: boolean;
-  redirectTo?: string;
+  redirectTo?: string | (() => string);
   fallback?: ReactNode;
 };
 
@@ -75,9 +76,10 @@ export const RequirePerm = ({
   perm,
   children,
   requireAll = false,
-  redirectTo = "/admin/login",
+  redirectTo = adminLoginPath,
   fallback
 }: RequirePermProps) => {
+  const target = () => (typeof redirectTo === "function" ? redirectTo() : redirectTo);
   const { isAuthenticated, isBootstrapping } = useAuth();
   const { hasPermission } = useRbac();
   const location = useLocation();
@@ -87,11 +89,11 @@ export const RequirePerm = ({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+    return <Navigate to={target()} state={{ from: location }} replace />;
   }
 
   if (!hasPermission(perm, requireAll)) {
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to={target()} replace />;
   }
 
   return <>{children}</>;
