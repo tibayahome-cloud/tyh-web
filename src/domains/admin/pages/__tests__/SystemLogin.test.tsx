@@ -84,6 +84,18 @@ describe("system administration sign-in page", () => {
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/dashboard"));
   });
 
+  it("keeps existing bookmarks working: a facility admin who signs in here still reaches the facility portal", async () => {
+    const user = userEvent.setup();
+    loginAdminMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin.ops"] } });
+    renderPage();
+
+    await user.type(screen.getByLabelText("Email"), "ops@clinic.example");
+    await user.type(screen.getByLabelText("Password"), "correct-horse");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/facility"));
+  });
+
   it("shows the redirect notice when sent here from the personal sign-in", () => {
     renderPage({ redirected: "admin-role" });
 

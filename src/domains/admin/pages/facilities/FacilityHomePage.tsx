@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { Link, Navigate } from "react-router-dom";
 import BusinessIcon from "@mui/icons-material/BusinessOutlined";
 
+import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { fetchFacilities } from "../../../../shared/libs/facilities";
@@ -10,16 +11,22 @@ import type { Facility } from "../../../../shared/schemas/facility";
 
 type FacilityWorkspaceResolution =
   | { kind: "workspace"; to: string }
-  | { kind: "scope_error" }
+  | { kind: "select"; options: Array<{ id: string; to: string }> }
   | { kind: "empty" };
 
-/** Resolve the tenant workspace route from the backend-scoped facility list. */
+// The API returns only the facilities this account may manage, so the list is the whole of what
+// can be offered. Nothing here decides access: each workspace route asks the API again, and a
+// facility that is not in the list is never linked to.
 export const resolveFacilityWorkspaceRoute = (facilities: Facility[]): FacilityWorkspaceResolution => {
   if (facilities.length === 1) {
     return { kind: "workspace", to: `/admin/facilities/${facilities[0].id}` };
   }
   if (facilities.length > 1) {
-    return { kind: "scope_error" };
+    // A selector appears only when there is a real choice to make.
+    return {
+      kind: "select",
+      options: facilities.map((facility) => ({ id: facility.id, to: `/admin/facilities/${facility.id}` }))
+    };
   }
   return { kind: "empty" };
 };
@@ -32,10 +39,12 @@ const extractErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : "Request failed";
 };
 
+const STATUS_LABEL: Record<string, string> = { active: "Active", pending: "Pending approval", suspended: "Suspended" };
+
 const FacilityHomePage = () => {
   const facilitiesQuery = useQuery({
     queryKey: ["admin", "facility-home"],
-    queryFn: () => fetchFacilities({ pageSize: 5 })
+    queryFn: () => fetchFacilities({ pageSize: 50 })
   });
 
   if (facilitiesQuery.isLoading) {
@@ -53,7 +62,18 @@ const FacilityHomePage = () => {
           <BusinessIcon className="mt-0.5 text-slate-400" />
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Facility</h1>
-            <p className="mt-1 text-sm text-danger-600">{extractErrorMessage(facilitiesQuery.error)}</p>
+            <p className="mt-1 text-sm text-danger-600" role="alert">
+              {extractErrorMessage(facilitiesQuery.error)}
+            </p>
+            <Button
+              className="mt-3"
+              variant="outline"
+              size="sm"
+              loading={facilitiesQuery.isFetching}
+              onClick={() => void facilitiesQuery.refetch()}
+            >
+              Try again
+            </Button>
           </div>
         </div>
       </Card>
@@ -67,7 +87,33 @@ const FacilityHomePage = () => {
     return <Navigate to={resolution.to} replace />;
   }
 
-  const hasScopeError = resolution.kind === "scope_error";
+  if (resolution.kind === "select") {
+    const byId = new Map(facilities.map((facility) => [facility.id, facility]));
+    return (
+      <Card>
+        <h1 className="text-xl font-semibold text-slate-900">Choose a facility</h1>
+        <p className="mt-1 text-sm text-slate-600">Your account can manage more than one facility. Pick the one to work in.</p>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {resolution.options.map((option) => {
+            const facility = byId.get(option.id);
+            return (
+              <li key={option.id}>
+                <Link
+                  to={option.to}
+                  className="flex min-h-14 flex-col justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-tiba-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+                >
+                  <span className="text-sm font-semibold text-slate-900">{facility?.name}</span>
+                  <span className="mt-0.5 text-xs text-slate-500">
+                    {[facility?.county, STATUS_LABEL[facility?.status ?? ""] ?? facility?.status].filter(Boolean).join(" · ")}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -77,9 +123,7 @@ const FacilityHomePage = () => {
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Facility</h1>
             <p className="mt-1 text-sm text-slate-600">
-              {hasScopeError
-                ? "Your admin ops account is linked to more than one facility. Access is blocked until the facility assignment is corrected."
-                : "No active facility is linked to your admin ops account yet."}
+              No active facility is linked to your account yet. Contact support to have one assigned.
             </p>
           </div>
         </div>

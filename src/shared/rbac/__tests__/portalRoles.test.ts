@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isAdminPortalRole } from "../roles";
-import { isFacilityAdminRole, isSystemAdminRole } from "../portalRoles";
+import { adminPortalHome, isFacilityAdminRole, isSystemAdminRole } from "../portalRoles";
 
 describe("portal roles", () => {
   it("treats only admin.ops as a facility admin", () => {
@@ -24,5 +24,26 @@ describe("portal roles", () => {
       expect(isFacilityAdminRole(role) && isSystemAdminRole(role)).toBe(false);
       expect(isFacilityAdminRole(role) || isSystemAdminRole(role)).toBe(isAdminPortalRole(role));
     }
+  });
+});
+
+describe("adminPortalHome", () => {
+  it("sends facility admins to the facility portal", () => {
+    expect(adminPortalHome(["admin.ops"])).toBe("/admin/facility");
+  });
+
+  it("sends system administrators to the system dashboard", () => {
+    expect(adminPortalHome(["admin.super"])).toBe("/admin/dashboard");
+    expect(adminPortalHome(["admin"])).toBe("/admin/dashboard");
+  });
+
+  it("prefers the system dashboard when an account holds both", () => {
+    expect(adminPortalHome(["admin.ops", "admin.super"])).toBe("/admin/dashboard");
+  });
+
+  it("falls back to the dashboard, whose guard redirects, for unknown or missing roles", () => {
+    expect(adminPortalHome([])).toBe("/admin/dashboard");
+    expect(adminPortalHome(undefined)).toBe("/admin/dashboard");
+    expect(adminPortalHome(["client"])).toBe("/admin/dashboard");
   });
 });

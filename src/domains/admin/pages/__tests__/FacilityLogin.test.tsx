@@ -94,14 +94,15 @@ describe("facility admin sign-in page", () => {
     expect(screen.getByLabelText("Remember me").closest("label")?.className).toContain("min-h-11");
   });
 
-  it("signs a facility admin in and opens the admin workspace", async () => {
+  it("signs a facility admin in and opens the facility portal, not the system dashboard", async () => {
     const user = userEvent.setup();
     loginAdminMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin.ops"] } });
     renderPage();
 
     await submit(user);
 
-    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/dashboard"));
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/facility"));
+    expect(screen.getByTestId("where")).not.toHaveTextContent("/admin/dashboard");
     expect(loginAdminMock).toHaveBeenCalledWith({
       email: "ops@clinic.example",
       password: "correct-horse",

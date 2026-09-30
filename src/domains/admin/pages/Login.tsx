@@ -14,6 +14,7 @@ import { Loading } from "../../../shared/components/Loading";
 import type { AdminLoginSchema } from "../../../shared/schemas/auth";
 import { adminLoginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { adminPortalHome } from "../../../shared/rbac/portalRoles";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -45,10 +46,13 @@ const AdminLoginPage = () => {
     defaultValues
   });
 
-  const handlePostAuth = useCallback(() => {
-    setRedirecting(true);
-    navigate("/admin/dashboard", { replace: true });
-  }, [navigate]);
+  const handlePostAuth = useCallback(
+    (roles: readonly string[] | undefined) => {
+      setRedirecting(true);
+      navigate(adminPortalHome(roles), { replace: true });
+    },
+    [navigate]
+  );
 
   const submit = handleSubmit(async (values) => {
     setError(null);
@@ -70,7 +74,7 @@ const AdminLoginPage = () => {
         navigate("/two-factor", { replace: true });
         return;
       }
-      handlePostAuth();
+      handlePostAuth(result.user?.roles);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "We could not sign you in. Check your details and try again."

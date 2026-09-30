@@ -15,7 +15,7 @@ import { Loading } from "../../../shared/components/Loading";
 import type { AdminLoginSchema } from "../../../shared/schemas/auth";
 import { adminLoginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
-import { isSystemAdminRole } from "../../../shared/rbac/portalRoles";
+import { adminPortalHome, isSystemAdminRole } from "../../../shared/rbac/portalRoles";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -85,7 +85,7 @@ const FacilityLoginPage = () => {
       }
 
       setRedirecting(true);
-      navigate("/admin/dashboard", { replace: true });
+      navigate(adminPortalHome(result.user?.roles), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : GENERIC_SIGN_IN_ERROR);
     }
