@@ -30,6 +30,7 @@ import {
   fetchFacilityAdminInvitationStatus,
   fetchFacilityAdminAccess,
   resendFacilityAdminInvitation,
+  sendFacilityAdminPasswordReset,
   facilityServiceUpdatePayload,
   updateFacilityStatus,
   updateFacilityProviderCompensation,
@@ -260,6 +261,24 @@ describe("facility API helpers", () => {
       resetId: "reset-1",
       expiresAt: "2026-08-04T10:00:00Z",
       redeemedAt: null
+    });
+  });
+
+  it("sends a password reset link to an active facility admin through the facility-scoped endpoint", async () => {
+    mockPost.mockResolvedValue({ data: { data: { reset_sent: true, reset_expires_at: "2026-10-01T11:00:00Z" } } });
+
+    const result = await sendFacilityAdminPasswordReset("facility-1", "user-9");
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins/user-9/password-reset");
+    expect(result).toEqual({ resetSent: true, resetExpiresAt: "2026-10-01T11:00:00Z" });
+  });
+
+  it("tolerates a reset response without an expiry", async () => {
+    mockPost.mockResolvedValue({ data: { data: { reset_sent: true } } });
+
+    expect(await sendFacilityAdminPasswordReset("facility-1", "user-9")).toEqual({
+      resetSent: true,
+      resetExpiresAt: null
     });
   });
 

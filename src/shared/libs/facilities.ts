@@ -675,3 +675,22 @@ export type BookingFacilitySelectionInput = {
   facilityId: string;
   requestMode: BookingRequestMode;
 };
+
+export type FacilityAdminPasswordResetResult = {
+  resetSent: boolean;
+  resetExpiresAt: string | null;
+};
+
+// Emails a one-time reset link to a facility admin whose account is already active. The API
+// answers 400 for an account that has not finished setup (send the setup invitation instead).
+export const sendFacilityAdminPasswordReset = async (
+  facilityId: string,
+  userId: string
+): Promise<FacilityAdminPasswordResetResult> => {
+  const response = await api.post(`/facilities/${facilityId}/admins/${userId}/password-reset`);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    resetSent: Boolean(data.reset_sent),
+    resetExpiresAt: data.reset_expires_at ? String(data.reset_expires_at) : null
+  };
+};

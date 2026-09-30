@@ -11,8 +11,6 @@ import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOffOutlined";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAddOutlined";
-import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
-import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -26,18 +24,17 @@ import {
   deleteFacilityService,
   assignFacilityBookingProvider,
   fetchFacility,
-  fetchFacilityAdminAccess,
   fetchFacilityBookings,
   fetchFacilityProviders,
   fetchFacilityServices,
   bootstrapFacilityProvider,
   replaceFacilityServices,
-  resendFacilityAdminInvitation,
   updateFacility,
   updateFacilityProviderCompensation,
   updateFacilityService
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
+import { FacilityAdminAccessCard } from "../../components/FacilityAdminAccessCard";
 import {
   cancelFacilityServiceRequest,
   createFacilityServiceRequest,
@@ -659,7 +656,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>({ providerUserId: "", reason: "" });
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [invitationMessage, setInvitationMessage] = useState<string | null>(null);
 
   const facilityScopeQuery = useAdminFacilityScope(isFacilityAdmin && canReadFacilities);
   const scopedFacilities = facilityScopeQuery.data?.facilities ?? [];
@@ -671,20 +667,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     enabled: Boolean(facilityId) && canReadFacilities && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
-  const facilityAdminsQuery = useQuery({
-    queryKey: ["admin", "facilities", facilityId, "admins"],
-    queryFn: () => fetchFacilityAdminAccess(String(facilityId)),
-    enabled: Boolean(facilityId) && canManageAdmins
-  });
-
-  const resendInvitationMutation = useMutation({
-    mutationFn: (userId: string) => resendFacilityAdminInvitation(String(facilityId), userId),
-    onSuccess: () => {
-      setInvitationMessage("A new password setup invitation has been queued.");
-      queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "admins"] });
-    },
-    onError: (error) => setMutationError(extractErrorMessage(error))
-  });
 
   const servicesQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId, "services"],
@@ -1226,56 +1208,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </div>
       </Card>
 
-      {canManageAdmins && (
-        <Card title="Facility administrator access" subtitle="Manage the initial account setup invitation for this facility.">
-          {facilityAdminsQuery.isLoading ? (
-            <Loading />
-          ) : facilityAdminsQuery.isError ? (
-            <p className="text-sm text-danger-600">{extractErrorMessage(facilityAdminsQuery.error)}</p>
-          ) : facilityAdminsQuery.data?.length ? (
-            <div className="space-y-3">
-              {facilityAdminsQuery.data.map((admin) => {
-                const canResend = admin.userStatus !== "active" && admin.invitation.status !== "completed";
-                return (
-                  <div key={admin.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <EmailOutlinedIcon className="mt-0.5 text-tiba-blue" />
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{admin.email}</p>
-                        <p className="mt-1 text-sm text-slate-600">
-                          Account {admin.userStatus} · Invitation {admin.invitation.status.replace("_", " ")}
-                        </p>
-                        {admin.invitation.expiresAt && admin.invitation.status === "pending" && (
-                          <p className="mt-1 text-xs text-slate-500">Expires {new Date(admin.invitation.expiresAt).toLocaleString()}</p>
-                        )}
-                      </div>
-                    </div>
-                    {canResend && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        loading={resendInvitationMutation.isPending && resendInvitationMutation.variables === admin.userId}
-                        onClick={() => {
-                          setMutationError(null);
-                          setInvitationMessage(null);
-                          resendInvitationMutation.mutate(admin.userId);
-                        }}
-                      >
-                        <RefreshOutlinedIcon fontSize="small" />
-                        Resend setup invitation
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-              {invitationMessage && <p className="text-sm text-success-700" role="status">{invitationMessage}</p>}
-              {mutationError && <p className="text-sm text-danger-600">{mutationError}</p>}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-600">No active facility administrator is assigned.</p>
-          )}
-        </Card>
-      )}
+      {canManageAdmins && facilityId && <FacilityAdminAccessCard facilityId={String(facilityId)} />}
 
       <Modal
         open={settingsModalOpen}
