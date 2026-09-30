@@ -20,13 +20,17 @@ import {
   assignFacilityBookingProvider,
   createFacility,
   discoverFacilities,
+  facilityUpdatePayload,
+  fetchFacilities,
   fetchFacilityOverview,
   bootstrapFacilityProvider,
   createFacilityProvider,
   fetchFacilityBookings,
   fetchFacilityProviders,
   fetchFacilityAdminInvitationStatus,
+  fetchFacilityAdminAccess,
   resendFacilityAdminInvitation,
+  sendFacilityAdminPasswordReset,
   facilityServiceUpdatePayload,
   updateFacilityStatus,
   updateFacilityProviderCompensation,
@@ -126,8 +130,66 @@ describe("facility API helpers", () => {
         }
       ],
       initial_admin_email: "admin@nairobi.test",
-      platform_fee_percent: 10
+      platform_fee_percent: 10,
+      fast_response_enabled: false
     });
+  });
+
+  it("requests a server-side page with search and status filters", async () => {
+    mockGet.mockResolvedValue({ data: { data: [], meta: {} } });
+
+    await fetchFacilities({ page: 3, pageSize: 25, status: "active", search: "kilimani" });
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities", {
+      params: {
+        "page[number]": 3,
+        "page[size]": 25,
+        "filter[status]": "active",
+        "filter[q]": "kilimani"
+      }
+    });
+  });
+
+  it("reads status counts for every page from the response metadata", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        data: [facilityResponse],
+        meta: { status_counts: { pending: 4, active: 30, suspended: 2 } }
+      }
+    });
+
+    const result = await fetchFacilities();
+
+    expect(result.facilities).toHaveLength(1);
+    expect(result.statusCounts).toEqual({ pending: 4, active: 30, suspended: 2 });
+  });
+
+  it("falls back to zero counts when the response has no status summary", async () => {
+    mockGet.mockResolvedValue({ data: { data: [facilityResponse] } });
+
+    expect((await fetchFacilities()).statusCounts).toEqual({ pending: 0, active: 0, suspended: 0 });
+
+    mockGet.mockResolvedValue({
+      data: { data: [], meta: { status_counts: { pending: "x", active: null } } }
+    });
+
+    expect((await fetchFacilities()).statusCounts).toEqual({ pending: 0, active: 0, suspended: 0 });
+  });
+
+  it("maps the fast-response flag and defaults it to off", async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [{ ...facilityResponse, fast_response_enabled: true }, { ...facilityResponse, id: "facility-2" }] }
+    });
+
+    const result = await fetchFacilities();
+
+    expect(result.facilities.map((facility) => facility.fastResponseEnabled)).toEqual([true, false]);
+  });
+
+  it("only sends fast_response_enabled on update when it was changed", () => {
+    expect(facilityUpdatePayload({ name: "Renamed" })).not.toHaveProperty("fast_response_enabled");
+    expect(facilityUpdatePayload({ fastResponseEnabled: true })).toMatchObject({ fast_response_enabled: true });
+    expect(facilityUpdatePayload({ fastResponseEnabled: false })).toMatchObject({ fast_response_enabled: false });
   });
 
   it("assigns facility admin ops by email", async () => {
@@ -155,6 +217,37 @@ describe("facility API helpers", () => {
     });
   });
 
+  it("loads facility admin access and invitation metadata", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [{
+          id: "admin-link-1",
+          facility_id: "facility-1",
+          user_id: "user-1",
+          email: "admin@example.com",
+          user_status: "pending",
+          role_key: "admin.ops",
+          active: true,
+          invitation: {
+            status: "pending",
+            reset_id: "reset-1",
+            expires_at: "2026-10-01T10:00:00Z"
+          }
+        }]
+      }
+    });
+
+    const result = await fetchFacilityAdminAccess("facility-1");
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/admins");
+    expect(result[0]).toMatchObject({
+      userId: "user-1",
+      email: "admin@example.com",
+      userStatus: "pending",
+      invitation: { status: "pending", resetId: "reset-1" }
+    });
+  });
+
   it("fetches facility admin invitation status without exposing a token", async () => {
     mockGet.mockResolvedValueOnce({
       data: { data: { status: "pending", reset_id: "reset-1", expires_at: "2026-08-04T10:00:00Z" } }
@@ -168,6 +261,24 @@ describe("facility API helpers", () => {
       resetId: "reset-1",
       expiresAt: "2026-08-04T10:00:00Z",
       redeemedAt: null
+    });
+  });
+
+  it("sends a password reset link to an active facility admin through the facility-scoped endpoint", async () => {
+    mockPost.mockResolvedValue({ data: { data: { reset_sent: true, reset_expires_at: "2026-10-01T11:00:00Z" } } });
+
+    const result = await sendFacilityAdminPasswordReset("facility-1", "user-9");
+
+    expect(mockPost).toHaveBeenCalledWith("/facilities/facility-1/admins/user-9/password-reset");
+    expect(result).toEqual({ resetSent: true, resetExpiresAt: "2026-10-01T11:00:00Z" });
+  });
+
+  it("tolerates a reset response without an expiry", async () => {
+    mockPost.mockResolvedValue({ data: { data: { reset_sent: true } } });
+
+    expect(await sendFacilityAdminPasswordReset("facility-1", "user-9")).toEqual({
+      resetSent: true,
+      resetExpiresAt: null
     });
   });
 

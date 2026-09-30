@@ -7,6 +7,8 @@ import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
+import { PasswordRequirements } from "../../../../shared/components/PasswordRequirements";
+import { firstPasswordProblem, isPasswordValid } from "../../../../shared/utils/passwordPolicy";
 import { Stepper } from "../../../../shared/components/Stepper";
 import { StickyActionBar } from "../../../../shared/components/StickyActionBar";
 import { useToast } from "../../../../shared/components/ToastProvider";
@@ -285,7 +287,7 @@ const ProviderOnboardingWizardPage = () => {
         }
         return Boolean(
           newUser.fullName.trim() &&
-          newUser.password &&
+          isPasswordValid(newUser.password) &&
           (newUser.email.trim() || newUser.phone.trim()) &&
           facilityId,
         );
@@ -514,8 +516,13 @@ const ProviderOnboardingWizardPage = () => {
                 label="Temporary password"
                 type="password"
                 value={newUser.password}
+                aria-describedby="onboarding-password-requirements"
+                error={newUser.password ? firstPasswordProblem(newUser.password) ?? undefined : undefined}
                 onChange={(event) => setNewUser((prev) => ({ ...prev, password: event.target.value }))}
               />
+              <div className="md:col-span-2">
+                <PasswordRequirements id="onboarding-password-requirements" password={newUser.password} />
+              </div>
             </div>
           )}
 

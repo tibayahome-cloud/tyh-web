@@ -13,6 +13,8 @@ import { Button } from "../../../shared/components/Button";
 import { FormField } from "../../../shared/components/FormField";
 import { Input } from "../../../shared/components/Input";
 import { Loading } from "../../../shared/components/Loading";
+import { PasswordRequirements } from "../../../shared/components/PasswordRequirements";
+import { newPasswordSchema } from "../../../shared/schemas/auth";
 import { api } from "../../../shared/libs/api";
 import { PHONE_PLACEHOLDER } from "../../../shared/constants/contact";
 
@@ -41,7 +43,8 @@ const addUserSchema = z
       .min(6, "Phone must be at least 6 characters")
       .optional()
       .or(z.literal("")),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    // Same policy the API enforces, so a temporary password is never rejected after submit.
+    password: newPasswordSchema,
     status: z.enum(["pending", "active", "suspended"]).default("pending"),
     roles: z.array(z.string()).default([]),
   })
@@ -94,11 +97,14 @@ export const AddUserDialog = ({ open, onClose, onSuccess }: AddUserDialogProps) 
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { isSubmitting }
   } = useForm<AddUserFormValues>({
     resolver: zodResolver(addUserSchema),
+    mode: "onChange",
     defaultValues
   });
+  const temporaryPassword = watch("password");
 
   const { data: roleOptions, isLoading: isLoadingRoles } = useQuery({
     queryKey: ["admin", "rbac", "roles"],
@@ -213,9 +219,14 @@ export const AddUserDialog = ({ open, onClose, onSuccess }: AddUserDialogProps) 
                 label="Temporary password"
                 type="password"
                 placeholder="Generate a secure password"
+                aria-describedby="add-user-password-requirements"
                 error={fieldState.error?.message}
               />
             )}
+          />
+          <PasswordRequirements
+            id="add-user-password-requirements"
+            password={temporaryPassword ?? ""}
           />
           <FormField
             control={control}

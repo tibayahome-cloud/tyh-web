@@ -1,3 +1,4 @@
+import { adminLoginPath } from "../shared/utils/portalMemory";
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 
@@ -45,6 +46,7 @@ const AdminRoutes = lazyWithRetry(() => import("../domains/admin/routes"));
 
 const ClientLoginPage = lazyWithRetry(() => import("../domains/client/pages/Login"));
 const AdminLoginPage = lazyWithRetry(() => import("../domains/admin/pages/Login"));
+const FacilityLoginPage = lazyWithRetry(() => import("../domains/admin/pages/FacilityLogin"));
 const SessionExpiredPage = lazyWithRetry(() =>
   import("../auth/SessionExpired").then((mod) => ({ default: mod.SessionExpired }))
 );
@@ -89,6 +91,14 @@ export const router = createBrowserRouter(
           element: (
             <SuspenseWrapper>
               <TwoFactorPage />
+            </SuspenseWrapper>
+          )
+        },
+        {
+          path: "facility/login",
+          element: (
+            <SuspenseWrapper>
+              <FacilityLoginPage />
             </SuspenseWrapper>
           )
         },
@@ -179,7 +189,7 @@ export const router = createBrowserRouter(
     {
       path: "/admin/*",
       element: (
-        <LogoutGate redirectTo="/admin/login">
+        <LogoutGate redirectTo={adminLoginPath}>
           <LegalConsentGate>
             <RequirePerm perm={PERMISSION_ADMIN_ACCESS}>
               <SuspenseWrapper>

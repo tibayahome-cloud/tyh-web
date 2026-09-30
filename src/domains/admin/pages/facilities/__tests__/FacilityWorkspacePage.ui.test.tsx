@@ -1,6 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FacilityBookingRow } from "../FacilityWorkspacePage";
 import type { Booking } from "../../../../../shared/schemas/booking";
@@ -60,25 +59,29 @@ const bookingFactory = (overrides: Partial<Booking> = {}): Booking =>
   }) as Booking;
 
 describe("FacilityBookingRow", () => {
-  it("shows assign-and-claim for unassigned facility bookings", async () => {
+  // The countdown now reads Date.now() itself (it owns its own ticking timer) instead of
+  // taking nowMs as a prop, so the clock has to be pinned for the countdown text to be
+  // deterministic.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-30T08:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows assign-and-claim for unassigned facility bookings", () => {
     const booking = bookingFactory();
     const onAssign = vi.fn();
-    const user = userEvent.setup();
 
-    render(
-      <FacilityBookingRow
-        booking={booking}
-        canAssign
-        nowMs={new Date("2026-07-30T08:00:00Z").getTime()}
-        onAssign={onAssign}
-      />
-    );
+    render(<FacilityBookingRow booking={booking} canAssign onAssign={onAssign} />);
 
     expect(screen.getByText("Dressing")).toBeInTheDocument();
     expect(screen.getByText(/Client One.*Kilimani/)).toBeInTheDocument();
     expect(screen.getByText("3m 00s")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /assign & claim/i }));
+    fireEvent.click(screen.getByRole("button", { name: /assign & claim/i }));
 
     expect(onAssign).toHaveBeenCalledWith(booking);
   });
@@ -97,7 +100,6 @@ describe("FacilityBookingRow", () => {
           facilityStatus: "claimed"
         })}
         canAssign
-        nowMs={new Date("2026-07-30T08:00:00Z").getTime()}
         onAssign={vi.fn()}
       />
     );
@@ -107,14 +109,7 @@ describe("FacilityBookingRow", () => {
   });
 
   it("hides assignment actions when the actor cannot manage bookings", () => {
-    render(
-      <FacilityBookingRow
-        booking={bookingFactory()}
-        canAssign={false}
-        nowMs={new Date("2026-07-30T08:00:00Z").getTime()}
-        onAssign={vi.fn()}
-      />
-    );
+    render(<FacilityBookingRow booking={bookingFactory()} canAssign={false} onAssign={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: /assign/i })).not.toBeInTheDocument();
   });

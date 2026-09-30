@@ -34,6 +34,7 @@ export type FacilityListParams = {
 export type FacilityListResult = {
   facilities: Facility[];
   meta: BookingListMeta;
+  statusCounts: Record<FacilityStatus, number>;
   raw?: Record<string, unknown>;
 };
 
@@ -123,6 +124,17 @@ export type FacilityAdminInvitationResendResult = {
   invitationExpiresAt: string | null;
 };
 
+export type FacilityAdminAccess = {
+  id: string;
+  facilityId: string;
+  userId: string;
+  email: string;
+  userStatus: string;
+  roleKey: string;
+  active: boolean;
+  invitation: FacilityAdminInvitationStatus;
+};
+
 export type FacilityCreateResult = {
   facility: Facility;
   adminInvitation: FacilityAdminInvitation | null;
@@ -197,7 +209,8 @@ export const facilityCreatePayload = (input: FacilityCreateInput): Record<string
   lng: input.lng,
   operating_hours: operatingHoursPayload(input.operatingHours),
   initial_admin_email: input.initialAdminEmail,
-  platform_fee_percent: input.platformFeePercent
+  platform_fee_percent: input.platformFeePercent,
+  fast_response_enabled: input.fastResponseEnabled ?? false
 });
 
 export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string, unknown> => {
@@ -217,6 +230,7 @@ export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string
   if (input.providerFinancialsVisible !== undefined) {
     payload.provider_financials_visible = input.providerFinancialsVisible;
   }
+  if (input.fastResponseEnabled !== undefined) payload.fast_response_enabled = input.fastResponseEnabled;
   return payload;
 };
 
@@ -267,7 +281,16 @@ export const fetchFacilities = async ({
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const data = Array.isArray(payload.data) ? payload.data : [];
   const facilities = mapFacilities(data);
-  return { facilities, meta: mapListMeta(payload.meta, page, pageSize, facilities.length), raw: payload };
+  const rawMeta = payload.meta && typeof payload.meta === "object" ? payload.meta as Record<string, unknown> : {};
+  const rawStatusCounts = rawMeta.status_counts && typeof rawMeta.status_counts === "object"
+    ? rawMeta.status_counts as Record<string, unknown>
+    : {};
+  const statusCounts = {
+    pending: Number(rawStatusCounts.pending) || 0,
+    active: Number(rawStatusCounts.active) || 0,
+    suspended: Number(rawStatusCounts.suspended) || 0
+  } satisfies Record<FacilityStatus, number>;
+  return { facilities, meta: mapListMeta(payload.meta, page, pageSize, facilities.length), statusCounts, raw: payload };
 };
 
 export const fetchFacility = async (facilityId: string): Promise<Facility> => {
@@ -353,6 +376,33 @@ export const assignFacilityAdmin = async (facilityId: string, email: string): Pr
     throw new Error("Failed to assign facility admin");
   }
   return admin;
+};
+
+export const fetchFacilityAdminAccess = async (facilityId: string): Promise<FacilityAdminAccess[]> => {
+  const response = await api.get(`/facilities/${facilityId}/admins`);
+  const data = payloadData(response.data);
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data.map((entry) => {
+    const raw = entry as Record<string, unknown>;
+    const invitation = (raw.invitation ?? {}) as Record<string, unknown>;
+    return {
+      id: String(raw.id ?? ""),
+      facilityId: String(raw.facility_id ?? ""),
+      userId: String(raw.user_id ?? ""),
+      email: String(raw.email ?? ""),
+      userStatus: String(raw.user_status ?? "pending"),
+      roleKey: String(raw.role_key ?? "admin.ops"),
+      active: Boolean(raw.active),
+      invitation: {
+        status: String(invitation.status ?? "not_issued") as FacilityAdminInvitationStatus["status"],
+        resetId: invitation.reset_id ? String(invitation.reset_id) : null,
+        expiresAt: invitation.expires_at ? String(invitation.expires_at) : null,
+        redeemedAt: invitation.redeemed_at ? String(invitation.redeemed_at) : null
+      }
+    };
+  });
 };
 
 export const fetchFacilityAdminInvitationStatus = async (
@@ -624,4 +674,23 @@ export const reviewFacilityProviderApplication = async (
 export type BookingFacilitySelectionInput = {
   facilityId: string;
   requestMode: BookingRequestMode;
+};
+
+export type FacilityAdminPasswordResetResult = {
+  resetSent: boolean;
+  resetExpiresAt: string | null;
+};
+
+// Emails a one-time reset link to a facility admin whose account is already active. The API
+// answers 400 for an account that has not finished setup (send the setup invitation instead).
+export const sendFacilityAdminPasswordReset = async (
+  facilityId: string,
+  userId: string
+): Promise<FacilityAdminPasswordResetResult> => {
+  const response = await api.post(`/facilities/${facilityId}/admins/${userId}/password-reset`);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    resetSent: Boolean(data.reset_sent),
+    resetExpiresAt: data.reset_expires_at ? String(data.reset_expires_at) : null
+  };
 };

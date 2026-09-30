@@ -14,7 +14,7 @@ const alignmentClass: Record<NonNullable<StickyFilterBarProps["align"]>, string>
 
 export const StickyFilterBar = ({ align = "between", children }: PropsWithChildren<StickyFilterBarProps>) => {
   return (
-    <div className="sticky top-24 z-30 -mx-6 mb-6 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
+    <div className="sticky top-24 z-30 -mx-6 mb-3 border-b border-slate-200 bg-white/95 px-6 py-2 backdrop-blur">
       <div className={classNames("flex flex-col gap-4 sm:flex-row sm:items-center", alignmentClass[align])}>{children}</div>
     </div>
   );

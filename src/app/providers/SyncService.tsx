@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSocket } from "../../shared/hooks/useSocket";
 import { useAuth } from "../../shared/hooks/useAuth";
@@ -28,6 +28,23 @@ export const SyncService = () => {
     const isProvider = roles.includes("provider");
 
     // --- BOOKING HANDLERS ---
+    // A location ping only ever changes the live-tracking trail on that one booking's own
+    // detail view (patched below) -- it carries no status/assignment change that any list row
+    // actually displays, so it must never invalidate every mounted booking-list query. Doing so
+    // scaled with tracking frequency (seconds-scale during an active job) and however many list
+    // views happened to be open (an admin queue, a client's Home, etc.), making it the highest-
+    // traffic accidental invalidation in the app.
+    const LIST_INVALIDATING_BOOKING_EVENTS = useMemo(
+        () => new Set([
+            "model.booking.created",
+            "model.booking.status",
+            "model.booking.accepted",
+            "model.booking.completed",
+            "model.booking.reassigned"
+        ]),
+        []
+    );
+
     const handleBookingEvent = useCallback(async (payload: any) => {
         const bookingId = payload.booking_id || payload.id;
         if (!bookingId) return;
@@ -47,8 +64,10 @@ export const SyncService = () => {
             });
         }
 
-        queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false });
-    }, [queryClient, upsertBooking]);
+        if (LIST_INVALIDATING_BOOKING_EVENTS.has(payload.event_topic)) {
+            queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false });
+        }
+    }, [queryClient, upsertBooking, LIST_INVALIDATING_BOOKING_EVENTS]);
 
     // --- FINANCE HANDLERS ---
     const handleFinanceEvent = useCallback((payload: any) => {

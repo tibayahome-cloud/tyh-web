@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+import { firstPasswordProblem } from "../utils/passwordPolicy";
+
+// One rule set for every place a person chooses a password. The message names the first
+// requirement still unmet, so the field error and the live checklist never disagree.
+export const newPasswordSchema = z
+  .string()
+  .min(1, "Enter a password")
+  .superRefine((value, ctx) => {
+    if (!value) {
+      return;
+    }
+    const problem = firstPasswordProblem(value);
+    if (problem) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+    }
+  });
+
 export const loginSchema = z.object({
   emailOrPhone: z.string().min(1, "Email or phone is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -34,8 +51,8 @@ export const registerSchema = z
     fullName: z.string().min(1, "Full name is required"),
     email: optionalEmail,
     phone: optionalPhone,
-    password: z.string().min(10, "Password must be at least 10 characters"),
-    confirmPassword: z.string().min(10, "Confirm your password"),
+    password: newPasswordSchema,
+    confirmPassword: z.string().min(1, "Confirm your password"),
     acceptedTerms: z.boolean(),
     acknowledgedPrivacy: z.boolean()
   })
@@ -48,7 +65,7 @@ export const registerSchema = z
       });
     }
 
-    if (data.password !== data.confirmPassword) {
+    if (data.confirmPassword && data.password !== data.confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["confirmPassword"],
@@ -80,11 +97,11 @@ export const passwordResetSchema = z.object({
 export const passwordResetPerformSchema = z
   .object({
     token: z.string().min(1, "Reset token is required"),
-    password: z.string().min(10, "Password must be at least 10 characters"),
-    confirmPassword: z.string().min(10, "Confirm your password")
+    password: newPasswordSchema,
+    confirmPassword: z.string().min(1, "Confirm your password")
   })
   .superRefine((data, ctx) => {
-    if (data.password !== data.confirmPassword) {
+    if (data.confirmPassword && data.password !== data.confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["confirmPassword"],

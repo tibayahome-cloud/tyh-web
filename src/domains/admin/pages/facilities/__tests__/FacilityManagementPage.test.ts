@@ -16,7 +16,8 @@ const validForm = {
   platformFeePercent: "10",
   is24Hours: true,
   openTime: "08:00",
-  closeTime: "17:00"
+  closeTime: "17:00",
+  fastResponseEnabled: false
 };
 
 describe("FacilityManagementPage helpers", () => {
@@ -41,10 +42,15 @@ describe("FacilityManagementPage helpers", () => {
       initialAdminEmail: "ops@nairobi.test",
       lat: -1.2921,
       lng: 36.8219,
-      platformFeePercent: 10
+      platformFeePercent: 10,
+      fastResponseEnabled: false
     });
     expect(payload.operatingHours).toHaveLength(7);
     expect(payload.operatingHours.every((hour) => hour.is24Hours && !hour.isClosed)).toBe(true);
+  });
+
+  it("carries the fast-response choice into the create payload", () => {
+    expect(buildFacilityCreateInput({ ...validForm, fastResponseEnabled: true }).fastResponseEnabled).toBe(true);
   });
 
   it("builds daily operating-hour payloads when not open 24/7", () => {

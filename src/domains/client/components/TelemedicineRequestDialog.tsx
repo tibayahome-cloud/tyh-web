@@ -12,7 +12,15 @@ import {
   fetchTelemedicineCategories,
   fetchTelemedicineSubcategories
 } from "../../../shared/libs/telemedicineCatalog";
+import {
+  getTelemedicineCategoryAsset,
+  getTelemedicineServiceAsset,
+  TELEMEDICINE_ALL_SERVICES_ASSET,
+  type TelemedicineServiceAssetKeys
+} from "../../../shared/libs/telemedicineCategoryAssets";
+import { TelemedicineServiceVisual } from "../../../shared/components/TelemedicineServiceVisual";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
+import { useFastestFacility } from "../../../shared/hooks/useFastestFacility";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
@@ -21,7 +29,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { RemoteFacility } from "../../../shared/libs/telemedicine";
-import type { TelemedicineSlot } from "../../../shared/schemas/telemedicine";
+import type { TelemedicineHold, TelemedicineSlot } from "../../../shared/schemas/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import { mpesaPhoneValidationError } from "../../../shared/utils/mpesaPhone";
 import { sortSpecialistFirst } from "../../../shared/utils/telemedicineCatalogOrdering";
@@ -91,6 +99,14 @@ const WEEK_LENGTH = 7;
 // is refused, so the picker stops offering weeks it knows the API will reject.
 const MAX_LOOKAHEAD_DAYS = 30;
 
+// Shared by the hold query's refetchInterval (which only sees query.state.data) and the
+// component's own derived state below, so the two can never drift out of sync.
+const isHoldPaymentConfirmed = (hold: Pick<TelemedicineHold, "bookingStatus"> | null | undefined): boolean =>
+  Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
+
+const isHoldExpired = (hold: Pick<TelemedicineHold, "isActive" | "bookingStatus"> | null | undefined): boolean =>
+  Boolean(hold) && !hold?.isActive && hold?.bookingStatus !== "telemedicine_paid_pending_assignment";
+
 const useRemoteServiceOptions = (enabled: boolean) =>
   useQuery({
     queryKey: ["client", "services", "telemedicine-booking-form"],
@@ -117,6 +133,11 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TelemedicineSlot | null>(null);
+  // Set only when the facility was chosen with "Fastest available": which facility, and the
+  // start of the earliest appointment it reported. Choosing a facility by hand clears it.
+  const [fastestPick, setFastestPick] = useState<{ facilityId: string; startAt: string } | null>(null);
+  const [noFastestFound, setNoFastestFound] = useState(false);
+  const fastestFacility = useFastestFacility();
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
@@ -130,20 +151,28 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
   const policyQuery = useTelemedicinePolicy();
   const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
+  // Matches useTelemedicinePolicy's own staleTime convention: this catalog (categories,
+  // subcategories, services) changes about as rarely as the policy does, but previously had no
+  // staleTime at all (default 0), so every dialog reopen within the same session silently
+  // refetched all three in the background even though nothing had changed.
+  const TELEMEDICINE_CATALOG_STALE_TIME = 5 * 60_000;
   const categoriesQuery = useQuery({
     queryKey: ["client", "telemedicine", "categories"],
     queryFn: fetchTelemedicineCategories,
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId,
+    staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
   const subcategoriesQuery = useQuery({
     queryKey: ["client", "telemedicine", "subcategories"],
     queryFn: () => fetchTelemedicineSubcategories(),
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId,
+    staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
   const catalogServicesQuery = useQuery({
     queryKey: ["client", "telemedicine", "services"],
     queryFn: () => fetchTelemedicineCatalogServices(),
-    enabled: open && step === TM_STEP_INDEX.service && !serviceId
+    enabled: open && step === TM_STEP_INDEX.service && !serviceId,
+    staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
@@ -196,9 +225,41 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     return `${first.weekday} ${first.day} \u2013 ${last.weekday} ${last.day}`;
   }, [weekDates, weekStart]);
   const slotsForActiveDate = slotsByDate.get(activeDate) ?? [];
+  // The slot the earliest-time lookup pointed at, found again in the freshly loaded list so a
+  // time that has since been taken is never offered.
+  const earliestSlot = useMemo(() => {
+    if (!fastestPick || fastestPick.facilityId !== selectedFacility?.id) {
+      return null;
+    }
+    const target = new Date(fastestPick.startAt).getTime();
+    return (slotsQuery.data?.slots ?? []).find((slot) => new Date(slot.startAt).getTime() === target) ?? null;
+  }, [fastestPick, selectedFacility?.id, slotsQuery.data]);
+  // Open on the day that has the earliest time, so it is visible in the list as well as in the banner.
+  useEffect(() => {
+    if (!earliestSlot || selectedDate) {
+      return;
+    }
+    for (const [date, daySlots] of slotsByDate) {
+      if (daySlots.some((slot) => slot.startAt === earliestSlot.startAt)) {
+        setSelectedDate(date);
+        return;
+      }
+    }
+  }, [earliestSlot, selectedDate, slotsByDate]);
   const holdQuery = useHoldQuery(holdId, {
     enabled: Boolean(holdId),
-    refetchInterval: holdId ? 4000 : false
+    // Once payment is confirmed or the hold has reached a terminal state, nothing will change
+    // again -- keep polling only while payment is genuinely still pending.
+    refetchInterval: (query) => {
+      if (!holdId) {
+        return false;
+      }
+      const data = query.state.data;
+      if (isHoldPaymentConfirmed(data) || isHoldExpired(data)) {
+        return false;
+      }
+      return 4000;
+    }
   });
 
   const createHoldMutation = useCreateHoldMutation();
@@ -217,6 +278,25 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const serviceOptions = serviceId ? servicesQuery.data ?? [] : catalogServiceOptions;
   const selectedService = serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const hold = holdQuery.data ?? null;
+  // Stable catalog keys per service id, derived from the three catalog queries already loaded --
+  // lets the confirm summary reuse the resolver without another request or an API change.
+  const catalogServiceAssetKeys = useMemo(() => {
+    const categoriesById = new Map((categoriesQuery.data ?? []).map((category) => [category.id, category]));
+    const subcategoriesById = new Map((subcategoriesQuery.data ?? []).map((subcategory) => [subcategory.id, subcategory]));
+    const keysByServiceId = new Map<string, TelemedicineServiceAssetKeys>();
+    (catalogServicesQuery.data ?? []).forEach((service) => {
+      const subcategory = subcategoriesById.get(service.subcategoryId);
+      const category = subcategory ? categoriesById.get(subcategory.categoryId) : undefined;
+      keysByServiceId.set(service.id, {
+        serviceKey: service.key,
+        subcategoryKey: subcategory?.key,
+        categoryKey: category?.key
+      });
+    });
+    return keysByServiceId;
+  }, [categoriesQuery.data, catalogServicesQuery.data, subcategoriesQuery.data]);
+  const selectedServiceAssetKeys =
+    selectedService && !serviceId ? catalogServiceAssetKeys.get(selectedService.id) : undefined;
   const categoryCards = useMemo(() => {
     const subcategoriesByCategory = new Map<string, typeof subcategoriesQuery.data>();
     (subcategoriesQuery.data ?? []).forEach((subcategory) => {
@@ -277,7 +357,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     return () => window.clearInterval(timer);
   }, [hold?.id, hold?.remainingSeconds]);
 
-  const holdExpired = Boolean(hold) && !hold?.isActive && hold?.bookingStatus !== "telemedicine_paid_pending_assignment";
+  const holdExpired = isHoldExpired(hold);
 
   // Once payment succeeds and admin.ops hasn't assigned yet, the booking is created -- treat
   // that as done from the client's point of view; assignment happens asynchronously.
@@ -308,6 +388,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setStep(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
     setSelectedServiceId(serviceId ?? null);
     setSelectedFacility(null);
+    setFastestPick(null);
+    setNoFastestFound(false);
+    fastestFacility.reset();
     setSelectedDate(null);
     setSelectedSlot(null);
     setHoldId(null);
@@ -316,6 +399,28 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
     onClose();
+  };
+
+  const handleChooseFastest = () => {
+    if (!selectedServiceId) return;
+    setNoFastestFound(false);
+    fastestFacility.mutate(
+      { serviceId: selectedServiceId, countryCode: user?.countryCode ?? undefined },
+      {
+        onSuccess: ({ facility, earliestAvailableAt }) => {
+          if (!facility || !earliestAvailableAt) {
+            setNoFastestFound(true);
+            return;
+          }
+          setSelectedFacility(facility);
+          setFastestPick({ facilityId: facility.id, startAt: earliestAvailableAt });
+          // Same reset as choosing a facility by hand: another facility may keep a different calendar.
+          setSelectedDate(null);
+          setPreference({});
+          setStep(TM_STEP_INDEX.preferences);
+        }
+      }
+    );
   };
 
   const handleSelectSlot = async (slot: TelemedicineSlot) => {
@@ -384,10 +489,15 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     Boolean(hold?.bookingId) && (initiatePaymentMutation.isSuccess || Boolean(hold?.paymentPending));
   // Any work in flight that a second click would duplicate.
   const paymentInFlight = initiatePaymentMutation.isPending;
-  const paymentConfirmed = Boolean(hold?.bookingStatus && hold.bookingStatus !== "telemedicine_payment_pending");
+  const paymentConfirmed = isHoldPaymentConfirmed(hold);
+
+  // Only the service picker benefits from extra width -- category tiles and richer service
+  // cards need room to breathe; every later step is still a single-column form/list that "md"
+  // already fits. One Modal, one DOM tree; this is a prop value, not a second layout branch.
+  const isServiceStep = step === TM_STEP_INDEX.service && !serviceId;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth="md">
+    <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth={isServiceStep ? "lg" : "md"}>
       <div className="space-y-6">
         <Stepper steps={TM_STEPS} current={step} />
 
@@ -410,29 +520,47 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">Choose a consultation below to see available facilities and times.</p>
-                <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                  <Input
-                    type="search"
-                    label="Search consultations"
-                    value={catalogSearch}
-                    onChange={(event) => setCatalogSearch(event.target.value)}
-                    placeholder="Search services, specialties, or care areas"
-                  />
-                  <label className="block text-sm font-medium text-slate-700">
-                    <span className="mb-1 block">Care area</span>
-                    <select
-                      value={catalogCategoryFilter}
-                      onChange={(event) => setCatalogCategoryFilter(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-tiba-blue focus:ring-2 focus:ring-tiba-blue/20 sm:min-w-52"
-                    >
-                      <option value="all">All care areas</option>
-                      {categoryCards.map(({ category }) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <Input
+                  type="search"
+                  label="Search consultations"
+                  value={catalogSearch}
+                  onChange={(event) => setCatalogSearch(event.target.value)}
+                  placeholder="Search services, specialties, or care areas"
+                />
+                {/* Visual replacement for the old "Care area" <select> -- same catalogCategoryFilter
+                    state, same values ("all" or a category id), just a richer control. */}
+                <div
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+                  role="group"
+                  aria-label="Filter by care area"
+                >
+                  {[
+                    { id: "all", name: TELEMEDICINE_ALL_SERVICES_ASSET.label, asset: TELEMEDICINE_ALL_SERVICES_ASSET },
+                    ...categoryCards.map(({ category }) => ({
+                      id: category.id,
+                      name: category.name,
+                      asset: getTelemedicineCategoryAsset(category.key)
+                    }))
+                  ].map(({ id, name, asset }) => {
+                    const isActive = catalogCategoryFilter === id;
+                    const Icon = asset.Icon;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => setCatalogCategoryFilter(id)}
+                        className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition ${
+                          isActive ? "border-tiba-blue bg-tiba-blue/5" : "border-slate-200 bg-white hover:border-tiba-blue"
+                        }`}
+                      >
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${asset.bgClass}`}>
+                          <Icon className={`h-5 w-5 ${asset.iconClass}`} aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 text-sm font-semibold leading-tight text-slate-800">{name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {visibleCategoryCards.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
@@ -448,33 +576,71 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       <p className="text-sm text-slate-500">No consultations are available in this area yet.</p>
                     ) : (
                       <div className="space-y-3">
-                        {specialties.map(({ subcategory, services }) => (
-                          <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
-                            <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
-                            {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
-                            {services.length === 0 ? (
-                              <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
-                            ) : (
-                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                {services.map((service) => (
-                                  <button
-                                    key={service.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedServiceId(service.id);
-                                      setStep(TM_STEP_INDEX.facility);
-                                    }}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
-                                  >
-                                    <p className="text-sm font-semibold text-slate-900">{service.name}</p>
-                                    {service.description && <p className="mt-1 text-xs text-slate-500">{service.description}</p>}
-                                    <p className="mt-2 text-sm font-medium text-tiba-blue">From {formatCurrency(service.basePriceCents, service.currency)}</p>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        {specialties.map(({ subcategory, services }) => {
+                          return (
+                            <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
+                              <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
+                              {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
+                              {services.length === 0 ? (
+                                <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
+                              ) : (
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  {services.map((service) => {
+                                    const serviceAsset = getTelemedicineServiceAsset({
+                                      serviceKey: service.key,
+                                      subcategoryKey: subcategory.key,
+                                      categoryKey: category.key
+                                    });
+                                    return (
+                                      <button
+                                        key={service.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedServiceId(service.id);
+                                          setStep(TM_STEP_INDEX.facility);
+                                        }}
+                                        className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
+                                      >
+                                        <TelemedicineServiceVisual asset={serviceAsset} />
+                                        <span className="min-w-0 flex-1">
+                                          <span className="flex items-start justify-between gap-2">
+                                            <span className="text-sm font-semibold text-slate-900">{service.name}</span>
+                                            {service.isEmergencyCapable && (
+                                              <span className="shrink-0 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase text-danger-600">
+                                                Urgent care
+                                              </span>
+                                            )}
+                                          </span>
+                                          {service.description && (
+                                            <span className="mt-1 block text-xs text-slate-500">{service.description}</span>
+                                          )}
+                                          <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                            <span className="text-sm font-medium text-tiba-blue">
+                                              From {formatCurrency(service.basePriceCents, service.currency)}
+                                            </span>
+                                            <span className="text-xs text-slate-500">{service.defaultEstimateMinutes} min</span>
+                                          </span>
+                                          {service.tags.length > 0 && (
+                                            <span className="mt-2 flex flex-wrap gap-1">
+                                              {service.tags.map((tag) => (
+                                                <span
+                                                  key={tag}
+                                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                                                >
+                                                  {tag}
+                                                </span>
+                                              ))}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </section>
@@ -496,6 +662,42 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     No facilities currently offer this service remotely in your country.
                   </p>
                 )}
+                {(facilitiesQuery.data ?? []).length > 0 && (
+                  <section
+                    className="rounded-2xl border border-tiba-blue/30 bg-tiba-blue/5 p-4"
+                    aria-labelledby="fastest-available-heading"
+                  >
+                    <h3 id="fastest-available-heading" className="text-base font-semibold text-slate-900">
+                      Fastest available
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      We check every facility that offers this consultation and pick the one with the earliest open
+                      time. You can still choose a facility yourself below.
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-3 w-full sm:w-auto"
+                      loading={fastestFacility.isPending}
+                      onClick={handleChooseFastest}
+                    >
+                      {fastestFacility.isError ? "Try again" : "Find the earliest time"}
+                    </Button>
+                    {fastestFacility.isError && (
+                      <p className="mt-2 text-sm text-red-600" role="alert">
+                        We could not check availability just now. Try again, or choose a facility below.
+                      </p>
+                    )}
+                    {noFastestFound && (
+                      <p className="mt-2 text-sm text-slate-700" role="status">
+                        No facility has an open time in the next {WEEK_LENGTH} days. Choose a facility below to see
+                        its calendar.
+                      </p>
+                    )}
+                  </section>
+                )}
+                {(facilitiesQuery.data ?? []).length > 0 && (
+                  <p className="pt-1 text-sm font-medium text-slate-600">Or choose a facility yourself</p>
+                )}
                 <div className="space-y-2">
                   {(facilitiesQuery.data ?? []).map((facility) => (
                     <button
@@ -503,6 +705,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                       type="button"
                       onClick={() => {
                         setSelectedFacility(facility);
+                        setFastestPick(null);
                         // Clear the day: another facility may keep a different calendar, so
                         // the same date string would not mean the same window.
                         setSelectedDate(null);
@@ -529,6 +732,13 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.preferences && selectedFacility && (
           <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            {fastestPick && fastestPick.facilityId === selectedFacility.id && (
+              <div className="rounded-xl border border-tiba-blue/30 bg-white px-4 py-3 text-sm text-slate-700" role="status">
+                <span className="font-semibold text-slate-900">Fastest available: {selectedFacility.name}.</span>{" "}
+                Earliest open time {formatSlotDate(fastestPick.startAt, selectedFacility.timezone ?? undefined)} at{" "}
+                {formatSlotTime(fastestPick.startAt, selectedFacility.timezone ?? undefined)}.
+              </div>
+            )}
             <div>
               <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
               <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
@@ -558,6 +768,29 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
+            {fastestPick && fastestPick.facilityId === selectedFacility.id && !slotsQuery.isLoading && !slotsQuery.isError && (
+              earliestSlot ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-tiba-blue/30 bg-tiba-blue/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Earliest available:</span>{" "}
+                    {formatSlotDate(earliestSlot.startAt, slotTimezone)} at {formatSlotTime(earliestSlot.startAt, slotTimezone)}{" "}
+                    at {selectedFacility.name}
+                  </p>
+                  <Button
+                    type="button"
+                    disabled={createHoldMutation.isPending}
+                    loading={createHoldMutation.isPending && selectedSlot?.startAt === earliestSlot.startAt}
+                    onClick={() => handleSelectSlot(earliestSlot)}
+                  >
+                    Book this time
+                  </Button>
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+                  The earliest time we found at {selectedFacility.name} has just been taken. Pick another time below.
+                </p>
+              )
+            )}
             {/* Week navigation, separate from day selection: choosing a day must not move
                 the window the client is looking at. */}
             <div className="flex items-center justify-between gap-2">
@@ -654,8 +887,15 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         {step === TM_STEP_INDEX.confirm && selectedFacility && selectedSlot && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
-              <p className="text-sm text-slate-500">{selectedFacility.name}</p>
+              <div className="flex items-center gap-3">
+                {selectedServiceAssetKeys && (
+                  <TelemedicineServiceVisual asset={getTelemedicineServiceAsset(selectedServiceAssetKeys)} size="sm" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900">{selectedService?.name ?? "Consultation"}</p>
+                  <p className="text-sm text-slate-500">{selectedFacility.name}</p>
+                </div>
+              </div>
               <p className="mt-1 text-sm text-slate-700">
                 {formatSlotDate(selectedSlot.startAt, slotTimezone)} at{" "}
                 {formatSlotTime(selectedSlot.startAt, slotTimezone)}

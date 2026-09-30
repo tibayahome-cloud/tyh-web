@@ -23,7 +23,7 @@ import {
   reviewTechnicalIssue
 } from "../libs/telemedicine";
 import { fetchRescheduleRequests } from "../libs/telemedicineOps";
-import type { TechnicalIssueCategory } from "../schemas/telemedicine";
+import type { TechnicalIssueCategory, TelemedicineHold } from "../schemas/telemedicine";
 import { bookingKeys } from "./useBookings";
 
 export const telemedicineKeys = {
@@ -119,7 +119,12 @@ export const useCreateHoldMutation = () => {
   });
 };
 
-export const useHoldQuery = (holdId: string | null, options?: { enabled?: boolean; refetchInterval?: number | false }) => {
+type HoldRefetchInterval =
+  | number
+  | false
+  | ((query: { state: { data?: TelemedicineHold } }) => number | false);
+
+export const useHoldQuery = (holdId: string | null, options?: { enabled?: boolean; refetchInterval?: HoldRefetchInterval }) => {
   return useQuery({
     queryKey: telemedicineKeys.hold(holdId ?? "unknown"),
     queryFn: () => {

@@ -12,12 +12,12 @@ import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { classifyApiError, getApiError } from "../../../../shared/utils/errors";
 import {
   createFacilityProvider,
-  fetchFacilities,
   fetchFacilityProviders,
   fetchFacilityServices,
   updateFacilityProvider,
   updateFacilityProviderLifecycle
 } from "../../../../shared/libs/facilities";
+import { useAdminFacilityScope } from "../finance/paymentAccess";
 import {
   fetchTelemedicineAdminServices,
   fetchTelemedicineSubcategories,
@@ -225,8 +225,8 @@ const FacilityProvidersPage = () => {
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [lifecyclePendingKey, setLifecyclePendingKey] = useState<string | null>(null);
 
-  const facilitiesQuery = useQuery({ queryKey: ["admin", "facility-scope"], queryFn: () => fetchFacilities({ pageSize: 5 }) });
-  const facilityId = facilitiesQuery.data?.facilities.length === 1 ? facilitiesQuery.data.facilities[0].id : undefined;
+  const facilitiesQuery = useAdminFacilityScope(true);
+  const facilityId = facilitiesQuery.facility?.id;
   const providersQuery = useQuery({
     queryKey: ["admin", "facility-providers", facilityId, search],
     queryFn: () => fetchFacilityProviders(facilityId as string, { search: search || undefined }),

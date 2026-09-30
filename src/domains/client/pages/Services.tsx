@@ -252,7 +252,7 @@ const ServicesPage = () => {
                         </span>
                         <div className="flex items-center gap-0.5 text-slate-500">
                           <Timer size={10} className="text-slate-400" />
-                          <span className="text-[10px] font-bold">{service.default_estimate_minutes}m</span>
+                          <span className="text-[10px] font-bold">{service.default_estimate_minutes} min</span>
                         </div>
                       </div>
 

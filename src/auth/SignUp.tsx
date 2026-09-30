@@ -1,19 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import { AxiosError } from "axios";
 import { Phone, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
 import { Input } from "../shared/components/Input";
 import { PasswordField } from "../shared/components/PasswordField";
+import { PasswordRequirements } from "../shared/components/PasswordRequirements";
 import { Button } from "../shared/components/Button";
 import type { RegisterSchema } from "../shared/schemas/auth";
 import { registerSchema } from "../shared/schemas/auth";
+import { describePasswordSubmitError } from "../shared/utils/passwordErrors";
+import { withPasswordConfirmation } from "../shared/utils/passwordResolver";
+
+const REQUIREMENTS_ID = "signup-password-requirements";
 import api from "../shared/libs/api";
+import { getApiError } from "../shared/utils/errors";
 import { PHONE_PLACEHOLDER } from "../shared/constants/contact";
 import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
 
@@ -43,11 +48,28 @@ export const SignUp = () => {
   const {
     control,
     handleSubmit,
+    watch,
+    trigger,
+    setError: setFieldError,
+    setFocus,
     formState: { isSubmitting }
   } = useForm<RegisterSchema>({
-    resolver: zodResolver(registerSchema),
+    resolver: withPasswordConfirmation(zodResolver(registerSchema)),
+    // Validate as the person types so every password rule reports live, not only on submit.
+    mode: "onChange",
     defaultValues
   });
+
+  const password = watch("password");
+  const confirmPassword = watch("confirmPassword");
+
+  // Editing the password can make an already-typed confirmation match (or stop matching).
+  useEffect(() => {
+    if (confirmPassword) {
+      void trigger("confirmPassword");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password]);
 
   const submit = handleSubmit(async (values) => {
     setError(null);
@@ -84,13 +106,14 @@ export const SignUp = () => {
         setStep("success");
       }
     } catch (err) {
-      if (err instanceof AxiosError) {
-        const payload = err.response?.data as { error?: { message?: string }; message?: string } | undefined;
-        const message = payload?.error?.message ?? payload?.message;
-        setError(message ?? t("auth.signUpError"));
-      } else {
-        setError(t("auth.signUpError"));
+      const failure = describePasswordSubmitError(err, t("auth.signUpError"));
+      if (failure.field === "password") {
+        // The server rejected the password itself: say so on the field and put focus there.
+        setFieldError("password", { type: "server", message: failure.message });
+        setFocus("password");
+        return;
       }
+      setError(failure.message);
     }
   });
 
@@ -109,12 +132,7 @@ export const SignUp = () => {
       );
       setStep("success");
     } catch (err) {
-      if (err instanceof AxiosError) {
-        const message = (err.response?.data as { message?: string })?.message;
-        setError(message ?? "Invalid code. Please try again.");
-      } else {
-        setError("Verification failed. Please try again.");
-      }
+      setError(getApiError(err, "Invalid code. Please try again."));
     } finally {
       setVerifying(false);
     }
@@ -130,10 +148,7 @@ export const SignUp = () => {
         { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
       );
     } catch (err) {
-      if (err instanceof AxiosError) {
-        const message = (err.response?.data as { message?: string })?.message;
-        setError(message ?? "Failed to resend code");
-      }
+      setError(getApiError(err, "Failed to resend code"));
     } finally {
       setResending(false);
     }
@@ -142,6 +157,7 @@ export const SignUp = () => {
   if (step === "success") {
     return (
       <AuthLayout
+        split
         title="Account Verified!"
         subtitle="Your account is ready to use."
         footer={null}
@@ -164,6 +180,7 @@ export const SignUp = () => {
   if (step === "verify") {
     return (
       <AuthLayout
+        split
         title="Verify Your Phone"
         subtitle={`We sent a code to ${registeredPhone}`}
         footer={
@@ -232,6 +249,7 @@ export const SignUp = () => {
 
   return (
     <AuthLayout
+      split
       title={t("auth.signUpTitle")}
       subtitle="Join our community for a premium care experience."
       footer={
@@ -252,7 +270,7 @@ export const SignUp = () => {
           )}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <FormField
             control={control}
             name="email"
@@ -291,9 +309,16 @@ export const SignUp = () => {
               {...field}
               label={t("auth.password")}
               autoComplete="new-password"
+              aria-describedby={REQUIREMENTS_ID}
               error={fieldState.error?.message}
             />
           )}
+        />
+
+        <PasswordRequirements
+          id={REQUIREMENTS_ID}
+          password={password ?? ""}
+          confirmPassword={confirmPassword ?? ""}
         />
 
         <FormField
@@ -304,6 +329,7 @@ export const SignUp = () => {
               {...field}
               label={t("auth.confirmPassword")}
               autoComplete="new-password"
+              aria-describedby={REQUIREMENTS_ID}
               error={fieldState.error?.message}
             />
           )}

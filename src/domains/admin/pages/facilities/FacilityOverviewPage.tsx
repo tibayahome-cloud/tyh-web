@@ -9,7 +9,8 @@ import ScheduleIcon from "@mui/icons-material/ScheduleOutlined";
 import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
-import { fetchFacilities, fetchFacilityOverview } from "../../../../shared/libs/facilities";
+import { fetchFacilityOverview } from "../../../../shared/libs/facilities";
+import { useAdminFacilityScope } from "../finance/paymentAccess";
 
 const Metric = ({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) => (
   <Card className="min-w-0" padding="default">
@@ -26,11 +27,8 @@ const Metric = ({ label, value, icon }: { label: string; value: number; icon: Re
 );
 
 const FacilityOverviewPage = () => {
-  const facilitiesQuery = useQuery({
-    queryKey: ["admin", "facility-scope"],
-    queryFn: () => fetchFacilities({ pageSize: 5 })
-  });
-  const facilityId = facilitiesQuery.data?.facilities.length === 1 ? facilitiesQuery.data.facilities[0].id : undefined;
+  const facilitiesQuery = useAdminFacilityScope(true);
+  const facilityId = facilitiesQuery.facility?.id;
   const overviewQuery = useQuery({
     queryKey: ["admin", "facility-overview", facilityId],
     queryFn: () => fetchFacilityOverview(facilityId as string),
