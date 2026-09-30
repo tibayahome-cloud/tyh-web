@@ -74,11 +74,16 @@ describe("reset and set-up password page", () => {
     it("shows every requirement before anything is typed or submitted", () => {
       renderPage();
 
-      expect(screen.getByText("Your password needs")).toBeInTheDocument();
-      for (const rule of [/At least 10 characters/, /uppercase/, /lowercase/, /One number/, /special character/]) {
-        expect(screen.getByText(rule)).toBeInTheDocument();
+      const list = screen.getByRole("list", { name: "Requirements for your password" });
+      for (const rule of [
+        /Password must be at least 10 characters/,
+        /Password must contain 1 number/,
+        /Password must contain 1 special character/,
+        /Password must contain 1 upper case and 1 lower case letter/,
+        /Passwords must match/
+      ]) {
+        expect(within(list).getByText(rule)).toBeInTheDocument();
       }
-      expect(screen.getByText(/Both passwords match/)).toBeInTheDocument();
     });
 
     it("ties both fields to the requirements for assistive technology", () => {
@@ -103,11 +108,11 @@ describe("reset and set-up password page", () => {
 
   describe("live validation", () => {
     it.each([
-      ["Ab1!", /At least 10 characters/, "Password must be at least 10 characters"],
-      ["abcdefg1!x", /uppercase/, "Password needs an uppercase letter"],
-      ["ABCDEFG1!X", /lowercase/, "Password needs a lowercase letter"],
-      ["Abcdefgh!x", /One number/, "Password needs a number"],
-      ["Abcdefgh1x", /special character/, "Password needs a special character"]
+      ["Ab1!", /at least 10 characters/, "Password must be at least 10 characters"],
+      ["abcdefg1!x", /upper case and 1 lower case/, "Password needs an uppercase letter"],
+      ["ABCDEFG1!X", /upper case and 1 lower case/, "Password needs a lowercase letter"],
+      ["Abcdefgh!x", /1 number/, "Password needs a number"],
+      ["Abcdefgh1x", /1 special character/, "Password needs a special character"]
     ])("flags %s as it is typed, naming the failed rule", async (typed, rule, message) => {
       const user = userEvent.setup();
       renderPage();
@@ -141,7 +146,7 @@ describe("reset and set-up password page", () => {
       await user.type(confirmField(), "@Qwerty12");
 
       expect(await screen.findByText("Passwords must match", { selector: "span.text-red-500" })).toBeInTheDocument();
-      expect(ruleState(/Both passwords match/)).toMatch(/: not met$/);
+      expect(ruleState(/Passwords must match/)).toMatch(/: not met$/);
     });
 
     it("re-checks the confirmation when the password is edited afterwards", async () => {
@@ -150,12 +155,12 @@ describe("reset and set-up password page", () => {
 
       await user.type(passwordField(), GOOD);
       await user.type(confirmField(), GOOD);
-      await waitFor(() => expect(ruleState(/Both passwords match/)).toMatch(/: met$/));
+      await waitFor(() => expect(ruleState(/Passwords must match/)).toMatch(/: met$/));
 
       await user.type(passwordField(), "x");
 
       expect(await screen.findByText("Passwords must match", { selector: "span.text-red-500" })).toBeInTheDocument();
-      expect(ruleState(/Both passwords match/)).toMatch(/: not met$/);
+      expect(ruleState(/Passwords must match/)).toMatch(/: not met$/);
     });
   });
 

@@ -52,7 +52,7 @@ export const SignUp = () => {
     trigger,
     setError: setFieldError,
     setFocus,
-    formState: { isSubmitting, submitCount }
+    formState: { isSubmitting }
   } = useForm<RegisterSchema>({
     resolver: withPasswordConfirmation(zodResolver(registerSchema)),
     // Validate as the person types so every password rule reports live, not only on submit.
@@ -316,7 +316,6 @@ export const SignUp = () => {
           id={REQUIREMENTS_ID}
           password={password ?? ""}
           confirmPassword={confirmPassword ?? ""}
-          showFailures={submitCount > 0}
         />
 
         <FormField

@@ -41,7 +41,7 @@ export const ResetPassword = () => {
     trigger,
     setError: setFieldError,
     setFocus,
-    formState: { isSubmitting, submitCount }
+    formState: { isSubmitting }
   } = useForm<PasswordResetPerformSchema>({
     resolver: withPasswordConfirmation(zodResolver(passwordResetPerformSchema)),
     // Validate as the person types so every rule reports live, not only on submit.
@@ -138,7 +138,6 @@ export const ResetPassword = () => {
           id={REQUIREMENTS_ID}
           password={password ?? ""}
           confirmPassword={confirmPassword ?? ""}
-          showFailures={submitCount > 0}
         />
 
         <FormField

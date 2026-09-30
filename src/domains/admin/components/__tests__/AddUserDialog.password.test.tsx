@@ -43,7 +43,7 @@ describe("add user dialog temporary password", () => {
   it("shows the requirements before anything is typed", async () => {
     renderDialog();
 
-    expect(await screen.findByText("Your password needs")).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Requirements for your password" })).toBeInTheDocument();
     expect(passwordField()).toHaveAttribute("aria-describedby", "add-user-password-requirements");
   });
 

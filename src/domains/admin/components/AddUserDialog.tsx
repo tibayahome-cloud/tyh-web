@@ -98,7 +98,7 @@ export const AddUserDialog = ({ open, onClose, onSuccess }: AddUserDialogProps) 
     handleSubmit,
     reset,
     watch,
-    formState: { isSubmitting, submitCount }
+    formState: { isSubmitting }
   } = useForm<AddUserFormValues>({
     resolver: zodResolver(addUserSchema),
     mode: "onChange",
@@ -227,7 +227,6 @@ export const AddUserDialog = ({ open, onClose, onSuccess }: AddUserDialogProps) 
           <PasswordRequirements
             id="add-user-password-requirements"
             password={temporaryPassword ?? ""}
-            showFailures={submitCount > 0}
           />
           <FormField
             control={control}

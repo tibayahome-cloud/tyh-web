@@ -79,8 +79,8 @@ describe("registration password", () => {
     renderPage();
 
     const list = document.getElementById("signup-password-requirements") as HTMLElement;
-    expect(within(list).getByText("Your password needs")).toBeInTheDocument();
-    expect(within(list).getAllByRole("listitem")).toHaveLength(6);
+    expect(within(list).getByRole("list", { name: "Requirements for your password" })).toBeInTheDocument();
+    expect(within(list).getAllByRole("listitem")).toHaveLength(5);
     expect(passwordField()).toHaveAttribute("aria-describedby", "signup-password-requirements");
     expect(confirmField()).toHaveAttribute("aria-describedby", "signup-password-requirements");
   });

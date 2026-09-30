@@ -1,75 +1,58 @@
-import { Check, Circle, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import classNames from "classnames";
 
-import { evaluatePassword } from "../utils/passwordPolicy";
+import { evaluatePassword, PASSWORD_MIN_LENGTH } from "../utils/passwordPolicy";
 
 type PasswordRequirementsProps = {
   id: string;
   password: string;
-  // Pass the confirmation to add a live "passwords match" row. Omit it on forms with one field.
+  // Pass the confirmation to add a live "Passwords must match" line. Omit it on forms with one field.
   confirmPassword?: string;
-  // Rules that have not been met turn red only once the person has typed something into the
-  // field or tried to submit; before that they stay neutral so the list reads as guidance.
-  showFailures?: boolean;
 };
 
-type RowState = "met" | "unmet" | "failed";
-
-const STATE_TEXT: Record<RowState, string> = { met: "met", unmet: "not met yet", failed: "not met" };
-
-const Row = ({ label, state }: { label: string; state: RowState }) => (
-  <li className="flex items-center gap-2 text-xs">
-    {state === "met" && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />}
-    {state === "unmet" && <Circle className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />}
-    {state === "failed" && <X className="h-3.5 w-3.5 shrink-0 text-red-600" aria-hidden="true" />}
+const Row = ({ label, met }: { label: string; met: boolean }) => (
+  <li className="flex items-center gap-3 text-sm text-slate-700">
     <span
       className={classNames(
-        state === "met" && "text-emerald-700",
-        state === "unmet" && "text-slate-600",
-        state === "failed" && "text-red-700"
+        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white transition-colors",
+        met ? "bg-emerald-600" : "bg-slate-400"
       )}
+      aria-hidden="true"
     >
+      {met ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
+    </span>
+    <span>
       {label}
-      {/* Colour and icon are not the only signal: screen readers hear the state too. */}
-      <span className="sr-only">: {STATE_TEXT[state]}</span>
+      {/* The tick and cross are not the only signal: screen readers hear the state too. */}
+      <span className="sr-only">: {met ? "met" : "not met"}</span>
     </span>
   </li>
 );
 
-// The requirements are shown before anything is submitted and update as the person types. The
-// list is exposed as the fields' description (aria-describedby={id}); the status text below it
-// is a polite live region so a screen reader hears when the password becomes acceptable.
-export const PasswordRequirements = ({
-  id,
-  password,
-  confirmPassword,
-  showFailures = false
-}: PasswordRequirementsProps) => {
-  const requirements = evaluatePassword(password);
-  const touched = password.length > 0;
-  const allMet = requirements.every((requirement) => requirement.met);
+// A short list shown before anything is submitted that updates as the person types: a green tick
+// for a rule that is met, a grey cross for one that is not. Upper and lower case are one line to
+// keep it short. The list is the fields' description (aria-describedby={id}), and a polite status
+// announces when the password becomes acceptable.
+export const PasswordRequirements = ({ id, password, confirmPassword }: PasswordRequirementsProps) => {
+  const status = Object.fromEntries(evaluatePassword(password).map(({ id: rule, met }) => [rule, met])) as Record<
+    string,
+    boolean
+  >;
+  const allMet = Object.values(status).every(Boolean);
   const hasConfirmation = confirmPassword !== undefined;
-  const confirmationTouched = hasConfirmation && confirmPassword.length > 0;
-  const matches = hasConfirmation && confirmPassword === password && password.length > 0;
-
-  const matchState: RowState = matches
-    ? "met"
-    : confirmationTouched || showFailures
-      ? "failed"
-      : "unmet";
+  const matches = hasConfirmation && password.length > 0 && confirmPassword === password;
 
   return (
-    <div id={id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-      <p className="mb-2 text-xs font-semibold text-slate-700">Your password needs</p>
-      <ul className="grid gap-1.5 sm:grid-cols-2">
-        {requirements.map((requirement) => (
-          <Row
-            key={requirement.id}
-            label={requirement.label}
-            state={requirement.met ? "met" : touched || showFailures ? "failed" : "unmet"}
-          />
-        ))}
-        {hasConfirmation && <Row label="Both passwords match" state={matchState} />}
+    <div id={id}>
+      <ul className="space-y-2" aria-label="Requirements for your password">
+        <Row label={`Password must be at least ${PASSWORD_MIN_LENGTH} characters`} met={status.length} />
+        <Row label="Password must contain 1 number" met={status.digit} />
+        <Row label="Password must contain 1 special character" met={status.special} />
+        <Row
+          label="Password must contain 1 upper case and 1 lower case letter"
+          met={status.uppercase && status.lowercase}
+        />
+        {hasConfirmation && <Row label="Passwords must match" met={matches} />}
       </ul>
       <p className="sr-only" role="status" aria-live="polite">
         {allMet ? "Password meets every requirement." : ""}
