@@ -134,7 +134,7 @@ describe("fastest available facility selection", () => {
 
       expect(screen.getByRole("heading", { name: "Fastest available" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Find the earliest time" })).toBeInTheDocument();
-      expect(screen.getByText("Or choose a facility yourself")).toBeInTheDocument();
+      expect(screen.getByText("Facilities offering this consultation")).toBeInTheDocument();
       const facilityButtons = screen.getAllByRole("button").filter((b) => /Hospital|Clinic/.test(b.textContent ?? ""));
       expect(facilityButtons.map((b) => b.querySelector("p")?.textContent)).toEqual(["Nyali Hospital", "Kilimani Clinic"]);
     });
@@ -264,7 +264,7 @@ describe("fastest available facility selection", () => {
 
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
 
-      expect(await screen.findByText(/No facility has an open time in the next 7 days/)).toBeInTheDocument();
+      expect(await screen.findByText(/These facilities offer this consultation, but none currently has an open appointment in the next 7 days/)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Nyali Hospital/ })).toBeEnabled();
       expect(screen.queryByRole("button", { name: "Continue to choose a time" })).not.toBeInTheDocument();
     });

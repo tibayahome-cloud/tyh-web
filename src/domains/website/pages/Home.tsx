@@ -35,6 +35,7 @@ import diagnosticsImage from "../../../assets/images/service-nurse.png";
 import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
 import telemedicineHeroImage from "../../../assets/images/telemedicine-hero.webp";
+import mentalHealthImage from "../../../assets/images/telemedicine/mental-health-support.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -342,6 +343,7 @@ export const Home = () => {
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:gap-8 lg:grid-cols-12">
                         {[
                             { name: "Online Doctor Consultation", img: telemedicineImage, onClick: handleTelemedicineClick },
+                            { name: "Mental Health Support", img: mentalHealthImage, onClick: handleTelemedicineClick },
                             { name: "Doctor & Nurse Home Visits", img: doctorImage, onClick: handleServiceClick },
                             { name: "Nursing & Long-Term Care", img: nursingImage, onClick: handleServiceClick },
                             { name: "Therapy & Rehabilitation", img: therapyImage, onClick: handleServiceClick },
@@ -352,15 +354,13 @@ export const Home = () => {
                             <button
                                 key={i}
                                 onClick={service.onClick}
-                                className={`group col-span-1 h-full overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-all hover:shadow-xl sm:col-span-1 lg:col-span-3 ${
-                                    i === 4 ? "lg:col-start-2" : i === 5 ? "lg:col-start-5" : i === 6 ? "lg:col-start-8" : ""
-                                }`}
+                                className="group col-span-1 h-full overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-all hover:shadow-xl sm:col-span-1 lg:col-span-3"
                             >
                                 <div className="relative aspect-[3/2] overflow-hidden bg-slate-100">
                                     <img
                                         src={service.img}
                                         alt={service.name}
-                                        className="h-full w-full object-contain transition-transform duration-500"
+                                        className="h-full w-full rounded-t-2xl object-cover transition-transform duration-500"
                                     />
                                     <div className="absolute inset-0 bg-tiba-blue/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
