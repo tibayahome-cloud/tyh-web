@@ -15,7 +15,7 @@ import { Loading } from "../../../shared/components/Loading";
 import type { AdminLoginSchema } from "../../../shared/schemas/auth";
 import { adminLoginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
-import { adminPortalHome, isSystemAdminRole } from "../../../shared/rbac/portalRoles";
+import { adminPortalHome } from "../../../shared/rbac/portalRoles";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -31,10 +31,8 @@ const defaultValues: AdminLoginSchema = {
 
 // Deliberately identical to the wrong-password message: this page must not confirm that an
 // account exists elsewhere, or name any other kind of administrator.
-const GENERIC_SIGN_IN_ERROR = "We could not sign you in. Check your details and try again.";
-
 const FacilityLoginPage = () => {
-  const { loginAdmin, logout } = useAuth();
+  const { loginAdmin } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -72,22 +70,10 @@ const FacilityLoginPage = () => {
         return;
       }
 
-      // System administrators have their own sign-in. If one authenticates here, end the session
-      // and answer exactly as for a failed sign-in rather than telling them where to go.
-      if (isSystemAdminRole(result.user?.roles?.[0])) {
-        try {
-          await logout();
-        } catch {
-          // ignore logout failure
-        }
-        setError(GENERIC_SIGN_IN_ERROR);
-        return;
-      }
-
       setRedirecting(true);
       navigate(adminPortalHome(result.user?.roles), { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : GENERIC_SIGN_IN_ERROR);
+      setError(err instanceof Error ? err.message : "We could not sign you in. Check your details and try again.");
     }
   });
 
