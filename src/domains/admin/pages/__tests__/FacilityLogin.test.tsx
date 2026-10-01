@@ -1,7 +1,6 @@
 /**
- * Facility admin sign-in. It shares the admin API with system administration but is a separate,
- * publicly linked entry point; a system administrator who authenticates here is signed out and
- * shown the same message as a failed sign-in, so this page never names another kind of admin.
+ * Facility portal sign-in. It shares the admin API with system administration, then routes the
+ * authenticated account to the correct portal based on its server-issued role.
  */
 
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -10,7 +9,6 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const loginAdminMock = vi.fn();
-const logoutMock = vi.fn();
 const saveTwofaChallengeMock = vi.fn();
 const setTwofaPendingFlagMock = vi.fn();
 const isTwofaPendingMock = vi.fn();
@@ -30,7 +28,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("../../../../shared/hooks/useAuth", () => ({
-  useAuth: () => ({ loginAdmin: loginAdminMock, logout: logoutMock })
+  useAuth: () => ({ loginAdmin: loginAdminMock })
 }));
 
 vi.mock("../../../../shared/utils/twofaStorage", () => ({
@@ -65,7 +63,6 @@ describe("facility admin sign-in page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isTwofaPendingMock.mockReturnValue(false);
-    logoutMock.mockResolvedValue(undefined);
   });
 
   it("names the facility portal and shows the two-way switch with facility admin selected", () => {
@@ -108,21 +105,16 @@ describe("facility admin sign-in page", () => {
       password: "correct-horse",
       remember: true
     });
-    expect(logoutMock).not.toHaveBeenCalled();
   });
 
-  it("signs a system administrator out and answers exactly as for a failed sign-in", async () => {
+  it("routes a system administrator to the system dashboard", async () => {
     const user = userEvent.setup();
     loginAdminMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin.super"] } });
     renderPage();
 
     await submit(user);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("We could not sign you in. Check your details and try again.");
-    expect(alert.textContent).not.toMatch(/admin|system|portal/i);
-    expect(logoutMock).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("where")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/dashboard"));
   });
 
   it("hands off to two-factor verification", async () => {
