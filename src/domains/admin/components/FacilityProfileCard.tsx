@@ -5,6 +5,7 @@ import SaveIcon from "@mui/icons-material/SaveOutlined";
 
 import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
+import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { Input } from "../../../shared/components/Input";
 import { updateFacility, updateFacilityStatus } from "../../../shared/libs/facilities";
 import type { Facility } from "../../../shared/schemas/facility";
@@ -65,6 +66,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
   const [errors, setErrors] = useState<FacilityProfileErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const editButtonRef = useRef<HTMLButtonElement>(null);
 
   const saveMutation = useMutation({
@@ -85,6 +87,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
       }
     },
     onSuccess: () => {
+      setConfirming(false);
       setEditing(false);
       setErrors({});
       setFormError(null);
@@ -93,6 +96,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
       requestAnimationFrame(() => editButtonRef.current?.focus());
     },
     onError: (error) => {
+      setConfirming(false);
       if ((error as { partial?: boolean }).partial) {
         setErrors({});
         setFormError(
@@ -143,8 +147,16 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
       setEditing(false);
       return;
     }
+    // A fee or status change has commercial consequences, so it is confirmed first.
+    const { update, status } = buildFacilityProfileChanges(facility, form);
+    if (status || update.platformFeePercent !== undefined) {
+      setConfirming(true);
+      return;
+    }
     saveMutation.mutate();
   };
+
+  const { update: pendingUpdate, status: pendingStatus } = buildFacilityProfileChanges(facility, form);
 
   const badge = editing ? (
     <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
@@ -264,6 +276,28 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
           </div>
         </form>
       )}
+      <ConfirmDialog
+        open={confirming}
+        title="Confirm these changes?"
+        description={
+          [
+            pendingUpdate.platformFeePercent !== undefined
+              ? `Platform fee changes from ${facility.platformFeePercent}% to ${pendingUpdate.platformFeePercent}%. Settlement uses the fee in force when it runs, so this can also affect payments already made but not yet settled.`
+              : null,
+            pendingStatus
+              ? `Status changes from ${titleCase(facility.status)} to ${titleCase(pendingStatus)}. This can change whether clients can find and book this facility.`
+              : null
+          ]
+            .filter(Boolean)
+            .join(" ")
+        }
+        confirmLabel="Save changes"
+        loading={saveMutation.isPending}
+        onConfirm={() => saveMutation.mutate()}
+        onClose={() => {
+          if (!saveMutation.isPending) setConfirming(false);
+        }}
+      />
     </Card>
   );
 };

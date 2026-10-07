@@ -112,6 +112,7 @@ describe("FacilityProfileCard", () => {
     await user.clear(fee);
     await user.type(fee, "15");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(updateFacilityMock).toHaveBeenCalledTimes(1));
     expect(updateFacilityMock).toHaveBeenCalledWith("f-1", { name: "Karen Family Clinic", platformFeePercent: 15 });
@@ -143,6 +144,7 @@ describe("FacilityProfileCard", () => {
     await user.selectOptions(screen.getByLabelText("Status"), "suspended");
     expect(screen.getByText(/Status will change from Active to Suspended/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(updateFacilityStatusMock).toHaveBeenCalledWith("f-1", "suspended"));
     expect(updateFacilityMock).not.toHaveBeenCalled();
@@ -156,6 +158,7 @@ describe("FacilityProfileCard", () => {
     await user.type(screen.getByLabelText("County"), "x");
     await user.selectOptions(screen.getByLabelText("Status"), "suspended");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save changes" }));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/profile changes were saved, but the status change was not/i);
@@ -163,6 +166,41 @@ describe("FacilityProfileCard", () => {
     expect(screen.getByText("Editing")).toBeInTheDocument();
     expect(updateFacilityMock).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("asks for confirmation naming the fee and status impact, and sends nothing until confirmed", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /edit facility profile/i }));
+    const fee = screen.getByLabelText(/platform fee/i);
+    await user.clear(fee);
+    await user.type(fee, "20");
+    await user.selectOptions(screen.getByLabelText("Status"), "suspended");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Platform fee changes from 12% to 20%");
+    expect(dialog).toHaveTextContent(/not yet settled/i);
+    expect(dialog).toHaveTextContent("Status changes from Active to Suspended");
+    expect(dialog).not.toHaveTextContent(/future payments/i);
+    expect(updateFacilityMock).not.toHaveBeenCalled();
+    expect(updateFacilityStatusMock).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(updateFacilityMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Editing")).toBeInTheDocument();
+  });
+
+  it("saves a change that touches neither fee nor status without a confirmation", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /edit facility profile/i }));
+    await user.type(screen.getByLabelText("County"), "x");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(updateFacilityMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("states that settlement uses the fee in force when it runs", async () => {
@@ -181,6 +219,7 @@ describe("FacilityProfileCard", () => {
     await user.clear(fee);
     await user.type(fee, "50");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText("platform_fee_percent must be between 0 and 100")).toBeInTheDocument();
     expect(screen.getByText("Editing")).toBeInTheDocument();
