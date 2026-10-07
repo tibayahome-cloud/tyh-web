@@ -8,10 +8,17 @@ const admin = (userStatus: string, invitation: FacilityAdminAccess["invitation"]
   id: "a-1",
   facilityId: "f-1",
   userId: "u-1",
+  fullName: "Ops Admin",
   email: "ops@clinic.test",
+  phone: null,
   userStatus,
+  emailVerifiedAt: null,
+  phoneVerifiedAt: null,
   roleKey: "admin.ops",
   active: true,
+  assignmentStatus: "active",
+  removedAt: null,
+  pendingEmail: null,
   invitation: { status: invitation, resetId: null, expiresAt: null, redeemedAt: null }
 });
 

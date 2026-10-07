@@ -41,6 +41,14 @@ describe("describeProviderSaveError", () => {
     expect(describeProviderSaveError(error)).toMatch(/archived since this form was opened/i);
   });
 
+  it("shows the specialties the API names when it says which are inactive", () => {
+    const error = httpError("These telemedicine specialties are inactive or unavailable: Cardiology / Legacy heart care");
+    expect(isInactiveSubcategoryError(error)).toBe(true);
+    expect(describeProviderSaveError(error)).toBe(
+      "These telemedicine specialties are inactive or unavailable: Cardiology / Legacy heart care. Remove them and save again."
+    );
+  });
+
   it("leaves unrelated server messages unchanged", () => {
     const error = httpError("email already in use");
     expect(isInactiveSubcategoryError(error)).toBe(false);

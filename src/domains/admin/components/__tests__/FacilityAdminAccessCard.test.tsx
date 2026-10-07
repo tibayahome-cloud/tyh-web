@@ -110,6 +110,31 @@ describe("facility administrator access", () => {
       expect(screen.queryByRole("button", RESET)).not.toBeInTheDocument();
     });
 
+    it("shows name, phone, a pending email change and removed history, with Edit only for current admins", async () => {
+      fetchAccessMock.mockResolvedValue([
+        row({ userStatus: "active", fullName: "Amina Ops", phone: "+254700000001", phoneVerifiedAt: null, pendingEmail: "new@clinic.test", invitation: { status: "completed", resetId: null, expiresAt: null, redeemedAt: null } }),
+        row({ id: "a-2", userId: "u-2", email: "old@clinic.test", fullName: "Old Admin", active: false, assignmentStatus: "removed", removedAt: "2026-08-01T00:00:00Z" })
+      ]);
+      renderCard();
+
+      expect(await screen.findByText("Amina Ops")).toBeInTheDocument();
+      expect(screen.getByText("+254700000001")).toBeInTheDocument();
+      expect(screen.getByText("Not verified")).toBeInTheDocument();
+      expect(screen.getByText(/Waiting for new@clinic.test to be verified/)).toBeInTheDocument();
+      expect(screen.getByText("Removed")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /edit details/i })).toHaveLength(1);
+    });
+
+    it("opens the editor for an admin and closes it again on Cancel", async () => {
+      fetchAccessMock.mockResolvedValue([row({ userStatus: "active", fullName: "Amina Ops" })]);
+      renderCard();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: /edit details/i }));
+      expect(screen.getByRole("form", { name: /edit details for ops@clinic.test/i })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    });
+
     it("says so when no administrator is assigned", async () => {
       fetchAccessMock.mockResolvedValue([]);
       renderCard();
