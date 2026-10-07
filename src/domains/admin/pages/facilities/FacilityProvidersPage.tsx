@@ -10,6 +10,7 @@ import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { classifyApiError, getApiError } from "../../../../shared/utils/errors";
+import { describeProviderSaveError, findStaleSubcategories, type StaleSubcategory } from "../../../../shared/utils/telemedicineSelection";
 import {
   createFacilityProvider,
   fetchFacilityProviders,
@@ -20,7 +21,7 @@ import {
 import { useAdminFacilityScope } from "../finance/paymentAccess";
 import {
   fetchTelemedicineAdminServices,
-  fetchTelemedicineSubcategories,
+  fetchSelectableTelemedicineSubcategories,
   type TelemedicineCatalogService,
   type TelemedicineSubcategory
 } from "../../../../shared/libs/telemedicineCatalog";
@@ -104,11 +105,13 @@ const ProviderFormFields = ({
   form,
   services,
   telemedicineSubcategories,
+  staleSubcategories,
   onChange
 }: {
   form: ProviderForm;
   services: Array<{ serviceId: string; service?: { name?: string | null } | null }>;
   telemedicineSubcategories: TelemedicineSubcategory[];
+  staleSubcategories: StaleSubcategory[];
   onChange: (next: ProviderForm) => void;
 }) => {
   const toggleService = (serviceId: string) => {
@@ -184,6 +187,27 @@ const ProviderFormFields = ({
       <fieldset>
         <legend className="mb-1 text-sm font-semibold text-slate-700">Telemedicine specialties</legend>
         <p className="mb-2 text-xs text-slate-500">Assign subcategories that this provider can handle remotely.</p>
+        {staleSubcategories.length > 0 && (
+          <div role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">Archived specialties are still selected</p>
+            <p className="mt-1">These specialties are archived and can no longer be assigned. Their history is kept.</p>
+            <ul className="mt-2 space-y-1">
+              {staleSubcategories.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3">
+                  <span>{item.name}</span>
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-amber-900 underline"
+                    aria-label={`Remove ${item.name} from this provider`}
+                    onClick={() => onChange({ ...form, telemedicineSubcategoryIds: form.telemedicineSubcategoryIds.filter((id) => id !== item.id) })}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {groupedSubcategories.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">No active telemedicine subcategories are available.</p>
         ) : (
@@ -239,7 +263,7 @@ const FacilityProvidersPage = () => {
   });
   const telemedicineSubcategoriesQuery = useQuery({
     queryKey: ["telemedicine", "catalog", "subcategories"],
-    queryFn: () => fetchTelemedicineSubcategories(),
+    queryFn: () => fetchSelectableTelemedicineSubcategories(),
     enabled: Boolean(facilityId)
   });
   const telemedicineServicesQuery = useQuery<TelemedicineCatalogService[]>({
@@ -254,6 +278,14 @@ const FacilityProvidersPage = () => {
   const services = useMemo(
     () => servicesQuery.data?.filter((service) => service.active && !telemedicineServiceIds.has(service.serviceId)) ?? [],
     [servicesQuery.data, telemedicineServiceIds]
+  );
+  // Only judged once the selectable list has loaded, so a slow response never looks like a stale selection.
+  const staleSubcategories = useMemo(
+    () =>
+      telemedicineSubcategoriesQuery.isSuccess
+        ? findStaleSubcategories(form.telemedicineSubcategoryIds, telemedicineSubcategoriesQuery.data, editingProvider?.telemedicineSubcategoryAssignments ?? [])
+        : [],
+    [telemedicineSubcategoriesQuery.isSuccess, telemedicineSubcategoriesQuery.data, form.telemedicineSubcategoryIds, editingProvider]
   );
   const invalidateProviders = () => void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
 
@@ -369,15 +401,15 @@ const FacilityProvidersPage = () => {
 
       {(showForm || editingProvider) && (
         <Card title={editingProvider ? "Edit provider" : "Add provider"} subtitle={editingProvider ? "Changes apply only to this facility provider." : "The provider will receive an invitation when an email is supplied."}>
-          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} onChange={setForm} />
+          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} staleSubcategories={staleSubcategories} onChange={setForm} />
           {(createMutation.error || updateMutation.error) && (
             <p className="mt-4 text-sm text-danger-600">
-              {getApiError(createMutation.error || updateMutation.error, "Unable to save provider")}
+              {describeProviderSaveError(createMutation.error || updateMutation.error)}
             </p>
           )}
           <div className="mt-5 flex flex-wrap gap-3">
             <Button variant="secondary" onClick={() => { setShowForm(false); setEditingProvider(null); }}>Cancel</Button>
-            <Button loading={createMutation.isPending || updateMutation.isPending} disabled={!form.fullName.trim() || (!form.email.trim() && !form.phone.trim())} onClick={() => editingProvider ? updateMutation.mutate() : createMutation.mutate()}>
+            <Button loading={createMutation.isPending || updateMutation.isPending} disabled={!form.fullName.trim() || (!form.email.trim() && !form.phone.trim()) || staleSubcategories.length > 0} onClick={() => editingProvider ? updateMutation.mutate() : createMutation.mutate()}>
               {editingProvider ? "Save provider" : "Create provider"}
             </Button>
           </div>

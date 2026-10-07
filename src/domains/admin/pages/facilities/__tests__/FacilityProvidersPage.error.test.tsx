@@ -25,7 +25,7 @@ vi.mock("../../../../../shared/libs/facilities", () => ({
 
 vi.mock("../../../../../shared/libs/telemedicineCatalog", () => ({
   fetchTelemedicineAdminServices: vi.fn().mockResolvedValue([]),
-  fetchTelemedicineSubcategories: vi.fn().mockResolvedValue([])
+  fetchSelectableTelemedicineSubcategories: vi.fn().mockResolvedValue([])
 }));
 
 import FacilityProvidersPage from "../FacilityProvidersPage";
