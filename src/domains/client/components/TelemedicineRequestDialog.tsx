@@ -689,14 +689,19 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     )}
                     {noFastestFound && (
                       <p className="mt-2 text-sm text-slate-700" role="status">
-                        No facility has an open time in the next {WEEK_LENGTH} days. Choose a facility below to see
-                        its calendar.
+                        These facilities offer this consultation, but none currently has an open appointment in the
+                        next {WEEK_LENGTH} days. Choose a facility below to inspect its calendar, or try again later.
                       </p>
                     )}
                   </section>
                 )}
                 {(facilitiesQuery.data ?? []).length > 0 && (
-                  <p className="pt-1 text-sm font-medium text-slate-600">Or choose a facility yourself</p>
+                  <div className="pt-1">
+                    <p className="text-sm font-medium text-slate-600">Facilities offering this consultation</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      The list confirms service coverage; appointment availability is checked separately.
+                    </p>
+                  </div>
                 )}
                 <div className="space-y-2">
                   {(facilitiesQuery.data ?? []).map((facility) => (
