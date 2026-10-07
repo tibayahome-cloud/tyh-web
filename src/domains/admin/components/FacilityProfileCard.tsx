@@ -74,7 +74,14 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
         await updateFacility(facility.id, update);
       }
       if (status) {
-        await updateFacilityStatus(facility.id, status);
+        try {
+          await updateFacilityStatus(facility.id, status);
+        } catch (error) {
+          // The core fields above are already saved; say so rather than reporting a plain failure.
+          throw Object.assign(new Error(mapFacilityProfileError(error).message), {
+            partial: Object.keys(update).length > 0
+          });
+        }
       }
     },
     onSuccess: () => {
@@ -86,6 +93,14 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
       requestAnimationFrame(() => editButtonRef.current?.focus());
     },
     onError: (error) => {
+      if ((error as { partial?: boolean }).partial) {
+        setErrors({});
+        setFormError(
+          `Your profile changes were saved, but the status change was not: ${(error as Error).message} Save again to retry the status.`
+        );
+        onSaved();
+        return;
+      }
       const { field, message } = mapFacilityProfileError(error);
       if (field) {
         setErrors({ [field]: message });
@@ -217,7 +232,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
               inputMode="decimal"
               value={form.platformFeePercent}
               error={errors.platformFeePercent}
-              hint="Percentage of each payment kept by TYH, from 0 to 100. Applies to future payments."
+              hint="Percentage of each payment kept by TYH, from 0 to 100. Settlement uses the fee in force when it runs, so a change can also affect payments already made but not yet settled."
               onChange={(e) => change("platformFeePercent", e.target.value)}
             />
           </div>

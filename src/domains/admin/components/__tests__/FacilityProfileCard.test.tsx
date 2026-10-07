@@ -148,6 +148,30 @@ describe("FacilityProfileCard", () => {
     expect(updateFacilityMock).not.toHaveBeenCalled();
   });
 
+  it("says the profile changes were saved when only the status change fails", async () => {
+    const user = userEvent.setup();
+    updateFacilityStatusMock.mockRejectedValueOnce(rejection(400, "status is invalid"));
+    const { onSaved } = setup();
+    await user.click(screen.getByRole("button", { name: /edit facility profile/i }));
+    await user.type(screen.getByLabelText("County"), "x");
+    await user.selectOptions(screen.getByLabelText("Status"), "suspended");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/profile changes were saved, but the status change was not/i);
+    expect(alert).toHaveTextContent("status is invalid");
+    expect(screen.getByText("Editing")).toBeInTheDocument();
+    expect(updateFacilityMock).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("states that settlement uses the fee in force when it runs", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /edit facility profile/i }));
+    expect(screen.getByText(/already made but not yet settled/i)).toBeInTheDocument();
+  });
+
   it("keeps edit mode and shows a server rejection beside the field it names", async () => {
     const user = userEvent.setup();
     updateFacilityMock.mockRejectedValue(rejection(400, "platform_fee_percent must be between 0 and 100"));
