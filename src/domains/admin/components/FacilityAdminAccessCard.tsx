@@ -19,7 +19,15 @@ import { describeRecoveryError, facilityAdminAccessState } from "../../../shared
 const LABEL_CLASS: Record<string, string> = {
   Pending: "bg-amber-50 text-amber-800 ring-amber-200",
   Expired: "bg-red-50 text-red-700 ring-red-200",
-  "Account active": "bg-emerald-50 text-emerald-700 ring-emerald-200"
+  "Account active": "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  Suspended: "bg-slate-100 text-slate-700 ring-slate-300",
+  Removed: "bg-slate-100 text-slate-500 ring-slate-200"
+};
+
+const STATE_NOTE: Record<string, string> = {
+  Expired: "The invitation can no longer be used. Send a new one.",
+  Suspended: "This account is suspended. Reactivate it before sending a setup invitation or reset link.",
+  Removed: "This administrator was removed from the facility."
 };
 
 type Props = { facilityId: string };
@@ -102,9 +110,7 @@ export const FacilityAdminAccessCard = ({ facilityId }: Props) => {
                         Invitation expires {new Date(admin.invitation.expiresAt).toLocaleString()}
                       </p>
                     )}
-                    {state.label === "Expired" && (
-                      <p className="mt-1 text-xs text-slate-500">The invitation can no longer be used. Send a new one.</p>
-                    )}
+                    {STATE_NOTE[state.label] && <p className="mt-1 text-xs text-slate-500">{STATE_NOTE[state.label]}</p>}
                   </div>
                 </div>
                 {state.canResendInvitation && (

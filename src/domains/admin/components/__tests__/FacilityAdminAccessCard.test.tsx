@@ -91,6 +91,25 @@ describe("facility administrator access", () => {
       expect(screen.queryByText(/Invitation expires/)).not.toBeInTheDocument();
     });
 
+    it("shows Suspended with an explanation and no recovery action", async () => {
+      fetchAccessMock.mockResolvedValue([row({ userStatus: "suspended" })]);
+      renderCard();
+
+      expect(await screen.findByText("Suspended")).toBeInTheDocument();
+      expect(screen.getByText(/Reactivate it before sending/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", RESEND)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", RESET)).not.toBeInTheDocument();
+    });
+
+    it("shows Removed for an inactive assignment and no recovery action", async () => {
+      fetchAccessMock.mockResolvedValue([row({ active: false, userStatus: "active" })]);
+      renderCard();
+
+      expect(await screen.findByText("Removed")).toBeInTheDocument();
+      expect(screen.queryByRole("button", RESEND)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", RESET)).not.toBeInTheDocument();
+    });
+
     it("says so when no administrator is assigned", async () => {
       fetchAccessMock.mockResolvedValue([]);
       renderCard();
