@@ -15,6 +15,7 @@ const hasPermissionMock = vi.fn();
 
 vi.mock("../../../../../shared/libs/facilities", () => ({
   assignFacilityAdmin: vi.fn(),
+  fetchFacilityAdminAccess: vi.fn().mockResolvedValue([]),
   createFacility: vi.fn(),
   fetchFacilityAdminInvitationStatus: vi.fn(),
   fetchFacilities: (...args: unknown[]) => fetchFacilitiesMock(...args),

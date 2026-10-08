@@ -18,8 +18,9 @@ import { Card } from "../../../../shared/components/Card";
 import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { Input } from "../../../../shared/components/Input";
 import { Modal } from "../../../../shared/components/Modal";
+import { ActionMenu, type ActionMenuItem } from "../../../../shared/components/ActionMenu";
+import { FacilityAdminSummary } from "../../components/FacilityAdminSummary";
 import {
-  assignFacilityAdmin,
   createFacility,
   fetchFacilityAdminInvitationStatus,
   fetchFacilities,
@@ -27,7 +28,7 @@ import {
   updateFacilityStatus
 } from "../../../../shared/libs/facilities";
 import type { Facility, FacilityCreateInput, FacilityStatus } from "../../../../shared/schemas/facility";
-import { FACILITY_TYPES, HOSPITAL_LEVELS, WEEKDAYS, formatOperatingHoursSummary } from "../../../../shared/schemas/facility";
+import { FACILITY_TYPES, HOSPITAL_LEVELS, WEEKDAYS } from "../../../../shared/schemas/facility";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import LocationPickerMap from "../../../../shared/components/LocationPickerMap";
@@ -55,11 +56,6 @@ type CreateFormState = {
 type StatusDialogState = {
   facility: Facility;
   status: FacilityStatus;
-};
-
-type AdminDialogState = {
-  facility: Facility;
-  email: string;
 };
 
 const initialFormState: CreateFormState = {
@@ -206,87 +202,74 @@ const FacilityCard = ({
   canManageAdmins,
   onStatus,
   onOpen,
-  onAssignAdmin
+  onManageAdmins
 }: {
   facility: Facility;
   canManageFacilities: boolean;
   canManageAdmins: boolean;
   onStatus: (facility: Facility, status: FacilityStatus) => void;
   onOpen: (facility: Facility) => void;
-  onAssignAdmin: (facility: Facility) => void;
+  onManageAdmins: (facility: Facility) => void;
 }) => {
-  const primaryPhone = facility.phones.find((phone) => phone.isPrimary) ?? facility.phones[0];
-  const serviceCount = facility.services.filter((service) => service.active).length;
+  const menuItems: ActionMenuItem[] = [
+    ...(canManageFacilities && facility.status !== "active"
+      ? [{ key: "approve", label: "Approve facility", icon: <CheckCircleIcon fontSize="small" />, onSelect: () => onStatus(facility, "active") }]
+      : []),
+    ...(canManageFacilities && facility.status !== "pending"
+      ? [{ key: "pending", label: "Set to pending", icon: <MoreTimeIcon fontSize="small" />, onSelect: () => onStatus(facility, "pending") }]
+      : []),
+    ...(canManageFacilities && facility.status !== "suspended"
+      ? [{ key: "suspend", label: "Suspend facility", icon: <BlockIcon fontSize="small" />, onSelect: () => onStatus(facility, "suspended") }]
+      : []),
+    ...(canManageAdmins
+      ? [{ key: "admins", label: "Manage administrators", icon: <PersonAddIcon fontSize="small" />, onSelect: () => onManageAdmins(facility) }]
+      : [])
+  ];
+  const place = [facility.county, facility.countryCode].filter(Boolean).join(", ");
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-base font-semibold text-slate-900">{facility.name}</h2>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone[facility.status]}`}>
-              {formatLabel(facility.status)}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-600">
-            {formatLabel(facility.facilityType)}{facility.hospitalLevel ? ` · Level ${facility.hospitalLevel}` : ""} in {facility.county}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">{facility.address}</p>
+    <article
+      className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_auto] lg:items-center"
+      aria-label={facility.name}
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="truncate text-base font-semibold text-slate-900">{facility.name}</h2>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone[facility.status]}`}>
+            {formatLabel(facility.status)}
+          </span>
         </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Button size="sm" variant="outline" onClick={() => onOpen(facility)}>
-            <VisibilityIcon fontSize="small" />
-            Open
-          </Button>
-          {canManageFacilities && facility.status !== "active" && (
-            <Button size="sm" variant="outline" onClick={() => onStatus(facility, "active")}>
-              <CheckCircleIcon fontSize="small" />
-              Approve
-            </Button>
-          )}
-          {canManageFacilities && facility.status !== "pending" && (
-            <Button size="sm" variant="outline" onClick={() => onStatus(facility, "pending")}>
-              <MoreTimeIcon fontSize="small" />
-              Pending
-            </Button>
-          )}
-          {canManageFacilities && facility.status !== "suspended" && (
-            <Button size="sm" variant="outline" onClick={() => onStatus(facility, "suspended")}>
-              <BlockIcon fontSize="small" />
-              Suspend
-            </Button>
-          )}
-          {canManageAdmins && (
-            <Button size="sm" variant="secondary" onClick={() => onAssignAdmin(facility)}>
-              <PersonAddIcon fontSize="small" />
-              Admin
-            </Button>
-          )}
-        </div>
+        <p className="mt-1 text-sm text-slate-600">
+          {formatLabel(facility.facilityType)}
+          {facility.hospitalLevel ? ` · Level ${facility.hospitalLevel}` : ""}
+          {place ? ` · ${place}` : ""}
+        </p>
+        <p className="mt-0.5 truncate text-sm text-slate-500">{facility.address}</p>
+        <p className="mt-0.5 break-words text-sm text-slate-500">{facility.email || "-"}</p>
       </div>
 
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        {canManageAdmins && (
+          <div className="col-span-2">
+            <dt className="text-xs font-semibold text-slate-500">Administrators</dt>
+            <dd className="mt-0.5">
+              <FacilityAdminSummary facilityId={facility.id} />
+            </dd>
+          </div>
+        )}
         <div>
-          <dt className="text-xs font-semibold uppercase text-slate-500">Email</dt>
-          <dd className="mt-1 break-words text-slate-800">{facility.email || "-"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold uppercase text-slate-500">Phone</dt>
-          <dd className="mt-1 text-slate-800">{primaryPhone?.phone ?? "-"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold uppercase text-slate-500">Services</dt>
-          <dd className="mt-1 text-slate-800">{serviceCount} active</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold uppercase text-slate-500">TYH fee</dt>
-          <dd className="mt-1 text-slate-800">{facility.platformFeePercent}%</dd>
-        </div>
-        <div className="sm:col-span-2 lg:col-span-4">
-          <dt className="text-xs font-semibold uppercase text-slate-500">Operating hours</dt>
-          <dd className="mt-1 text-slate-800">{formatOperatingHoursSummary(facility.operatingHours)}</dd>
+          <dt className="text-xs font-semibold text-slate-500">TYH fee</dt>
+          <dd className="mt-0.5 text-slate-800">{facility.platformFeePercent}%</dd>
         </div>
       </dl>
+
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <Button size="sm" onClick={() => onOpen(facility)} aria-label={`Open facility ${facility.name}`}>
+          <VisibilityIcon fontSize="small" aria-hidden="true" />
+          Open facility
+        </Button>
+        <ActionMenu label="Manage" subject={facility.name} items={menuItems} />
+      </div>
     </article>
   );
 };
@@ -310,7 +293,6 @@ const FacilityManagementPage = () => {
   const [form, setForm] = useState<CreateFormState>(initialFormState);
   const [formError, setFormError] = useState<string | null>(null);
   const [statusDialog, setStatusDialog] = useState<StatusDialogState | null>(null);
-  const [adminDialog, setAdminDialog] = useState<AdminDialogState | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [invitationNotice, setInvitationNotice] = useState<{
@@ -397,18 +379,6 @@ const FacilityManagementPage = () => {
     onSuccess: () => {
       invalidateFacilities();
       setStatusDialog(null);
-      setMutationError(null);
-    },
-    onError: (error) => {
-      setMutationError(extractErrorMessage(error));
-    }
-  });
-
-  const adminMutation = useMutation({
-    mutationFn: ({ facility, email }: AdminDialogState) => assignFacilityAdmin(facility.id, email.trim()),
-    onSuccess: () => {
-      invalidateFacilities();
-      setAdminDialog(null);
       setMutationError(null);
     },
     onError: (error) => {
@@ -615,10 +585,7 @@ const FacilityManagementPage = () => {
                 setStatusDialog({ facility: target, status: nextStatus });
               }}
               onOpen={(target) => navigate(`/admin/facilities/${target.id}`)}
-              onAssignAdmin={(target) => {
-                setMutationError(null);
-                setAdminDialog({ facility: target, email: "" });
-              }}
+              onManageAdmins={(target) => navigate(`/admin/facilities/${target.id}#facility-administrators`)}
             />
           ))}
         </section>
@@ -837,44 +804,6 @@ const FacilityManagementPage = () => {
           }
         }}
       />
-
-      <Modal
-        open={Boolean(adminDialog)}
-        title="Assign admin ops"
-        description={adminDialog ? `Assign an existing admin ops user to ${adminDialog.facility.name}.` : undefined}
-        onClose={() => setAdminDialog(null)}
-        maxWidth="sm"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Admin email"
-            type="email"
-            placeholder="admin@facility.example"
-            value={adminDialog?.email ?? ""}
-            onChange={(event) =>
-              setAdminDialog((current) => (current ? { ...current, email: event.target.value } : current))
-            }
-          />
-          {mutationError && <p className="text-sm text-danger-600">{mutationError}</p>}
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setAdminDialog(null)} disabled={adminMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              loading={adminMutation.isPending}
-              disabled={!adminDialog?.email.trim()}
-              onClick={() => {
-                if (adminDialog) {
-                  adminMutation.mutate(adminDialog);
-                }
-              }}
-            >
-              Assign admin
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };
