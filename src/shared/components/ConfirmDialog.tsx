@@ -16,6 +16,7 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   confirmVariant?: "primary" | "secondary" | "ghost";
   loading?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onClose: () => void;
   children?: ReactNode;
@@ -30,6 +31,7 @@ export const ConfirmDialog = ({
   cancelLabel = "Cancel",
   confirmVariant = "primary",
   loading,
+  confirmDisabled,
   onConfirm,
   onClose,
   children
@@ -59,7 +61,7 @@ export const ConfirmDialog = ({
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           {cancelLabel}
         </Button>
-        <Button variant={confirmVariant} onClick={onConfirm} loading={loading}>
+        <Button variant={confirmVariant} onClick={onConfirm} loading={loading} disabled={confirmDisabled}>
           {confirmLabel}
         </Button>
       </DialogActions>

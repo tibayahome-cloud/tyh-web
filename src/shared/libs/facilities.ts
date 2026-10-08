@@ -130,6 +130,8 @@ export type FacilityAdminEmailChange = {
   expiresInSeconds: number | null;
 };
 
+export type FacilityAdminAssignmentStatus = "active" | "suspended" | "removed";
+
 export type FacilityAdminAccess = {
   id: string;
   facilityId: string;
@@ -142,7 +144,11 @@ export type FacilityAdminAccess = {
   phoneVerifiedAt: string | null;
   roleKey: string;
   active: boolean;
-  assignmentStatus: "active" | "removed";
+  // The facility assignment, separate from the account's own status (userStatus). A suspended
+  // assignment has active=false too, and so does a removed one: only assignmentStatus tells them apart.
+  assignmentStatus: FacilityAdminAssignmentStatus;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
   removedAt: string | null;
   invitation: FacilityAdminInvitationStatus;
   // A new address waiting for its verification link; the current address stays in use until then.
@@ -400,6 +406,61 @@ export const assignFacilityAdmin = async (facilityId: string, email: string): Pr
   return admin;
 };
 
+const mapAssignmentStatus = (raw: Record<string, unknown>): FacilityAdminAssignmentStatus => {
+  if (raw.assignment_status === "active" || raw.assignment_status === "suspended" || raw.assignment_status === "removed") {
+    return raw.assignment_status;
+  }
+  // An API without assignment_status: suspension cannot be told from removal, so only an active
+  // assignment is treated as current.
+  return raw.active ? "active" : "removed";
+};
+
+export type FacilityAdminInviteResult = {
+  facilityAdminId: string;
+  userId: string;
+  email: string;
+  invitationSent: boolean;
+  invitationExpiresAt: string | null;
+};
+
+// Invites a new email address: creates a pending account and sends a setup invitation. An email
+// that already has an account is refused (409); use assignFacilityAdmin for an existing account.
+export const inviteFacilityAdmin = async (facilityId: string, email: string): Promise<FacilityAdminInviteResult> => {
+  const response = await api.post(`/facilities/${facilityId}/admins/invitations`, { email });
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    facilityAdminId: String(data.facility_admin_id ?? ""),
+    userId: String(data.user_id ?? ""),
+    email: String(data.email ?? email),
+    invitationSent: Boolean(data.invitation_sent),
+    invitationExpiresAt: data.invitation_expires_at ? String(data.invitation_expires_at) : null
+  };
+};
+
+export type FacilityAdminStatusResult = {
+  userId: string;
+  assignmentStatus: "active" | "suspended";
+  suspendedAt: string | null;
+  suspensionReason: string | null;
+};
+
+// Suspends or reactivates this facility's admin assignment only. It never touches the user's
+// account: the global user-suspension endpoint is deliberately not used here.
+export const setFacilityAdminStatus = async (
+  facilityId: string,
+  userId: string,
+  input: { status: "active" } | { status: "suspended"; reason: string }
+): Promise<FacilityAdminStatusResult> => {
+  const response = await api.patch(`/facilities/${facilityId}/admins/${userId}/status`, input);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    userId: String(data.user_id ?? userId),
+    assignmentStatus: data.assignment_status === "suspended" ? "suspended" : "active",
+    suspendedAt: data.suspended_at ? String(data.suspended_at) : null,
+    suspensionReason: data.suspension_reason ? String(data.suspension_reason) : null
+  };
+};
+
 export const fetchFacilityAdminAccess = async (facilityId: string): Promise<FacilityAdminAccess[]> => {
   const response = await api.get(`/facilities/${facilityId}/admins`);
   const data = payloadData(response.data);
@@ -420,8 +481,10 @@ export const fetchFacilityAdminAccess = async (facilityId: string): Promise<Faci
       emailVerifiedAt: raw.email_verified_at ? String(raw.email_verified_at) : null,
       phoneVerifiedAt: raw.phone_verified_at ? String(raw.phone_verified_at) : null,
       roleKey: String(raw.role_key ?? "admin.ops"),
-      active: Boolean(raw.active) && raw.assignment_status !== "removed",
-      assignmentStatus: raw.assignment_status === "removed" || raw.active === false ? "removed" : "active",
+      active: Boolean(raw.active),
+      assignmentStatus: mapAssignmentStatus(raw),
+      suspendedAt: raw.suspended_at ? String(raw.suspended_at) : null,
+      suspensionReason: raw.suspension_reason ? String(raw.suspension_reason) : null,
       removedAt: raw.removed_at ? String(raw.removed_at) : null,
       pendingEmail: raw.email_change ? String((raw.email_change as Record<string, unknown>).email ?? "") || null : null,
       invitation: {

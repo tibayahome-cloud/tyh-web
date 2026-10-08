@@ -41,8 +41,8 @@ vi.mock("../../../../../shared/hooks/useRbac", () => ({
   useRbac: () => ({ roles, hasPermission: () => true, hasRole: (role: string) => roles.includes(role) })
 }));
 vi.mock("../FacilityFinanceSummaryCard", () => ({ FacilityFinanceSummaryCard: () => null }));
-vi.mock("../../../components/FacilityAdminAccessCard", () => ({
-  FacilityAdminAccessCard: () => <div>admin-access-card</div>
+vi.mock("../../../components/FacilityAdministratorsSection", () => ({
+  FacilityAdministratorsSection: () => <div>admin-access-card</div>
 }));
 
 import { fetchFacility } from "../../../../../shared/libs/facilities";
@@ -95,6 +95,16 @@ describe("FacilityWorkspacePage super-admin controls", () => {
     expect(screen.getByText("admin-access-card")).toBeInTheDocument();
   });
 
+  it("puts the Administrators section above finance and the profile, with a jump link in the header", async () => {
+    roles = ["admin.super"];
+    const { container } = renderPage();
+    await screen.findByRole("button", { name: /edit facility profile/i });
+    expect(screen.getByRole("link", { name: "Administrators" })).toHaveAttribute("href", "#facility-administrators");
+    const text = container.textContent ?? "";
+    expect(text.indexOf("admin-access-card")).toBeLessThan(text.indexOf("Facility profile"));
+    expect(text.indexOf("admin-access-card")).toBeLessThan(text.indexOf("Facility settings"));
+  });
+
   it("offers neither to a facility admin, who keeps the operations settings", async () => {
     roles = ["admin.ops"];
     renderPage();
@@ -102,5 +112,6 @@ describe("FacilityWorkspacePage super-admin controls", () => {
     expect(screen.queryByRole("button", { name: /edit facility profile/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Facility profile")).not.toBeInTheDocument();
     expect(screen.queryByText("admin-access-card")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Administrators" })).not.toBeInTheDocument();
   });
 });

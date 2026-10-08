@@ -35,7 +35,7 @@ import {
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
 import { FacilityProfileCard } from "../../components/FacilityProfileCard";
-import { FacilityAdminAccessCard } from "../../components/FacilityAdminAccessCard";
+import { FacilityAdministratorsSection } from "../../components/FacilityAdministratorsSection";
 import {
   cancelFacilityServiceRequest,
   createFacilityServiceRequest,
@@ -1122,9 +1122,17 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           <h1 className="mt-3 truncate text-xl font-semibold text-slate-900">{facility.name}</h1>
           <p className="text-sm text-slate-500">{facility.address}</p>
         </div>
-        <span className="self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-600">
-          {facility.status}
-        </span>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          {canManageAdmins && (
+            <a
+              href="#facility-administrators"
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-tiba-blue hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-tiba-blue/30"
+            >
+              Administrators
+            </a>
+          )}
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-600">{facility.status}</span>
+        </div>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1136,6 +1144,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         <WorkspaceStat label="Active services" value={String(activeServiceCount)} />
         <WorkspaceStat label="TYH fee" value={`${facility.platformFeePercent}%`} />
       </section>
+
+      {canManageAdmins && facilityId && <FacilityAdministratorsSection facilityId={String(facilityId)} />}
 
       {canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
         <FacilityFinanceSummaryCard facilityId={String(facilityId)} />
@@ -1213,7 +1223,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </div>
       </Card>
 
-      {canManageAdmins && facilityId && <FacilityAdminAccessCard facilityId={String(facilityId)} />}
 
       <Modal
         open={settingsModalOpen}
