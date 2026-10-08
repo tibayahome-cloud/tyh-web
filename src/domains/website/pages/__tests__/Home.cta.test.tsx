@@ -73,13 +73,32 @@ describe("homepage calls to action", () => {
     useServicesMock.mockReturnValue({ data: [], isLoading: false });
   });
 
+  it("separates one-time telemedicine prices from monthly care package prices", () => {
+    renderHome({ isAuthenticated: false });
+
+    expect(screen.getByRole("heading", { name: "One-time telemedicine services" })).toBeInTheDocument();
+    expect(screen.getByText("Video Consultation")).toBeInTheDocument();
+    expect(screen.getByText("Drug & Lab Report Review")).toBeInTheDocument();
+    expect(screen.getByText("Specialist Consultation")).toBeInTheDocument();
+    expect(screen.getAllByText("From KES 1,000")).toHaveLength(2);
+    expect(screen.getByText("From KES 2,000")).toBeInTheDocument();
+    expect(screen.getAllByText("per call")).toHaveLength(2);
+    expect(screen.getByText("per review")).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: "Ongoing care packages" })).toBeInTheDocument();
+    expect(screen.getByText("All prices shown per month")).toBeInTheDocument();
+    expect(screen.getAllByText("/ month")).toHaveLength(5);
+    expect(screen.queryByText(/per visit\s*\/\s*month/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Premium Palliative")).toBeInTheDocument();
+  });
+
   describe("when the visitor is signed in", () => {
     it.each([
       "Talk to a Doctor",
       "Find a Specialist",
       "Book Home Care",
       "Get Ambulance",
-      "View Detailed Care Packages"
+      "View All Services & Care Packages"
     ])("sends %s into the client app rather than back to login", async (label) => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: true });
