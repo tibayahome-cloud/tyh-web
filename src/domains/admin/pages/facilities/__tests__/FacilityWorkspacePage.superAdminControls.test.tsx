@@ -4,7 +4,7 @@
  * admin holds facility:manage. The API enforces the same rule; this keeps the UI from offering it.
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,17 +92,35 @@ describe("FacilityWorkspacePage super-admin controls", () => {
     roles = ["admin.super"];
     renderPage();
     expect(await screen.findByRole("button", { name: /edit facility profile/i })).toBeInTheDocument();
+    expect(screen.queryByText("admin-access-card")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Administrators" }));
     expect(screen.getByText("admin-access-card")).toBeInTheDocument();
   });
 
-  it("puts the Administrators section above finance and the profile, with a jump link in the header", async () => {
+  it("organizes facility work into focused sections instead of stacking every panel", async () => {
     roles = ["admin.super"];
-    const { container } = renderPage();
+    renderPage();
     await screen.findByRole("button", { name: /edit facility profile/i });
-    expect(screen.getByRole("link", { name: "Administrators" })).toHaveAttribute("href", "#facility-administrators");
-    const text = container.textContent ?? "";
-    expect(text.indexOf("admin-access-card")).toBeLessThan(text.indexOf("Facility profile"));
-    expect(text.indexOf("admin-access-card")).toBeLessThan(text.indexOf("Facility settings"));
+    const tabs = screen.getByRole("tablist", { name: "Facility workspace sections" });
+    expect(within(tabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Overview",
+      "Administrators",
+      "Services",
+      "Providers & bookings",
+      "Finance"
+    ]);
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Facility settings")).toBeInTheDocument();
+    expect(screen.queryByText("Facility services")).not.toBeInTheDocument();
+    expect(screen.queryByText("admin-access-card")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Administrators" }));
+    expect(screen.getByText("admin-access-card")).toBeInTheDocument();
+    expect(screen.queryByText("Facility settings")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Services" }));
+    expect(screen.getByText("Facility services")).toBeInTheDocument();
+    expect(screen.queryByText("admin-access-card")).not.toBeInTheDocument();
   });
 
   it("offers neither to a facility admin, who keeps the operations settings", async () => {
