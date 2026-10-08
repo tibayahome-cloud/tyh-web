@@ -20,6 +20,7 @@ export type FacilityProfileForm = {
   facilityType: FacilityType;
   hospitalLevel: string;
   address: string;
+  locationDetails: string;
   county: string;
   countryCode: string;
   email: string;
@@ -36,6 +37,7 @@ export const buildFacilityProfileForm = (facility: Facility): FacilityProfileFor
   facilityType: facility.facilityType,
   hospitalLevel: facility.hospitalLevel === null ? "" : String(facility.hospitalLevel),
   address: facility.address,
+  locationDetails: facility.locationDetails ?? "",
   county: facility.county,
   countryCode: facility.countryCode ?? "",
   email: facility.email,
@@ -89,6 +91,8 @@ export const buildFacilityProfileChanges = (
   // The API validates type and level together, so send the level whenever either changes.
   if (level !== facility.hospitalLevel || form.facilityType !== facility.facilityType) update.hospitalLevel = level;
   if (form.address.trim() !== facility.address) update.address = form.address.trim();
+  const locationDetails = form.locationDetails.trim();
+  if (locationDetails !== (facility.locationDetails ?? "")) update.locationDetails = locationDetails || null;
   if (form.county.trim() !== facility.county) update.county = form.county.trim();
   const country = form.countryCode.trim().toUpperCase();
   if (country !== (facility.countryCode ?? "")) update.countryCode = country || null;
@@ -111,6 +115,7 @@ const FIELD_HINTS: Array<[RegExp, FacilityProfileField]> = [
   [/country/i, "countryCode"],
   [/email/i, "email"],
   [/address/i, "address"],
+  [/location_details|location details/i, "locationDetails"],
   [/county/i, "county"],
   [/\bname\b/i, "name"],
   [/fast_response|fast response/i, "fastResponseEnabled"],

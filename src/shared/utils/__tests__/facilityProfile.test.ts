@@ -114,6 +114,14 @@ describe("buildFacilityProfileChanges", () => {
     expect(update).not.toHaveProperty("status");
   });
 
+  it("edits indoor location details independently from the street address", () => {
+    const current = facility();
+    const form = { ...buildFacilityProfileForm(current), locationDetails: "Building B, floor 2, Room 3" };
+    expect(buildFacilityProfileChanges(current, form).update).toEqual({
+      locationDetails: "Building B, floor 2, Room 3"
+    });
+  });
+
   it("routes a status change separately", () => {
     const current = facility();
     expect(buildFacilityProfileChanges(current, { ...buildFacilityProfileForm(current), status: "suspended" })).toEqual({

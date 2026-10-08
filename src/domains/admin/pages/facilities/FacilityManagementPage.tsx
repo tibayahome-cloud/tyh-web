@@ -12,6 +12,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import MyLocationOutlinedIcon from "@mui/icons-material/MyLocationOutlined";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -46,6 +47,7 @@ type CreateFormState = {
   initialAdminEmail: string;
   lat: string;
   lng: string;
+  locationDetails: string;
   platformFeePercent: string;
   is24Hours: boolean;
   openTime: string;
@@ -70,6 +72,7 @@ const initialFormState: CreateFormState = {
   initialAdminEmail: "",
   lat: "",
   lng: "",
+  locationDetails: "",
   platformFeePercent: "10",
   is24Hours: true,
   openTime: "08:00",
@@ -149,6 +152,7 @@ export const buildFacilityCreateInput = (form: CreateFormState): FacilityCreateI
   facilityType: form.facilityType,
   hospitalLevel: form.facilityType === "hospital" ? Number(form.hospitalLevel) : null,
   address: form.address.trim(),
+  locationDetails: form.locationDetails.trim() || null,
   county: form.county.trim(),
   countryCode: form.countryCode || null,
   phones: form.phones.map((phone) => ({ ...phone, phone: phone.phone.trim(), label: phone.label.trim() || null })),
@@ -292,6 +296,8 @@ const FacilityManagementPage = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [form, setForm] = useState<CreateFormState>(initialFormState);
   const [formError, setFormError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [statusDialog, setStatusDialog] = useState<StatusDialogState | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -414,6 +420,33 @@ const FacilityManagementPage = () => {
 
   const updateForm = <K extends keyof CreateFormState>(key: K, value: CreateFormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("This browser does not support location access.");
+      return;
+    }
+    setLocationError(null);
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        updateForm("lat", String(coords.latitude));
+        updateForm("lng", String(coords.longitude));
+        setIsLocating(false);
+      },
+      (error) => {
+        setLocationError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location access was denied. Search for the address or place the pin manually."
+            : error.code === error.TIMEOUT
+              ? "We could not get your location in time. Try again or place the pin manually."
+              : "We could not get your current location. Search for the address or place the pin manually."
+        );
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+    );
   };
 
   if (!canReadFacilities) {
@@ -724,25 +757,44 @@ const FacilityManagementPage = () => {
                 </span>
               </span>
             </label>
-            <label className="md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Address</span>
-              <textarea
-                value={form.address}
-                onChange={(event) => updateForm("address", event.target.value)}
-                className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
-              />
-            </label>
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">
-            <div className="mb-3"><p className="text-sm font-semibold text-slate-800">Facility location</p><p className="text-xs text-slate-500">Select the facility on the map. Coordinates are captured automatically.</p></div>
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-slate-800">Facility location</p>
+              <p className="text-xs text-slate-500">Search for the street address or place the pin. Use current location only when you are at the facility.</p>
+            </div>
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Street address</span>
+              <textarea
+                value={form.address}
+                onChange={(event) => updateForm("address", event.target.value)}
+                className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
+              />
+            </label>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500">Choose the pin for the building entrance or main site.</p>
+              <Button type="button" variant="outline" size="sm" onClick={useCurrentLocation} loading={isLocating}>
+                <MyLocationOutlinedIcon fontSize="small" />
+                Use my current location
+              </Button>
+            </div>
             <LocationPickerMap
               value={form.lat && form.lng ? { lat: Number(form.lat), lng: Number(form.lng) } : null}
               onChange={(location) => { updateForm("lat", String(location.lat)); updateForm("lng", String(location.lng)); }}
               onAddressChange={(address) => updateForm("address", address)}
               height={280}
             />
+            {locationError && <p className="mt-2 text-sm text-danger-600" role="alert">{locationError}</p>}
             {form.lat && form.lng && <p className="mt-2 text-xs text-slate-500">Location selected: {Number(form.lat).toFixed(5)}, {Number(form.lng).toFixed(5)}</p>}
+            <div className="mt-4">
+              <Input
+                label="Building, floor, suite or room (optional)"
+                value={form.locationDetails}
+                onChange={(event) => updateForm("locationDetails", event.target.value)}
+                placeholder="Building B, 2nd floor, Room 3"
+              />
+            </div>
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">

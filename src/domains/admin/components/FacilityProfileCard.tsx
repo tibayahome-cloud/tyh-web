@@ -188,6 +188,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
               <Detail label="Hospital level" value={facility.hospitalLevel ? `Level ${facility.hospitalLevel}` : "Not set"} />
             )}
             <Detail label="Address" value={facility.address} />
+            {facility.locationDetails && <Detail label="Building / unit" value={facility.locationDetails} />}
             <Detail label="County" value={facility.county} />
             <Detail label="Country" value={facility.countryCode ?? "Not set"} />
             <Detail label="Email" value={facility.email} />
@@ -230,6 +231,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
               </SelectField>
             )}
             <Input label="Address" name="facility-address" value={form.address} error={errors.address} onChange={(e) => change("address", e.target.value)} />
+            <Input label="Building, floor, suite or room" name="facility-location-details" value={form.locationDetails} onChange={(e) => change("locationDetails", e.target.value)} placeholder="Building B, 2nd floor, Room 3" />
             <Input label="County" name="facility-county" value={form.county} error={errors.county} onChange={(e) => change("county", e.target.value)} />
             <Input label="Country code" name="facility-country" value={form.countryCode} error={errors.countryCode} hint="Two letters, for example KE." maxLength={2} onChange={(e) => change("countryCode", e.target.value.toUpperCase())} />
             <Input label="Facility email" name="facility-email" type="email" value={form.email} error={errors.email} onChange={(e) => change("email", e.target.value)} />
