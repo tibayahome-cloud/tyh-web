@@ -1,4 +1,5 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { Link, useParams } from "react-router-dom";
@@ -159,6 +160,8 @@ type AssignmentFormState = {
 type FacilityWorkspacePageProps = {
   showOperationalSections?: boolean;
 };
+
+type WorkspaceTab = "overview" | "administrators" | "services" | "operations" | "finance";
 
 type FacilitySettingsFormState = {
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
@@ -628,7 +631,19 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const canManageBookings = hasPermission("booking:manage");
   const canManageFinance = hasPermission("facility:finance.manage");
   const canManageAdmins = isSuperAdmin && hasPermission("facility:admins.manage");
-
+  const workspaceTabs = [
+    { id: "overview", label: "Overview", available: true },
+    { id: "administrators", label: "Administrators", available: canManageAdmins },
+    { id: "services", label: "Services", available: canReadFacilities },
+    {
+      id: "operations",
+      label: "Providers & bookings",
+      available: showOperationalSections && (canVerifyProviders || canManageBookings)
+    },
+    { id: "finance", label: "Finance", available: canManageFinance }
+  ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [financialsVisible, setFinancialsVisible] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsForm, setSettingsForm] = useState<FacilitySettingsFormState>({
@@ -657,6 +672,27 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>({ providerUserId: "", reason: "" });
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (window.location.hash === "#facility-administrators" && canManageAdmins) {
+      setActiveTab("administrators");
+    }
+  }, [canManageAdmins]);
+
+  const handleWorkspaceTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = workspaceTabs.findIndex((tab) => tab.id === activeTab);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % workspaceTabs.length;
+    if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + workspaceTabs.length) % workspaceTabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = workspaceTabs.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    const nextTab = workspaceTabs[nextIndex];
+    setActiveTab(nextTab.id);
+    tabRefs.current[nextIndex]?.focus();
+  };
 
   const facilityScopeQuery = useAdminFacilityScope(isFacilityAdmin && canReadFacilities);
   const scopedFacilities = facilityScopeQuery.data?.facilities ?? [];
@@ -1123,14 +1159,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           <p className="text-sm text-slate-500">{facility.address}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
-          {canManageAdmins && (
-            <a
-              href="#facility-administrators"
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-tiba-blue hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-tiba-blue/30"
-            >
-              Administrators
-            </a>
-          )}
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-600">{facility.status}</span>
         </div>
       </div>
@@ -1145,11 +1173,43 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         <WorkspaceStat label="TYH fee" value={`${facility.platformFeePercent}%`} />
       </section>
 
-      {canManageAdmins && facilityId && <FacilityAdministratorsSection facilityId={String(facilityId)} />}
+      <div
+        role="tablist"
+        aria-label="Facility workspace sections"
+        onKeyDown={handleWorkspaceTabKeyDown}
+        className="-mx-1 flex max-w-full gap-1 overflow-x-auto border-b border-slate-200 px-1"
+      >
+        {workspaceTabs.map((tab, index) => (
+          <button
+            key={tab.id}
+            ref={(element) => { tabRefs.current[index] = element; }}
+            id={`facility-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`facility-panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            onClick={() => setActiveTab(tab.id)}
+            className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-tiba-blue ${
+              activeTab === tab.id
+                ? "border-tiba-blue text-tiba-blue"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
-        <FacilityFinanceSummaryCard facilityId={String(facilityId)} />
-      )}
+      <div
+        role="tabpanel"
+        id={`facility-panel-${activeTab}`}
+        aria-labelledby={`facility-tab-${activeTab}`}
+        tabIndex={0}
+        className="min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/30"
+      >
+      {activeTab === "overview" && (
+        <div className="space-y-6">
 
       {isSuperAdmin && canManageFacility && facilityId && (
         <FacilityProfileCard facility={facility} onEditContactAndHours={openSettingsModal} onSaved={invalidateWorkspace} />
@@ -1164,7 +1224,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             </Button>
           </div>
         )}
-        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+        <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
           <div className="space-y-3">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Contact</p>
@@ -1182,7 +1242,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-4">
+          <div className="border-t border-slate-200 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
             <div className="flex items-start gap-3">
               {financialsVisible ? (
                 <VisibilityIcon className="mt-0.5 text-success-600" />
@@ -1222,6 +1282,18 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           </div>
         </div>
       </Card>
+        </div>
+      )}
+
+      {activeTab === "administrators" && canManageAdmins && facilityId && (
+        <section id="facility-administrators">
+          <FacilityAdministratorsSection facilityId={String(facilityId)} />
+        </section>
+      )}
+
+      {activeTab === "finance" && canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
+        <FacilityFinanceSummaryCard facilityId={String(facilityId)} />
+      )}
 
 
       <Modal
@@ -1282,7 +1354,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </div>
       </Modal>
 
-      <Card
+      {activeTab === "services" && <Card
         title="Facility services"
         description="Choose the exact services this facility offers. Normal and telemedicine services are managed separately."
         badge={`${activeServiceCount} active`}
@@ -1422,7 +1494,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             )}
           </div>
         )}
-      </Card>
+      </Card>}
 
       <Modal
         open={serviceRequestModalOpen}
@@ -1476,7 +1548,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </div>
       </Modal>
 
-      {showOperationalSections && (
+      {activeTab === "operations" && showOperationalSections && (
         <>
       <Card
         title="Facility providers"
@@ -1911,6 +1983,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       </Modal>
         </>
       )}
+      </div>
     </div>
   );
 };
