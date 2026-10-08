@@ -34,6 +34,7 @@ import {
   updateFacilityService
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
+import { FacilityProfileCard } from "../../components/FacilityProfileCard";
 import { FacilityAdminAccessCard } from "../../components/FacilityAdminAccessCard";
 import {
   cancelFacilityServiceRequest,
@@ -1138,6 +1139,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
       {canManageFinance && facilityId && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope)) && (
         <FacilityFinanceSummaryCard facilityId={String(facilityId)} />
+      )}
+
+      {isSuperAdmin && canManageFacility && facilityId && (
+        <FacilityProfileCard facility={facility} onEditContactAndHours={openSettingsModal} onSaved={invalidateWorkspace} />
       )}
 
       <Card title="Facility settings">

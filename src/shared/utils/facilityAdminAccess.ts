@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import type { FacilityAdminAccess } from "../libs/facilities";
 import { classifyApiError } from "./errors";
 
-export type FacilityAdminAccessLabel = "Pending" | "Expired" | "Account active";
+export type FacilityAdminAccessLabel = "Pending" | "Expired" | "Account active" | "Suspended" | "Removed";
 
 export type FacilityAdminAccessState = {
   label: FacilityAdminAccessLabel;
@@ -13,11 +13,19 @@ export type FacilityAdminAccessState = {
   canSendResetLink: boolean;
 };
 
-// The three states a super admin sees. An account that has finished setup is "Account active"
+// The states a super admin sees. An account that has finished setup is "Account active"
 // whatever its old invitation looks like; otherwise the invitation decides between Pending and
 // Expired. A superseded (revoked) invitation with no live replacement reads as Expired, and an
 // invitation that was never sent reads as Pending.
 export const facilityAdminAccessState = (admin: FacilityAdminAccess): FacilityAdminAccessState => {
+  // Neither a suspended account nor a removed assignment can be recovered from here: no setup
+  // invitation or reset link is offered, and the API refuses both anyway.
+  if (!admin.active) {
+    return { label: "Removed", canResendInvitation: false, canSendResetLink: false };
+  }
+  if (admin.userStatus === "suspended") {
+    return { label: "Suspended", canResendInvitation: false, canSendResetLink: false };
+  }
   if (admin.userStatus === "active" || admin.invitation.status === "completed") {
     return { label: "Account active", canResendInvitation: false, canSendResetLink: true };
   }

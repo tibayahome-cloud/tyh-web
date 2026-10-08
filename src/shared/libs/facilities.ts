@@ -124,15 +124,37 @@ export type FacilityAdminInvitationResendResult = {
   invitationExpiresAt: string | null;
 };
 
+export type FacilityAdminEmailChange = {
+  status: "pending_verification" | "unchanged";
+  email: string;
+  expiresInSeconds: number | null;
+};
+
 export type FacilityAdminAccess = {
   id: string;
   facilityId: string;
   userId: string;
+  fullName: string;
   email: string;
+  phone: string | null;
   userStatus: string;
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
   roleKey: string;
   active: boolean;
+  assignmentStatus: "active" | "removed";
+  removedAt: string | null;
   invitation: FacilityAdminInvitationStatus;
+  // A new address waiting for its verification link; the current address stays in use until then.
+  pendingEmail: string | null;
+};
+
+// Only these fields are editable, as the API accepts them.
+export type FacilityAdminProfileInput = Partial<{ fullName: string; phone: string | null; email: string }>;
+
+export type FacilityAdminProfileResult = {
+  admin: Pick<FacilityAdminAccess, "userId" | "fullName" | "email" | "phone" | "phoneVerifiedAt">;
+  emailChange: FacilityAdminEmailChange | null;
 };
 
 export type FacilityCreateResult = {
@@ -391,10 +413,17 @@ export const fetchFacilityAdminAccess = async (facilityId: string): Promise<Faci
       id: String(raw.id ?? ""),
       facilityId: String(raw.facility_id ?? ""),
       userId: String(raw.user_id ?? ""),
+      fullName: String(raw.full_name ?? ""),
       email: String(raw.email ?? ""),
+      phone: raw.phone ? String(raw.phone) : null,
       userStatus: String(raw.user_status ?? "pending"),
+      emailVerifiedAt: raw.email_verified_at ? String(raw.email_verified_at) : null,
+      phoneVerifiedAt: raw.phone_verified_at ? String(raw.phone_verified_at) : null,
       roleKey: String(raw.role_key ?? "admin.ops"),
-      active: Boolean(raw.active),
+      active: Boolean(raw.active) && raw.assignment_status !== "removed",
+      assignmentStatus: raw.assignment_status === "removed" || raw.active === false ? "removed" : "active",
+      removedAt: raw.removed_at ? String(raw.removed_at) : null,
+      pendingEmail: raw.email_change ? String((raw.email_change as Record<string, unknown>).email ?? "") || null : null,
       invitation: {
         status: String(invitation.status ?? "not_issued") as FacilityAdminInvitationStatus["status"],
         resetId: invitation.reset_id ? String(invitation.reset_id) : null,
@@ -403,6 +432,36 @@ export const fetchFacilityAdminAccess = async (facilityId: string): Promise<Faci
       }
     };
   });
+};
+
+export const updateFacilityAdminProfile = async (
+  facilityId: string,
+  userId: string,
+  input: FacilityAdminProfileInput
+): Promise<FacilityAdminProfileResult> => {
+  const body: Record<string, unknown> = {};
+  if (input.fullName !== undefined) body.full_name = input.fullName;
+  if (input.phone !== undefined) body.phone = input.phone;
+  if (input.email !== undefined) body.email = input.email;
+  const response = await api.patch(`/facilities/${facilityId}/admins/${userId}`, body);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  const change = data.email_change as Record<string, unknown> | null | undefined;
+  return {
+    admin: {
+      userId: String(data.user_id ?? userId),
+      fullName: String(data.full_name ?? ""),
+      email: String(data.email ?? ""),
+      phone: data.phone ? String(data.phone) : null,
+      phoneVerifiedAt: data.phone_verified_at ? String(data.phone_verified_at) : null
+    },
+    emailChange: change
+      ? {
+          status: change.status === "unchanged" ? "unchanged" : "pending_verification",
+          email: String(change.email ?? ""),
+          expiresInSeconds: typeof change.expires_in_seconds === "number" ? change.expires_in_seconds : null
+        }
+      : null
+  };
 };
 
 export const fetchFacilityAdminInvitationStatus = async (

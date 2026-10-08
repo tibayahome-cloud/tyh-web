@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import LockResetOutlinedIcon from "@mui/icons-material/LockResetOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
@@ -14,12 +15,21 @@ import {
   sendFacilityAdminPasswordReset,
   type FacilityAdminAccess
 } from "../../../shared/libs/facilities";
+import { FacilityAdminProfileEditor } from "./FacilityAdminProfileEditor";
 import { describeRecoveryError, facilityAdminAccessState } from "../../../shared/utils/facilityAdminAccess";
 
 const LABEL_CLASS: Record<string, string> = {
   Pending: "bg-amber-50 text-amber-800 ring-amber-200",
   Expired: "bg-red-50 text-red-700 ring-red-200",
-  "Account active": "bg-emerald-50 text-emerald-700 ring-emerald-200"
+  "Account active": "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  Suspended: "bg-slate-100 text-slate-700 ring-slate-300",
+  Removed: "bg-slate-100 text-slate-500 ring-slate-200"
+};
+
+const STATE_NOTE: Record<string, string> = {
+  Expired: "The invitation can no longer be used. Send a new one.",
+  Suspended: "This account is suspended. Reactivate it before sending a setup invitation or reset link.",
+  Removed: "This administrator was removed from the facility."
 };
 
 type Props = { facilityId: string };
@@ -32,6 +42,7 @@ export const FacilityAdminAccessCard = ({ facilityId }: Props) => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<FacilityAdminAccess | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const adminsQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId, "admins"],
@@ -81,15 +92,38 @@ export const FacilityAdminAccessCard = ({ facilityId }: Props) => {
         <div className="space-y-3">
           {adminsQuery.data.map((admin) => {
             const state = facilityAdminAccessState(admin);
+            const removed = state.label === "Removed";
+            const editing = editingId === admin.id;
             return (
               <div
                 key={admin.id}
-                className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${removed ? "border-slate-100 bg-slate-50" : "border-slate-200"}`}
               >
+                {editing ? (
+                  <FacilityAdminProfileEditor
+                    facilityId={facilityId}
+                    admin={admin}
+                    onCancel={() => setEditingId(null)}
+                    onSaved={(text) => {
+                      setEditingId(null);
+                      setError(null);
+                      setMessage(text);
+                      void refresh();
+                    }}
+                  />
+                ) : (
+                  <>
                 <div className="flex items-start gap-3">
                   <EmailOutlinedIcon className="mt-0.5 text-tiba-blue" aria-hidden="true" />
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{admin.email}</p>
+                    {admin.fullName && <p className="text-sm font-semibold text-slate-900">{admin.fullName}</p>}
+                    <p className={admin.fullName ? "text-sm text-slate-600" : "text-sm font-semibold text-slate-900"}>{admin.email}</p>
+                    {admin.phone && (
+                      <p className="text-sm text-slate-600">
+                        {admin.phone}
+                        {!admin.phoneVerifiedAt && <span className="ml-2 text-xs text-slate-500">Not verified</span>}
+                      </p>
+                    )}
                     <p className="mt-1">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${LABEL_CLASS[state.label]}`}
@@ -102,11 +136,33 @@ export const FacilityAdminAccessCard = ({ facilityId }: Props) => {
                         Invitation expires {new Date(admin.invitation.expiresAt).toLocaleString()}
                       </p>
                     )}
-                    {state.label === "Expired" && (
-                      <p className="mt-1 text-xs text-slate-500">The invitation can no longer be used. Send a new one.</p>
+                    {STATE_NOTE[state.label] && <p className="mt-1 text-xs text-slate-500">{STATE_NOTE[state.label]}</p>}
+                    {removed && admin.removedAt && (
+                      <p className="text-xs text-slate-500">Removed {new Date(admin.removedAt).toLocaleDateString()}</p>
+                    )}
+                    {admin.pendingEmail && !removed && (
+                      <p className="mt-1 text-xs text-amber-800">
+                        Waiting for {admin.pendingEmail} to be verified. {admin.email} stays the sign-in address until then.
+                      </p>
                     )}
                   </div>
                 </div>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                {!removed && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      setMessage(null);
+                      setError(null);
+                      setEditingId(admin.id);
+                    }}
+                  >
+                    <EditOutlinedIcon fontSize="small" aria-hidden="true" />
+                    Edit details
+                  </Button>
+                )}
                 {state.canResendInvitation && (
                   <Button
                     size="sm"
@@ -137,6 +193,9 @@ export const FacilityAdminAccessCard = ({ facilityId }: Props) => {
                     <LockResetOutlinedIcon fontSize="small" aria-hidden="true" />
                     Send password reset link
                   </Button>
+                )}
+                </div>
+                  </>
                 )}
               </div>
             );

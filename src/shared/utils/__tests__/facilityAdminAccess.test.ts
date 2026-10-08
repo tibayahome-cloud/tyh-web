@@ -8,10 +8,17 @@ const admin = (userStatus: string, invitation: FacilityAdminAccess["invitation"]
   id: "a-1",
   facilityId: "f-1",
   userId: "u-1",
+  fullName: "Ops Admin",
   email: "ops@clinic.test",
+  phone: null,
   userStatus,
+  emailVerifiedAt: null,
+  phoneVerifiedAt: null,
   roleKey: "admin.ops",
   active: true,
+  assignmentStatus: "active",
+  removedAt: null,
+  pendingEmail: null,
   invitation: { status: invitation, resetId: null, expiresAt: null, redeemedAt: null }
 });
 
@@ -23,6 +30,24 @@ const httpError = (status: number, message = "boom") =>
     config: {} as never,
     data: { error: { code: "x", name: "y", message } }
   });
+
+describe("facilityAdminAccessState: suspended and removed", () => {
+  it("offers no recovery action for a suspended account, even with an expired invitation", () => {
+    expect(facilityAdminAccessState(admin("suspended", "expired"))).toEqual({
+      label: "Suspended",
+      canResendInvitation: false,
+      canSendResetLink: false
+    });
+  });
+
+  it("offers no recovery action for a removed assignment", () => {
+    expect(facilityAdminAccessState({ ...admin("active", "completed"), active: false })).toEqual({
+      label: "Removed",
+      canResendInvitation: false,
+      canSendResetLink: false
+    });
+  });
+});
 
 describe("facilityAdminAccessState", () => {
   it.each([
@@ -45,12 +70,12 @@ describe("facilityAdminAccessState", () => {
     }
   );
 
-  it("never offers both actions at once", () => {
+  it("never offers both actions at once, and offers one unless the account is suspended", () => {
     for (const userStatus of ["pending", "active", "suspended"]) {
       for (const invitation of ["not_issued", "pending", "completed", "expired", "revoked"] as const) {
         const state = facilityAdminAccessState(admin(userStatus, invitation));
         expect(state.canResendInvitation && state.canSendResetLink).toBe(false);
-        expect(state.canResendInvitation || state.canSendResetLink).toBe(true);
+        expect(state.canResendInvitation || state.canSendResetLink).toBe(userStatus !== "suspended");
       }
     }
   });
