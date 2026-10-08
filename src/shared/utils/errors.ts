@@ -45,3 +45,15 @@ export function classifyApiError(err: unknown, fallback = "Something went wrong"
       return { category: err.response.status >= 500 ? "unavailable" : "unknown", message };
   }
 }
+// The API reports validation failures as `error.details = { field: ["message", ...] }`. Returns the
+// first message per field, or an empty object when the response carries none.
+export function getApiFieldErrors(err: unknown): Record<string, string> {
+  const details = (err as AxiosError<{ error?: { details?: unknown } }>)?.response?.data?.error?.details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return {};
+  const result: Record<string, string> = {};
+  for (const [field, value] of Object.entries(details as Record<string, unknown>)) {
+    const message = Array.isArray(value) ? value.map(String).join(" ") : typeof value === "string" ? value : "";
+    if (message) result[field] = message;
+  }
+  return result;
+}
