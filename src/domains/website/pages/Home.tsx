@@ -35,6 +35,8 @@ import diagnosticsImage from "../../../assets/images/service-nurse.png";
 import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
 import telemedicineHeroImage from "../../../assets/images/telemedicine-hero.webp";
+import labResultsReviewImage from "../../../assets/images/telemedicine/lab-results-review.webp";
+import specialistFollowUpImage from "../../../assets/images/telemedicine/generated/specialist-follow-up.webp";
 import mentalHealthImage from "../../../assets/images/telemedicine/mental-health-support.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
@@ -96,11 +98,38 @@ export const Home = () => {
     ];
 
     const packages = [
-        { name: "Tiba Basic", price: "KES 5,000", color: "blue" },
-        { name: "Tiba Family", price: "KES 15,000", color: "gold" },
-        { name: "Recover at Home", price: "KES 45,000", color: "gold" },
-        { name: "Senior Comfort", price: "KES 60,000", color: "blue" },
-        { name: "Premium Palliative", price: "KES 120,000", color: "gold" },
+        { name: "Tiba Basic", price: "KES 5,000", color: "blue", image: doctorImage },
+        { name: "Tiba Family", price: "KES 15,000", color: "gold", image: nursingImage },
+        { name: "Recover at Home", price: "KES 45,000", color: "blue", image: therapyImage },
+        { name: "Senior Comfort", price: "KES 60,000", color: "gold", image: elderlyImage },
+        { name: "Premium Palliative", price: "KES 120,000", color: "blue", image: diagnosticsImage },
+    ];
+
+    const introductoryServices = [
+        {
+            name: "Video Consultation",
+            description: "Talk to a licensed doctor online from anywhere.",
+            price: "KES 1,000",
+            unit: "per call",
+            image: telemedicineImage,
+            alt: "Doctor speaking with a patient by video",
+        },
+        {
+            name: "Drug & Lab Report Review",
+            description: "Get a professional review of your medicines or lab results.",
+            price: "KES 1,000",
+            unit: "per review",
+            image: labResultsReviewImage,
+            alt: "Laboratory report being reviewed",
+        },
+        {
+            name: "Specialist Consultation",
+            description: "Speak with a specialist about your health concerns.",
+            price: "KES 2,000",
+            unit: "per call",
+            image: specialistFollowUpImage,
+            alt: "Specialist providing a remote consultation",
+        },
     ];
 
     return (
@@ -427,36 +456,81 @@ export const Home = () => {
                 </div>
             </section>
 
-            {/* Care Packages */}
-            <section className="py-24 bg-slate-50">
+            {/* Services and care packages */}
+            <section className="py-16 md:py-20 bg-slate-50">
                 <div className="container mx-auto px-4 md:px-6">
-                    <SectionHeader title="Our Flagship Care Packages" />
+                    <SectionHeader
+                        title="Our Services & Care Packages"
+                        subtitle="Choose a one-time online consultation or review, or explore ongoing monthly care."
+                    />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <div className="mb-14">
+                        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-900">One-time telemedicine services</h3>
+                                <p className="mt-1 text-sm text-slate-600">Introductory prices for online care.</p>
+                            </div>
+                            <span className="text-sm font-medium text-slate-600">Pay per call or review</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            {introductoryServices.map((service) => (
+                                <button
+                                    key={service.name}
+                                    onClick={handleTelemedicineClick}
+                                    className="group flex min-h-36 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                                >
+                                    <img src={service.image} alt={service.alt} className="h-auto w-2/5 min-w-28 object-cover" />
+                                    <span className="flex min-w-0 flex-1 flex-col justify-between p-4">
+                                        <span>
+                                            <span className="block font-bold text-slate-900">{service.name}</span>
+                                            <span className="mt-1 block text-sm leading-snug text-slate-600">{service.description}</span>
+                                        </span>
+                                        <span className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                            <span className="font-bold text-tiba-blue">From {service.price}</span>
+                                            <span className="text-xs text-slate-500">{service.unit}</span>
+                                            <ArrowRight className="ml-auto h-4 w-4 text-tiba-blue transition group-hover:translate-x-1" aria-hidden="true" />
+                                        </span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-900">Ongoing care packages</h3>
+                                <p className="mt-1 text-sm text-slate-600">Monthly plans for you and your loved ones.</p>
+                            </div>
+                            <span className="text-sm font-medium text-slate-600">All prices shown per month</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
                         {packages.map((pkg, i) => (
                             <button
                                 key={i}
                                 onClick={handleServiceClick}
-                                className={`flex flex-col rounded-2xl overflow-hidden shadow-sm border border-slate-100 transition-transform hover:-translate-y-1 text-left`}
+                                className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                             >
-                                <div className={`p-6 text-center h-24 flex items-center justify-center bg-white`}>
-                                    <h3 className="leading-tight">{pkg.name}</h3>
-                                </div>
-                                <div className={`p-4 text-center ${pkg.color === 'blue' ? 'bg-tiba-blue text-white' : 'bg-tiba-gold text-white'}`}>
-                                    <span className="text-sm font-bold uppercase tracking-wider">{pkg.price}</span>
-                                    <span className="block text-[10px] opacity-75 mt-0.5">PER VISIT / MONTH</span>
-                                </div>
+                                <img src={pkg.image} alt="" className="h-32 w-full object-cover" />
+                                <span className="flex flex-1 flex-col justify-between p-4">
+                                    <span className="font-bold leading-snug text-slate-900">{pkg.name}</span>
+                                    <span className={`mt-4 flex items-baseline justify-between gap-2 rounded-lg px-3 py-2.5 text-white ${pkg.color === "blue" ? "bg-tiba-blue" : "bg-tiba-gold"}`}>
+                                        <span className="font-bold">{pkg.price}</span>
+                                        <span className="text-xs">/ month</span>
+                                    </span>
+                                </span>
                             </button>
                         ))}
-                    </div>
+                        </div>
 
-                    <div className="mt-16 text-center">
+                    <div className="mt-8 text-center">
                         <button
                             onClick={handleServiceClick}
                             className="text-tiba-blue font-bold hover:text-tiba-gold flex items-center justify-center gap-2 group mx-auto"
                         >
-                            View Detailed Care Packages <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            View All Services & Care Packages <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
+                    </div>
                     </div>
                 </div>
             </section>
