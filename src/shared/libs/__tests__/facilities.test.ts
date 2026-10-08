@@ -192,6 +192,30 @@ describe("facility API helpers", () => {
     expect(facilityUpdatePayload({ fastResponseEnabled: false })).toMatchObject({ fast_response_enabled: false });
   });
 
+  it("sends optional facility building and room details on create and update", async () => {
+    mockPost.mockResolvedValue({ data: { data: { facility: facilityResponse } } });
+    await createFacility({
+      name: "Nairobi Clinic",
+      facilityType: "clinic",
+      address: "Kilimani",
+      locationDetails: "Building B, 2nd floor, Room 3",
+      county: "Nairobi",
+      phones: [{ phone: "+254700000000", label: "Reception", isPrimary: true }],
+      email: "care@nairobi.test",
+      initialAdminEmail: "ops@nairobi.test",
+      lat: -1.2921,
+      lng: 36.8219,
+      operatingHours: [],
+      platformFeePercent: 10
+    });
+    expect(mockPost).toHaveBeenCalledWith("/facilities", expect.objectContaining({
+      location_details: "Building B, 2nd floor, Room 3"
+    }));
+    expect(facilityUpdatePayload({ locationDetails: "Block A, Suite 2" })).toEqual({
+      location_details: "Block A, Suite 2"
+    });
+  });
+
   it("assigns facility admin ops by email", async () => {
     mockPost.mockResolvedValueOnce({
       data: {
