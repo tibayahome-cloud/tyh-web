@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
@@ -68,6 +68,14 @@ export const FacilityAdministratorsSection = ({ facilityId }: Props) => {
   const [emailDialog, setEmailDialog] = useState<EmailDialog>(null);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
+
+  // Arriving from the facilities list's "Manage administrators" lands here.
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (window.location.hash === "#facility-administrators") {
+      sectionRef.current?.scrollIntoView?.({ block: "start" });
+    }
+  }, []);
 
   const queryKey = ["admin", "facilities", facilityId, "admins"];
   const adminsQuery = useQuery({ queryKey, queryFn: () => fetchFacilityAdminAccess(facilityId) });
@@ -169,7 +177,7 @@ export const FacilityAdministratorsSection = ({ facilityId }: Props) => {
   const admins = adminsQuery.data ?? [];
 
   return (
-    <section id="facility-administrators" aria-labelledby="facility-administrators-heading" className="scroll-mt-20">
+    <section ref={sectionRef} id="facility-administrators" aria-labelledby="facility-administrators-heading" className="scroll-mt-20">
       <Card
         title={<span id="facility-administrators-heading">Administrators</span>}
         subtitle="Who can manage this facility, and the state of their access and account."

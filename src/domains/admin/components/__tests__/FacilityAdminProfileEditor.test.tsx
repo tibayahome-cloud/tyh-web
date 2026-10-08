@@ -15,7 +15,7 @@ import { FacilityAdminProfileEditor, buildAdminProfileChanges } from "../Facilit
 const admin: FacilityAdminAccess = {
   id: "a-1", facilityId: "f-1", userId: "u-1", fullName: "Amina Ops", email: "amina@clinic.test",
   phone: "+254700000001", userStatus: "active", emailVerifiedAt: null, phoneVerifiedAt: "2026-09-01T00:00:00Z",
-  roleKey: "admin.ops", active: true, assignmentStatus: "active", removedAt: null, pendingEmail: null,
+  roleKey: "admin.ops", active: true, assignmentStatus: "active", suspendedAt: null, suspensionReason: null, removedAt: null, pendingEmail: null,
   invitation: { status: "completed", resetId: null, expiresAt: null, redeemedAt: null }
 };
 
