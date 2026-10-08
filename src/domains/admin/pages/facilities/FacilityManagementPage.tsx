@@ -769,8 +769,13 @@ const FacilityManagementPage = () => {
               <textarea
                 value={form.address}
                 onChange={(event) => updateForm("address", event.target.value)}
+                placeholder="e.g., Ngong Road, Karen, Nairobi"
+                aria-describedby="facility-street-address-hint"
                 className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20"
               />
+              <span id="facility-street-address-hint" className="mt-1 block text-xs text-slate-500">
+                Enter the street or road and area. The map pin marks the entrance; add floor or room details below.
+              </span>
             </label>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-slate-500">Choose the pin for the building entrance or main site.</p>

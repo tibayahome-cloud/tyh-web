@@ -230,7 +230,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
                 ))}
               </SelectField>
             )}
-            <Input label="Address" name="facility-address" value={form.address} error={errors.address} onChange={(e) => change("address", e.target.value)} />
+            <Input label="Street address" name="facility-address" value={form.address} error={errors.address} hint="Street or road and area, e.g. Ngong Road, Karen, Nairobi." placeholder="e.g., Ngong Road, Karen, Nairobi" onChange={(e) => change("address", e.target.value)} />
             <Input label="Building, floor, suite or room" name="facility-location-details" value={form.locationDetails} onChange={(e) => change("locationDetails", e.target.value)} placeholder="Building B, 2nd floor, Room 3" />
             <Input label="County" name="facility-county" value={form.county} error={errors.county} onChange={(e) => change("county", e.target.value)} />
             <Input label="Country code" name="facility-country" value={form.countryCode} error={errors.countryCode} hint="Two letters, for example KE." maxLength={2} onChange={(e) => change("countryCode", e.target.value.toUpperCase())} />
