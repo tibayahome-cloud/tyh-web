@@ -23,6 +23,7 @@ vi.mock("../../../../../shared/libs/telemedicineCatalog", () => ({
 
 import { fetchFacilityProviders } from "../../../../../shared/libs/facilities";
 import { fetchSelectableTelemedicineSubcategories } from "../../../../../shared/libs/telemedicineCatalog";
+import { MemoryRouter } from "react-router-dom";
 import { FacilityProvidersManager } from "../FacilityProvidersPage";
 
 const provider = (id: string, over: Record<string, unknown> = {}) => ({
@@ -41,11 +42,13 @@ const provider = (id: string, over: Record<string, unknown> = {}) => ({
   ...over
 });
 
-const renderManager = (embedded = false) =>
+const renderManager = (embedded = false, canViewDetails = false) =>
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <FacilityProvidersManager facilityId="facility-1" embedded={embedded} />
-    </QueryClientProvider>
+    <MemoryRouter>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <FacilityProvidersManager facilityId="facility-1" embedded={embedded} canViewDetails={canViewDetails} />
+      </QueryClientProvider>
+    </MemoryRouter>
   );
 
 describe("provider telemedicine readiness in the list", () => {
@@ -96,5 +99,17 @@ describe("provider telemedicine readiness in the list", () => {
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add provider/i })).toBeInTheDocument();
     expect(within(row.parentElement as HTMLElement).getByRole("button", { name: "Disable telemedicine" })).toBeInTheDocument();
+  });
+
+  it("links a platform admin to the provider's full profile, and no one else", async () => {
+    vi.mocked(fetchFacilityProviders).mockResolvedValue({ providers: [provider("f")] } as never);
+    const first = renderManager(true, true);
+    const link = await screen.findByRole("link", { name: "View details for Provider f" });
+    expect(link).toHaveAttribute("href", "/admin/providers/u-f");
+    first.unmount();
+
+    renderManager(true, false);
+    await screen.findByText("Provider f");
+    expect(screen.queryByRole("link", { name: /View details/ })).not.toBeInTheDocument();
   });
 });

@@ -1531,7 +1531,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
               Onboard an existing user
             </Button>
           </div>
-          <FacilityProvidersManager facilityId={String(facilityId)} embedded onChanged={() => void providersQuery.refetch()} />
+          <FacilityProvidersManager facilityId={String(facilityId)} embedded canViewDetails={isSuperAdmin} onChanged={() => void providersQuery.refetch()} />
         </section>
       )}
 
