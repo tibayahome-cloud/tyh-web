@@ -276,7 +276,6 @@ export const facilityServicePayload = (input: FacilityServiceInput): Record<stri
 
 export const facilityServiceUpdatePayload = (input: Partial<FacilityServiceInput>): Record<string, unknown> => {
   const payload: Record<string, unknown> = {};
-  if (input.serviceId !== undefined) payload.service_id = input.serviceId;
   if (input.priceCents !== undefined) payload.price_cents = input.priceCents;
   if (input.currency !== undefined) payload.currency = input.currency;
   if (input.estimateDurationMinutes !== undefined) payload.estimate_duration_minutes = input.estimateDurationMinutes;
