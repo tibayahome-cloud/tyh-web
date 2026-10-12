@@ -129,6 +129,8 @@ describe("facility workspace: setup checklist and providers", () => {
     expect(screen.getByRole("button", { name: "Set unavailable" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Edit$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /onboard an existing user/i })).toBeInTheDocument();
+    // A super admin can drill into the provider's full profile (schedule, specialties, onboarding).
+    expect(screen.getByRole("link", { name: "View details for Dr Gitobu" })).toHaveAttribute("href", "/admin/providers/u1");
   });
 
   it("shows no checklist or provider management to someone who cannot verify providers", async () => {
