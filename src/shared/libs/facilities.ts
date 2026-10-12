@@ -1,5 +1,5 @@
 import api from "./api";
-import { buildFieldParams, providerProfile } from "./fieldInclude";
+import { buildFieldParams, facilityProviderList } from "./fieldInclude";
 import { mapBooking, mapBookingListMeta, mapBookings } from "../schemas/booking";
 import type { Booking, BookingListMeta } from "../schemas/booking";
 import { mapProvider, mapProviders, type Provider } from "../schemas/provider";
@@ -724,7 +724,7 @@ export const fetchFacilityProviders = async (
   { page = 1, pageSize = 25, search, verified }: FacilityProviderListParams = {}
 ): Promise<FacilityProviderListResult> => {
   const params: Record<string, unknown> = {
-    ...buildFieldParams(providerProfile),
+    ...buildFieldParams(facilityProviderList),
     "filter[facility_id]": facilityId,
     "page[number]": page,
     "page[size]": pageSize
