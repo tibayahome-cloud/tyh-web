@@ -151,7 +151,9 @@ export const providerProfile: FieldPreset = {
       fields: ["id", "name", "provider_financials_visible"]
     },
     user: {
-      fields: ["id", "full_name", "email", "phone", "avatar_url"]
+      // status is needed to show whether the provider's account is active; without it the UI
+      // cannot tell an active account from one still waiting to finish setup.
+      fields: ["id", "full_name", "email", "phone", "avatar_url", "status"]
     },
     services: {
       fields: ["id", "service_id", "active"],
