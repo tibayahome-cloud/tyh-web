@@ -50,11 +50,20 @@ export type FacilityBookingListParams = {
   pageSize?: number;
   status?: string;
   facilityStatus?: string;
+  // true for telemedicine bookings, false for home-based care, undefined for both.
+  isTelemedicine?: boolean;
 };
+
+// How many bookings a facility has of each kind, in total and by status. Covers every booking, not
+// just the page or filter that was asked for.
+export type FacilityBookingKindCounts = { total: number; byStatus: Record<string, number> };
+export type FacilityBookingCounts = { home: FacilityBookingKindCounts; telemedicine: FacilityBookingKindCounts };
 
 export type FacilityBookingListResult = {
   bookings: Booking[];
   meta: BookingListMeta;
+  // Absent when the API predates the counts.
+  counts: FacilityBookingCounts | null;
   raw?: Record<string, unknown>;
 };
 
@@ -624,7 +633,7 @@ export const deleteFacilityService = async (facilityId: string, facilityServiceI
 
 export const fetchFacilityBookings = async (
   facilityId: string,
-  { page = 1, pageSize = 25, status, facilityStatus }: FacilityBookingListParams = {}
+  { page = 1, pageSize = 25, status, facilityStatus, isTelemedicine }: FacilityBookingListParams = {}
 ): Promise<FacilityBookingListResult> => {
   const params: Record<string, unknown> = {
     "page[number]": page,
@@ -632,12 +641,33 @@ export const fetchFacilityBookings = async (
   };
   if (status) params["filter[status]"] = status;
   if (facilityStatus) params["filter[facility_status]"] = facilityStatus;
+  if (isTelemedicine !== undefined) params["filter[is_telemedicine]"] = String(isTelemedicine);
 
   const response = await api.get(`/facilities/${facilityId}/bookings`, { params });
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const data = Array.isArray(payload.data) ? payload.data : [];
   const bookings = mapBookings(data);
-  return { bookings, meta: mapListMeta(payload.meta, page, pageSize, bookings.length), raw: payload };
+  return {
+    bookings,
+    meta: mapListMeta(payload.meta, page, pageSize, bookings.length),
+    counts: mapBookingCounts((payload.meta as Record<string, unknown> | undefined)?.counts),
+    raw: payload
+  };
+};
+
+const mapBookingKindCounts = (value: unknown): FacilityBookingKindCounts => {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const byStatus: Record<string, number> = {};
+  Object.entries((raw.by_status ?? {}) as Record<string, unknown>).forEach(([status, count]) => {
+    byStatus[status] = Number(count) || 0;
+  });
+  return { total: Number(raw.total) || 0, byStatus };
+};
+
+const mapBookingCounts = (value: unknown): FacilityBookingCounts | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  return { home: mapBookingKindCounts(raw.home), telemedicine: mapBookingKindCounts(raw.telemedicine) };
 };
 
 export const assignFacilityBookingProvider = async (

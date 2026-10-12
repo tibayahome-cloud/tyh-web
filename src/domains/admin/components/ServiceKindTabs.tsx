@@ -6,13 +6,18 @@ type Props = {
   active: ServiceKind;
   counts: Record<ServiceKind, { active: number; total: number }>;
   onChange: (kind: ServiceKind) => void;
+  // Names the group for assistive technology and ties the tabs to the panel they control.
+  label?: string;
+  panelId?: string;
+  // Replaces the default "N active of M" caption, e.g. for bookings.
+  caption?: (kind: ServiceKind, counts: { active: number; total: number }) => string;
 };
 
 const KINDS: ServiceKind[] = ["home", "telemedicine"];
 
 // Home-based care and telemedicine services are managed separately, so each has its own tab with
 // its own count. Arrow keys, Home and End move between them.
-export const ServiceKindTabs = ({ active, counts, onChange }: Props) => {
+export const ServiceKindTabs = ({ active, counts, onChange, label = "Service type", panelId = "service-kind-panel", caption }: Props) => {
   const refs = useRef<Record<ServiceKind, HTMLButtonElement | null>>({ home: null, telemedicine: null });
 
   const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -28,7 +33,7 @@ export const ServiceKindTabs = ({ active, counts, onChange }: Props) => {
   };
 
   return (
-    <div role="tablist" aria-label="Service type" className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 sm:inline-grid sm:min-w-[360px]">
+    <div role="tablist" aria-label={label} className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 sm:inline-grid sm:min-w-[360px]">
       {KINDS.map((kind, index) => {
         const selected = active === kind;
         return (
@@ -39,9 +44,9 @@ export const ServiceKindTabs = ({ active, counts, onChange }: Props) => {
             }}
             type="button"
             role="tab"
-            id={`service-kind-${kind}`}
+            id={`${panelId}-${kind}`}
             aria-selected={selected}
-            aria-controls="service-kind-panel"
+            aria-controls={panelId}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(kind)}
             onKeyDown={(event) => move(event, index)}
@@ -49,7 +54,7 @@ export const ServiceKindTabs = ({ active, counts, onChange }: Props) => {
           >
             {SERVICE_KIND_LABEL[kind]}
             <span className="ml-1.5 text-xs font-medium text-slate-500">
-              {counts[kind].active} active{counts[kind].total !== counts[kind].active ? ` of ${counts[kind].total}` : ""}
+              {caption ? caption(kind, counts[kind]) : `${counts[kind].active} active${counts[kind].total !== counts[kind].active ? ` of ${counts[kind].total}` : ""}`}
             </span>
           </button>
         );

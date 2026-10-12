@@ -577,6 +577,44 @@ describe("facility API helpers", () => {
     });
   });
 
+  it("filters facility bookings by kind and reads the counts per kind and status", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [],
+        meta: {
+          page: { number: 1, size: 15, total: 0, total_pages: 1 },
+          counts: {
+            home: { total: 3, by_status: { requested: 1, fully_completed: 2 } },
+            telemedicine: { total: 1, by_status: { scheduled: 1 } }
+          }
+        }
+      }
+    });
+
+    const result = await fetchFacilityBookings("facility-1", { pageSize: 15, status: "requested,disputed", isTelemedicine: true });
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/bookings", {
+      params: { "page[number]": 1, "page[size]": 15, "filter[status]": "requested,disputed", "filter[is_telemedicine]": "true" }
+    });
+    expect(result.counts).toEqual({
+      home: { total: 3, byStatus: { requested: 1, fully_completed: 2 } },
+      telemedicine: { total: 1, byStatus: { scheduled: 1 } }
+    });
+  });
+
+  it("sends isTelemedicine false as false, and nothing when no kind is asked for", async () => {
+    mockGet.mockResolvedValue({ data: { data: [], meta: {} } });
+    await fetchFacilityBookings("facility-1", { isTelemedicine: false });
+    expect(mockGet.mock.calls.at(-1)?.[1]).toEqual({ params: { "page[number]": 1, "page[size]": 25, "filter[is_telemedicine]": "false" } });
+    await fetchFacilityBookings("facility-1", {});
+    expect(mockGet.mock.calls.at(-1)?.[1]).toEqual({ params: { "page[number]": 1, "page[size]": 25 } });
+  });
+
+  it("has no counts when the API does not send them", async () => {
+    mockGet.mockResolvedValueOnce({ data: { data: [], meta: { page: { number: 1, size: 25, total: 0, total_pages: 1 } } } });
+    expect((await fetchFacilityBookings("facility-1")).counts).toBeNull();
+  });
+
   it("assigns a provider to a facility booking with backend field names", async () => {
     mockPost.mockResolvedValueOnce({
       data: {
