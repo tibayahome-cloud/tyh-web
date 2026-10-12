@@ -1,7 +1,7 @@
 /**
  * The facility workspace shows what is missing before telemedicine works, and lets a super admin
  * manage the facility's providers on the same page: the setup checklist on Overview, and the full
- * provider management screen in the Providers & bookings tab.
+ * provider management screen in the Providers tab.
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
@@ -71,12 +71,12 @@ const readyProvider = {
 const inPerson = { id: "fs1", facilityId: "facility-1", serviceId: "x", priceCents: 1, currency: "KES", estimateDurationMinutes: 30, active: true, isEmergencyCapable: false, deliveryMode: "in_person", service: null };
 const remote = { ...inPerson, id: "fs2", serviceId: "svc1", deliveryMode: "remote" };
 
-const renderPage = () =>
+const renderPage = (props: { showOperationalSections?: boolean } = {}) =>
   render(
     <MemoryRouter initialEntries={["/admin/facilities/facility-1"]}>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <Routes>
-          <Route path="/admin/facilities/:facilityId" element={<FacilityWorkspacePage />} />
+          <Route path="/admin/facilities/:facilityId" element={<FacilityWorkspacePage {...props} />} />
         </Routes>
       </QueryClientProvider>
     </MemoryRouter>
@@ -114,14 +114,14 @@ describe("facility workspace: setup checklist and providers", () => {
 
     expect(await screen.findByText("No providers.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Go to Providers" }));
-    expect(screen.getByRole("tab", { name: "Providers & bookings" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Providers" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByRole("button", { name: /add provider/i })).toBeInTheDocument();
   });
 
   it("manages providers in the facility workspace: readiness, lifecycle and telemedicine controls", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("tab", { name: "Providers & bookings" }));
+    await user.click(await screen.findByRole("tab", { name: "Providers" }));
 
     expect(await screen.findByText("Dr Gitobu")).toBeInTheDocument();
     expect(screen.getByText("Ready for telemedicine bookings")).toBeInTheDocument();
@@ -129,18 +129,38 @@ describe("facility workspace: setup checklist and providers", () => {
     expect(screen.getByRole("button", { name: "Set unavailable" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Edit$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /onboard an existing user/i })).toBeInTheDocument();
+    // A super admin can drill into the provider's full profile (schedule, specialties, onboarding).
+    expect(screen.getByRole("link", { name: "View details for Dr Gitobu" })).toHaveAttribute("href", "/admin/providers/u1");
+  });
+
+  it("shows Providers to a super admin on the platform-admin route, which hides the booking queue", async () => {
+    // routes.tsx renders the workspace with showOperationalSections={false} for /admin/facilities/:id.
+    const user = userEvent.setup();
+    renderPage({ showOperationalSections: false });
+
+    expect(await screen.findByText("Telemedicine setup")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Bookings" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Providers" }));
+    expect(await screen.findByText("Dr Gitobu")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disable telemedicine" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add provider/i })).toBeInTheDocument();
+  });
+
+  it("keeps the booking queue on its own Bookings tab when operational sections are on", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Bookings" }));
+    expect(await screen.findByText("Facility booking queue")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add provider/i })).not.toBeInTheDocument();
   });
 
   it("shows no checklist or provider management to someone who cannot verify providers", async () => {
     denied = ["provider:verify"];
     renderPage();
-    const user = userEvent.setup();
     await screen.findByRole("tab", { name: "Overview" });
     await waitFor(() => expect(screen.queryByText("Telemedicine setup")).not.toBeInTheDocument());
-    // The bookings tab stays for booking managers, but without provider management.
-    await user.click(screen.getByRole("tab", { name: "Providers & bookings" }));
-    expect(screen.queryByRole("button", { name: /add provider/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Providers" })).not.toBeInTheDocument();
+    // No Providers tab, and no provider request, without the permission.
+    expect(screen.queryByRole("tab", { name: "Providers" })).not.toBeInTheDocument();
     expect(fetchFacilityProviders).not.toHaveBeenCalled();
   });
 });

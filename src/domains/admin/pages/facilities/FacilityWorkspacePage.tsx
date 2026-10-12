@@ -35,6 +35,8 @@ import {
   updateFacilityService
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
+import { ServiceKindTabs } from "../../components/ServiceKindTabs";
+import { defaultServiceKind, splitServicesByKind, type ServiceKind } from "../../../../shared/utils/facilityServiceKinds";
 import { FacilityProvidersManager } from "./FacilityProvidersPage";
 import { FacilitySetupChecklist as FacilitySetupChecklistCard } from "../../components/FacilitySetupChecklist";
 import { facilitySetupChecklist } from "../../../../shared/utils/telemedicineReadiness";
@@ -164,7 +166,7 @@ type FacilityWorkspacePageProps = {
   showOperationalSections?: boolean;
 };
 
-type WorkspaceTab = "overview" | "administrators" | "services" | "operations" | "finance";
+type WorkspaceTab = "overview" | "administrators" | "services" | "providers" | "operations" | "finance";
 
 type FacilitySettingsFormState = {
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
@@ -450,11 +452,14 @@ const WorkspaceStat = ({ label, value }: { label: string; value: string }) => (
 
 const ServiceRow = ({
   service,
+  detail,
   onEdit,
   onDisable,
   canManage
 }: {
   service: FacilityService;
+  // For telemedicine, the category and specialty the service belongs to.
+  detail?: string | null;
   onEdit: (service: FacilityService) => void;
   onDisable: (service: FacilityService) => void;
   canManage: boolean;
@@ -466,6 +471,7 @@ const ServiceRow = ({
         <p className="mt-1 text-sm text-slate-500">
           {formatMoney(service.priceCents, service.currency)} • {service.estimateDurationMinutes ?? "-"} min
         </p>
+        {detail && <p className="mt-0.5 text-xs text-slate-500">{detail}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
@@ -593,11 +599,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     { id: "overview", label: "Overview", available: true },
     { id: "administrators", label: "Administrators", available: canManageAdmins },
     { id: "services", label: "Services", available: canReadFacilities },
-    {
-      id: "operations",
-      label: "Providers & bookings",
-      available: showOperationalSections && (canVerifyProviders || canManageBookings)
-    },
+    // Providers do not depend on showOperationalSections: the platform admin route turns that off to
+    // hide the booking queue, but a super admin still has to manage a facility's providers here.
+    { id: "providers", label: "Providers", available: canVerifyProviders },
+    { id: "operations", label: "Bookings", available: showOperationalSections && canManageBookings },
     { id: "finance", label: "Finance", available: canManageFinance }
   ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
@@ -619,6 +624,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [serviceRequestModalOpen, setServiceRequestModalOpen] = useState(false);
   const [serviceRequestForm, setServiceRequestForm] = useState<ServiceRequestFormState>(initialServiceRequestForm);
   const [serviceRequestFormError, setServiceRequestFormError] = useState<string | null>(null);
+  const [serviceKind, setServiceKind] = useState<ServiceKind | null>(null);
   const [serviceSearch, setServiceSearch] = useState("");
   const [servicePage, setServicePage] = useState(1);
   const [providerModalOpen, setProviderModalOpen] = useState(false);
@@ -701,7 +707,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const providersQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId, "providers"],
     queryFn: () => fetchFacilityProviders(String(facilityId)),
-    enabled: showOperationalSections && Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
+    enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const bookingsQuery = useQuery({
@@ -716,9 +722,19 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
   const facility = facilityQuery.data;
   const facilityServices = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
+  const telemedicineIdSet = useMemo(
+    () => new Set((telemedicineServicesQuery.data ?? []).map((service) => service.id)),
+    [telemedicineServicesQuery.data]
+  );
+  const { home: homeServices, telemedicine: telemedicineFacilityServices } = useMemo(
+    () => splitServicesByKind(facilityServices, telemedicineIdSet),
+    [facilityServices, telemedicineIdSet]
+  );
+  const activeServiceKind = serviceKind ?? defaultServiceKind(homeServices.length, telemedicineFacilityServices.length);
+  const kindServices = activeServiceKind === "telemedicine" ? telemedicineFacilityServices : homeServices;
   const filteredFacilityServices = useMemo(
-    () => filterFacilityServicesBySearch(facilityServices, serviceSearch),
-    [facilityServices, serviceSearch]
+    () => filterFacilityServicesBySearch(kindServices, serviceSearch),
+    [kindServices, serviceSearch]
   );
   const {
     items: paginatedFacilityServices,
@@ -786,6 +802,16 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     });
   }, [catalogQuery.data, telemedicineCategoriesQuery.data, telemedicineServicesQuery.data, telemedicineSubcategoriesQuery.data]);
 
+  const telemedicineSpecialtyByServiceId = useMemo(
+    () =>
+      new Map(
+        telemedicineCatalogServices.map((service) => [
+          service.id,
+          [service.categoryName, service.subcategoryName].filter(Boolean).join(" / ") || null
+        ])
+      ),
+    [telemedicineCatalogServices]
+  );
   const telemedicineServiceIds = useMemo(
     () => new Set(telemedicineCatalogServices.map((service) => service.id)),
     [telemedicineCatalogServices]
@@ -817,6 +843,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   });
 
   const activeServiceCount = facilityServices.filter((service) => service.active).length;
+
+  const editingTelemedicineService = Boolean(editingService && telemedicineServiceIds.has(editingService.serviceId));
 
   const selectedCatalogServiceIsRemoteCapable = useMemo(() => {
     const selected = (catalogQuery.data ?? []).find((service) => service.id === serviceForm.serviceId);
@@ -1003,7 +1031,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     setEditingService(service ?? null);
     setServiceForm(service ? mapServiceForm(service) : initialServiceForm);
     setBulkServiceRows([]);
-    setCatalogServiceType(service && telemedicineServiceIds.has(service.serviceId) ? "telemedicine" : "normal");
+    setCatalogServiceType(service ? (telemedicineServiceIds.has(service.serviceId) ? "telemedicine" : "normal") : activeServiceKind === "telemedicine" ? "telemedicine" : "normal");
     setServiceFormError(null);
     setServiceModalOpen(true);
   };
@@ -1329,12 +1357,32 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
       {activeTab === "services" && <Card
         title="Facility services"
-        description="Choose the exact services this facility offers. Normal and telemedicine services are managed separately."
+        description="Home-based care and telemedicine services are set up and priced separately for this facility."
         badge={`${activeServiceCount} active`}
       >
+        <ServiceKindTabs
+          active={activeServiceKind}
+          counts={{
+            home: { active: homeServices.filter((service) => service.active).length, total: homeServices.length },
+            telemedicine: { active: telemedicineFacilityServices.filter((service) => service.active).length, total: telemedicineFacilityServices.length }
+          }}
+          onChange={(kind) => {
+            setServiceKind(kind);
+            setServiceSearch("");
+            setServicePage(1);
+          }}
+        />
+        <div id="service-kind-panel" role="tabpanel" aria-labelledby={`service-kind-${activeServiceKind}`}>
+        {telemedicineServicesQuery.isError && (
+          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert">
+            We could not load the telemedicine catalogue, so telemedicine services may be listed under Home-based care until it loads.
+          </p>
+        )}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-500">
-            Select an active catalog service to offer at this facility, with your own price and duration.
+            {activeServiceKind === "telemedicine"
+              ? "Telemedicine services are always remote. Set this facility's own price and duration. Providers need the matching telemedicine specialty to be bookable."
+              : "Select an active catalog service to offer at this facility, with your own price and duration."}
           </p>
           {canManageServices && (
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -1344,13 +1392,13 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
               </Button>
               <Button className="w-full sm:w-auto" onClick={() => openServiceModal()}>
                 <AddIcon fontSize="small" />
-                Add facility services
+                {activeServiceKind === "telemedicine" ? "Add telemedicine services" : "Add home-based care services"}
               </Button>
             </div>
           )}
         </div>
 
-        {facilityServices.length > 0 && (
+        {kindServices.length > 0 && (
           <div className="mb-4">
             <Input
               label="Search services"
@@ -1364,10 +1412,14 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           </div>
         )}
 
-        {servicesQuery.isLoading ? (
+        {servicesQuery.isLoading || telemedicineServicesQuery.isLoading ? (
           <Loading />
-        ) : facilityServices.length === 0 ? (
-          <p className="text-sm text-slate-600">No facility services configured.</p>
+        ) : kindServices.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-600">
+            {activeServiceKind === "telemedicine"
+              ? "No telemedicine services at this facility yet. Add the services its providers can deliver, then make sure those providers have the matching specialties."
+              : "No home-based care services at this facility yet."}
+          </p>
         ) : filteredFacilityServices.length === 0 ? (
           <p className="text-sm text-slate-600">No services match "{serviceSearch}".</p>
         ) : (
@@ -1377,6 +1429,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                 <ServiceRow
                   key={service.id}
                   service={service}
+                  detail={telemedicineSpecialtyByServiceId.get(service.serviceId) ?? null}
                   canManage={canManageServices}
                   onEdit={openServiceModal}
                   onDisable={(target) => {
@@ -1467,6 +1520,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             )}
           </div>
         )}
+        </div>
       </Card>}
 
       <Modal
@@ -1521,9 +1575,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </div>
       </Modal>
 
-      {activeTab === "operations" && showOperationalSections && (
-        <>
-      {canVerifyProviders && facilityId && (
+      {activeTab === "providers" && canVerifyProviders && facilityId && (
         <section aria-labelledby="facility-providers-heading" className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -1534,10 +1586,12 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
               Onboard an existing user
             </Button>
           </div>
-          <FacilityProvidersManager facilityId={String(facilityId)} embedded onChanged={() => void providersQuery.refetch()} />
+          <FacilityProvidersManager facilityId={String(facilityId)} embedded canViewDetails={isSuperAdmin} onChanged={() => void providersQuery.refetch()} />
         </section>
       )}
 
+      {activeTab === "operations" && showOperationalSections && (
+        <>
       <Card
         title="Facility booking queue"
         description="Assign or reassign providers for bookings routed to this facility."
@@ -1612,6 +1666,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                   />
                   Active
                 </label>
+                {!editingTelemedicineService && (
                 <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800">
                   <input
                     type="checkbox"
@@ -1621,7 +1676,13 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                   />
                   Emergency capable
                 </label>
+                )}
               </div>
+              {editingTelemedicineService ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  Delivery: remote only. Telemedicine services are always delivered by video.
+                </p>
+              ) : (
               <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
                 <span>Delivery mode</span>
                 <select
@@ -1638,6 +1699,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                   <span className="text-xs text-slate-500">This service isn&apos;t enabled for remote delivery in the global catalog.</span>
                 )}
               </label>
+              )}
             </>
           ) : (
             <>

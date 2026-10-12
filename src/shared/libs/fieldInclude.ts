@@ -230,8 +230,18 @@ export const providerDetail: FieldPreset = {
         }
       }
     },
+    // The slot engine works from the local start and end times, so those are what to show.
     availability: {
-      fields: ["id", "weekday", "start_time", "end_time", "effective_from", "effective_to"]
+      fields: ["id", "weekday", "start_time", "end_time", "start_time_local", "end_time_local", "delivery_mode", "effective_from", "effective_to"]
+    },
+    telemedicine_subcategory_assignments: {
+      fields: ["id", "subcategory_id", "status"],
+      children: {
+        subcategory: {
+          fields: ["id", "name", "status", "category_id"],
+          children: { category: { fields: ["id", "name", "status"] } }
+        }
+      }
     },
     blackouts: {
       fields: ["id", "start_at", "end_at", "reason"]

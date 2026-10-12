@@ -5,14 +5,14 @@ type Props = {
   steps: ChecklistStep[];
   firstMissing: ChecklistStep | null;
   // Opens the workspace tab where a missing step is fixed.
-  onOpenTab: (tab: "services" | "operations") => void;
+  onOpenTab: (tab: "services" | "providers") => void;
 };
 
-const TAB_FOR_STEP: Record<string, "services" | "operations" | undefined> = {
+const TAB_FOR_STEP: Record<string, "services" | "providers" | undefined> = {
   services: "services",
-  providers: "operations",
-  ready: "operations",
-  coverage: "operations"
+  providers: "providers",
+  ready: "providers",
+  coverage: "providers"
 };
 
 // Whether clients can book this facility for telemedicine, as a list of steps, with the first

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AddIcon from "@mui/icons-material/PersonAddAltOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -260,9 +261,12 @@ const ReadinessLine = ({ provider, selectableIds }: { provider: Provider; select
 export const FacilityProvidersManager = ({
   facilityId,
   embedded = false,
+  canViewDetails = false,
   onChanged
 }: {
   facilityId: string;
+  // Platform admins can open a provider's full profile (schedule, specialties, onboarding, services).
+  canViewDetails?: boolean;
   // Inside the facility workspace the page already has a title, so the large heading is dropped.
   embedded?: boolean;
   // Called after anything that changes a provider, so a host page can refresh its own copies.
@@ -472,6 +476,15 @@ export const FacilityProvidersManager = ({
                     <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.isAvailable ? "unavailable" : "available")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
                     <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
                     <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
+                    {canViewDetails && (
+                      <Link
+                        to={`/admin/providers/${provider.userId}`}
+                        aria-label={`View details for ${provider.user?.fullName ?? provider.user?.email ?? "provider"}`}
+                        className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-tiba-blue hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-tiba-blue/30"
+                      >
+                        View details
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

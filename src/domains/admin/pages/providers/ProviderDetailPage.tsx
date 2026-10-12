@@ -2,7 +2,7 @@ import classNames from "classnames";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -17,6 +17,8 @@ import { StickyActionBar } from "../../../../shared/components/StickyActionBar";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
+import { ProviderAvailabilityCard } from "../../components/ProviderAvailabilityCard";
+import { ProviderTelemedicineCard } from "../../components/ProviderTelemedicineCard";
 import { buildFieldParams, providerApplicationAdmin, providerDetail, svcCard } from "../../../../shared/libs/fieldInclude";
 
 type ProviderUser = {
@@ -43,8 +45,22 @@ type ProviderAvailabilityEntry = {
   weekday: string;
   startTime: string;
   endTime: string;
+  // The times the slot engine uses, in the provider's local time. Absent on an older API.
+  startTimeLocal: string | null;
+  endTimeLocal: string | null;
+  deliveryMode: string | null;
   effectiveFrom: string | null;
   effectiveTo: string | null;
+};
+
+type ProviderSpecialtyEntry = {
+  id: string;
+  subcategoryId: string;
+  status: string;
+  name: string;
+  subcategoryStatus: string | null;
+  categoryName: string | null;
+  categoryStatus: string | null;
 };
 
 type ProviderBlackoutEntry = {
@@ -68,6 +84,10 @@ type ProviderDetail = {
   locationUpdatedAt: string | null;
   zoneId: string | null;
   user: ProviderUser | null;
+  timezone: string | null;
+  facility: { id: string; name: string } | null;
+  telemedicineEnabled: boolean;
+  specialties: ProviderSpecialtyEntry[];
   services: ProviderServiceEntry[];
   availability: ProviderAvailabilityEntry[];
   blackouts: ProviderBlackoutEntry[];
@@ -194,27 +214,6 @@ const formatCurrency = (value: number | null) => {
   }
 };
 
-const formatWeekday = (weekday: string) => {
-  switch (weekday) {
-    case "mon":
-      return "Monday";
-    case "tue":
-      return "Tuesday";
-    case "wed":
-      return "Wednesday";
-    case "thu":
-      return "Thursday";
-    case "fri":
-      return "Friday";
-    case "sat":
-      return "Saturday";
-    case "sun":
-      return "Sunday";
-    default:
-      return weekday;
-  }
-};
-
 const StatusPill = ({
   label,
   tone = "default",
@@ -241,7 +240,7 @@ const StatusPill = ({
   );
 };
 
-const mapProviderDetail = (resource: unknown): ProviderDetail => {
+export const mapProviderDetail = (resource: unknown): ProviderDetail => {
   if (!resource || typeof resource !== "object") {
     throw new Error("Invalid provider payload");
   }
@@ -263,6 +262,8 @@ const mapProviderDetail = (resource: unknown): ProviderDetail => {
   const servicesRaw = (attributes as { services?: unknown[] }).services ?? [];
   const availabilityRaw = (attributes as { availability?: unknown[] }).availability ?? [];
   const blackoutsRaw = (attributes as { blackouts?: unknown[] }).blackouts ?? [];
+  const specialtiesRaw = (attributes as { telemedicine_subcategory_assignments?: unknown[] }).telemedicine_subcategory_assignments ?? [];
+  const facilityRaw = (attributes as { facility?: Record<string, unknown> | null }).facility;
 
   const mapService = (entry: unknown): ProviderServiceEntry | null => {
     if (!entry || typeof entry !== "object") {
@@ -304,6 +305,9 @@ const mapProviderDetail = (resource: unknown): ProviderDetail => {
       weekday: coerceString(node.weekday) ?? "",
       startTime: coerceString(node.start_time) ?? "",
       endTime: coerceString(node.end_time) ?? "",
+      startTimeLocal: coerceString(node.start_time_local),
+      endTimeLocal: coerceString(node.end_time_local),
+      deliveryMode: coerceString(node.delivery_mode),
       effectiveFrom: coerceString(node.effective_from),
       effectiveTo: coerceString(node.effective_to),
     };
@@ -356,6 +360,28 @@ const mapProviderDetail = (resource: unknown): ProviderDetail => {
     ratingCount: coerceNumber((attributes as { rating_count?: unknown }).rating_count),
     timezone: coerceString((attributes as { timezone?: unknown }).timezone),
     user,
+    facility:
+      facilityRaw && typeof facilityRaw === "object" && facilityRaw.id
+        ? { id: normalizeId(facilityRaw.id), name: coerceString(facilityRaw.name) ?? "Facility" }
+        : null,
+    telemedicineEnabled: coerceBoolean((attributes as { telemedicine_enabled?: unknown }).telemedicine_enabled),
+    specialties: specialtiesRaw
+      .map((entry): ProviderSpecialtyEntry | null => {
+        if (!entry || typeof entry !== "object") return null;
+        const node = entry as Record<string, unknown>;
+        const subcategory = (node.subcategory ?? {}) as Record<string, unknown>;
+        const category = (subcategory.category ?? {}) as Record<string, unknown>;
+        return {
+          id: normalizeId(node.id),
+          subcategoryId: normalizeId(node.subcategory_id ?? subcategory.id),
+          status: coerceString(node.status) ?? "active",
+          name: coerceString(subcategory.name) ?? "Specialty",
+          subcategoryStatus: coerceString(subcategory.status),
+          categoryName: coerceString(category.name),
+          categoryStatus: coerceString(category.status)
+        };
+      })
+      .filter((entry): entry is ProviderSpecialtyEntry => Boolean(entry)),
     services: servicesRaw.map(mapService).filter((entry): entry is ProviderServiceEntry => Boolean(entry)),
     availability: availabilityRaw.map(mapAvailability).filter((entry): entry is ProviderAvailabilityEntry => Boolean(entry)),
     blackouts: blackoutsRaw.map(mapBlackout).filter((entry): entry is ProviderBlackoutEntry => Boolean(entry)),
@@ -1037,6 +1063,14 @@ const ProviderDetailPage = () => {
                   {provider.user?.email && <span>{provider.user.email}</span>}
                   {provider.user?.phone && <span>{provider.user.phone}</span>}
                 </div>
+                {provider.facility && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    Facility:{" "}
+                    <Link className="font-medium text-tiba-blue hover:underline" to={`/admin/facilities/${provider.facility.id}`}>
+                      {provider.facility.name}
+                    </Link>
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {heroStatusPills.map((pill) => (
@@ -1293,29 +1327,16 @@ const ProviderDetailPage = () => {
         )}
       </Card>
 
+      <ProviderTelemedicineCard
+        verified={provider.verified}
+        telemedicineEnabled={provider.telemedicineEnabled}
+        accountStatus={provider.user?.status ?? null}
+        specialties={provider.specialties}
+        windows={provider.availability}
+      />
+
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Availability" description="Weekly schedule for this provider.">
-          {provider.availability.length === 0 ? (
-            <p className="text-sm text-slate-600">No availability configured.</p>
-          ) : (
-            <ul className="space-y-2 text-sm text-slate-600">
-              {provider.availability.map((slot) => (
-                <li key={slot.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <span className="font-medium text-slate-900">{formatWeekday(slot.weekday)}</span>
-                  <span className="ml-2">
-                    {slot.startTime} – {slot.endTime}
-                  </span>
-                  {(slot.effectiveFrom || slot.effectiveTo) && (
-                    <span className="ml-2 text-xs text-slate-500">
-                      {slot.effectiveFrom ? `From ${new Date(slot.effectiveFrom).toLocaleDateString()}` : ""}
-                      {slot.effectiveTo ? ` until ${new Date(slot.effectiveTo).toLocaleDateString()}` : ""}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        <ProviderAvailabilityCard windows={provider.availability} timezone={provider.timezone} />
         <Card title="Blackouts" description="Upcoming blackout periods.">
           {provider.blackouts.length === 0 ? (
             <p className="text-sm text-slate-600">No blackouts scheduled.</p>
