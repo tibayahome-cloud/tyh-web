@@ -32,6 +32,7 @@ import {
   resendFacilityAdminInvitation,
   sendFacilityAdminPasswordReset,
   facilityServiceUpdatePayload,
+  updateFacilityService,
   updateFacilityStatus,
   updateFacilityProviderCompensation,
   updateFacilityProvider,
@@ -317,11 +318,39 @@ describe("facility API helpers", () => {
     expect(result).toEqual({ invitationSent: true, invitationExpiresAt: "2026-08-04T11:00:00Z" });
   });
 
-  it("keeps facility service partial update payloads partial", () => {
-    expect(facilityServiceUpdatePayload({ active: false, priceCents: 120000 })).toEqual({
+  it("omits the immutable service id from facility service update payloads", () => {
+    expect(facilityServiceUpdatePayload({ serviceId: "service-1", active: false, priceCents: 120000 })).toEqual({
       active: false,
       price_cents: 120000
     });
+  });
+
+  it("patches all editable service fields without sending the catalogue service id", async () => {
+    const editableFields = {
+      price_cents: 120050,
+      currency: "KES",
+      estimate_duration_minutes: 45,
+      active: false,
+      is_emergency_capable: false,
+      delivery_mode: "in_person"
+    };
+    mockPatch.mockResolvedValueOnce({
+      data: { data: { id: "offering-1", service_id: "service-1", ...editableFields } }
+    });
+
+    const result = await updateFacilityService("facility-1", "offering-1", {
+      serviceId: "service-1",
+      priceCents: 120050,
+      currency: "KES",
+      estimateDurationMinutes: 45,
+      active: false,
+      isEmergencyCapable: false,
+      deliveryMode: "in_person"
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith("/facilities/facility-1/services/offering-1", editableFields);
+    expect(result.priceCents).toBe(120050);
+    expect(result.serviceId).toBe("service-1");
   });
 
   it("updates facility lifecycle status with backend field names", async () => {
