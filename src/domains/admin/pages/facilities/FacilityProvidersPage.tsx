@@ -10,6 +10,7 @@ import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { classifyApiError, getApiError } from "../../../../shared/utils/errors";
+import { providerTelemedicineReadiness } from "../../../../shared/utils/telemedicineReadiness";
 import { describeProviderSaveError, findStaleSubcategories, type StaleSubcategory } from "../../../../shared/utils/telemedicineSelection";
 import {
   createFacilityProvider,
@@ -241,7 +242,32 @@ const ProviderFormFields = ({
   );
 };
 
-const FacilityProvidersPage = () => {
+// Says whether clients can book this provider for telemedicine, and if not, the first step to do.
+const ReadinessLine = ({ provider, selectableIds }: { provider: Provider; selectableIds: ReadonlySet<string> | null }) => {
+  const { ready, blockers } = providerTelemedicineReadiness(provider, selectableIds);
+  if (ready) {
+    return <p className="mt-1 text-xs font-medium text-green-700">Ready for telemedicine bookings</p>;
+  }
+  return (
+    <p className="mt-1 text-xs text-amber-800" role="status">
+      <span className="font-medium">Not bookable for telemedicine:</span> {blockers.map((blocker) => blocker.label).join(", ")}. {blockers[0].fix}
+    </p>
+  );
+};
+
+// The full provider management screen for one facility. The facility admin's own page and the
+// super-admin facility workspace both render it, so both manage providers the same way.
+export const FacilityProvidersManager = ({
+  facilityId,
+  embedded = false,
+  onChanged
+}: {
+  facilityId: string;
+  // Inside the facility workspace the page already has a title, so the large heading is dropped.
+  embedded?: boolean;
+  // Called after anything that changes a provider, so a host page can refresh its own copies.
+  onChanged?: () => void;
+}) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -249,8 +275,6 @@ const FacilityProvidersPage = () => {
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [lifecyclePendingKey, setLifecyclePendingKey] = useState<string | null>(null);
 
-  const facilitiesQuery = useAdminFacilityScope(true);
-  const facilityId = facilitiesQuery.facility?.id;
   const providersQuery = useQuery({
     queryKey: ["admin", "facility-providers", facilityId, search],
     queryFn: () => fetchFacilityProviders(facilityId as string, { search: search || undefined }),
@@ -287,7 +311,14 @@ const FacilityProvidersPage = () => {
         : [],
     [telemedicineSubcategoriesQuery.isSuccess, telemedicineSubcategoriesQuery.data, form.telemedicineSubcategoryIds, editingProvider]
   );
-  const invalidateProviders = () => void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
+  const invalidateProviders = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
+    onChanged?.();
+  };
+  const selectableIds = useMemo(
+    () => (telemedicineSubcategoriesQuery.isSuccess ? new Set(telemedicineSubcategoriesQuery.data.map((item) => item.id)) : null),
+    [telemedicineSubcategoriesQuery.isSuccess, telemedicineSubcategoriesQuery.data]
+  );
 
   const createMutation = useMutation({
     mutationFn: () => createFacilityProvider(facilityId as string, {
@@ -367,19 +398,7 @@ const FacilityProvidersPage = () => {
   const isLifecyclePending = (provider: Provider, action: ProviderLifecycleAction) =>
     lifecyclePendingKey === `${provider.userId}:${action}`;
 
-  if (facilitiesQuery.isLoading) return <Loading fullHeight />;
-  if (facilitiesQuery.isError) {
-    return (
-      <Card title="Providers">
-        <ApiErrorBanner
-          {...classifyApiError(facilitiesQuery.error, "We couldn't load your facility right now.")}
-          onRetry={() => facilitiesQuery.refetch()}
-        />
-      </Card>
-    );
-  }
-  if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
-  if (providersQuery.isLoading) return <Loading fullHeight />;
+  if (providersQuery.isLoading) return embedded ? <Loading /> : <Loading fullHeight />;
 
   const openCreate = () => {
     setEditingProvider(null);
@@ -393,11 +412,17 @@ const FacilityProvidersPage = () => {
   };
 
   return (
-    <div className="space-y-5 pb-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-tiba-blue">Facility operations</p><h1 className="mt-1 text-2xl font-bold text-slate-950">Providers</h1><p className="mt-1 text-sm text-slate-500">Manage providers, services, compensation, and financial visibility.</p></div>
-        <Button size="sm" onClick={openCreate}><AddIcon fontSize="small" />{showForm ? "Close form" : "Add provider"}</Button>
-      </div>
+    <div className={embedded ? "space-y-5" : "space-y-5 pb-6"}>
+      {embedded ? (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={openCreate}><AddIcon fontSize="small" />{showForm ? "Close form" : "Add provider"}</Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-tiba-blue">Facility operations</p><h1 className="mt-1 text-2xl font-bold text-slate-950">Providers</h1><p className="mt-1 text-sm text-slate-500">Manage providers, services, compensation, and financial visibility.</p></div>
+          <Button size="sm" onClick={openCreate}><AddIcon fontSize="small" />{showForm ? "Close form" : "Add provider"}</Button>
+        </div>
+      )}
 
       {(showForm || editingProvider) && (
         <Card title={editingProvider ? "Edit provider" : "Add provider"} subtitle={editingProvider ? "Changes apply only to this facility provider." : "The provider will receive an invitation when an email is supplied."}>
@@ -431,7 +456,7 @@ const FacilityProvidersPage = () => {
           <div className="divide-y divide-slate-100">
             {providersQuery.data?.providers.map((provider) => (
               <div key={provider.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.telemedicineSubcategoryAssignments.length} remote specialties · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p></div>
+                <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.telemedicineSubcategoryAssignments.length} remote specialties · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p><ReadinessLine provider={provider} selectableIds={selectableIds} /></div>
                 <div className="flex flex-col gap-2 sm:items-end">
                   {/* State first, on its own line -- actions below, so the two never mix into one wrapped blob. */}
                   <div className="flex flex-wrap gap-1.5 text-xs font-semibold sm:justify-end">
@@ -461,6 +486,25 @@ const FacilityProvidersPage = () => {
       </Card>
     </div>
   );
+};
+
+const FacilityProvidersPage = () => {
+  const facilitiesQuery = useAdminFacilityScope(true);
+  const facilityId = facilitiesQuery.facility?.id;
+
+  if (facilitiesQuery.isLoading) return <Loading fullHeight />;
+  if (facilitiesQuery.isError) {
+    return (
+      <Card title="Providers">
+        <ApiErrorBanner
+          {...classifyApiError(facilitiesQuery.error, "We couldn't load your facility right now.")}
+          onRetry={() => facilitiesQuery.refetch()}
+        />
+      </Card>
+    );
+  }
+  if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
+  return <FacilityProvidersManager facilityId={facilityId} />;
 };
 
 export default FacilityProvidersPage;

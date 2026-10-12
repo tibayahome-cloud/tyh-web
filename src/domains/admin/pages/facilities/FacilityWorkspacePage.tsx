@@ -35,6 +35,9 @@ import {
   updateFacilityService
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
+import { FacilityProvidersManager } from "./FacilityProvidersPage";
+import { FacilitySetupChecklist as FacilitySetupChecklistCard } from "../../components/FacilitySetupChecklist";
+import { facilitySetupChecklist } from "../../../../shared/utils/telemedicineReadiness";
 import { FacilityProfileCard } from "../../components/FacilityProfileCard";
 import { FacilityAdministratorsSection } from "../../components/FacilityAdministratorsSection";
 import {
@@ -52,8 +55,7 @@ import type {
 import {
   PROVIDER_COMPENSATION_MODES,
   WEEKDAYS,
-  formatOperatingHoursSummary,
-  formatProviderCompensation
+  formatOperatingHoursSummary
 } from "../../../../shared/schemas/facility";
 import type { FacilityOperatingHour, FacilityPhone, Provider } from "../../../../shared/schemas/facility";
 import type { Booking } from "../../../../shared/schemas/booking";
@@ -63,6 +65,7 @@ import { useRbac } from "../../../../shared/hooks/useRbac";
 import { FacilityFinanceSummaryCard } from "./FacilityFinanceSummaryCard";
 import {
   fetchTelemedicineAdminCategories,
+  fetchSelectableTelemedicineSubcategories,
   fetchTelemedicineAdminServices,
   fetchTelemedicineAdminSubcategories
 } from "../../../../shared/libs/telemedicineCatalog";
@@ -496,51 +499,6 @@ const ServiceRow = ({
   </article>
 );
 
-const ProviderRow = ({
-  provider,
-  onEditCompensation,
-  canManage
-}: {
-  provider: Provider;
-  onEditCompensation: (provider: Provider) => void;
-  canManage: boolean;
-}) => (
-  <article className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
-        <h3 className="truncate text-sm font-semibold text-slate-900">{providerName(provider)}</h3>
-        <p className="mt-1 break-words text-sm text-slate-500">{provider.user?.email ?? provider.userId}</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-          {provider.verified ? "Verified" : "Unverified"}
-        </span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-          {provider.isAvailable ? "Available" : "Offline"}
-        </span>
-      </div>
-    </div>
-    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-      <div>
-        <p className="text-xs font-semibold uppercase text-slate-500">Compensation</p>
-        <p className="mt-1 text-slate-800">{formatProviderCompensation(provider.compensation)}</p>
-      </div>
-      <div>
-        <p className="text-xs font-semibold uppercase text-slate-500">Services</p>
-        <p className="mt-1 text-slate-800">{provider.services.filter((service) => service.active).length} active</p>
-      </div>
-    </div>
-    {canManage && (
-      <div className="mt-4 flex justify-end">
-        <Button size="sm" variant="outline" onClick={() => onEditCompensation(provider)}>
-          <EditIcon fontSize="small" />
-          Compensation
-        </Button>
-      </div>
-    )}
-  </article>
-);
-
 // Owns its own tick so the once-a-second countdown only rerenders this small block, not the
 // whole booking row (or, before that, the whole page) that every other row's tick used to.
 const FacilityResponseCountdown = memo(({ dueAt }: { dueAt: string | null | undefined }) => {
@@ -663,7 +621,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const [serviceRequestFormError, setServiceRequestFormError] = useState<string | null>(null);
   const [serviceSearch, setServiceSearch] = useState("");
   const [servicePage, setServicePage] = useState(1);
-  const [providerSearch, setProviderSearch] = useState("");
   const [providerModalOpen, setProviderModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [providerForm, setProviderForm] = useState<ProviderCompensationFormState>(initialProviderForm);
@@ -742,11 +699,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   });
 
   const providersQuery = useQuery({
-    queryKey: ["admin", "facilities", facilityId, "providers", providerSearch],
-    queryFn: () =>
-      fetchFacilityProviders(String(facilityId), {
-        search: providerSearch.trim() || undefined
-      }),
+    queryKey: ["admin", "facilities", facilityId, "providers"],
+    queryFn: () => fetchFacilityProviders(String(facilityId)),
     enabled: showOperationalSections && Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
@@ -775,6 +729,22 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     [filteredFacilityServices, servicePage]
   );
   const providers = useMemo(() => providersQuery.data?.providers ?? [], [providersQuery.data?.providers]);
+  // Same query as the providers screen, so the two share one request.
+  const selectableSpecialtiesQuery = useQuery({
+    queryKey: ["telemedicine", "catalog", "subcategories"],
+    queryFn: () => fetchSelectableTelemedicineSubcategories(),
+    enabled: Boolean(facilityId) && canVerifyProviders
+  });
+  const setupChecklist = useMemo(() => {
+    if (!facility || !providersQuery.isSuccess || !servicesQuery.isSuccess || !selectableSpecialtiesQuery.isSuccess) return null;
+    return facilitySetupChecklist({
+      facility,
+      facilityServices: servicesQuery.data ?? [],
+      catalogServices: (telemedicineServicesQuery.data ?? []).map((service) => ({ id: service.id, subcategoryId: service.subcategoryId })),
+      providers,
+      selectableSubcategoryIds: new Set(selectableSpecialtiesQuery.data.map((item) => item.id))
+    });
+  }, [facility, providersQuery.isSuccess, servicesQuery.isSuccess, servicesQuery.data, selectableSpecialtiesQuery.isSuccess, selectableSpecialtiesQuery.data, telemedicineServicesQuery.data, providers]);
   const facilityBookings = bookingsQuery.data?.bookings ?? [];
   const assignableProviders = useMemo(
     () => filterAssignableProviders(assignmentBooking, providers),
@@ -1210,6 +1180,9 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       >
       {activeTab === "overview" && (
         <div className="space-y-6">
+      {setupChecklist && (
+        <FacilitySetupChecklistCard steps={setupChecklist.steps} firstMissing={setupChecklist.firstMissing} onOpenTab={setActiveTab} />
+      )}
 
       {isSuperAdmin && canManageFacility && facilityId && (
         <FacilityProfileCard facility={facility} onEditContactAndHours={openSettingsModal} onSaved={invalidateWorkspace} />
@@ -1550,45 +1523,20 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
       {activeTab === "operations" && showOperationalSections && (
         <>
-      <Card
-        title="Facility providers"
-        description="Onboard existing users into this facility and manage provider compensation."
-        badge={`${providers.length} listed`}
-      >
-        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-          <Input
-            label="Search providers"
-            value={providerSearch}
-            onChange={(event) => setProviderSearch(event.target.value)}
-            placeholder="Name, email, or phone"
-          />
-          {hasPermission("provider:verify") && (
-            <Button className="w-full md:w-auto" onClick={() => openProviderModal()}>
-              <AddIcon fontSize="small" />
-              Bootstrap provider
+      {canVerifyProviders && facilityId && (
+        <section aria-labelledby="facility-providers-heading" className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 id="facility-providers-heading" className="text-base font-semibold text-slate-900">Providers</h2>
+              <p className="text-sm text-slate-500">Add providers, verify them, switch telemedicine on, assign specialties and manage compensation.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => openProviderModal()}>
+              Onboard an existing user
             </Button>
-          )}
-        </div>
-
-        {providersQuery.isLoading ? (
-          <Loading />
-        ) : providersQuery.isError ? (
-          <p className="text-sm text-danger-600">{extractErrorMessage(providersQuery.error)}</p>
-        ) : providers.length === 0 ? (
-          <p className="text-sm text-slate-600">No providers are currently visible for this facility.</p>
-        ) : (
-          <div className="grid gap-3">
-            {providers.map((provider) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                canManage={canManageFacility}
-                onEditCompensation={openProviderModal}
-              />
-            ))}
           </div>
-        )}
-      </Card>
+          <FacilityProvidersManager facilityId={String(facilityId)} embedded onChanged={() => void providersQuery.refetch()} />
+        </section>
+      )}
 
       <Card
         title="Facility booking queue"

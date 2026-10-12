@@ -179,6 +179,16 @@ export const providerProfile: FieldPreset = {
   }
 };
 
+// The facility provider list also needs each provider's availability windows and their delivery
+// mode, so the page can say whether a provider can take telemedicine bookings.
+export const facilityProviderList: FieldPreset = {
+  ...providerProfile,
+  includes: {
+    ...providerProfile.includes,
+    availability: { fields: ["id", "weekday", "delivery_mode"] }
+  }
+};
+
 export const providerDetail: FieldPreset = {
   resource: "providers",
   fields: [
