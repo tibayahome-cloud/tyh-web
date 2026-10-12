@@ -48,7 +48,7 @@ vi.mock("../../../../../shared/hooks/useRbac", () => ({
 vi.mock("../FacilityFinanceSummaryCard", () => ({ FacilityFinanceSummaryCard: () => null }));
 vi.mock("../../../components/FacilityAdministratorsSection", () => ({ FacilityAdministratorsSection: () => null }));
 
-import { fetchFacility, fetchFacilityProviders, fetchFacilityServices } from "../../../../../shared/libs/facilities";
+import { fetchFacility, fetchFacilityBookings, fetchFacilityProviders, fetchFacilityServices } from "../../../../../shared/libs/facilities";
 import type { Facility } from "../../../../../shared/schemas/facility";
 import FacilityWorkspacePage from "../FacilityWorkspacePage";
 
@@ -133,25 +133,45 @@ describe("facility workspace: setup checklist and providers", () => {
     expect(screen.getByRole("link", { name: "View details for Dr Gitobu" })).toHaveAttribute("href", "/admin/providers/u1");
   });
 
-  it("shows Providers to a super admin on the platform-admin route, which hides the booking queue", async () => {
-    // routes.tsx renders the workspace with showOperationalSections={false} for /admin/facilities/:id.
+  it("shows Providers and Bookings to a super admin on the platform-admin route", async () => {
+    // routes.tsx renders the workspace with showOperationalSections={false} for /admin/facilities/:id; a super admin still gets both tabs.
     const user = userEvent.setup();
     renderPage({ showOperationalSections: false });
 
     expect(await screen.findByText("Telemedicine setup")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Bookings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Bookings" })).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Providers" }));
     expect(await screen.findByText("Dr Gitobu")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Disable telemedicine" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add provider/i })).toBeInTheDocument();
   });
 
-  it("keeps the booking queue on its own Bookings tab when operational sections are on", async () => {
+  it("keeps bookings on their own Bookings tab, apart from provider management", async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole("tab", { name: "Bookings" }));
-    expect(await screen.findByText("Facility booking queue")).toBeInTheDocument();
+    expect(await screen.findByText("Facility bookings")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add provider/i })).not.toBeInTheDocument();
+  });
+
+  it("lets a super admin see a facility's bookings by kind and assign a provider from the Bookings tab", async () => {
+    vi.mocked(fetchFacilityBookings).mockResolvedValue({
+      bookings: [
+        { id: "b1", status: "requested", scheduledAt: null, createdAt: "2026-10-12T08:00:00Z", priceCents: 150000, currency: "KES", paidAt: null, isTelemedicine: false, telemedicineSession: null,
+          service: { id: "s1", name: "Nurse Visit at Home" }, client: { id: "c1", fullName: "Amina Client" }, provider: null }
+      ],
+      meta: { page: { number: 1, size: 15, total: 1, totalPages: 1 } },
+      counts: { home: { total: 1, byStatus: { requested: 1 } }, telemedicine: { total: 0, byStatus: {} } }
+    } as never);
+    const user = userEvent.setup();
+    renderPage({ showOperationalSections: false });
+    await user.click(await screen.findByRole("tab", { name: "Bookings" }));
+
+    expect(await screen.findByText("Nurse Visit at Home")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Booking type" })).toBeInTheDocument();
+    expect(vi.mocked(fetchFacilityBookings).mock.calls.at(-1)?.[1]).toMatchObject({ isTelemedicine: false });
+    await user.click(screen.getByRole("button", { name: "Assign provider" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/Assign provider/);
   });
 
   it("shows no checklist or provider management to someone who cannot verify providers", async () => {

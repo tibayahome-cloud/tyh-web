@@ -25,7 +25,6 @@ import {
   deleteFacilityService,
   assignFacilityBookingProvider,
   fetchFacility,
-  fetchFacilityBookings,
   fetchFacilityProviders,
   fetchFacilityServices,
   bootstrapFacilityProvider,
@@ -37,6 +36,7 @@ import {
 import { useAdminFacilityScope } from "../finance/paymentAccess";
 import { ServiceKindTabs } from "../../components/ServiceKindTabs";
 import { defaultServiceKind, splitServicesByKind, type ServiceKind } from "../../../../shared/utils/facilityServiceKinds";
+import { FacilityBookingsPanel } from "../../components/FacilityBookingsPanel";
 import { FacilityProvidersManager } from "./FacilityProvidersPage";
 import { FacilitySetupChecklist as FacilitySetupChecklistCard } from "../../components/FacilitySetupChecklist";
 import { facilitySetupChecklist } from "../../../../shared/utils/telemedicineReadiness";
@@ -602,7 +602,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     // Providers do not depend on showOperationalSections: the platform admin route turns that off to
     // hide the booking queue, but a super admin still has to manage a facility's providers here.
     { id: "providers", label: "Providers", available: canVerifyProviders },
-    { id: "operations", label: "Bookings", available: showOperationalSections && canManageBookings },
+    { id: "operations", label: "Bookings", available: canManageBookings },
     { id: "finance", label: "Finance", available: canManageFinance }
   ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
@@ -710,16 +710,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
-  const bookingsQuery = useQuery({
-    queryKey: ["admin", "facilities", facilityId, "bookings", "assignment"],
-    queryFn: () =>
-      fetchFacilityBookings(String(facilityId), {
-        pageSize: 25,
-        facilityStatus: "pending,claimed"
-      }),
-    enabled: showOperationalSections && Boolean(facilityId) && canReadFacilities && canManageBookings && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
-  });
-
   const facility = facilityQuery.data;
   const facilityServices = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
   const telemedicineIdSet = useMemo(
@@ -761,7 +751,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       selectableSubcategoryIds: new Set(selectableSpecialtiesQuery.data.map((item) => item.id))
     });
   }, [facility, providersQuery.isSuccess, servicesQuery.isSuccess, servicesQuery.data, selectableSpecialtiesQuery.isSuccess, selectableSpecialtiesQuery.data, telemedicineServicesQuery.data, providers]);
-  const facilityBookings = bookingsQuery.data?.bookings ?? [];
   const assignableProviders = useMemo(
     () => filterAssignableProviders(assignmentBooking, providers),
     [assignmentBooking, providers]
@@ -1372,7 +1361,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             setServicePage(1);
           }}
         />
-        <div id="service-kind-panel" role="tabpanel" aria-labelledby={`service-kind-${activeServiceKind}`}>
+        <div id="service-kind-panel" role="tabpanel" aria-labelledby={`service-kind-panel-${activeServiceKind}`}>
         {telemedicineServicesQuery.isError && (
           <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert">
             We could not load the telemedicine catalogue, so telemedicine services may be listed under Home-based care until it loads.
@@ -1590,35 +1579,11 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </section>
       )}
 
-      {activeTab === "operations" && showOperationalSections && (
-        <>
-      <Card
-        title="Facility booking queue"
-        description="Assign or reassign providers for bookings routed to this facility."
-        badge={`${facilityBookings.length} open`}
-      >
-        {!canManageBookings ? (
-          <p className="text-sm text-slate-600">You do not have permission to manage facility bookings.</p>
-        ) : bookingsQuery.isLoading ? (
-          <Loading />
-        ) : bookingsQuery.isError ? (
-          <p className="text-sm text-danger-600">{extractErrorMessage(bookingsQuery.error)}</p>
-        ) : facilityBookings.length === 0 ? (
-          <p className="text-sm text-slate-600">No pending facility bookings.</p>
-        ) : (
-          <div className="grid gap-3">
-            {facilityBookings.map((booking) => (
-              <FacilityBookingRow
-                key={booking.id}
-                booking={booking}
-                canAssign={canManageBookings && canVerifyProviders}
-                onAssign={openAssignmentModal}
-              />
-            ))}
-          </div>
-        )}
-      </Card>
-        </>
+      {activeTab === "operations" && canManageBookings && facilityId && (
+        <FacilityBookingsPanel
+          facilityId={String(facilityId)}
+          onAssign={canVerifyProviders ? openAssignmentModal : undefined}
+        />
       )}
 
       <Modal
@@ -1935,8 +1900,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </>
       )}
 
-      {showOperationalSections && (
-        <>
+      {/* Not tied to showOperationalSections: a super admin assigns from the Bookings tab on the platform route. */}
       <Modal
         open={Boolean(assignmentBooking)}
         title={assignmentBooking?.provider ? "Reassign provider" : "Assign provider"}
@@ -1991,8 +1955,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
           </div>
         </div>
       </Modal>
-        </>
-      )}
       </div>
     </div>
   );
