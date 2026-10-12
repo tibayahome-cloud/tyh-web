@@ -164,7 +164,7 @@ type FacilityWorkspacePageProps = {
   showOperationalSections?: boolean;
 };
 
-type WorkspaceTab = "overview" | "administrators" | "services" | "operations" | "finance";
+type WorkspaceTab = "overview" | "administrators" | "services" | "providers" | "operations" | "finance";
 
 type FacilitySettingsFormState = {
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
@@ -593,11 +593,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     { id: "overview", label: "Overview", available: true },
     { id: "administrators", label: "Administrators", available: canManageAdmins },
     { id: "services", label: "Services", available: canReadFacilities },
-    {
-      id: "operations",
-      label: "Providers & bookings",
-      available: showOperationalSections && (canVerifyProviders || canManageBookings)
-    },
+    // Providers do not depend on showOperationalSections: the platform admin route turns that off to
+    // hide the booking queue, but a super admin still has to manage a facility's providers here.
+    { id: "providers", label: "Providers", available: canVerifyProviders },
+    { id: "operations", label: "Bookings", available: showOperationalSections && canManageBookings },
     { id: "finance", label: "Finance", available: canManageFinance }
   ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
@@ -701,7 +700,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const providersQuery = useQuery({
     queryKey: ["admin", "facilities", facilityId, "providers"],
     queryFn: () => fetchFacilityProviders(String(facilityId)),
-    enabled: showOperationalSections && Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
+    enabled: Boolean(facilityId) && canReadFacilities && canVerifyProviders && (!isFacilityAdmin || (facilityScopeQuery.isSuccess && hasFacilityScope))
   });
 
   const bookingsQuery = useQuery({
@@ -1521,9 +1520,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </div>
       </Modal>
 
-      {activeTab === "operations" && showOperationalSections && (
-        <>
-      {canVerifyProviders && facilityId && (
+      {activeTab === "providers" && canVerifyProviders && facilityId && (
         <section aria-labelledby="facility-providers-heading" className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -1538,6 +1535,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         </section>
       )}
 
+      {activeTab === "operations" && showOperationalSections && (
+        <>
       <Card
         title="Facility booking queue"
         description="Assign or reassign providers for bookings routed to this facility."

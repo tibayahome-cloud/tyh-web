@@ -106,7 +106,8 @@ describe("FacilityWorkspacePage super-admin controls", () => {
       "Overview",
       "Administrators",
       "Services",
-      "Providers & bookings",
+      "Providers",
+      "Bookings",
       "Finance"
     ]);
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");

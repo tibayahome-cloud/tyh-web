@@ -53,7 +53,7 @@ describe("FacilitySetupChecklist", () => {
     const user = userEvent.setup();
     const onOpenTab = renderChecklist(build({ providers: [] }));
     await user.click(screen.getByRole("button", { name: "Go to Providers" }));
-    expect(onOpenTab).toHaveBeenCalledWith("operations");
+    expect(onOpenTab).toHaveBeenCalledWith("providers");
   });
 
   it("offers no button for a step fixed on the profile, but still says what to do", () => {
