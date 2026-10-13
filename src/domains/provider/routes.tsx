@@ -1,23 +1,24 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import type { RouteObject } from "react-router-dom";
 import { Navigate, useRoutes } from "react-router-dom";
 
 import { Loading } from "../../shared/components/Loading";
 import { ProviderShell } from "./components/ProviderShell";
+import { lazyWithRetry } from "../../shared/utils/lazyWithRetry";
 
-const ProviderHome = lazy(() => import("./pages/Home"));
-const ProviderBookings = lazy(() => import("./pages/Bookings"));
-const ProviderTelemedicine = lazy(() => import("./pages/Telemedicine"));
-const ProviderOnboarding = lazy(() => import("./pages/Onboarding"));
-const ProviderServices = lazy(() => import("./pages/Services"));
-const ProviderAvailability = lazy(() => import("./pages/Availability"));
-const ProviderPayments = lazy(() => import("./pages/Payments"));
-const ProviderInbox = lazy(() => import("./pages/Inbox"));
-const ProviderSettings = lazy(() => import("./pages/Settings"));
-const ProviderProfile = lazy(() => import("./pages/Profile"));
-const ProviderSelfCare = lazy(() => import("./pages/SelfCare"));
-const NotificationsPage = lazy(() => import("../../shared/pages/Notifications/NotificationsPage"));
-const ProviderBookingDetail = lazy(() => import("./pages/BookingDetail"));
+const ProviderHome = lazyWithRetry(() => import("./pages/Home"));
+const ProviderBookings = lazyWithRetry(() => import("./pages/Bookings"));
+const ProviderTelemedicine = lazyWithRetry(() => import("./pages/Telemedicine"));
+const ProviderOnboarding = lazyWithRetry(() => import("./pages/Onboarding"));
+const ProviderServices = lazyWithRetry(() => import("./pages/Services"));
+const ProviderAvailability = lazyWithRetry(() => import("./pages/Availability"));
+const ProviderPayments = lazyWithRetry(() => import("./pages/Payments"));
+const ProviderInbox = lazyWithRetry(() => import("./pages/Inbox"));
+const ProviderSettings = lazyWithRetry(() => import("./pages/Settings"));
+const ProviderProfile = lazyWithRetry(() => import("./pages/Profile"));
+const ProviderSelfCare = lazyWithRetry(() => import("./pages/SelfCare"));
+const NotificationsPage = lazyWithRetry(() => import("../../shared/pages/Notifications/NotificationsPage"));
+const ProviderBookingDetail = lazyWithRetry(() => import("./pages/BookingDetail"));
 
 const buildRoutes = (): RouteObject[] => [
   {
