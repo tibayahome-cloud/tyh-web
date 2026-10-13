@@ -1,5 +1,5 @@
 import { adminLoginPath } from "../shared/utils/portalMemory";
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 
 import { LogoutGate } from "../auth/LogoutGate";
@@ -7,38 +7,8 @@ import { LegalConsentGate } from "../auth/LegalConsentGate";
 import { PhoneVerificationGate } from "../auth/PhoneVerificationGate";
 import { RequirePerm, RequireRole } from "../shared/rbac/Can";
 import { Loading } from "../shared/components/Loading";
+import { lazyWithRetry } from "../shared/utils/lazyWithRetry";
 import { ROLE_CLIENT, ROLE_PROVIDER, PERMISSION_ADMIN_ACCESS } from "../shared/rbac/roles";
-
-// Retries a failed dynamic import once by reloading the page.
-// This handles the case where a new deploy has replaced the old
-// hashed chunk files (e.g. SessionExpired-xxxx.js no longer exists)
-// while a user still has the old index.html/JS loaded in their tab.
-const RELOAD_FLAG_KEY = "chunk-reload-attempted";
-
-function lazyWithRetry<T extends { default: React.ComponentType<unknown> }>(
-  importer: () => Promise<T>
-) {
-  return lazy(() =>
-    importer()
-      .then((module) => {
-        // Clear the retry marker only after the requested chunk actually loads.
-        sessionStorage.removeItem(RELOAD_FLAG_KEY);
-        return module;
-      })
-      .catch((error) => {
-        const alreadyTried = sessionStorage.getItem(RELOAD_FLAG_KEY);
-        if (!alreadyTried) {
-          sessionStorage.setItem(RELOAD_FLAG_KEY, "1");
-          window.location.reload();
-          // Suspend forever; the page is about to hard-reload anyway.
-          return new Promise<T>(() => {});
-        }
-        // We already tried reloading once and it still failed — surface the
-        // module error instead of trapping the application in a reload loop.
-        throw error;
-      })
-  );
-}
 
 const ClientRoutes = lazyWithRetry(() => import("../domains/client/routes"));
 const ProviderRoutes = lazyWithRetry(() => import("../domains/provider/routes"));
