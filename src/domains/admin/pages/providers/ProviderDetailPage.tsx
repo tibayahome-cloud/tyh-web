@@ -13,11 +13,15 @@ import { FormField } from "../../../../shared/components/FormField";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
-import { StickyActionBar } from "../../../../shared/components/StickyActionBar";
+import { ActionMenu, type ActionMenuItem } from "../../../../shared/components/ActionMenu";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { api } from "../../../../shared/libs/api";
-import { ProviderAvailabilityCard } from "../../components/ProviderAvailabilityCard";
+import { FacilityBookingsPanel } from "../../components/FacilityBookingsPanel";
+import { ConsoleTabs, type ConsoleTab } from "../../components/providerConsole/ConsoleTabs";
+import { ProviderEditDialog, type EditableProviderInfo } from "../../components/providerConsole/ProviderEditDialog";
+import { ProviderScheduleEditor } from "../../components/providerConsole/ProviderScheduleEditor";
+import { ProviderTimeOffCard } from "../../components/providerConsole/ProviderTimeOffCard";
 import { ProviderTelemedicineCard } from "../../components/ProviderTelemedicineCard";
 import { buildFieldParams, providerApplicationAdmin, providerDetail, svcCard } from "../../../../shared/libs/fieldInclude";
 
@@ -51,6 +55,7 @@ type ProviderAvailabilityEntry = {
   deliveryMode: string | null;
   effectiveFrom: string | null;
   effectiveTo: string | null;
+  slotDurationMinutes: number | null;
 };
 
 type ProviderSpecialtyEntry = {
@@ -75,6 +80,8 @@ type ProviderDetail = {
   userId: string;
   verified: boolean;
   verifiedAt: string | null;
+  ratingAvg: number;
+  ratingCount: number;
   isAvailable: boolean;
   dailyRequestLimit: number;
   canEmergency: boolean;
@@ -170,6 +177,8 @@ type Envelope<T, M = unknown> = {
   meta?: M;
 };
 
+type ConsoleTabId = "overview" | "schedule" | "services" | "bookings" | "onboarding";
+
 type ConfirmConfig = {
   title: string;
   description?: string;
@@ -257,6 +266,11 @@ export const mapProviderDetail = (resource: unknown): ProviderDetail => {
     return 0;
   };
   const coerceBoolean = (value: unknown): boolean => Boolean(value);
+  const numberOrNull = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
 
   const userRaw = (attributes as { user?: unknown }).user;
   const servicesRaw = (attributes as { services?: unknown[] }).services ?? [];
@@ -310,6 +324,7 @@ export const mapProviderDetail = (resource: unknown): ProviderDetail => {
       deliveryMode: coerceString(node.delivery_mode),
       effectiveFrom: coerceString(node.effective_from),
       effectiveTo: coerceString(node.effective_to),
+      slotDurationMinutes: typeof node.slot_duration_minutes === "number" ? node.slot_duration_minutes : null,
     };
   };
 
@@ -358,6 +373,11 @@ export const mapProviderDetail = (resource: unknown): ProviderDetail => {
     canEmergency: coerceBoolean((attributes as { can_emergency?: unknown }).can_emergency),
     ratingAvg: Number((attributes as { rating_avg?: unknown }).rating_avg ?? 0),
     ratingCount: coerceNumber((attributes as { rating_count?: unknown }).rating_count),
+    priorityScore: numberOrNull((attributes as { priority_score?: unknown }).priority_score),
+    currentLat: numberOrNull((attributes as { current_lat?: unknown }).current_lat),
+    currentLng: numberOrNull((attributes as { current_lng?: unknown }).current_lng),
+    locationUpdatedAt: coerceString((attributes as { location_updated_at?: unknown }).location_updated_at),
+    zoneId: coerceString((attributes as { zone_id?: unknown }).zone_id),
     timezone: coerceString((attributes as { timezone?: unknown }).timezone),
     user,
     facility:
@@ -505,6 +525,8 @@ const ProviderDetailPage = () => {
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [reviewModal, setReviewModal] = useState<ReviewModalState>({ open: false });
   const [reviewNotes, setReviewNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<ConsoleTabId>("overview");
+  const [editSection, setEditSection] = useState<"details" | "specialties" | null>(null);
 
   const invalidateProviderData = useCallback(() => {
     if (!userId) {
@@ -647,14 +669,18 @@ const ProviderDetailPage = () => {
       applicationId,
       decision,
       notes,
+      facilityId,
     }: {
       applicationId: string;
       decision: "approved" | "rejected";
       notes?: string;
+      facilityId?: string;
     }) => {
+      // The API requires a facility to approve into, and only accepts "approved" or "rejected".
       await api.post(`/provider-applications/${applicationId}/review`, {
         decision,
         ...(notes ? { notes } : {}),
+        ...(decision === "approved" && facilityId ? { facility_id: facilityId } : {}),
       });
     },
     onSuccess: (_, variables) => {
@@ -735,8 +761,8 @@ const ProviderDetailPage = () => {
     },
   });
   const dialogLoading =
-    updateProviderMutation.isLoading ||
-    updateServicesMutation.isLoading ||
+    updateProviderMutation.isPending ||
+    updateServicesMutation.isPending ||
     requestResubmissionMutation.isPending ||
     resendWelcomeMutation.isPending;
 
@@ -963,8 +989,9 @@ const ProviderDetailPage = () => {
     }
     reviewApplicationMutation.mutate({
       applicationId: application.id,
-      decision: reviewModal.mode,
+      decision: reviewModal.mode === "approve" ? "approved" : "rejected",
       notes: reviewNotes.trim() ? reviewNotes.trim() : undefined,
+      facilityId: provider?.facility?.id,
     });
   };
 
@@ -992,7 +1019,7 @@ const ProviderDetailPage = () => {
       action: () =>
         resendWelcomeMutation.mutate({
           userId,
-          fullName: provider.user?.fullName,
+          fullName: provider?.user?.fullName,
         }),
     });
   };
@@ -1013,7 +1040,7 @@ const ProviderDetailPage = () => {
     analyticsQuery.isFetching ||
     applicationQuery.isFetching ||
     reviewApplicationMutation.isPending;
-  const toggleDisabled = updateProviderMutation.isLoading || dialogLoading;
+  const toggleDisabled = updateProviderMutation.isPending || dialogLoading;
   const canPerformReview = canManageProviders && onboardingActionable && !reviewApplicationMutation.isPending;
 
   if (providerQuery.isLoading) {
@@ -1044,150 +1071,8 @@ const ProviderDetailPage = () => {
   const availabilityActionLabel = provider.isAvailable ? "Mark offline" : "Set available";
   const emergencyActionLabel = provider.canEmergency ? "Disable emergency" : "Enable emergency";
 
-  return (
-    <div className="space-y-6 pb-24">
-      <Card>
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary-100 text-xl font-semibold text-primary-700">
-              {provider.user?.avatarUrl ? (
-                <img src={provider.user.avatarUrl} alt={providerName} className="h-full w-full object-cover" />
-              ) : (
-                initials
-              )}
-            </div>
-            <div className="space-y-2">
-              <div>
-                <p className="text-lg font-semibold text-slate-900">{providerName}</p>
-                <div className="flex flex-wrap gap-2 text-sm text-slate-600">
-                  {provider.user?.email && <span>{provider.user.email}</span>}
-                  {provider.user?.phone && <span>{provider.user.phone}</span>}
-                </div>
-                {provider.facility && (
-                  <p className="mt-1 text-sm text-slate-600">
-                    Facility:{" "}
-                    <Link className="font-medium text-tiba-blue hover:underline" to={`/admin/facilities/${provider.facility.id}`}>
-                      {provider.facility.name}
-                    </Link>
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {heroStatusPills.map((pill) => (
-                  <StatusPill key={`${pill.label}-${pill.tone}`} label={pill.label} tone={pill.tone} />
-                ))}
-                {provider.priorityScore != null && (
-                  <StatusPill label={`AI Score: ${provider.priorityScore.toFixed(0)}`} tone="indigo" />
-                )}
-                {provider.zoneId && (
-                  <StatusPill label={`Zone: ${provider.zoneId}`} tone="neutral" />
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Daily limit</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">{provider.dailyRequestLimit}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Rating</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">
-                {provider.ratingCount > 0 ? provider.ratingAvg.toFixed(2) : "No ratings"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Timezone</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">{provider.timezone ?? "Not set"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Last reviewed</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">
-                {application?.reviewedAt ? dateTimeFormatter.format(new Date(application.reviewedAt)) : "Pending"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Telemetry</p>
-              <p className="mt-0.5 text-[10px] font-medium text-slate-500">
-                {provider.currentLat && provider.currentLng
-                  ? `${provider.currentLat.toFixed(4)}, ${provider.currentLng.toFixed(4)}`
-                  : "No tracking data"}
-              </p>
-              {provider.locationUpdatedAt && (
-                <p className="text-[9px] text-slate-400 uppercase">
-                  Last: {new Date(provider.locationUpdatedAt).toLocaleTimeString()}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => navigate(-1)} type="button">
-            Back to directory
-          </Button>
-          <Button variant="ghost" onClick={handleNavigateToApplications} type="button">
-            View onboarding history
-          </Button>
-        </div>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Card title="Provider settings" description="Update limits and preferences.">
-          <form className="space-y-3" onSubmit={onSubmitDailyLimit}>
-            <FormField
-              control={detailForm.control}
-              name="dailyLimit"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  label="Daily request limit"
-                  type="number"
-                  min={0}
-                  placeholder="0"
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
-            <FormField
-              control={detailForm.control}
-              name="timezone"
-              render={({ field }) => <Input {...field} label="Timezone" placeholder="Africa/Nairobi" />}
-            />
-            <div className="pt-2">
-              <Button type="submit" variant="secondary" className="w-full" loading={updateProviderMutation.isLoading}>
-                Save settings
-              </Button>
-            </div>
-          </form>
-        </Card>
-
-
-
-        <Card title="Intelligence insights" description="AI-driven feedback and sentiment analysis.">
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 italic text-sm text-slate-600">
-              <p className="font-semibold text-slate-900 not-italic mb-1 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-                Performance Summary
-              </p>
-              "This provider maintains a high reliability score with particular strength in pediatric care. Sentiment analysis indicates high client satisfaction regarding turnaround time."
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Positive Sentiment</p>
-                <p className="text-xl font-bold text-emerald-900">92%</p>
-              </div>
-              <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-                <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Priority Weight</p>
-                <p className="text-xl font-bold text-indigo-900">{provider.priorityScore?.toFixed(1) ?? "—"}</p>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <Card title="Onboarding status" description="Track verification progress and outstanding requirements.">
+  const onboardingContent = (
+    <>
         {applicationQuery.isLoading ? (
           <Loading />
         ) : application ? (
@@ -1299,108 +1184,298 @@ const ProviderDetailPage = () => {
         ) : (
           <p className="text-sm text-slate-600">No onboarding application found for this provider.</p>
         )}
+    </>
+  );
+
+  const scheduleCanEdit = canManageProviders;
+  const editableProvider: EditableProviderInfo | null = provider.facility
+    ? {
+        userId: provider.userId,
+        facilityId: provider.facility.id,
+        fullName: provider.user?.fullName ?? "",
+        email: provider.user?.email ?? "",
+        phone: provider.user?.phone ?? "",
+        activeSpecialtyIds: provider.specialties.filter((item) => item.status === "active").map((item) => item.subcategoryId),
+        specialtyNames: Object.fromEntries(provider.specialties.map((item) => [item.subcategoryId, item.name])),
+      }
+    : null;
+  const manageItems: ActionMenuItem[] = canManageProviders
+    ? [
+        { key: "availability", label: availabilityActionLabel, disabled: toggleDisabled, onSelect: handleToggleAvailability },
+        { key: "emergency", label: emergencyActionLabel, disabled: toggleDisabled, onSelect: handleToggleEmergency },
+        { key: "welcome", label: "Resend welcome message", disabled: resendWelcomeMutation.isPending, onSelect: handleResendWelcome },
+        { key: "history", label: "View onboarding history", onSelect: handleNavigateToApplications },
+        { key: "refresh", label: "Refresh data", disabled: stickyLoading, onSelect: refreshProvider },
+      ]
+    : [{ key: "refresh", label: "Refresh data", disabled: stickyLoading, onSelect: refreshProvider }];
+  const consoleTabs: ConsoleTab<ConsoleTabId>[] = [
+    { id: "overview", label: "Overview" },
+    { id: "schedule", label: "Schedule" },
+    { id: "services", label: "Services and specialties" },
+    { id: "bookings", label: "Bookings" },
+    { id: "onboarding", label: "Onboarding", badge: onboardingActionable ? "Review" : null },
+  ];
+
+  return (
+    <div className="space-y-5 pb-8">
+      <Link to="/admin/providers" className="inline-flex items-center text-sm font-medium text-tiba-blue hover:underline">
+        Back to providers
+      </Link>
+
+      <Card>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-100 text-xl font-semibold text-primary-700">
+              {provider.user?.avatarUrl ? (
+                <img src={provider.user.avatarUrl} alt={providerName} className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="min-w-0 space-y-2">
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">{providerName}</h1>
+                <div className="flex flex-wrap gap-x-3 text-sm text-slate-600">
+                  {provider.user?.email && <span>{provider.user.email}</span>}
+                  {provider.user?.phone && <span>{provider.user.phone}</span>}
+                </div>
+                {provider.facility && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    Facility:{" "}
+                    <Link className="font-medium text-tiba-blue hover:underline" to={`/admin/facilities/${provider.facility.id}`}>
+                      {provider.facility.name}
+                    </Link>
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {heroStatusPills.map((pill) => (
+                  <StatusPill key={`${pill.label}-${pill.tone}`} label={pill.label} tone={pill.tone} />
+                ))}
+                {provider.zoneId && <StatusPill label={`Zone: ${provider.zoneId}`} tone="default" />}
+              </div>
+            </div>
+          </div>
+
+          {/* One place for every action. The decision that needs making comes first and is the only
+              filled button; everything occasional lives in the menu. */}
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {canPerformReview && (
+              <>
+                <Button variant="secondary" onClick={() => openReviewModal("reject")} disabled={reviewApplicationMutation.isPending}>
+                  Reject
+                </Button>
+                <Button onClick={() => openReviewModal("approve")} disabled={reviewApplicationMutation.isPending}>
+                  Approve
+                </Button>
+              </>
+            )}
+            {canManageProviders && editableProvider && (
+              <Button variant="secondary" onClick={() => setEditSection("details")}>
+                Edit details
+              </Button>
+            )}
+            <ActionMenu label="More actions" subject={providerName} items={manageItems} />
+          </div>
+        </div>
+
+        <dl className="mt-5 grid gap-4 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Daily request limit</dt>
+            <dd className="mt-0.5 text-base font-semibold text-slate-900">{provider.dailyRequestLimit}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Rating</dt>
+            <dd className="mt-0.5 text-base font-semibold text-slate-900">
+              {provider.ratingCount > 0 ? `${provider.ratingAvg.toFixed(2)} (${provider.ratingCount})` : "No ratings"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Timezone</dt>
+            <dd className="mt-0.5 text-base font-semibold text-slate-900">{provider.timezone ?? "Not set"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Last seen location</dt>
+            <dd className="mt-0.5 text-base font-semibold text-slate-900">
+              {provider.currentLat && provider.currentLng ? `${provider.currentLat.toFixed(3)}, ${provider.currentLng.toFixed(3)}` : "No tracking data"}
+            </dd>
+            {provider.locationUpdatedAt && (
+              <dd className="text-xs text-slate-500">{new Date(provider.locationUpdatedAt).toLocaleString()}</dd>
+            )}
+          </div>
+        </dl>
       </Card>
 
-      <Card
-        title="Service membership"
-        description="Select the services that this provider can deliver."
-        actions={
-          <Button variant="secondary" onClick={openServiceModal}>
-            Manage services
-          </Button>
-        }
-      >
-        {provider.services.length === 0 ? (
-          <p className="text-sm text-slate-600">No services assigned yet.</p>
-        ) : (
-          <ul className="grid gap-3 md:grid-cols-2">
-            {provider.services.map((svc) => (
-              <li key={svc.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-900">{svc.name}</p>
-                <p className="text-xs uppercase tracking-wide text-slate-400">{svc.key}</p>
-                <p className="text-xs text-slate-500">
-                  {formatCurrency(svc.priceCents)} · {svc.estimateMinutes ? `${svc.estimateMinutes} min` : "—"}
-                </p>
-              </li>
-            ))}
-          </ul>
+      <ConsoleTabs tabs={consoleTabs} active={activeTab} idPrefix="provider" label="Provider sections" onChange={setActiveTab} />
+
+      <div role="tabpanel" id={`provider-panel-${activeTab}`} aria-labelledby={`provider-tab-${activeTab}`} className="space-y-5">
+        {activeTab === "overview" && (
+          <>
+            {performanceMetrics.length > 0 && (
+              <Card title="Performance">
+                <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {performanceMetrics.map((metric) => (
+                    <div key={metric.label}>
+                      <dt className="text-xs font-semibold text-slate-500">{metric.label}</dt>
+                      <dd className="mt-0.5 text-base font-semibold text-slate-900">{metric.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
+            )}
+            <div className="grid gap-5 lg:grid-cols-2">
+              <Card title="Provider settings" description="Limits and timezone.">
+                <form className="space-y-3" onSubmit={onSubmitDailyLimit}>
+                  <FormField
+                    control={detailForm.control}
+                    name="dailyLimit"
+                    render={({ field, fieldState }) => (
+                      <Input {...field} label="Daily request limit" type="number" min={0} placeholder="0" error={fieldState.error?.message} />
+                    )}
+                  />
+                  <FormField
+                    control={detailForm.control}
+                    name="timezone"
+                    render={({ field }) => <Input {...field} label="Timezone" placeholder="Africa/Nairobi" />}
+                  />
+                  <div className="pt-2">
+                    <Button type="submit" variant="secondary" className="w-full" loading={updateProviderMutation.isPending} disabled={!canManageProviders}>
+                      Save settings
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+              <Card title="Recent activity" description="Latest changes to this provider, including edits made by administrators.">
+                {activityQuery.isLoading ? (
+                  <Loading />
+                ) : auditEntries.length === 0 ? (
+                  <p className="text-sm text-slate-600">No recorded activity yet.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100 text-sm">
+                    {auditEntries.map((entry) => (
+                      <li key={entry.id} className="py-2">
+                        <p className="font-medium text-slate-900">
+                          {entry.action.charAt(0) + entry.action.slice(1).toLowerCase()} {entry.resource_type.replace(/_/g, " ")}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {dateTimeFormatter.format(new Date(entry.at))}
+                          {entry.reason ? ` · ${entry.reason}` : ""}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
+          </>
         )}
-      </Card>
 
-      <ProviderTelemedicineCard
-        verified={provider.verified}
-        telemedicineEnabled={provider.telemedicineEnabled}
-        accountStatus={provider.user?.status ?? null}
-        specialties={provider.specialties}
-        windows={provider.availability}
-      />
+        {activeTab === "schedule" && (
+          <>
+            <ProviderScheduleEditor
+              userId={provider.userId}
+              providerName={providerName}
+              windows={provider.availability}
+              timezone={provider.timezone}
+              canEdit={scheduleCanEdit}
+              onSaved={() => {
+                toast.showToast({ title: "Weekly hours saved", description: `${providerName} has been notified.`, variant: "success" });
+                invalidateProviderData();
+              }}
+            />
+            <ProviderTimeOffCard
+              userId={provider.userId}
+              providerName={providerName}
+              blackouts={provider.blackouts}
+              canEdit={scheduleCanEdit}
+              onChanged={() => {
+                toast.showToast({ title: "Time off updated", description: `${providerName} has been notified.`, variant: "success" });
+                invalidateProviderData();
+              }}
+            />
+          </>
+        )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ProviderAvailabilityCard windows={provider.availability} timezone={provider.timezone} />
-        <Card title="Blackouts" description="Upcoming blackout periods.">
-          {provider.blackouts.length === 0 ? (
-            <p className="text-sm text-slate-600">No blackouts scheduled.</p>
+        {activeTab === "services" && (
+          <>
+            <Card
+              title="Services"
+              description="The home-based care services this provider delivers."
+              badge={
+                canManageProviders ? (
+                  <Button size="sm" variant="secondary" onClick={openServiceModal}>
+                    Manage services
+                  </Button>
+                ) : undefined
+              }
+            >
+              {provider.services.length === 0 ? (
+                <p className="text-sm text-slate-600">No services assigned yet.</p>
+              ) : (
+                <ul className="grid gap-3 md:grid-cols-2">
+                  {provider.services.map((svc) => (
+                    <li key={svc.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-sm font-semibold text-slate-900">{svc.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatCurrency(svc.priceCents)} · {svc.estimateMinutes ? `${svc.estimateMinutes} min` : "—"}
+                        {!svc.active && " · Inactive"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <ProviderTelemedicineCard
+              verified={provider.verified}
+              telemedicineEnabled={provider.telemedicineEnabled}
+              accountStatus={provider.user?.status ?? null}
+              specialties={provider.specialties}
+              windows={provider.availability}
+            />
+            {canManageProviders && editableProvider && (
+              <div className="flex justify-end">
+                <Button variant="secondary" onClick={() => setEditSection("specialties")}>
+                  Edit remote specialties
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === "bookings" &&
+          (provider.facility ? (
+            <FacilityBookingsPanel
+              facilityId={provider.facility.id}
+              providerUserId={provider.userId}
+              title={`Bookings for ${providerName}`}
+              description="Everything this provider has been assigned: upcoming, completed and cancelled, home-based care and telemedicine apart."
+              defaultGroup="all"
+            />
           ) : (
-            <ul className="space-y-2 text-sm text-slate-600">
-              {provider.blackouts.map((blackout) => (
-                <li key={blackout.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <span className="font-medium text-slate-900">
-                    {new Date(blackout.startAt).toLocaleString()} – {new Date(blackout.endAt).toLocaleString()}
-                  </span>
-                  {blackout.reason && <span className="ml-2 text-xs text-slate-500">{blackout.reason}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+            <Card title="Bookings">
+              <p className="text-sm text-slate-600">This provider is not attached to a facility, so there are no bookings to show.</p>
+            </Card>
+          ))}
+
+        {activeTab === "onboarding" && (
+          <Card title="Onboarding status" description="Verification progress and outstanding requirements.">
+            {onboardingContent}
+          </Card>
+        )}
       </div>
 
-
-      <StickyActionBar align="between">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" type="button" onClick={() => navigate(-1)}>
-            Back
-          </Button>
-          <Button variant="ghost" type="button" onClick={refreshProvider} disabled={stickyLoading}>
-            Refresh data
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canManageProviders && (
-            <>
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={handleResendWelcome}
-                disabled={resendWelcomeMutation.isPending}
-              >
-                Resend welcome
-              </Button>
-              <Button variant="secondary" type="button" onClick={handleToggleAvailability} disabled={toggleDisabled}>
-                {availabilityActionLabel}
-              </Button>
-              <Button variant="secondary" type="button" onClick={handleToggleEmergency} disabled={toggleDisabled}>
-                {emergencyActionLabel}
-              </Button>
-            </>
-          )}
-          {canPerformReview && (
-            <>
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => openReviewModal("reject")}
-                disabled={reviewApplicationMutation.isPending}
-              >
-                Reject
-              </Button>
-              <Button type="button" onClick={() => openReviewModal("approve")} disabled={reviewApplicationMutation.isPending}>
-                Approve
-              </Button>
-            </>
-          )}
-        </div>
-      </StickyActionBar>
+      {editableProvider && editSection && (
+        <ProviderEditDialog
+          open
+          section={editSection}
+          provider={editableProvider}
+          onClose={() => setEditSection(null)}
+          onSaved={() => {
+            toast.showToast({ title: "Provider updated", description: `${providerName} has been notified.`, variant: "success" });
+            invalidateProviderData();
+          }}
+        />
+      )}
 
       <Modal
         open={reviewModal.open}
@@ -1474,7 +1549,7 @@ const ProviderDetailPage = () => {
               <Button variant="secondary" onClick={() => setServiceModalOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveServices} loading={updateServicesMutation.isLoading}>
+              <Button onClick={handleSaveServices} loading={updateServicesMutation.isPending}>
                 Save
               </Button>
             </div>
