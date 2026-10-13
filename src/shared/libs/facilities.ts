@@ -52,6 +52,8 @@ export type FacilityBookingListParams = {
   facilityStatus?: string;
   // true for telemedicine bookings, false for home-based care, undefined for both.
   isTelemedicine?: boolean;
+  // Only this provider's bookings (a user id).
+  providerUserId?: string;
 };
 
 // How many bookings a facility has of each kind, in total and by status. Covers every booking, not
@@ -633,7 +635,7 @@ export const deleteFacilityService = async (facilityId: string, facilityServiceI
 
 export const fetchFacilityBookings = async (
   facilityId: string,
-  { page = 1, pageSize = 25, status, facilityStatus, isTelemedicine }: FacilityBookingListParams = {}
+  { page = 1, pageSize = 25, status, facilityStatus, isTelemedicine, providerUserId }: FacilityBookingListParams = {}
 ): Promise<FacilityBookingListResult> => {
   const params: Record<string, unknown> = {
     "page[number]": page,
@@ -642,6 +644,7 @@ export const fetchFacilityBookings = async (
   if (status) params["filter[status]"] = status;
   if (facilityStatus) params["filter[facility_status]"] = facilityStatus;
   if (isTelemedicine !== undefined) params["filter[is_telemedicine]"] = String(isTelemedicine);
+  if (providerUserId) params["filter[provider_user_id]"] = providerUserId;
 
   const response = await api.get(`/facilities/${facilityId}/bookings`, { params });
   const payload = (response.data ?? {}) as Record<string, unknown>;

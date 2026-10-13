@@ -30,9 +30,16 @@ type Props = {
   facilityId: string;
   // Assign or reassign a provider. Omit to make the list read-only.
   onAssign?: (booking: Booking) => void;
+  // Show only one provider's bookings (a user id). The provider column is then redundant and hidden.
+  providerUserId?: string;
+  title?: string;
+  description?: string;
+  // The status group the list opens on. A facility opens on what needs attention; one provider's
+  // history reads better from everything.
+  defaultGroup?: BookingGroup;
 };
 
-const BookingRow = ({ booking, onAssign }: { booking: Booking; onAssign?: (booking: Booking) => void }) => {
+const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booking; onAssign?: (booking: Booking) => void; showProvider?: boolean }) => {
   const when = booking.scheduledAt ?? booking.createdAt;
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
@@ -53,10 +60,12 @@ const BookingRow = ({ booking, onAssign }: { booking: Booking; onAssign?: (booki
         </div>
       </div>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-        <div>
-          <dt className="text-xs font-semibold text-slate-500">Provider</dt>
-          <dd className="mt-0.5 text-slate-800">{booking.provider?.fullName ?? "Unassigned"}</dd>
-        </div>
+        {showProvider && (
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Provider</dt>
+            <dd className="mt-0.5 text-slate-800">{booking.provider?.fullName ?? "Unassigned"}</dd>
+          </div>
+        )}
         <div>
           <dt className="text-xs font-semibold text-slate-500">Amount</dt>
           <dd className="mt-0.5 text-slate-800">{money(booking.priceCents, booking.currency)}</dd>
@@ -89,20 +98,21 @@ const BookingRow = ({ booking, onAssign }: { booking: Booking; onAssign?: (booki
 // A facility's bookings, home-based care and telemedicine apart, filtered by what needs doing. For
 // a super admin acting as support when a facility admin is stuck; the facility's own admins see
 // the same list for their facility.
-export const FacilityBookingsPanel = ({ facilityId, onAssign }: Props) => {
+export const FacilityBookingsPanel = ({ facilityId, onAssign, providerUserId, title, description, defaultGroup = "attention" }: Props) => {
   const [kind, setKind] = useState<ServiceKind | null>(null);
-  const [group, setGroup] = useState<BookingGroup>("attention");
+  const [group, setGroup] = useState<BookingGroup>(defaultGroup);
   const [page, setPage] = useState(1);
   const activeKind: ServiceKind = kind ?? "home";
 
   const query = useQuery({
-    queryKey: ["admin", "facilities", facilityId, "bookings", "list", activeKind, group, page],
+    queryKey: ["admin", "facilities", facilityId, "bookings", "list", providerUserId ?? "all", activeKind, group, page],
     queryFn: () =>
       fetchFacilityBookings(facilityId, {
         page,
         pageSize: PAGE_SIZE,
         status: statusFilterFor(group),
-        isTelemedicine: activeKind === "telemedicine"
+        isTelemedicine: activeKind === "telemedicine",
+        providerUserId
       }),
     placeholderData: keepPreviousData
   });
@@ -134,16 +144,16 @@ export const FacilityBookingsPanel = ({ facilityId, onAssign }: Props) => {
   };
 
   return (
-    <Card title="Facility bookings" description="Home-based care and telemedicine bookings for this facility, apart.">
+    <Card title={title ?? "Facility bookings"} description={description ?? "Home-based care and telemedicine bookings for this facility, apart."}>
       <ServiceKindTabs
         active={activeKind}
         counts={tabCounts}
         label="Booking type"
-        panelId="facility-bookings-panel"
+        panelId={providerUserId ? "provider-bookings-panel" : "facility-bookings-panel"}
         caption={(_kindName, value) => (counts ? `${value.active} need attention of ${value.total}` : "")}
         onChange={(next) => select(() => setKind(next))}
       />
-      <div id="facility-bookings-panel" role="tabpanel" aria-labelledby={`facility-bookings-panel-${activeKind}`}>
+      <div id={providerUserId ? "provider-bookings-panel" : "facility-bookings-panel"} role="tabpanel" aria-labelledby={`${providerUserId ? "provider-bookings-panel" : "facility-bookings-panel"}-${activeKind}`}>
         {splitUnsupported && (
           <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
             This server cannot yet separate telemedicine from home-based care, so both tabs list every booking.
@@ -182,7 +192,7 @@ export const FacilityBookingsPanel = ({ facilityId, onAssign }: Props) => {
         ) : bookings.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-600">
             {group === "all"
-              ? `No ${activeKind === "telemedicine" ? "telemedicine" : "home-based care"} bookings for this facility yet.`
+              ? `No ${activeKind === "telemedicine" ? "telemedicine" : "home-based care"} bookings for this ${providerUserId ? "provider" : "facility"} yet.`
               : `No ${activeKind === "telemedicine" ? "telemedicine" : "home-based care"} bookings in "${BOOKING_GROUP_LABEL[group]}".`}
           </p>
         ) : (
@@ -194,7 +204,7 @@ export const FacilityBookingsPanel = ({ facilityId, onAssign }: Props) => {
             )}
             <ul className={`grid gap-3 ${query.isPlaceholderData ? "opacity-60" : ""}`} aria-label="Bookings" aria-busy={query.isPlaceholderData}>
               {bookings.map((booking) => (
-                <BookingRow key={booking.id} booking={booking} onAssign={onAssign} />
+                <BookingRow key={booking.id} booking={booking} onAssign={onAssign} showProvider={!providerUserId} />
               ))}
             </ul>
             {totalPages > 1 && (

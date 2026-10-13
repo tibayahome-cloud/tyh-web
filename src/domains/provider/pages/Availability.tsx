@@ -28,6 +28,8 @@ import type { Booking } from "../../../shared/schemas/booking";
 type AvailabilityRow = {
   id: string;
   weekday: string;
+  // Set by an administrator or earlier saves; sent back so saving here does not reset it to both.
+  delivery_mode?: string | null;
   start_time: string;
   end_time: string;
   effective_from?: string | null;
@@ -245,6 +247,7 @@ const AvailabilityPage = () => {
       }
       const body = payload.map((row) => ({
         weekday: row.weekday,
+        ...(row.delivery_mode ? { delivery_mode: row.delivery_mode } : {}),
         start_time: fromTimeInput(row.start_time),
         end_time: fromTimeInput(row.end_time),
         effective_from: fromDateInput(row.effective_from ?? undefined),
