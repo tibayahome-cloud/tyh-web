@@ -1,3 +1,4 @@
+import { removeBlackoutFromCache } from "../utils/blackoutCache";
 import classNames from "classnames";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -286,8 +287,8 @@ const AvailabilityPage = () => {
       }
       await api.delete(`/providers/${user.id}/blackouts/${blackoutId}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["provider", "blackouts", user?.id] });
+    onSuccess: (_data, blackoutId) => {
+      removeBlackoutFromCache(queryClient, user?.id, blackoutId);
       toast.showToast({
         title: "Time off removed",
         description: "You are available again during that time.",
