@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
+import { ProviderFacilityAffiliation } from "../components/ProviderFacilityAffiliation";
 
 import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
@@ -386,6 +387,8 @@ const ProviderHome = () => {
                   : "Activate to receive invitations"}
               </p>
             </div>
+
+            <ProviderFacilityAffiliation facility={profile?.facility} />
 
             <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
               <div className="flex items-center gap-2 mb-3">
