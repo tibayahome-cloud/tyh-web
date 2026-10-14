@@ -148,7 +148,8 @@ export const providerProfile: FieldPreset = {
   ],
   includes: {
     facility: {
-      fields: ["id", "name", "provider_financials_visible"]
+      // type and county only label the provider's affiliation on their dashboard.
+      fields: ["id", "name", "facility_type", "county", "provider_financials_visible"]
     },
     user: {
       // status is needed to show whether the provider's account is active; without it the UI
