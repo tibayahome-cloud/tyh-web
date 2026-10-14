@@ -59,7 +59,8 @@ import {
   WEEKDAYS,
   formatOperatingHoursSummary
 } from "../../../../shared/schemas/facility";
-import type { FacilityOperatingHour, FacilityPhone, Provider } from "../../../../shared/schemas/facility";
+import type { FacilityOperatingHour, FacilityPhone } from "../../../../shared/schemas/facility";
+import type { Provider } from "../../../../shared/schemas/provider";
 import type { Booking } from "../../../../shared/schemas/booking";
 import type { ServiceRequest, ServiceRequestCreateInput } from "../../../../shared/schemas/serviceRequest";
 import { STATUS_LABELS } from "../../../../shared/schemas/serviceRequest";
@@ -423,14 +424,36 @@ export const validateProviderForm = (form: ProviderCompensationFormState): strin
   return null;
 };
 
+const hasActiveService = (provider: Provider, serviceId: string) =>
+  provider.services.some((service) => service.active && service.serviceId === serviceId);
+
+const hasActiveSpecialty = (provider: Provider, subcategoryId?: string) =>
+  provider.telemedicineSubcategoryAssignments.some(
+    (assignment) => assignment.status === "active" && (subcategoryId === undefined || assignment.subcategoryId === subcategoryId)
+  );
+
+// Who can be offered for a booking. A home-based care booking needs a verified provider who delivers
+// that service. A telemedicine booking is staffed by specialty instead: the provider must be
+// verified, active, telemedicine-enabled and hold the active specialty the service belongs to. The
+// API checks the same rules, plus that the provider is free at the appointment's time.
 export const filterAssignableProviders = (booking: Booking | null, providers: Provider[]): Provider[] => {
-  if (!booking?.service?.id) {
+  const service = booking?.service;
+  if (!service?.id) {
     return providers.filter((provider) => provider.verified);
   }
-  return providers.filter((provider) =>
-    provider.verified &&
-    provider.services.some((service) => service.active && service.serviceId === booking.service?.id)
-  );
+  if (!booking?.isTelemedicine) {
+    return providers.filter((provider) => provider.verified && hasActiveService(provider, service.id));
+  }
+  return providers.filter((provider) => {
+    if (!provider.verified || !provider.telemedicineEnabled) return false;
+    if (provider.user?.status && provider.user.status !== "active") return false;
+    // A legacy remote service has no specialty and is delivered by provider-service membership.
+    if (service.telemedicineSubcategoryId === null) return hasActiveService(provider, service.id);
+    // An API that does not say which specialty the service belongs to: offer anyone qualified in
+    // either way and let the server make the final call.
+    if (service.telemedicineSubcategoryId === undefined) return hasActiveService(provider, service.id) || hasActiveSpecialty(provider);
+    return hasActiveSpecialty(provider, service.telemedicineSubcategoryId);
+  });
 };
 
 const fetchCatalogServices = async (): Promise<CatalogService[]> => {
@@ -1904,7 +1927,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       <Modal
         open={Boolean(assignmentBooking)}
         title={assignmentBooking?.provider ? "Reassign provider" : "Assign provider"}
-        description={assignmentBooking ? `Choose a provider configured for ${assignmentBooking.service?.name ?? "this service"}.` : undefined}
+        description={assignmentBooking ? `Choose a provider ${assignmentBooking.isTelemedicine ? "with the telemedicine specialty for" : "configured for"} ${assignmentBooking.service?.name ?? "this service"}.` : undefined}
         onClose={() => setAssignmentBooking(null)}
         maxWidth="sm"
       >
@@ -1933,7 +1956,11 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
             />
           </label>
           {assignableProviders.length === 0 && (
-            <p className="text-sm text-warning-500">No verified provider in this facility is configured for this service.</p>
+            <p className="text-sm text-warning-500">
+              {assignmentBooking?.isTelemedicine
+                ? "No verified, active provider at this facility has this telemedicine specialty switched on. Add it to a provider from the Providers tab."
+                : "No verified provider in this facility is configured for this service."}
+            </p>
           )}
           {assignmentError && <p className="text-sm text-danger-600">{assignmentError}</p>}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
