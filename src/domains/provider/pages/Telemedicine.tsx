@@ -1,3 +1,4 @@
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -170,6 +171,8 @@ const ProviderTelemedicinePage = () => {
             )}
           </div>
         </div>
+
+        <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
         {isLoading && <Loading />}
         {!isLoading && consultations.upcoming.length === 0 && consultations.history.length === 0 && (

@@ -12,6 +12,7 @@ import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
+import { useTelemedicineAttention } from "../../../shared/hooks/useTelemedicineAttention";
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
 import { useBookingStore } from "../../../shared/stores/useBookingStore";
 import { useBroadcastQueue } from "../hooks/useBroadcastQueue";
@@ -31,6 +32,7 @@ export const ProviderShell = () => {
   const showPayments = !profile || providerFinancialsAreVisible(profile);
   const toast = useToast();
   const { unreadCount: conversationUnread } = useConversationBadge();
+  const needsResponse = (useTelemedicineAttention().data?.length ?? 0) > 0;
   const activeBookingCount = useBookingStore((state: { active: Record<string, any> }) => Object.keys(state.active).length);
   const { queue: broadcastQueue, dismiss: dismissBroadcast, clear: clearBroadcastQueue } = useBroadcastQueue(
     user?.id,
@@ -82,7 +84,7 @@ export const ProviderShell = () => {
   const navItems: NavItem[] = [
     { label: "Home", to: "/pro/home", icon: <HomeIcon /> },
     { label: "Bookings", to: "/pro/bookings", icon: <EventAvailableIcon />, badge: activeBookingCount },
-    { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon /> },
+    { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon />, attention: needsResponse },
     { label: "Services", to: "/pro/services", icon: <MiscServicesIcon /> },
     { label: "Care", to: "/pro/selfcare", icon: <FavoriteBorderIcon /> },
     ...(showPayments ? [{ label: "Payments", to: "/pro/payments", icon: <PaymentsIcon /> }] : []),
