@@ -35,8 +35,8 @@ type Props = {
   providerUserId?: string;
   title?: string;
   description?: string;
-  // The status group the list opens on. A facility opens on what needs attention; one provider's
-  // history reads better from everything.
+  // The status group the list opens on. Everything by default, so a booking is never hidden behind a
+  // filter the viewer did not choose; the chips show how many need attention.
   defaultGroup?: BookingGroup;
 };
 
@@ -101,7 +101,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
 // A facility's bookings, home-based care and telemedicine apart, filtered by what needs doing. For
 // a super admin acting as support when a facility admin is stuck; the facility's own admins see
 // the same list for their facility.
-export const FacilityBookingsPanel = ({ facilityId, onAssign, providerUserId, title, description, defaultGroup = "attention" }: Props) => {
+export const FacilityBookingsPanel = ({ facilityId, onAssign, providerUserId, title, description, defaultGroup = "all" }: Props) => {
   const [kind, setKind] = useState<ServiceKind | null>(null);
   const [group, setGroup] = useState<BookingGroup>(defaultGroup);
   const [page, setPage] = useState(1);

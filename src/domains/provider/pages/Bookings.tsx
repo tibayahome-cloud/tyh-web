@@ -12,10 +12,12 @@ import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { StarIcon } from "lucide-react";
 
+import { PROVIDER_CANCELLED_STATUSES, PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
+
 const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] }> = [
     { value: "all", label: "All bookings" },
     { value: "active", label: "Active & In-Progress", statuses: ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider", "client_completed"] },
-    { value: "upcoming", label: "Upcoming", statuses: ["accepted", "en_route", "nearby", "arrived"] },
+    { value: "upcoming", label: "Upcoming", statuses: [...PROVIDER_UPCOMING_STATUSES] },
     {
         value: "awaiting_client",
         label: "Awaiting Client Confirmation",
@@ -25,7 +27,7 @@ const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] 
     {
         value: "cancelled",
         label: "Cancelled",
-        statuses: ["cancelled_by_client", "cancelled_by_admin", "expired_no_accept", "reassigned"]
+        statuses: [...PROVIDER_CANCELLED_STATUSES]
     },
     { value: "disputed", label: "Disputed", statuses: ["disputed"] }
 ];

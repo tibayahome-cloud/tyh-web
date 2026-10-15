@@ -30,14 +30,16 @@ const result = (bookings: unknown[], over: Record<string, unknown> = {}) => ({
   ...over
 });
 
-const renderPanel = (onAssign?: (b: unknown) => void) =>
-  render(
+const renderPanel = (opts: { onAssign?: (b: unknown) => void; defaultGroup?: "attention" | "all" } | ((b: unknown) => void) = {}) => {
+  const { onAssign, defaultGroup } = typeof opts === "function" ? { onAssign: opts, defaultGroup: undefined } : opts;
+  return render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <FacilityBookingsPanel facilityId="f-1" onAssign={onAssign as never} />
+        <FacilityBookingsPanel facilityId="f-1" onAssign={onAssign as never} defaultGroup={defaultGroup} />
       </QueryClientProvider>
     </MemoryRouter>
   );
+};
 
 const lastCall = () => fetchMock.mock.calls.at(-1) as [string, Record<string, unknown>];
 
@@ -53,13 +55,20 @@ describe("FacilityBookingsPanel", () => {
     expect(screen.queryByText(/cannot yet separate/)).not.toBeInTheDocument();
   });
 
-  it("opens on home-based care, needs attention, and asks the API for exactly that", async () => {
+  it("opens on home-based care showing every booking, so nothing is hidden behind a filter", async () => {
     renderPanel();
     expect(await screen.findByText("Nurse Visit at Home")).toBeInTheDocument();
     const [facilityId, params] = lastCall();
     expect(facilityId).toBe("f-1");
     expect(params).toMatchObject({ page: 1, pageSize: 15, isTelemedicine: false });
-    expect(params.status).toBe("requested,broadcasting,expired_no_accept,disputed,telemedicine_paid_pending_assignment,telemedicine_cancelled_payment_review,telemedicine_unattended");
+    expect(params.status).toBeUndefined();
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("can still be opened on what needs attention", async () => {
+    renderPanel({ defaultGroup: "attention" });
+    await screen.findByText("Nurse Visit at Home");
+    expect(lastCall()[1].status).toBe("requested,broadcasting,expired_no_accept,disputed,telemedicine_paid_pending_assignment,telemedicine_cancelled_payment_review,telemedicine_unattended");
   });
 
   it("shows counts on the tabs and the status filters, from the API's counts", async () => {
@@ -144,9 +153,9 @@ describe("FacilityBookingsPanel", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(result([]));
     renderPanel();
-    expect(await screen.findByText(/No home-based care bookings in "Needs attention"/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^All/ }));
     expect(await screen.findByText(/No home-based care bookings for this facility yet/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Needs attention/ }));
+    expect(await screen.findByText(/No home-based care bookings in "Needs attention"/)).toBeInTheDocument();
   });
 
   it("pages through the list", async () => {
