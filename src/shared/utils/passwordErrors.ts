@@ -1,3 +1,5 @@
+import { isAxiosError } from "axios";
+
 import { classifyApiError } from "./errors";
 
 export type PasswordSubmitError = {
@@ -18,7 +20,7 @@ export const describePasswordSubmitError = (err: unknown, fallback: string): Pas
   const { category, message } = classifyApiError(err, fallback);
 
   if (category === "timeout" || category === "unavailable") {
-    const serverError = category === "unavailable" && message && message !== "Network Error";
+    const serverError = category === "unavailable" && isAxiosError(err) && Boolean(err.response);
     return { message: serverError ? SERVER_TROUBLE : UNREACHABLE, field: null, retryable: true };
   }
 
