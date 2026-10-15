@@ -1,3 +1,4 @@
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -270,6 +271,8 @@ const ProviderHome = () => {
         {/* Non-blocking: every provider predates these fields, and a required answer would
             lock them out of their own dashboard until they filled them in. */}
         <ProviderSetupCard />
+
+        <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
         {/* Intelligence Layer */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

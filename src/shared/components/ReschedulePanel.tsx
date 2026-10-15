@@ -1,9 +1,11 @@
+import { getApiError } from "../utils/errors";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   acceptReschedule,
   cancelReschedule,
+  declineReschedule,
   fetchRescheduleRequests,
   proposeReschedule,
   type RescheduleRequest
@@ -39,9 +41,9 @@ const formatWhen = (iso: string | null) =>
  * moved or did not.
  *
  * Which actions appear depends on who is looking. You may withdraw your own proposal but not
- * answer it; the other participant may accept it but does not need a separate decline workflow.
- * Participants can discuss the proposal outside the system, then accept the agreed time or
- * withdraw and make another proposal.
+ * answer it; the other participant may accept or decline it, and the proposer is told either way.
+ * The same answer can be given from the "Needs your response" card on the home and telemedicine
+ * screens, which is where a proposal is noticed.
  */
 export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Props) => {
   const queryClient = useQueryClient();
@@ -59,6 +61,8 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
     queryClient.invalidateQueries({ queryKey: ["telemedicine", "reschedules", bookingId] });
     // The appointment time itself may have moved, so anything showing it is now stale.
     queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    // Answering here must clear the marker on the menu and the card, which read the same source.
+    queryClient.invalidateQueries({ queryKey: ["telemedicine", "attention"] });
   };
 
   const propose = useMutation({
@@ -74,15 +78,17 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
   });
 
   const respond = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "accept" | "cancel" }) =>
+    mutationFn: ({ id, action }: { id: string; action: "accept" | "cancel" | "decline" }) =>
       action === "accept"
         ? acceptReschedule(id)
-        : cancelReschedule(id),
+        : action === "decline"
+          ? declineReschedule(id)
+          : cancelReschedule(id),
     onSuccess: () => {
       setError(null);
       refresh();
     },
-    onError: (err: unknown) => setError(err instanceof Error ? err.message : "Could not respond")
+    onError: (err: unknown) => setError(getApiError(err, "Could not respond"))
   });
 
   const requests = requestsQuery.data ?? [];
@@ -130,6 +136,15 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
                   onClick={() => respond.mutate({ id: open.id, action: "accept" })}
                 >
                   Accept this time
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  loading={respond.isPending}
+                  onClick={() => respond.mutate({ id: open.id, action: "decline" })}
+                >
+                  Decline
                 </Button>
               </>
             )}

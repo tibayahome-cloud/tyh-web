@@ -8,6 +8,8 @@ export type NavItem = {
     to: string;
     icon: ReactNode;
     badge?: number;
+    // Something here is waiting on the person to answer. A dot, not a count: it marks where to go.
+    attention?: boolean;
 };
 
 interface AppSidebarProps {
@@ -84,6 +86,19 @@ export const AppSidebar = ({ items, collapsed, onToggle }: AppSidebarProps) => {
                             </div>
                             {!collapsed && (
                                 <span className="text-sm font-semibold truncate tracking-tight">{item.label}</span>
+                            )}
+
+                            {item.attention && (
+                                <>
+                                    <span
+                                        aria-hidden="true"
+                                        className={classNames(
+                                            "absolute h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white",
+                                            collapsed ? "top-2 right-4" : "right-4"
+                                        )}
+                                    />
+                                    <span className="sr-only">Needs your response</span>
+                                </>
                             )}
 
                             {/* Badge */}

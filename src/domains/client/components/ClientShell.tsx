@@ -9,6 +9,7 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
+import { useTelemedicineAttention } from "../../../shared/hooks/useTelemedicineAttention";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingRequestDialog } from "./BookingRequestDialog";
 import type { NavItem } from "../../../shared/components/AppSidebar";
@@ -16,6 +17,7 @@ import type { NavItem } from "../../../shared/components/AppSidebar";
 export const ClientShell = () => {
   const navigate = useNavigate();
   const { unreadCount: conversationUnread } = useConversationBadge();
+  const needsResponse = (useTelemedicineAttention().data?.length ?? 0) > 0;
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
 
   const handleBookingCreated = (bookingId: string) => {
@@ -26,7 +28,7 @@ export const ClientShell = () => {
   const navItems: NavItem[] = [
     { label: "Home", to: "/app/home", icon: <HomeIcon /> },
     { label: "Services", to: "/app/services", icon: <MedicalServicesIcon /> },
-    { label: "Telemedicine", to: "/app/telemedicine", icon: <VideocamOutlinedIcon /> },
+    { label: "Telemedicine", to: "/app/telemedicine", icon: <VideocamOutlinedIcon />, attention: needsResponse },
     { label: "Care", to: "/app/selfcare", icon: <FavoriteBorderIcon /> },
     { label: "Bookings", to: "/app/bookings", icon: <CalendarMonthIcon /> },
     { label: "Inbox", to: "/app/inbox", icon: <ForumIcon />, badge: conversationUnread },
