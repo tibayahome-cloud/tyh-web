@@ -16,7 +16,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
 import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
 import { AdminCreateBookingDialog } from "../../components/AdminCreateBookingDialog";
-import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
+import CancelBookingDialog from "../../components/CancelBookingDialog";
 import type { BookingDispute } from "../../../../shared/schemas/booking";
 
 const ACTIVE_STATUSES = [
@@ -67,8 +67,6 @@ const AdminBookingQueuePage = () => {
   const [reassignOpen, setReassignOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [cancelReasonCode, setCancelReasonCode] = useState(ADMIN_CANCELLATION_REASONS[0].value);
-  const [cancelNote, setCancelNote] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [reviewDispute, setReviewDispute] = useState<BookingDispute | null>(null);
   const [reviewStatus, setReviewStatus] = useState<"under_review" | "resolved" | "rejected">("under_review");
@@ -116,6 +114,7 @@ const AdminBookingQueuePage = () => {
     }
     return rows;
   }, [bookingQuery.data?.bookings, tab.key]);
+  const selectedQueueBooking = useMemo(() => bookings.find((row) => row.id === selectedBookingId), [bookings, selectedBookingId]);
 
   const openReassignModal = (bookingId: string) => {
     setSelectedBookingId(bookingId);
@@ -124,8 +123,6 @@ const AdminBookingQueuePage = () => {
 
   const openCancelDialog = (bookingId: string) => {
     setSelectedBookingId(bookingId);
-    setCancelReasonCode(ADMIN_CANCELLATION_REASONS[0].value);
-    setCancelNote("");
     setCancelDialogOpen(true);
   };
 
@@ -157,16 +154,14 @@ const AdminBookingQueuePage = () => {
     }
   };
 
-  const handleCancelConfirm = async () => {
+  const handleCancelConfirm = async (finalReason: string) => {
     if (!selectedBookingId) {
       return;
     }
     try {
-      const finalReason = formatCancellationReason(cancelReasonCode, cancelNote);
       await cancelMutation.mutateAsync({ bookingId: selectedBookingId, reason: finalReason });
       toast.showToast({ title: "Booking cancelled", variant: "success" });
       setCancelDialogOpen(false);
-      setCancelNote("");
       bookingQuery.refetch();
     } catch (error) {
       toast.showToast({
@@ -471,39 +466,13 @@ const AdminBookingQueuePage = () => {
         onClose={() => setReassignOpen(false)}
         onSuccess={() => bookingQuery.refetch()}
       />
-      <ConfirmDialog
+      <CancelBookingDialog
         open={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}
         onConfirm={handleCancelConfirm}
         loading={cancelMutation.isPending}
-        title="Cancel booking"
-        description="Provide a reason so the client and provider are notified."
-        confirmLabel="Cancel booking"
-        confirmVariant="secondary"
-      >
-        <label className="mt-3 flex flex-col gap-1 text-sm text-slate-700">
-          <span>Reason</span>
-          <select
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-            value={cancelReasonCode}
-            onChange={(event) => setCancelReasonCode(event.target.value)}
-          >
-            {ADMIN_CANCELLATION_REASONS.map((reason) => (
-              <option key={reason.value} value={reason.value}>
-                {reason.label}
-                {reason.description ? ` — ${reason.description}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <textarea
-          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-          rows={3}
-          value={cancelNote}
-          onChange={(event) => setCancelNote(event.target.value)}
-          placeholder="Internal note (optional)"
-        />
-      </ConfirmDialog>
+        paidTelemedicine={Boolean(selectedQueueBooking?.isTelemedicine && selectedQueueBooking?.paidAt)}
+      />
 
       <AdminCreateBookingDialog
         open={createDialogOpen}
