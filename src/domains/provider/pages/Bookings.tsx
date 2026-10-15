@@ -1,3 +1,5 @@
+import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
+import { classifyApiError } from "../../../shared/utils/errors";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -131,7 +133,7 @@ const ProviderBookings = () => {
     const statusConfig = STATUS_FILTERS.find((option) => option.value === statusFilter);
     const dateRange = useMemo(() => computeDateRange(dateFilter), [dateFilter]);
 
-    const { data: bookingsData, isLoading, isFetching } = useBookingList(
+    const { data: bookingsData, isLoading, isFetching, isError, error: listError, refetch } = useBookingList(
         {
             page,
             pageSize,
@@ -353,6 +355,10 @@ const ProviderBookings = () => {
                 {isLoading ? (
                     <div className="py-16 text-center">
                         <Loading label="Loading bookings" />
+                    </div>
+                ) : isError && !bookingsData ? (
+                    <div className="p-6">
+                        <ApiErrorBanner {...classifyApiError(listError, "We could not load your bookings.")} onRetry={() => void refetch()} />
                     </div>
                 ) : bookings.length === 0 ? (
                     <div className="py-16 text-center text-sm text-slate-500">No bookings match the selected filters.</div>
