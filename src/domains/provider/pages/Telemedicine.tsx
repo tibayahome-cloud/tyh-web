@@ -121,7 +121,9 @@ const ProviderTelemedicinePage = () => {
   const policyQuery = useTelemedicinePolicy();
 
   const { data, isLoading, dataUpdatedAt, refetch, isFetching } = useBookingList(
-    { providerId: user?.id ?? undefined, pageSize: 50, preset: "card" },
+    // Asked of the server rather than filtered here: a provider with many home-care bookings would
+    // otherwise fill this page with them and push their consultations off it.
+    { providerId: user?.id ?? undefined, isTelemedicine: true, pageSize: 100, preset: "card" },
     { enabled: Boolean(user?.id) }
   );
 
