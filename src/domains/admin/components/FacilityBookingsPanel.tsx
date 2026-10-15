@@ -11,6 +11,7 @@ import { getApiError } from "../../../shared/utils/errors";
 import {
   BOOKING_GROUPS,
   BOOKING_GROUP_LABEL,
+  assignBlockedReason,
   canAssignStatus,
   groupCount,
   statusFilterFor,
@@ -41,6 +42,7 @@ type Props = {
 
 const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booking; onAssign?: (booking: Booking) => void; showProvider?: boolean }) => {
   const when = booking.scheduledAt ?? booking.createdAt;
+  const blockedReason = onAssign && canAssignStatus(booking.status) ? assignBlockedReason(booking) : null;
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -77,6 +79,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
           </div>
         )}
       </dl>
+      {blockedReason && <p className="mt-3 text-xs text-slate-600">{blockedReason}</p>}
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <Link
           to={`/admin/bookings/${booking.id}`}
@@ -85,7 +88,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
         >
           View booking
         </Link>
-        {onAssign && canAssignStatus(booking.status) && (
+        {onAssign && canAssignStatus(booking.status) && !blockedReason && (
           <Button size="sm" variant="outline" onClick={() => onAssign(booking)}>
             {booking.provider ? "Reassign provider" : "Assign provider"}
           </Button>
