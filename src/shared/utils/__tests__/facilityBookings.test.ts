@@ -66,3 +66,18 @@ describe("statusLabel", () => {
     expect(statusLabel("telemedicine_paid_pending_assignment")).toBe("Paid pending assignment");
   });
 });
+
+describe("assignBlockedReason", () => {
+  it("blocks changing the provider once either person has joined the video call", async () => {
+    const { assignBlockedReason } = await import("../facilityBookings");
+    expect(assignBlockedReason({ isTelemedicine: true, telemedicineSession: { providerJoinedAt: "2026-10-15T10:00:00Z", clientJoinedAt: null } })).toMatch(/already started/);
+    expect(assignBlockedReason({ isTelemedicine: true, telemedicineSession: { providerJoinedAt: null, clientJoinedAt: "2026-10-15T10:00:00Z" } })).toMatch(/already started/);
+  });
+
+  it("allows it before anyone joins, with no session, and for home-based care", async () => {
+    const { assignBlockedReason } = await import("../facilityBookings");
+    expect(assignBlockedReason({ isTelemedicine: true, telemedicineSession: { providerJoinedAt: null, clientJoinedAt: null } })).toBeNull();
+    expect(assignBlockedReason({ isTelemedicine: true, telemedicineSession: null })).toBeNull();
+    expect(assignBlockedReason({ isTelemedicine: false, telemedicineSession: { providerJoinedAt: "x", clientJoinedAt: null } })).toBeNull();
+  });
+});
