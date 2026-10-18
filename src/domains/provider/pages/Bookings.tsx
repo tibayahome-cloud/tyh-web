@@ -14,11 +14,16 @@ import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { StarIcon } from "lucide-react";
 
-import { PROVIDER_CANCELLED_STATUSES, PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
+import {
+    PROVIDER_ACTIVE_STATUSES,
+    PROVIDER_CANCELLED_STATUSES,
+    PROVIDER_UPCOMING_STATUSES
+} from "../../../shared/utils/providerBookingStatuses";
+import { computeBookingDateRange } from "../../../shared/utils/bookingDateRange";
 
 const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] }> = [
     { value: "all", label: "All bookings" },
-    { value: "active", label: "Active & In-Progress", statuses: ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider", "client_completed"] },
+    { value: "active", label: "Active & In-Progress", statuses: [...PROVIDER_ACTIVE_STATUSES] },
     { value: "upcoming", label: "Upcoming", statuses: [...PROVIDER_UPCOMING_STATUSES] },
     {
         value: "awaiting_client",
@@ -36,6 +41,7 @@ const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] 
 
 const DATE_FILTERS = [
     { value: "all", label: "Any time" },
+    { value: "upcoming", label: "Upcoming appointments" },
     { value: "today", label: "Today" },
     { value: "7d", label: "Last 7 days" },
     { value: "30d", label: "Last 30 days" }
@@ -92,28 +98,6 @@ const formatRelativeTime = (iso?: string | null) => {
     return rtf.format(Math.round(value), unit);
 };
 
-const computeDateRange = (value: string) => {
-    const now = new Date();
-    if (value === "today") {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date();
-        end.setHours(23, 59, 59, 999);
-        return { from: start.toISOString(), to: end.toISOString() };
-    }
-    if (value === "7d") {
-        const from = new Date(now);
-        from.setDate(from.getDate() - 7);
-        return { from: from.toISOString(), to: now.toISOString() };
-    }
-    if (value === "30d") {
-        const from = new Date(now);
-        from.setDate(from.getDate() - 30);
-        return { from: from.toISOString(), to: now.toISOString() };
-    }
-    return null;
-};
-
 const ProviderBookings = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
@@ -124,14 +108,14 @@ const ProviderBookings = () => {
 
     const [page, setPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState("active");
-    const [dateFilter, setDateFilter] = useState("7d");
+    const [dateFilter, setDateFilter] = useState("all");
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [draftStatus, setDraftStatus] = useState(statusFilter);
     const [draftDate, setDraftDate] = useState(dateFilter);
     const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; clientName: string } | null>(null);
 
     const statusConfig = STATUS_FILTERS.find((option) => option.value === statusFilter);
-    const dateRange = useMemo(() => computeDateRange(dateFilter), [dateFilter]);
+    const dateRange = useMemo(() => computeBookingDateRange(dateFilter), [dateFilter]);
 
     const { data: bookingsData, isLoading, isFetching, isError, error: listError, refetch } = useBookingList(
         {
@@ -139,8 +123,9 @@ const ProviderBookings = () => {
             pageSize,
             statuses: statusConfig?.statuses,
             providerId: user?.id ?? undefined,
-            from: dateRange?.from,
-            to: dateRange?.to,
+            from: dateRange.from,
+            to: dateRange.to,
+            scheduledFrom: dateRange.scheduledFrom,
             preset: "card"
         },
         { enabled: Boolean(user?.id) }
