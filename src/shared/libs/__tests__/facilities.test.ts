@@ -32,6 +32,7 @@ import {
   resendFacilityAdminInvitation,
   sendFacilityAdminPasswordReset,
   facilityServiceUpdatePayload,
+  updateFacilityService,
   updateFacilityStatus,
   updateFacilityProviderCompensation,
   updateFacilityProvider,
@@ -192,6 +193,30 @@ describe("facility API helpers", () => {
     expect(facilityUpdatePayload({ fastResponseEnabled: false })).toMatchObject({ fast_response_enabled: false });
   });
 
+  it("sends optional facility building and room details on create and update", async () => {
+    mockPost.mockResolvedValue({ data: { data: { facility: facilityResponse } } });
+    await createFacility({
+      name: "Nairobi Clinic",
+      facilityType: "clinic",
+      address: "Kilimani",
+      locationDetails: "Building B, 2nd floor, Room 3",
+      county: "Nairobi",
+      phones: [{ phone: "+254700000000", label: "Reception", isPrimary: true }],
+      email: "care@nairobi.test",
+      initialAdminEmail: "ops@nairobi.test",
+      lat: -1.2921,
+      lng: 36.8219,
+      operatingHours: [],
+      platformFeePercent: 10
+    });
+    expect(mockPost).toHaveBeenCalledWith("/facilities", expect.objectContaining({
+      location_details: "Building B, 2nd floor, Room 3"
+    }));
+    expect(facilityUpdatePayload({ locationDetails: "Block A, Suite 2" })).toEqual({
+      location_details: "Block A, Suite 2"
+    });
+  });
+
   it("assigns facility admin ops by email", async () => {
     mockPost.mockResolvedValueOnce({
       data: {
@@ -293,11 +318,39 @@ describe("facility API helpers", () => {
     expect(result).toEqual({ invitationSent: true, invitationExpiresAt: "2026-08-04T11:00:00Z" });
   });
 
-  it("keeps facility service partial update payloads partial", () => {
-    expect(facilityServiceUpdatePayload({ active: false, priceCents: 120000 })).toEqual({
+  it("omits the immutable service id from facility service update payloads", () => {
+    expect(facilityServiceUpdatePayload({ serviceId: "service-1", active: false, priceCents: 120000 })).toEqual({
       active: false,
       price_cents: 120000
     });
+  });
+
+  it("patches all editable service fields without sending the catalogue service id", async () => {
+    const editableFields = {
+      price_cents: 120050,
+      currency: "KES",
+      estimate_duration_minutes: 45,
+      active: false,
+      is_emergency_capable: false,
+      delivery_mode: "in_person"
+    };
+    mockPatch.mockResolvedValueOnce({
+      data: { data: { id: "offering-1", service_id: "service-1", ...editableFields } }
+    });
+
+    const result = await updateFacilityService("facility-1", "offering-1", {
+      serviceId: "service-1",
+      priceCents: 120050,
+      currency: "KES",
+      estimateDurationMinutes: 45,
+      active: false,
+      isEmergencyCapable: false,
+      deliveryMode: "in_person"
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith("/facilities/facility-1/services/offering-1", editableFields);
+    expect(result.priceCents).toBe(120050);
+    expect(result.serviceId).toBe("service-1");
   });
 
   it("updates facility lifecycle status with backend field names", async () => {
@@ -522,6 +575,44 @@ describe("facility API helpers", () => {
       facilityId: "facility-1",
       facilityStatus: "pending"
     });
+  });
+
+  it("filters facility bookings by kind and reads the counts per kind and status", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: [],
+        meta: {
+          page: { number: 1, size: 15, total: 0, total_pages: 1 },
+          counts: {
+            home: { total: 3, by_status: { requested: 1, fully_completed: 2 } },
+            telemedicine: { total: 1, by_status: { scheduled: 1 } }
+          }
+        }
+      }
+    });
+
+    const result = await fetchFacilityBookings("facility-1", { pageSize: 15, status: "requested,disputed", isTelemedicine: true });
+
+    expect(mockGet).toHaveBeenCalledWith("/facilities/facility-1/bookings", {
+      params: { "page[number]": 1, "page[size]": 15, "filter[status]": "requested,disputed", "filter[is_telemedicine]": "true" }
+    });
+    expect(result.counts).toEqual({
+      home: { total: 3, byStatus: { requested: 1, fully_completed: 2 } },
+      telemedicine: { total: 1, byStatus: { scheduled: 1 } }
+    });
+  });
+
+  it("sends isTelemedicine false as false, and nothing when no kind is asked for", async () => {
+    mockGet.mockResolvedValue({ data: { data: [], meta: {} } });
+    await fetchFacilityBookings("facility-1", { isTelemedicine: false });
+    expect(mockGet.mock.calls.at(-1)?.[1]).toEqual({ params: { "page[number]": 1, "page[size]": 25, "filter[is_telemedicine]": "false" } });
+    await fetchFacilityBookings("facility-1", {});
+    expect(mockGet.mock.calls.at(-1)?.[1]).toEqual({ params: { "page[number]": 1, "page[size]": 25 } });
+  });
+
+  it("has no counts when the API does not send them", async () => {
+    mockGet.mockResolvedValueOnce({ data: { data: [], meta: { page: { number: 1, size: 25, total: 0, total_pages: 1 } } } });
+    expect((await fetchFacilityBookings("facility-1")).counts).toBeNull();
   });
 
   it("assigns a provider to a facility booking with backend field names", async () => {

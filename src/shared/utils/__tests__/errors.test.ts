@@ -65,3 +65,36 @@ describe("classifyApiError", () => {
     });
   });
 });
+
+describe("friendlyApiMessage and getApiError for transport and bare statuses", () => {
+  it("never returns axios's own status text", async () => {
+    const { friendlyApiMessage } = await import("../errors");
+    for (const status of [400, 401, 403, 404, 409, 422, 429, 500, 502, 503]) {
+      const error = new AxiosError(`Request failed with status code ${status}`, "ERR_BAD_REQUEST", undefined, undefined, {
+        status, statusText: "", headers: {}, config: {}, data: ""
+      } as never);
+      expect(friendlyApiMessage(error)).not.toMatch(/status code/);
+      expect(getApiError(error)).not.toMatch(/status code/);
+    }
+  });
+
+  it("ignores a bare HTTP name as the message and explains the status instead", () => {
+    const error = axiosErrorWithStatus(500, "Internal Server Error");
+    expect(getApiError(error)).toMatch(/our side/);
+  });
+
+  it("appends the first field-level reason to a general validation message", async () => {
+    const { friendlyApiMessage } = await import("../errors");
+    const error = new AxiosError("x", "ERR_BAD_REQUEST", undefined, undefined, {
+      status: 400, statusText: "", headers: {}, config: {},
+      data: { error: { message: "Validation failed.", details: { phone: ["Enter a valid phone number."] } } }
+    } as never);
+    expect(friendlyApiMessage(error)).toBe("Validation failed. Enter a valid phone number.");
+  });
+
+  it("describes a connection failure and a timeout", async () => {
+    const { friendlyApiMessage } = await import("../errors");
+    expect(friendlyApiMessage(new AxiosError("Network Error", "ERR_NETWORK"))).toMatch(/could not reach the server/);
+    expect(friendlyApiMessage(new AxiosError("timeout of 15000ms exceeded", "ECONNABORTED"))).toMatch(/too long/);
+  });
+});

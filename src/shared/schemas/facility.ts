@@ -76,6 +76,7 @@ export const FacilitySchema = z.object({
   facilityType: z.enum(FACILITY_TYPES),
   hospitalLevel: z.number().int().min(1).max(6).nullable(),
   address: z.string(),
+  locationDetails: z.string().nullable().optional(),
   county: z.string(),
   countryCode: z.string().nullable(),
   email: z.string(),
@@ -267,6 +268,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     facilityType,
     hospitalLevel: coerceNumber(raw.hospital_level ?? raw.hospitalLevel),
     address: coerceString(raw.address) ?? "",
+    locationDetails: coerceString(raw.location_details ?? raw.locationDetails),
     county: coerceString(raw.county) ?? "",
     countryCode: coerceString(raw.country_code ?? raw.countryCode),
     email: coerceString(raw.email) ?? "",
@@ -419,6 +421,7 @@ export type FacilityCreateInput = {
   facilityType: FacilityType;
   hospitalLevel?: number | null;
   address: string;
+  locationDetails?: string | null;
   county: string;
   countryCode?: string | null;
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
@@ -436,6 +439,7 @@ export type FacilityUpdateInput = Partial<{
   facilityType: FacilityType;
   hospitalLevel?: number | null;
   address: string;
+  locationDetails?: string | null;
   county: string;
   countryCode: string | null;
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;

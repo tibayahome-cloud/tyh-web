@@ -1,13 +1,14 @@
-import { lazy } from "react";
+
 import { Navigate, RouteObject } from "react-router-dom";
 import { WebsiteLayout } from "./components/WebsiteLayout";
 import { isNativePlatform } from "../../shared/libs/capacitor";
+import { lazyWithRetry } from "../../shared/utils/lazyWithRetry";
 
 // Lazy load pages
-const Home = lazy(() => import("./pages/Home").then((module) => ({ default: module.Home })));
+const Home = lazyWithRetry(() => import("./pages/Home").then((module) => ({ default: module.Home })));
 // Legal & Extra
-const Privacy = lazy(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Privacy })));
-const Terms = lazy(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Terms })));
+const Privacy = lazyWithRetry(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Privacy })));
+const Terms = lazyWithRetry(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Terms })));
 
 const NativeRedirect = () => {
     if (isNativePlatform()) {

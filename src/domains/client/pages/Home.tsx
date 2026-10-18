@@ -1,3 +1,4 @@
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useEffect, useMemo, useState } from "react";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -44,6 +45,7 @@ import {
   Minus,
   Calendar,
   House,
+  Ambulance,
   Video
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
@@ -372,6 +374,10 @@ const ClientHome = () => {
           className="pb-0 sm:pb-0 lg:pb-0"
         />
 
+        <div className="px-4 empty:hidden">
+          <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
+        </div>
+
         {/* HEALTH PULSE CHIPS */}
         <section className="px-4 -mt-2 overflow-x-auto no-scrollbar">
           <div className="flex gap-2 min-w-max">
@@ -454,15 +460,29 @@ const ClientHome = () => {
                 </span>
                 <ArrowRight className="h-5 w-5 shrink-0" />
               </button>
-              <button type="button" onClick={() => openBookingDialog()}
-                className="flex min-w-0 items-center gap-3 rounded-lg border border-tiba-gold bg-white p-4 text-left text-slate-900 transition hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
-                <House className="h-6 w-6 shrink-0 text-tiba-gold" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-semibold">Book Home Care</span>
-                  <span className="mt-1 block text-sm text-slate-600">A healthcare professional visits your home.</span>
-                </span>
-                <ArrowRight className="h-5 w-5 shrink-0 text-tiba-gold" />
-              </button>
+              <div className="rounded-lg border border-tiba-gold bg-white p-4">
+                <div className="mb-3 flex items-center gap-3">
+                  <House className="h-6 w-6 shrink-0 text-tiba-gold" />
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">Home-based care</h3>
+                    <p className="mt-1 text-sm text-slate-600">Care and support at your location.</p>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button type="button" onClick={() => openBookingDialog()}
+                    className="flex min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                    <House className="h-5 w-5 shrink-0 text-tiba-gold" />
+                    <span className="min-w-0 flex-1 text-sm font-semibold">Book Home Care</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
+                  </button>
+                  <button type="button" onClick={() => openBookingDialog()}
+                    className="flex min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                    <Ambulance className="h-5 w-5 shrink-0 text-tiba-gold" />
+                    <span className="min-w-0 flex-1 text-sm font-semibold">Request an Ambulance</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 

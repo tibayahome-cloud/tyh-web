@@ -236,6 +236,50 @@ describe("FacilityWorkspacePage helpers", () => {
     expect(filterAssignableProviders(booking, providers).map((provider) => provider.userId)).toEqual(["provider-1"]);
   });
 
+  describe("assignable providers for a telemedicine booking", () => {
+    const remote = (subcategoryId: string | null | undefined) =>
+      ({ isTelemedicine: true, service: { id: "svc", telemedicineSubcategoryId: subcategoryId } }) as unknown as Booking;
+    const specialist = (userId: string, over: Record<string, unknown> = {}) =>
+      ({
+        userId, verified: true, telemedicineEnabled: true, services: [], user: { status: "active" },
+        telemedicineSubcategoryAssignments: [{ subcategoryId: "mental-health", status: "active" }],
+        ...over
+      }) as unknown as Provider;
+
+    it("offers providers who hold the service's specialty, with no provider-service row needed", () => {
+      // The reported case: a facility with a counselling provider was told none was configured.
+      expect(filterAssignableProviders(remote("mental-health"), [specialist("p1")]).map((p) => p.userId)).toEqual(["p1"]);
+    });
+
+    it("leaves out providers who lack the specialty, have it removed, or are not ready", () => {
+      const providers = [
+        specialist("other-specialty", { telemedicineSubcategoryAssignments: [{ subcategoryId: "cardiology", status: "active" }] }),
+        specialist("removed", { telemedicineSubcategoryAssignments: [{ subcategoryId: "mental-health", status: "removed" }] }),
+        specialist("unverified", { verified: false }),
+        specialist("telemedicine-off", { telemedicineEnabled: false }),
+        specialist("suspended", { user: { status: "suspended" } }),
+        specialist("ok")
+      ];
+      expect(filterAssignableProviders(remote("mental-health"), providers).map((p) => p.userId)).toEqual(["ok"]);
+    });
+
+    it("keeps using service membership for a legacy remote service with no specialty", () => {
+      const member = specialist("member", { telemedicineSubcategoryAssignments: [], services: [{ serviceId: "svc", active: true }] });
+      const stranger = specialist("stranger", { telemedicineSubcategoryAssignments: [] });
+      expect(filterAssignableProviders(remote(null), [member, stranger]).map((p) => p.userId)).toEqual(["member"]);
+    });
+
+    it("offers anyone qualified either way when the API does not say which specialty applies", () => {
+      const member = specialist("member", { telemedicineSubcategoryAssignments: [], services: [{ serviceId: "svc", active: true }] });
+      expect(filterAssignableProviders(remote(undefined), [member, specialist("specialist")]).map((p) => p.userId)).toEqual(["member", "specialist"]);
+    });
+
+    it("does not let home-based care reuse the specialty rule", () => {
+      const home = { isTelemedicine: false, service: { id: "svc" } } as unknown as Booking;
+      expect(filterAssignableProviders(home, [specialist("p1")])).toEqual([]);
+    });
+  });
+
   it("formats facility response countdown urgency", () => {
     const now = new Date("2026-07-30T08:00:00Z").getTime();
 

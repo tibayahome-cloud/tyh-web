@@ -15,6 +15,9 @@ import { RefreshGate } from "../auth/RefreshGate";
 import { SessionEventBridge } from "./providers/SessionEventBridge";
 import { SyncService } from "./providers/SyncService";
 import { ToastProvider } from "../shared/components/ToastProvider";
+import { installStaleChunkHandler } from "../shared/utils/lazyWithRetry";
+
+installStaleChunkHandler();
 
 const root = document.getElementById("root");
 

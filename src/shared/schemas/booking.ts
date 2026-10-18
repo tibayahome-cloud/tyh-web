@@ -19,6 +19,8 @@ export const BookingServiceSummarySchema = z.object({
   key: z.string().nullable(),
   basePriceCents: z.number().nullable(),
   defaultEstimateMinutes: z.number().nullable(),
+  // Set for telemedicine specialty services; null for legacy services; absent from an older API.
+  telemedicineSubcategoryId: z.string().nullable().optional(),
   category: z.object({
     id: z.string(),
     name: z.string().nullable(),
@@ -164,6 +166,7 @@ const mapService = (payload: unknown): BookingServiceSummary | null => {
     key: coerceString(raw.key),
     basePriceCents: coerceNumber(raw.base_price_cents),
     defaultEstimateMinutes: coerceNumber(raw.default_estimate_minutes),
+    telemedicineSubcategoryId: "telemedicine_subcategory_id" in raw ? coerceId(raw.telemedicine_subcategory_id) || null : undefined,
     category: categoryId
       ? {
         id: categoryId,

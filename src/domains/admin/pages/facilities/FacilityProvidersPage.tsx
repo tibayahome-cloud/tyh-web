@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AddIcon from "@mui/icons-material/PersonAddAltOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -10,6 +11,8 @@ import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { classifyApiError, getApiError } from "../../../../shared/utils/errors";
+import { providerTelemedicineReadiness } from "../../../../shared/utils/telemedicineReadiness";
+import { describeProviderSaveError, findStaleSubcategories, type StaleSubcategory } from "../../../../shared/utils/telemedicineSelection";
 import {
   createFacilityProvider,
   fetchFacilityProviders,
@@ -18,9 +21,11 @@ import {
   updateFacilityProviderLifecycle
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
+import { TelemedicineSpecialtyPicker } from "../../components/TelemedicineSpecialtyPicker";
+import { holdersBySpecialty, offeredServicesBySpecialty } from "../../../../shared/utils/specialtyContext";
 import {
   fetchTelemedicineAdminServices,
-  fetchTelemedicineSubcategories,
+  fetchSelectableTelemedicineSubcategories,
   type TelemedicineCatalogService,
   type TelemedicineSubcategory
 } from "../../../../shared/libs/telemedicineCatalog";
@@ -104,11 +109,17 @@ const ProviderFormFields = ({
   form,
   services,
   telemedicineSubcategories,
+  staleSubcategories,
+  offeredBySpecialty,
+  holdersBySpecialtyCount,
   onChange
 }: {
   form: ProviderForm;
   services: Array<{ serviceId: string; service?: { name?: string | null } | null }>;
   telemedicineSubcategories: TelemedicineSubcategory[];
+  staleSubcategories: StaleSubcategory[];
+  offeredBySpecialty: Map<string, string[]>;
+  holdersBySpecialtyCount: Map<string, number>;
   onChange: (next: ProviderForm) => void;
 }) => {
   const toggleService = (serviceId: string) => {
@@ -128,18 +139,6 @@ const ProviderFormFields = ({
         : [...form.telemedicineSubcategoryIds, subcategoryId]
     });
   };
-
-  const groupedSubcategories = useMemo(() => {
-    const groups = new Map<string, { name: string; items: TelemedicineSubcategory[] }>();
-    telemedicineSubcategories.forEach((subcategory) => {
-      const category = subcategory.category;
-      const key = category?.id ?? "uncategorized";
-      const group = groups.get(key) ?? { name: category?.name ?? "Other", items: [] };
-      group.items.push(subcategory);
-      groups.set(key, group);
-    });
-    return Array.from(groups.values());
-  }, [telemedicineSubcategories]);
 
   return (
     <div className="space-y-4">
@@ -184,25 +183,34 @@ const ProviderFormFields = ({
       <fieldset>
         <legend className="mb-1 text-sm font-semibold text-slate-700">Telemedicine specialties</legend>
         <p className="mb-2 text-xs text-slate-500">Assign subcategories that this provider can handle remotely.</p>
-        {groupedSubcategories.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">No active telemedicine subcategories are available.</p>
-        ) : (
-          <div className="space-y-3">
-            {groupedSubcategories.map((group) => (
-              <div key={group.name}>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.name}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {group.items.map((subcategory) => (
-                    <label key={subcategory.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                      <input type="checkbox" checked={form.telemedicineSubcategoryIds.includes(subcategory.id)} onChange={() => toggleTelemedicineSubcategory(subcategory.id)} />
-                      {subcategory.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
+        {staleSubcategories.length > 0 && (
+          <div role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">Archived specialties are still selected</p>
+            <p className="mt-1">These specialties are archived and can no longer be assigned. Their history is kept.</p>
+            <ul className="mt-2 space-y-1">
+              {staleSubcategories.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3">
+                  <span>{item.name}</span>
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-amber-900 underline"
+                    aria-label={`Remove ${item.name} from this provider`}
+                    onClick={() => onChange({ ...form, telemedicineSubcategoryIds: form.telemedicineSubcategoryIds.filter((id) => id !== item.id) })}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
+        <TelemedicineSpecialtyPicker
+          specialties={telemedicineSubcategories}
+          selectedIds={form.telemedicineSubcategoryIds}
+          onToggle={toggleTelemedicineSubcategory}
+          offered={offeredBySpecialty}
+          holders={holdersBySpecialtyCount}
+        />
       </fieldset>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
@@ -217,7 +225,35 @@ const ProviderFormFields = ({
   );
 };
 
-const FacilityProvidersPage = () => {
+// Says whether clients can book this provider for telemedicine, and if not, the first step to do.
+const ReadinessLine = ({ provider, selectableIds }: { provider: Provider; selectableIds: ReadonlySet<string> | null }) => {
+  const { ready, blockers } = providerTelemedicineReadiness(provider, selectableIds);
+  if (ready) {
+    return <p className="mt-1 text-xs font-medium text-green-700">Ready for telemedicine bookings</p>;
+  }
+  return (
+    <p className="mt-1 text-xs text-amber-800" role="status">
+      <span className="font-medium">Not bookable for telemedicine:</span> {blockers.map((blocker) => blocker.label).join(", ")}. {blockers[0].fix}
+    </p>
+  );
+};
+
+// The full provider management screen for one facility. The facility admin's own page and the
+// super-admin facility workspace both render it, so both manage providers the same way.
+export const FacilityProvidersManager = ({
+  facilityId,
+  embedded = false,
+  canViewDetails = false,
+  onChanged
+}: {
+  facilityId: string;
+  // Platform admins can open a provider's full profile (schedule, specialties, onboarding, services).
+  canViewDetails?: boolean;
+  // Inside the facility workspace the page already has a title, so the large heading is dropped.
+  embedded?: boolean;
+  // Called after anything that changes a provider, so a host page can refresh its own copies.
+  onChanged?: () => void;
+}) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -225,8 +261,6 @@ const FacilityProvidersPage = () => {
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [lifecyclePendingKey, setLifecyclePendingKey] = useState<string | null>(null);
 
-  const facilitiesQuery = useAdminFacilityScope(true);
-  const facilityId = facilitiesQuery.facility?.id;
   const providersQuery = useQuery({
     queryKey: ["admin", "facility-providers", facilityId, search],
     queryFn: () => fetchFacilityProviders(facilityId as string, { search: search || undefined }),
@@ -239,7 +273,7 @@ const FacilityProvidersPage = () => {
   });
   const telemedicineSubcategoriesQuery = useQuery({
     queryKey: ["telemedicine", "catalog", "subcategories"],
-    queryFn: () => fetchTelemedicineSubcategories(),
+    queryFn: () => fetchSelectableTelemedicineSubcategories(),
     enabled: Boolean(facilityId)
   });
   const telemedicineServicesQuery = useQuery<TelemedicineCatalogService[]>({
@@ -255,7 +289,27 @@ const FacilityProvidersPage = () => {
     () => servicesQuery.data?.filter((service) => service.active && !telemedicineServiceIds.has(service.serviceId)) ?? [],
     [servicesQuery.data, telemedicineServiceIds]
   );
-  const invalidateProviders = () => void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
+  // Only judged once the selectable list has loaded, so a slow response never looks like a stale selection.
+  const staleSubcategories = useMemo(
+    () =>
+      telemedicineSubcategoriesQuery.isSuccess
+        ? findStaleSubcategories(form.telemedicineSubcategoryIds, telemedicineSubcategoriesQuery.data, editingProvider?.telemedicineSubcategoryAssignments ?? [])
+        : [],
+    [telemedicineSubcategoriesQuery.isSuccess, telemedicineSubcategoriesQuery.data, form.telemedicineSubcategoryIds, editingProvider]
+  );
+  const offeredBySpecialty = useMemo(
+    () => offeredServicesBySpecialty(servicesQuery.data ?? [], telemedicineServicesQuery.data ?? []),
+    [servicesQuery.data, telemedicineServicesQuery.data]
+  );
+  const holdersBySpecialtyCount = useMemo(() => holdersBySpecialty(providersQuery.data?.providers ?? []), [providersQuery.data?.providers]);
+  const invalidateProviders = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
+    onChanged?.();
+  };
+  const selectableIds = useMemo(
+    () => (telemedicineSubcategoriesQuery.isSuccess ? new Set(telemedicineSubcategoriesQuery.data.map((item) => item.id)) : null),
+    [telemedicineSubcategoriesQuery.isSuccess, telemedicineSubcategoriesQuery.data]
+  );
 
   const createMutation = useMutation({
     mutationFn: () => createFacilityProvider(facilityId as string, {
@@ -335,19 +389,7 @@ const FacilityProvidersPage = () => {
   const isLifecyclePending = (provider: Provider, action: ProviderLifecycleAction) =>
     lifecyclePendingKey === `${provider.userId}:${action}`;
 
-  if (facilitiesQuery.isLoading) return <Loading fullHeight />;
-  if (facilitiesQuery.isError) {
-    return (
-      <Card title="Providers">
-        <ApiErrorBanner
-          {...classifyApiError(facilitiesQuery.error, "We couldn't load your facility right now.")}
-          onRetry={() => facilitiesQuery.refetch()}
-        />
-      </Card>
-    );
-  }
-  if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
-  if (providersQuery.isLoading) return <Loading fullHeight />;
+  if (providersQuery.isLoading) return embedded ? <Loading /> : <Loading fullHeight />;
 
   const openCreate = () => {
     setEditingProvider(null);
@@ -361,23 +403,29 @@ const FacilityProvidersPage = () => {
   };
 
   return (
-    <div className="space-y-5 pb-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-tiba-blue">Facility operations</p><h1 className="mt-1 text-2xl font-bold text-slate-950">Providers</h1><p className="mt-1 text-sm text-slate-500">Manage providers, services, compensation, and financial visibility.</p></div>
-        <Button size="sm" onClick={openCreate}><AddIcon fontSize="small" />{showForm ? "Close form" : "Add provider"}</Button>
-      </div>
+    <div className={embedded ? "space-y-5" : "space-y-5 pb-6"}>
+      {embedded ? (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={openCreate}><AddIcon fontSize="small" />{showForm ? "Close form" : "Add provider"}</Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-tiba-blue">Facility operations</p><h1 className="mt-1 text-2xl font-bold text-slate-950">Providers</h1><p className="mt-1 text-sm text-slate-500">Manage providers, services, compensation, and financial visibility.</p></div>
+          <Button size="sm" onClick={openCreate}><AddIcon fontSize="small" />{showForm ? "Close form" : "Add provider"}</Button>
+        </div>
+      )}
 
       {(showForm || editingProvider) && (
         <Card title={editingProvider ? "Edit provider" : "Add provider"} subtitle={editingProvider ? "Changes apply only to this facility provider." : "The provider will receive an invitation when an email is supplied."}>
-          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} onChange={setForm} />
+          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} staleSubcategories={staleSubcategories} offeredBySpecialty={offeredBySpecialty} holdersBySpecialtyCount={holdersBySpecialtyCount} onChange={setForm} />
           {(createMutation.error || updateMutation.error) && (
             <p className="mt-4 text-sm text-danger-600">
-              {getApiError(createMutation.error || updateMutation.error, "Unable to save provider")}
+              {describeProviderSaveError(createMutation.error || updateMutation.error)}
             </p>
           )}
           <div className="mt-5 flex flex-wrap gap-3">
             <Button variant="secondary" onClick={() => { setShowForm(false); setEditingProvider(null); }}>Cancel</Button>
-            <Button loading={createMutation.isPending || updateMutation.isPending} disabled={!form.fullName.trim() || (!form.email.trim() && !form.phone.trim())} onClick={() => editingProvider ? updateMutation.mutate() : createMutation.mutate()}>
+            <Button loading={createMutation.isPending || updateMutation.isPending} disabled={!form.fullName.trim() || (!form.email.trim() && !form.phone.trim()) || staleSubcategories.length > 0} onClick={() => editingProvider ? updateMutation.mutate() : createMutation.mutate()}>
               {editingProvider ? "Save provider" : "Create provider"}
             </Button>
           </div>
@@ -399,22 +447,31 @@ const FacilityProvidersPage = () => {
           <div className="divide-y divide-slate-100">
             {providersQuery.data?.providers.map((provider) => (
               <div key={provider.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.telemedicineSubcategoryAssignments.length} remote specialties · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p></div>
+                <div><p className="font-semibold text-slate-900">{provider.user?.fullName ?? "Unnamed provider"}</p><p className="text-sm text-slate-500">{provider.user?.email ?? provider.user?.phone ?? "No contact"}</p><p className="mt-1 text-xs text-slate-500">{provider.services.length} services · {provider.telemedicineSubcategoryAssignments.length} remote specialties · {provider.compensation.mode} · {provider.financialsVisible === null ? "facility default" : provider.financialsVisible ? "financials visible" : "financials hidden"}</p><ReadinessLine provider={provider} selectableIds={selectableIds} /></div>
                 <div className="flex flex-col gap-2 sm:items-end">
                   {/* State first, on its own line -- actions below, so the two never mix into one wrapped blob. */}
                   <div className="flex flex-wrap gap-1.5 text-xs font-semibold sm:justify-end">
-                    <StatusChip tone={accountStatusTone(provider.user?.status)} label={`Account ${provider.user?.status ?? "pending"}`} />
+                    {provider.user?.status && <StatusChip tone={accountStatusTone(provider.user.status)} label={`Account ${provider.user.status}`} />}
                     <StatusChip tone={provider.verified ? "on" : "pending"} label={provider.verified ? "Verified" : "Not verified"} />
                     <StatusChip tone={provider.isAvailable ? "on" : "off"} label={provider.isAvailable ? "Available" : "Unavailable"} />
                     <StatusChip tone={provider.telemedicineEnabled ? "on" : "off"} label={provider.telemedicineEnabled ? "Telemedicine on" : "Telemedicine off"} />
                   </div>
                   <div className="flex flex-wrap gap-2 sm:justify-end">
                     {!provider.verified && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "verify")} onClick={() => lifecycleMutation.mutate({ provider, action: "verify" })}>Verify</Button>}
-                    {provider.verified && provider.user?.status !== "active" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "activate")} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
+                    {provider.verified && provider.user?.status && provider.user.status !== "active" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "activate")} onClick={() => lifecycleMutation.mutate({ provider, action: "activate" })}>Activate</Button>}
                     {provider.user?.status !== "suspended" && <Button size="sm" variant="outline" loading={isLifecyclePending(provider, "suspend")} onClick={() => lifecycleMutation.mutate({ provider, action: "suspend" })}>Suspend</Button>}
                     <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.isAvailable ? "unavailable" : "available")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.isAvailable ? "unavailable" : "available" })}>{provider.isAvailable ? "Set unavailable" : "Set available"}</Button>
                     <Button size="sm" variant="outline" loading={isLifecyclePending(provider, provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on")} onClick={() => lifecycleMutation.mutate({ provider, action: provider.telemedicineEnabled ? "telemedicine_off" : "telemedicine_on" })}>{provider.telemedicineEnabled ? "Disable telemedicine" : "Enable telemedicine"}</Button>
                     <Button size="sm" variant="outline" onClick={() => openEdit(provider)}><EditIcon fontSize="small" />Edit</Button>
+                    {canViewDetails && (
+                      <Link
+                        to={`/admin/providers/${provider.userId}`}
+                        aria-label={`View details for ${provider.user?.fullName ?? provider.user?.email ?? "provider"}`}
+                        className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-tiba-blue hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-tiba-blue/30"
+                      >
+                        View details
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
@@ -429,6 +486,25 @@ const FacilityProvidersPage = () => {
       </Card>
     </div>
   );
+};
+
+const FacilityProvidersPage = () => {
+  const facilitiesQuery = useAdminFacilityScope(true);
+  const facilityId = facilitiesQuery.facility?.id;
+
+  if (facilitiesQuery.isLoading) return <Loading fullHeight />;
+  if (facilitiesQuery.isError) {
+    return (
+      <Card title="Providers">
+        <ApiErrorBanner
+          {...classifyApiError(facilitiesQuery.error, "We couldn't load your facility right now.")}
+          onRetry={() => facilitiesQuery.refetch()}
+        />
+      </Card>
+    );
+  }
+  if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
+  return <FacilityProvidersManager facilityId={facilityId} />;
 };
 
 export default FacilityProvidersPage;

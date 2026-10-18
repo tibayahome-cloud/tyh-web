@@ -1,3 +1,4 @@
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Video, ChevronRight, Calendar as CalendarIcon, Clock as ClockIcon } from "lucide-react";
@@ -92,6 +93,8 @@ const ClientTelemedicinePage = () => {
         </div>
 
         {!user?.countryCode && <CountryRequiredBanner onComplete={() => navigate("/app/profile")} />}
+
+        <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
 
         <div className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold text-slate-700">Upcoming consultations</h2>

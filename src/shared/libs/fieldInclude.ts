@@ -151,7 +151,9 @@ export const providerProfile: FieldPreset = {
       fields: ["id", "name", "provider_financials_visible"]
     },
     user: {
-      fields: ["id", "full_name", "email", "phone", "avatar_url"]
+      // status is needed to show whether the provider's account is active; without it the UI
+      // cannot tell an active account from one still waiting to finish setup.
+      fields: ["id", "full_name", "email", "phone", "avatar_url", "status"]
     },
     services: {
       fields: ["id", "service_id", "active"],
@@ -174,6 +176,16 @@ export const providerProfile: FieldPreset = {
         }
       }
     }
+  }
+};
+
+// The facility provider list also needs each provider's availability windows and their delivery
+// mode, so the page can say whether a provider can take telemedicine bookings.
+export const facilityProviderList: FieldPreset = {
+  ...providerProfile,
+  includes: {
+    ...providerProfile.includes,
+    availability: { fields: ["id", "weekday", "delivery_mode"] }
   }
 };
 
@@ -218,8 +230,18 @@ export const providerDetail: FieldPreset = {
         }
       }
     },
+    // The slot engine works from the local start and end times, so those are what to show.
     availability: {
-      fields: ["id", "weekday", "start_time", "end_time", "effective_from", "effective_to"]
+      fields: ["id", "weekday", "start_time", "end_time", "start_time_local", "end_time_local", "delivery_mode", "effective_from", "effective_to", "slot_duration_minutes"]
+    },
+    telemedicine_subcategory_assignments: {
+      fields: ["id", "subcategory_id", "status"],
+      children: {
+        subcategory: {
+          fields: ["id", "name", "status", "category_id"],
+          children: { category: { fields: ["id", "name", "status"] } }
+        }
+      }
     },
     blackouts: {
       fields: ["id", "start_at", "end_at", "reason"]

@@ -3,26 +3,53 @@ import { isAxiosError } from "axios";
 import type { FacilityAdminAccess } from "../libs/facilities";
 import { classifyApiError } from "./errors";
 
-export type FacilityAdminAccessLabel = "Pending" | "Expired" | "Account active";
+// Two separate facts, never merged: the person's facility access (this assignment) and their
+// account (sign-in, setup). A suspended facility assignment says nothing about the account, and an
+// account suspended elsewhere says nothing about this assignment.
+export type FacilityAccessLabel = "Access active" | "Access suspended" | "Access removed";
+export type AccountLabel = "Setup pending" | "Invitation expired" | "Account active" | "Account suspended";
 
 export type FacilityAdminAccessState = {
-  label: FacilityAdminAccessLabel;
+  access: FacilityAccessLabel;
+  // Not shown for a removed assignment: the account is no longer this facility's concern.
+  account: AccountLabel | null;
+  // Profile editing, setup invitations and reset links only work on a current (active) assignment.
+  canEdit: boolean;
   // Setup has not finished: the admin needs a (new) setup invitation.
   canResendInvitation: boolean;
   // The account is active: a forgotten password is recovered with a reset link instead.
   canSendResetLink: boolean;
+  canSuspend: boolean;
+  canReactivate: boolean;
 };
 
-// The three states a super admin sees. An account that has finished setup is "Account active"
-// whatever its old invitation looks like; otherwise the invitation decides between Pending and
-// Expired. A superseded (revoked) invitation with no live replacement reads as Expired, and an
-// invitation that was never sent reads as Pending.
+const accountLabel = (admin: FacilityAdminAccess): AccountLabel => {
+  if (admin.userStatus === "suspended") return "Account suspended";
+  if (admin.userStatus === "active" || admin.invitation.status === "completed") return "Account active";
+  return admin.invitation.status === "expired" || admin.invitation.status === "revoked" ? "Invitation expired" : "Setup pending";
+};
+
+// What a super admin sees and may do for one administrator. Driven by assignmentStatus, not by
+// the raw `active` flag (a suspended and a removed assignment are both inactive).
 export const facilityAdminAccessState = (admin: FacilityAdminAccess): FacilityAdminAccessState => {
-  if (admin.userStatus === "active" || admin.invitation.status === "completed") {
-    return { label: "Account active", canResendInvitation: false, canSendResetLink: true };
+  if (admin.assignmentStatus === "removed") {
+    return { access: "Access removed", account: null, canEdit: false, canResendInvitation: false, canSendResetLink: false, canSuspend: false, canReactivate: false };
   }
-  const expired = admin.invitation.status === "expired" || admin.invitation.status === "revoked";
-  return { label: expired ? "Expired" : "Pending", canResendInvitation: true, canSendResetLink: false };
+  const account = accountLabel(admin);
+  if (admin.assignmentStatus === "suspended") {
+    return { access: "Access suspended", account, canEdit: false, canResendInvitation: false, canSendResetLink: false, canSuspend: false, canReactivate: true };
+  }
+  // A globally suspended account keeps its assignment, but no recovery link is offered for it.
+  const accountSuspended = account === "Account suspended";
+  return {
+    access: "Access active",
+    account,
+    canEdit: true,
+    canResendInvitation: account === "Setup pending" || account === "Invitation expired",
+    canSendResetLink: account === "Account active" && !accountSuspended,
+    canSuspend: true,
+    canReactivate: false
+  };
 };
 
 // Says what happened when a recovery request fails, including the rate limit.

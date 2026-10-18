@@ -1,21 +1,22 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import type { RouteObject } from "react-router-dom";
 import { Navigate, useRoutes } from "react-router-dom";
 
 import { Loading } from "../../shared/components/Loading";
 import { ClientShell } from "./components/ClientShell";
+import { lazyWithRetry } from "../../shared/utils/lazyWithRetry";
 
-const ClientHome = lazy(() => import("./pages/Home"));
-const ClientTelemedicine = lazy(() => import("./pages/Telemedicine"));
-const ClientServices = lazy(() => import("./pages/Services"));
-const ClientServiceDetail = lazy(() => import("./pages/ServiceDetail"));
-const NotificationsPage = lazy(() => import("../../shared/pages/Notifications/NotificationsPage"));
-const BookingDetailPage = lazy(() => import("./pages/BookingDetail"));
-const BookingsPage = lazy(() => import("./pages/Bookings"));
-const SelfCarePage = lazy(() => import("./pages/SelfCare"));
-const ClientProfilePage = lazy(() => import("./pages/Profile"));
-const ClientSettingsPage = lazy(() => import("./pages/Settings"));
-const ClientInboxPage = lazy(() => import("./pages/Inbox"));
+const ClientHome = lazyWithRetry(() => import("./pages/Home"));
+const ClientTelemedicine = lazyWithRetry(() => import("./pages/Telemedicine"));
+const ClientServices = lazyWithRetry(() => import("./pages/Services"));
+const ClientServiceDetail = lazyWithRetry(() => import("./pages/ServiceDetail"));
+const NotificationsPage = lazyWithRetry(() => import("../../shared/pages/Notifications/NotificationsPage"));
+const BookingDetailPage = lazyWithRetry(() => import("./pages/BookingDetail"));
+const BookingsPage = lazyWithRetry(() => import("./pages/Bookings"));
+const SelfCarePage = lazyWithRetry(() => import("./pages/SelfCare"));
+const ClientProfilePage = lazyWithRetry(() => import("./pages/Profile"));
+const ClientSettingsPage = lazyWithRetry(() => import("./pages/Settings"));
+const ClientInboxPage = lazyWithRetry(() => import("./pages/Inbox"));
 
 const buildRoutes = (): RouteObject[] => [
   {

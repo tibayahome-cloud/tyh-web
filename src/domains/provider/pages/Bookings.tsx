@@ -1,3 +1,5 @@
+import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
+import { classifyApiError } from "../../../shared/utils/errors";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,10 +14,12 @@ import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { StarIcon } from "lucide-react";
 
+import { PROVIDER_CANCELLED_STATUSES, PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
+
 const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] }> = [
     { value: "all", label: "All bookings" },
     { value: "active", label: "Active & In-Progress", statuses: ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider", "client_completed"] },
-    { value: "upcoming", label: "Upcoming", statuses: ["accepted", "en_route", "nearby", "arrived"] },
+    { value: "upcoming", label: "Upcoming", statuses: [...PROVIDER_UPCOMING_STATUSES] },
     {
         value: "awaiting_client",
         label: "Awaiting Client Confirmation",
@@ -25,7 +29,7 @@ const STATUS_FILTERS: Array<{ value: string; label: string; statuses?: string[] 
     {
         value: "cancelled",
         label: "Cancelled",
-        statuses: ["cancelled_by_client", "cancelled_by_admin", "expired_no_accept", "reassigned"]
+        statuses: [...PROVIDER_CANCELLED_STATUSES]
     },
     { value: "disputed", label: "Disputed", statuses: ["disputed"] }
 ];
@@ -129,7 +133,7 @@ const ProviderBookings = () => {
     const statusConfig = STATUS_FILTERS.find((option) => option.value === statusFilter);
     const dateRange = useMemo(() => computeDateRange(dateFilter), [dateFilter]);
 
-    const { data: bookingsData, isLoading, isFetching } = useBookingList(
+    const { data: bookingsData, isLoading, isFetching, isError, error: listError, refetch } = useBookingList(
         {
             page,
             pageSize,
@@ -351,6 +355,10 @@ const ProviderBookings = () => {
                 {isLoading ? (
                     <div className="py-16 text-center">
                         <Loading label="Loading bookings" />
+                    </div>
+                ) : isError && !bookingsData ? (
+                    <div className="p-6">
+                        <ApiErrorBanner {...classifyApiError(listError, "We could not load your bookings.")} onRetry={() => void refetch()} />
                     </div>
                 ) : bookings.length === 0 ? (
                     <div className="py-16 text-center text-sm text-slate-500">No bookings match the selected filters.</div>

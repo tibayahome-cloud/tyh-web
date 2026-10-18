@@ -111,6 +111,66 @@ const respond = async (requestId: string, action: string, note?: string): Promis
 
 export const acceptReschedule = (requestId: string, note?: string) => respond(requestId, "accept", note);
 export const cancelReschedule = (requestId: string) => respond(requestId, "cancel");
+export const declineReschedule = (requestId: string, note?: string) => respond(requestId, "decline", note);
+
+// ---------------------------------------------------------------------------
+// What is waiting on the signed-in person
+// ---------------------------------------------------------------------------
+
+export type AttentionKind = "reschedule_request" | "rebooking_offer";
+
+export type AttentionItem = {
+  kind: AttentionKind;
+  id: string;
+  bookingId: string;
+  proposedStartAt: string | null;
+  // Only a replacement-time offer lapses.
+  expiresAt: string | null;
+  reason: string | null;
+  createdAt: string | null;
+  currentStartAt: string | null;
+  role: "client" | "provider";
+  serviceName: string;
+  // The other participant, or the facility for a replacement-time offer.
+  fromName: string | null;
+};
+
+const text = (value: unknown): string | null => (typeof value === "string" && value ? value : null);
+
+export const mapAttentionItem = (value: unknown): AttentionItem | null => {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const kind = raw.kind === "reschedule_request" || raw.kind === "rebooking_offer" ? raw.kind : null;
+  const id = text(raw.id);
+  const bookingId = text(raw.booking_id);
+  if (!kind || !id || !bookingId) return null;
+  return {
+    kind,
+    id,
+    bookingId,
+    proposedStartAt: text(raw.proposed_start_at),
+    expiresAt: text(raw.expires_at),
+    reason: text(raw.reason),
+    createdAt: text(raw.created_at),
+    currentStartAt: text(raw.current_start_at),
+    role: raw.role === "provider" ? "provider" : "client",
+    serviceName: text(raw.service_name) ?? "Consultation",
+    fromName: text(raw.from_name)
+  };
+};
+
+export const fetchTelemedicineAttention = async (): Promise<AttentionItem[]> => {
+  const response = await api.get("/telemedicine/attention");
+  const items = (response.data?.data?.items ?? []) as unknown[];
+  return items.map(mapAttentionItem).filter((item): item is AttentionItem => item !== null);
+};
+
+export const acceptRebookingOffer = async (bookingId: string): Promise<void> => {
+  await api.post(`/telemedicine/bookings/${bookingId}/rebookings/accept`, {});
+};
+
+export const declineRebookingOffer = async (bookingId: string, note?: string): Promise<void> => {
+  await api.post(`/telemedicine/bookings/${bookingId}/rebookings/decline`, note ? { note } : {});
+};
 
 // ---------------------------------------------------------------------------
 // Payment report

@@ -36,3 +36,6 @@ tests/
 !tests/e2e/
 !tests/e2e/**
 test-results/
+
+# a bare name also matches a node_modules symlink in a worktree
+node_modules

@@ -125,6 +125,24 @@ export const fetchTelemedicineSubcategories = async (
   return dataRows(response.data).map(mapTelemedicineSubcategory).filter((item) => item.id && item.status === "active");
 };
 
+// Only active specialties under active categories may be chosen for a new assignment. The list
+// endpoint already omits archived and deleted rows; this also guards the response itself, and
+// attaches each category so the selector can group by it. Archived records are never changed.
+export const selectableTelemedicineSubcategories = (
+  subcategories: TelemedicineSubcategory[],
+  categories: TelemedicineCategory[]
+): TelemedicineSubcategory[] => {
+  const activeCategories = new Map(categories.filter((category) => category.status === "active").map((category) => [category.id, category]));
+  return subcategories
+    .filter((subcategory) => subcategory.id && subcategory.status === "active" && activeCategories.has(subcategory.categoryId))
+    .map((subcategory) => ({ ...subcategory, category: activeCategories.get(subcategory.categoryId) ?? null }));
+};
+
+export const fetchSelectableTelemedicineSubcategories = async (): Promise<TelemedicineSubcategory[]> => {
+  const [categories, subcategories] = await Promise.all([fetchTelemedicineCategories(), fetchTelemedicineSubcategories()]);
+  return selectableTelemedicineSubcategories(subcategories, categories);
+};
+
 export const fetchTelemedicineCatalogServices = async (
   subcategoryId?: string
 ): Promise<TelemedicineCatalogService[]> => {

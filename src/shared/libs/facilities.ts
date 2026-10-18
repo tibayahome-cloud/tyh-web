@@ -1,5 +1,5 @@
 import api from "./api";
-import { buildFieldParams, providerProfile } from "./fieldInclude";
+import { buildFieldParams, facilityProviderList } from "./fieldInclude";
 import { mapBooking, mapBookingListMeta, mapBookings } from "../schemas/booking";
 import type { Booking, BookingListMeta } from "../schemas/booking";
 import { mapProvider, mapProviders, type Provider } from "../schemas/provider";
@@ -50,11 +50,22 @@ export type FacilityBookingListParams = {
   pageSize?: number;
   status?: string;
   facilityStatus?: string;
+  // true for telemedicine bookings, false for home-based care, undefined for both.
+  isTelemedicine?: boolean;
+  // Only this provider's bookings (a user id).
+  providerUserId?: string;
 };
+
+// How many bookings a facility has of each kind, in total and by status. Covers every booking, not
+// just the page or filter that was asked for.
+export type FacilityBookingKindCounts = { total: number; byStatus: Record<string, number> };
+export type FacilityBookingCounts = { home: FacilityBookingKindCounts; telemedicine: FacilityBookingKindCounts };
 
 export type FacilityBookingListResult = {
   bookings: Booking[];
   meta: BookingListMeta;
+  // Absent when the API predates the counts.
+  counts: FacilityBookingCounts | null;
   raw?: Record<string, unknown>;
 };
 
@@ -124,15 +135,43 @@ export type FacilityAdminInvitationResendResult = {
   invitationExpiresAt: string | null;
 };
 
+export type FacilityAdminEmailChange = {
+  status: "pending_verification" | "unchanged";
+  email: string;
+  expiresInSeconds: number | null;
+};
+
+export type FacilityAdminAssignmentStatus = "active" | "suspended" | "removed";
+
 export type FacilityAdminAccess = {
   id: string;
   facilityId: string;
   userId: string;
+  fullName: string;
   email: string;
+  phone: string | null;
   userStatus: string;
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
   roleKey: string;
   active: boolean;
+  // The facility assignment, separate from the account's own status (userStatus). A suspended
+  // assignment has active=false too, and so does a removed one: only assignmentStatus tells them apart.
+  assignmentStatus: FacilityAdminAssignmentStatus;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
+  removedAt: string | null;
   invitation: FacilityAdminInvitationStatus;
+  // A new address waiting for its verification link; the current address stays in use until then.
+  pendingEmail: string | null;
+};
+
+// Only these fields are editable, as the API accepts them.
+export type FacilityAdminProfileInput = Partial<{ fullName: string; phone: string | null; email: string }>;
+
+export type FacilityAdminProfileResult = {
+  admin: Pick<FacilityAdminAccess, "userId" | "fullName" | "email" | "phone" | "phoneVerifiedAt">;
+  emailChange: FacilityAdminEmailChange | null;
 };
 
 export type FacilityCreateResult = {
@@ -201,6 +240,7 @@ export const facilityCreatePayload = (input: FacilityCreateInput): Record<string
   facility_type: input.facilityType,
   hospital_level: input.hospitalLevel ?? null,
   address: input.address,
+  ...(input.locationDetails !== undefined ? { location_details: input.locationDetails } : {}),
   county: input.county,
   country_code: input.countryCode,
   phones: phonePayload(input.phones),
@@ -219,6 +259,7 @@ export const facilityUpdatePayload = (input: FacilityUpdateInput): Record<string
   if (input.facilityType !== undefined) payload.facility_type = input.facilityType;
   if (input.hospitalLevel !== undefined) payload.hospital_level = input.hospitalLevel;
   if (input.address !== undefined) payload.address = input.address;
+  if (input.locationDetails !== undefined) payload.location_details = input.locationDetails;
   if (input.county !== undefined) payload.county = input.county;
   if (input.countryCode !== undefined) payload.country_code = input.countryCode;
   if (input.phones !== undefined) payload.phones = phonePayload(input.phones);
@@ -246,7 +287,6 @@ export const facilityServicePayload = (input: FacilityServiceInput): Record<stri
 
 export const facilityServiceUpdatePayload = (input: Partial<FacilityServiceInput>): Record<string, unknown> => {
   const payload: Record<string, unknown> = {};
-  if (input.serviceId !== undefined) payload.service_id = input.serviceId;
   if (input.priceCents !== undefined) payload.price_cents = input.priceCents;
   if (input.currency !== undefined) payload.currency = input.currency;
   if (input.estimateDurationMinutes !== undefined) payload.estimate_duration_minutes = input.estimateDurationMinutes;
@@ -378,6 +418,61 @@ export const assignFacilityAdmin = async (facilityId: string, email: string): Pr
   return admin;
 };
 
+const mapAssignmentStatus = (raw: Record<string, unknown>): FacilityAdminAssignmentStatus => {
+  if (raw.assignment_status === "active" || raw.assignment_status === "suspended" || raw.assignment_status === "removed") {
+    return raw.assignment_status;
+  }
+  // An API without assignment_status: suspension cannot be told from removal, so only an active
+  // assignment is treated as current.
+  return raw.active ? "active" : "removed";
+};
+
+export type FacilityAdminInviteResult = {
+  facilityAdminId: string;
+  userId: string;
+  email: string;
+  invitationSent: boolean;
+  invitationExpiresAt: string | null;
+};
+
+// Invites a new email address: creates a pending account and sends a setup invitation. An email
+// that already has an account is refused (409); use assignFacilityAdmin for an existing account.
+export const inviteFacilityAdmin = async (facilityId: string, email: string): Promise<FacilityAdminInviteResult> => {
+  const response = await api.post(`/facilities/${facilityId}/admins/invitations`, { email });
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    facilityAdminId: String(data.facility_admin_id ?? ""),
+    userId: String(data.user_id ?? ""),
+    email: String(data.email ?? email),
+    invitationSent: Boolean(data.invitation_sent),
+    invitationExpiresAt: data.invitation_expires_at ? String(data.invitation_expires_at) : null
+  };
+};
+
+export type FacilityAdminStatusResult = {
+  userId: string;
+  assignmentStatus: "active" | "suspended";
+  suspendedAt: string | null;
+  suspensionReason: string | null;
+};
+
+// Suspends or reactivates this facility's admin assignment only. It never touches the user's
+// account: the global user-suspension endpoint is deliberately not used here.
+export const setFacilityAdminStatus = async (
+  facilityId: string,
+  userId: string,
+  input: { status: "active" } | { status: "suspended"; reason: string }
+): Promise<FacilityAdminStatusResult> => {
+  const response = await api.patch(`/facilities/${facilityId}/admins/${userId}/status`, input);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  return {
+    userId: String(data.user_id ?? userId),
+    assignmentStatus: data.assignment_status === "suspended" ? "suspended" : "active",
+    suspendedAt: data.suspended_at ? String(data.suspended_at) : null,
+    suspensionReason: data.suspension_reason ? String(data.suspension_reason) : null
+  };
+};
+
 export const fetchFacilityAdminAccess = async (facilityId: string): Promise<FacilityAdminAccess[]> => {
   const response = await api.get(`/facilities/${facilityId}/admins`);
   const data = payloadData(response.data);
@@ -391,10 +486,19 @@ export const fetchFacilityAdminAccess = async (facilityId: string): Promise<Faci
       id: String(raw.id ?? ""),
       facilityId: String(raw.facility_id ?? ""),
       userId: String(raw.user_id ?? ""),
+      fullName: String(raw.full_name ?? ""),
       email: String(raw.email ?? ""),
+      phone: raw.phone ? String(raw.phone) : null,
       userStatus: String(raw.user_status ?? "pending"),
+      emailVerifiedAt: raw.email_verified_at ? String(raw.email_verified_at) : null,
+      phoneVerifiedAt: raw.phone_verified_at ? String(raw.phone_verified_at) : null,
       roleKey: String(raw.role_key ?? "admin.ops"),
       active: Boolean(raw.active),
+      assignmentStatus: mapAssignmentStatus(raw),
+      suspendedAt: raw.suspended_at ? String(raw.suspended_at) : null,
+      suspensionReason: raw.suspension_reason ? String(raw.suspension_reason) : null,
+      removedAt: raw.removed_at ? String(raw.removed_at) : null,
+      pendingEmail: raw.email_change ? String((raw.email_change as Record<string, unknown>).email ?? "") || null : null,
       invitation: {
         status: String(invitation.status ?? "not_issued") as FacilityAdminInvitationStatus["status"],
         resetId: invitation.reset_id ? String(invitation.reset_id) : null,
@@ -403,6 +507,36 @@ export const fetchFacilityAdminAccess = async (facilityId: string): Promise<Faci
       }
     };
   });
+};
+
+export const updateFacilityAdminProfile = async (
+  facilityId: string,
+  userId: string,
+  input: FacilityAdminProfileInput
+): Promise<FacilityAdminProfileResult> => {
+  const body: Record<string, unknown> = {};
+  if (input.fullName !== undefined) body.full_name = input.fullName;
+  if (input.phone !== undefined) body.phone = input.phone;
+  if (input.email !== undefined) body.email = input.email;
+  const response = await api.patch(`/facilities/${facilityId}/admins/${userId}`, body);
+  const data = payloadData(response.data) as Record<string, unknown>;
+  const change = data.email_change as Record<string, unknown> | null | undefined;
+  return {
+    admin: {
+      userId: String(data.user_id ?? userId),
+      fullName: String(data.full_name ?? ""),
+      email: String(data.email ?? ""),
+      phone: data.phone ? String(data.phone) : null,
+      phoneVerifiedAt: data.phone_verified_at ? String(data.phone_verified_at) : null
+    },
+    emailChange: change
+      ? {
+          status: change.status === "unchanged" ? "unchanged" : "pending_verification",
+          email: String(change.email ?? ""),
+          expiresInSeconds: typeof change.expires_in_seconds === "number" ? change.expires_in_seconds : null
+        }
+      : null
+  };
 };
 
 export const fetchFacilityAdminInvitationStatus = async (
@@ -501,7 +635,7 @@ export const deleteFacilityService = async (facilityId: string, facilityServiceI
 
 export const fetchFacilityBookings = async (
   facilityId: string,
-  { page = 1, pageSize = 25, status, facilityStatus }: FacilityBookingListParams = {}
+  { page = 1, pageSize = 25, status, facilityStatus, isTelemedicine, providerUserId }: FacilityBookingListParams = {}
 ): Promise<FacilityBookingListResult> => {
   const params: Record<string, unknown> = {
     "page[number]": page,
@@ -509,12 +643,34 @@ export const fetchFacilityBookings = async (
   };
   if (status) params["filter[status]"] = status;
   if (facilityStatus) params["filter[facility_status]"] = facilityStatus;
+  if (isTelemedicine !== undefined) params["filter[is_telemedicine]"] = String(isTelemedicine);
+  if (providerUserId) params["filter[provider_user_id]"] = providerUserId;
 
   const response = await api.get(`/facilities/${facilityId}/bookings`, { params });
   const payload = (response.data ?? {}) as Record<string, unknown>;
   const data = Array.isArray(payload.data) ? payload.data : [];
   const bookings = mapBookings(data);
-  return { bookings, meta: mapListMeta(payload.meta, page, pageSize, bookings.length), raw: payload };
+  return {
+    bookings,
+    meta: mapListMeta(payload.meta, page, pageSize, bookings.length),
+    counts: mapBookingCounts((payload.meta as Record<string, unknown> | undefined)?.counts),
+    raw: payload
+  };
+};
+
+const mapBookingKindCounts = (value: unknown): FacilityBookingKindCounts => {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const byStatus: Record<string, number> = {};
+  Object.entries((raw.by_status ?? {}) as Record<string, unknown>).forEach(([status, count]) => {
+    byStatus[status] = Number(count) || 0;
+  });
+  return { total: Number(raw.total) || 0, byStatus };
+};
+
+const mapBookingCounts = (value: unknown): FacilityBookingCounts | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  return { home: mapBookingKindCounts(raw.home), telemedicine: mapBookingKindCounts(raw.telemedicine) };
 };
 
 export const assignFacilityBookingProvider = async (
@@ -601,7 +757,7 @@ export const fetchFacilityProviders = async (
   { page = 1, pageSize = 25, search, verified }: FacilityProviderListParams = {}
 ): Promise<FacilityProviderListResult> => {
   const params: Record<string, unknown> = {
-    ...buildFieldParams(providerProfile),
+    ...buildFieldParams(facilityProviderList),
     "filter[facility_id]": facilityId,
     "page[number]": page,
     "page[size]": pageSize

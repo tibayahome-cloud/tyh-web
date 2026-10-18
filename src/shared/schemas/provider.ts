@@ -19,6 +19,8 @@ export interface ProviderAvailability {
     endTime: string;
     effectiveFrom: string | null;
     effectiveTo: string | null;
+    // in_person, remote or both. Only set when the list was asked for it.
+    deliveryMode?: string;
 }
 
 export interface ProviderBlackout {
@@ -149,6 +151,7 @@ export const mapProvider = (payload: unknown): Provider | null => {
                 weekday: Number(availability.weekday) || 0,
                 startTime: coerceString(availability.start_time) || "00:00",
                 endTime: coerceString(availability.end_time) || "00:00",
+                deliveryMode: coerceString(availability.delivery_mode) || undefined,
                 effectiveFrom: coerceDate(availability.effective_from),
                 effectiveTo: coerceDate(availability.effective_to)
             };
