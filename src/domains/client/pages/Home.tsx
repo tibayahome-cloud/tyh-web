@@ -29,6 +29,7 @@ import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
 import { useWalletAccount } from "../../../shared/hooks/useWallet";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
+import { WidgetError } from "../../../shared/components/WidgetError";
 import { HomeCarePaymentActions } from "../components/HomeCarePaymentActions";
 import { formatMsisdn } from "../utils/payerPhone";
 import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
@@ -116,6 +117,11 @@ const ClientHome = () => {
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
   const latestCheckin = checkinsQuery.data?.[0];
+  // Show only readings that exist. The heart-rate chip used to read a field that is not on the record, so it
+  // always said "-- bpm", and a check-in with no blood pressure showed "undefined/undefined".
+  const hasHeartRate = typeof latestCheckin?.vitals?.heartRate === "number";
+  const hasBloodPressure =
+    typeof latestCheckin?.vitals?.bpSystolic === "number" && typeof latestCheckin?.vitals?.bpDiastolic === "number";
 
   const { data: activeList } = useBookingList(
     {
@@ -164,7 +170,7 @@ const ClientHome = () => {
   const upcomingQuery = useBookingList(
     upcomingParams,
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] }, isLoading: boolean };
+  ) as { data?: { bookings?: Booking[] }, isLoading: boolean, isError?: boolean, refetch: () => unknown };
   const upcomingList = upcomingQuery.data;
 
   // A payment that arrived for an appointment that could not be honoured. Surfaced above
@@ -183,7 +189,7 @@ const ClientHome = () => {
     }
   }, [activeBooking]);
 
-  const { data: historyList } = useBookingList(
+  const historyQuery = useBookingList(
     {
       statuses: HISTORY_STATUSES,
       clientId: user?.id ?? undefined,
@@ -191,11 +197,17 @@ const ClientHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] } };
+  ) as { data?: { bookings?: Booking[] }, isError?: boolean, refetch: () => unknown };
+  const historyList = historyQuery.data;
 
 
 
-  const walletBalance = walletQuery.data ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}` : "—";
+  // "—" while loading, and a plain "unavailable" if the request failed, so a failure never looks like a balance.
+  const walletBalance = walletQuery.data
+    ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}`
+    : walletQuery.isError
+      ? "Balance unavailable"
+      : "—";
 
 
 
@@ -381,16 +393,20 @@ const ClientHome = () => {
         {/* HEALTH PULSE CHIPS */}
         <section className="px-4 -mt-2 overflow-x-auto no-scrollbar">
           <div className="flex gap-2 min-w-max">
-            {latestCheckin?.vitals ? (
+            {hasHeartRate || hasBloodPressure ? (
               <>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-bold">
-                  <Heart className="w-3 h-3" />
-                  {latestCheckin.vitals.pulseRate || "--"} bpm
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-[11px] font-bold">
-                  <Activity className="w-3 h-3" />
-                  {latestCheckin.vitals.bpSystolic}/{latestCheckin.vitals.bpDiastolic}
-                </div>
+                {hasHeartRate && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-bold">
+                    <Heart className="w-3 h-3" />
+                    {latestCheckin?.vitals?.heartRate} bpm
+                  </div>
+                )}
+                {hasBloodPressure && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-[11px] font-bold">
+                    <Activity className="w-3 h-3" />
+                    {latestCheckin?.vitals?.bpSystolic}/{latestCheckin?.vitals?.bpDiastolic} mmHg
+                  </div>
+                )}
               </>
             ) : (
               <div onClick={() => navigate("/app/selfcare/checkin")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[11px] font-bold cursor-pointer">
@@ -503,7 +519,9 @@ const ClientHome = () => {
                 </button>
               </div>
               <div className="space-y-2">
-                {upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
+                {upcomingQuery.isError && !upcomingList ? (
+                  <WidgetError what="your upcoming appointments" onRetry={() => void upcomingQuery.refetch()} />
+                ) : upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
                   upcomingList.bookings.slice(0, 3).map((b) => (
                     <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
                   ))
@@ -524,7 +542,9 @@ const ClientHome = () => {
               </button>
               {activityExpanded && (
                 <div className="space-y-2">
-                  {historyList?.bookings && historyList.bookings.length > 0 ? (
+                  {historyQuery.isError && !historyList ? (
+                    <WidgetError what="your past activity" onRetry={() => void historyQuery.refetch()} />
+                  ) : historyList?.bookings && historyList.bookings.length > 0 ? (
                     historyList.bookings.map((b) => (
                       <BookingCompactCard
                         key={b.id}
@@ -552,7 +572,13 @@ const ClientHome = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-slate-400">Health Pulse</p>
                   <p className="text-sm font-bold text-slate-900">
-                    {latestCheckin?.vitals?.bpSystolic ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}` : "Normal"}
+                    {latestCheckin?.vitals?.bpSystolic
+                      ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}`
+                      : checkinsQuery.isError
+                        ? "Unavailable"
+                        : checkinsQuery.isLoading
+                          ? "—"
+                          : "No readings yet"}
                   </p>
                 </div>
                 <ChevronRight size={16} className="text-slate-300" />

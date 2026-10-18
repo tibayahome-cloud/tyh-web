@@ -3,9 +3,11 @@ import { useProviderAnalytics } from "../hooks/useProviderAnalytics";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import classNames from "classnames";
 
+import { WidgetError } from "../../../shared/components/WidgetError";
+
 export const PerformanceStats = () => {
     const { user } = useAuth();
-    const { data: analytics, isLoading } = useProviderAnalytics(user?.id);
+    const { data: analytics, isLoading, isError, refetch } = useProviderAnalytics(user?.id);
 
     if (isLoading) {
         return (
@@ -13,26 +15,33 @@ export const PerformanceStats = () => {
         );
     }
 
+    // A failed request is not a provider with no reviews, no rank and no services.
+    if (isError || !analytics) {
+        return <WidgetError what="your performance" onRetry={() => void refetch()} />;
+    }
+
+    const hasRatings = (analytics.rating_count ?? 0) > 0;
     const stats = [
         {
             label: "Mission Rating",
-            value: analytics?.rating_avg?.toFixed(1) || "0.0",
-            caption: `${analytics?.rating_count || 0} reviews`,
+            // No reviews is not a rating of 0.0.
+            value: hasRatings ? analytics.rating_avg.toFixed(1) : "—",
+            caption: hasRatings ? `${analytics.rating_count} reviews` : "No ratings yet",
             icon: <Star className="h-5 w-5" />,
             color: "text-amber-500",
             bg: "bg-amber-500/10"
         },
         {
             label: "Fleet Rank",
-            value: analytics?.rank ? `#${analytics.rank}` : "—",
-            caption: `of ${analytics?.total_providers || 0} pros`,
+            value: analytics.rank ? `#${analytics.rank}` : "—",
+            caption: analytics.rank ? `of ${analytics.total_providers} pros` : "Not ranked yet",
             icon: <Trophy className="h-5 w-5" />,
             color: "text-sky-500",
             bg: "bg-sky-500/10"
         },
         {
             label: "Capability",
-            value: analytics?.active_services || 0,
+            value: analytics.active_services,
             caption: "Active services",
             icon: <Zap className="h-5 w-5" />,
             color: "text-brand-500",
@@ -40,7 +49,7 @@ export const PerformanceStats = () => {
         },
         {
             label: "Daily Limit",
-            value: analytics?.daily_request_limit || 0,
+            value: analytics.daily_request_limit,
             caption: "Target capacity",
             icon: <Target className="h-5 w-5" />,
             color: "text-rose-500",
