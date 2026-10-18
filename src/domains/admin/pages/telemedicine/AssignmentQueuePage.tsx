@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ClipboardList, Flag, RefreshCw, Video } from "lucide-react";
 
 import { Card } from "../../../../shared/components/Card";
@@ -292,7 +292,12 @@ const AssignmentQueuePage = () => {
     { isTelemedicine: true, pageSize: 100, preset: "card" },
     { refetchInterval: 60_000 }
   );
-  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>("queue");
+  // A link from the facility overview can open straight onto a tab (?tab=review).
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>(
+    WORKSPACE_TABS.some((tab) => tab.key === requestedTab) ? (requestedTab as WorkspaceTabKey) : "queue"
+  );
   const [consultationFilter, setConsultationFilter] = useState<ConsultationFilterKey>("upcoming");
 
   const bookings = queueQuery.data ?? [];

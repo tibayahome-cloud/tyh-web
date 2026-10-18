@@ -351,9 +351,24 @@ export const fetchFacilityOverview = async (facilityId: string): Promise<Facilit
   if (!facility) {
     throw new Error("Facility overview not found");
   }
+  const attention = metrics.needs_attention as Record<string, unknown> | undefined;
+  const count = (value: unknown): number => Number(value) || 0;
   return {
     facility,
     metrics: {
+      inProgressBookings: metrics.in_progress_bookings === undefined ? null : count(metrics.in_progress_bookings),
+      upcomingBookings: metrics.upcoming_bookings === undefined ? null : count(metrics.upcoming_bookings),
+      needsAttention:
+        attention && typeof attention === "object"
+          ? {
+              unassignedConsultations: count(attention.unassigned_consultations),
+              unattendedConsultations: count(attention.unattended_consultations),
+              paymentReview: count(attention.payment_review),
+              awaitingResponse: count(attention.awaiting_response),
+              total: count(attention.total)
+            }
+          : null,
+      asOf: typeof metrics.as_of === "string" ? metrics.as_of : null,
       openBookings: Number(metrics.open_bookings) || 0,
       unassignedBookings: Number(metrics.unassigned_bookings) || 0,
       providersTotal: Number(metrics.providers_total) || 0,
