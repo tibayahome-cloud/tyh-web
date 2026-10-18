@@ -21,6 +21,7 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
 vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "provider-1" } }) }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/components/BookingFeedbackDialog", () => ({ BookingFeedbackDialog: () => null }));
+vi.mock("../../../../shared/components/NeedsYourResponse", () => ({ NeedsYourResponse: () => null }));
 
 import ProviderBookings from "../Bookings";
 

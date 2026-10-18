@@ -14,7 +14,6 @@ import { useAuth } from "../../../shared/hooks/useAuth";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 import { useTelemedicineAttention } from "../../../shared/hooks/useTelemedicineAttention";
 import { useConversationBadge } from "../../../shared/hooks/useConversationBadge";
-import { useBookingStore } from "../../../shared/stores/useBookingStore";
 import { useBroadcastQueue } from "../hooks/useBroadcastQueue";
 import { BroadcastOfferDialog } from "./BroadcastOfferDialog";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -32,8 +31,10 @@ export const ProviderShell = () => {
   const showPayments = !profile || providerFinancialsAreVisible(profile);
   const toast = useToast();
   const { unreadCount: conversationUnread } = useConversationBadge();
-  const needsResponse = (useTelemedicineAttention().data?.length ?? 0) > 0;
-  const activeBookingCount = useBookingStore((state: { active: Record<string, any> }) => Object.keys(state.active).length);
+  // What the server says is waiting on this provider. The Bookings badge used to count bookings the browser
+  // had merely heard about, which never went down, so it showed a number over an empty list.
+  const attentionCount = useTelemedicineAttention().data?.length ?? 0;
+  const needsResponse = attentionCount > 0;
   const { queue: broadcastQueue, dismiss: dismissBroadcast, clear: clearBroadcastQueue } = useBroadcastQueue(
     user?.id,
     profile?.id
@@ -83,7 +84,7 @@ export const ProviderShell = () => {
 
   const navItems: NavItem[] = [
     { label: "Home", to: "/pro/home", icon: <HomeIcon /> },
-    { label: "Bookings", to: "/pro/bookings", icon: <EventAvailableIcon />, badge: activeBookingCount },
+    { label: "Bookings", to: "/pro/bookings", icon: <EventAvailableIcon />, badge: attentionCount },
     { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon />, attention: needsResponse },
     { label: "Services", to: "/pro/services", icon: <MiscServicesIcon /> },
     { label: "Care", to: "/pro/selfcare", icon: <FavoriteBorderIcon /> },
