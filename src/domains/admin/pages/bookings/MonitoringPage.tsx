@@ -13,8 +13,7 @@ import { useCancelBookingMutation } from "../../../../shared/hooks/useBookings";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { Link } from "react-router-dom";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
-import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
-import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
+import CancelBookingDialog from "../../components/CancelBookingDialog";
 
 const STATUS_FILTERS = [
   { label: "Active (default)", value: "active" },
@@ -124,8 +123,6 @@ const MonitoringPage = () => {
   const cancelMutation = useCancelBookingMutation("detail");
   const [reassignOpen, setReassignOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReasonCode, setCancelReasonCode] = useState(ADMIN_CANCELLATION_REASONS[0].value);
-  const [cancelNote, setCancelNote] = useState("");
 
   useEffect(() => {
     if (data?.bookings?.length) {
@@ -170,21 +167,17 @@ const MonitoringPage = () => {
     if (!selectedBooking) {
       return;
     }
-    setCancelReasonCode(ADMIN_CANCELLATION_REASONS[0].value);
-    setCancelNote("");
     setCancelDialogOpen(true);
   };
 
-  const handleCancelConfirm = async () => {
+  const handleCancelConfirm = async (finalReason: string) => {
     if (!selectedBooking) {
       return;
     }
     try {
-      const finalReason = formatCancellationReason(cancelReasonCode, cancelNote);
       await cancelMutation.mutateAsync({ bookingId: selectedBooking.id, reason: finalReason });
       toast.showToast({ title: "Booking cancelled", variant: "success" });
       setCancelDialogOpen(false);
-      setCancelNote("");
     } catch (error) {
       toast.showToast({
         title: "Cancellation failed",
@@ -369,39 +362,13 @@ const MonitoringPage = () => {
         onClose={() => setReassignOpen(false)}
         onSuccess={() => refetch()}
       />
-      <ConfirmDialog
+      <CancelBookingDialog
         open={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}
         onConfirm={handleCancelConfirm}
         loading={cancelMutation.isPending}
-        title="Cancel booking"
-        description="Provide a short reason so the client and assigned provider know why this booking was cancelled."
-        confirmLabel="Cancel booking"
-        confirmVariant="secondary"
-      >
-        <label className="mt-3 flex flex-col gap-1 text-sm text-slate-700">
-          <span>Reason</span>
-          <select
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-            value={cancelReasonCode}
-            onChange={(event) => setCancelReasonCode(event.target.value)}
-          >
-            {ADMIN_CANCELLATION_REASONS.map((reason) => (
-              <option key={reason.value} value={reason.value}>
-                {reason.label}
-                {reason.description ? ` — ${reason.description}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <textarea
-          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-          rows={3}
-          value={cancelNote}
-          onChange={(event) => setCancelNote(event.target.value)}
-          placeholder="Internal note (optional)"
-        />
-      </ConfirmDialog>
+        paidTelemedicine={Boolean((selectedBooking as { isTelemedicine?: boolean; paidAt?: unknown } | undefined)?.isTelemedicine && (selectedBooking as { paidAt?: unknown } | undefined)?.paidAt)}
+      />
     </div>
   );
 };

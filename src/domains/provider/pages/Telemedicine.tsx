@@ -1,3 +1,6 @@
+import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
+import { classifyApiError } from "../../../shared/utils/errors";
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -120,8 +123,10 @@ const ProviderTelemedicinePage = () => {
   const reportNoShowMutation = useReportNoShowMutation();
   const policyQuery = useTelemedicinePolicy();
 
-  const { data, isLoading, dataUpdatedAt, refetch, isFetching } = useBookingList(
-    { providerId: user?.id ?? undefined, pageSize: 50, preset: "card" },
+  const { data, isLoading, isError, error: listError, dataUpdatedAt, refetch, isFetching } = useBookingList(
+    // Asked of the server rather than filtered here: a provider with many home-care bookings would
+    // otherwise fill this page with them and push their consultations off it.
+    { providerId: user?.id ?? undefined, isTelemedicine: true, pageSize: 100, preset: "card" },
     { enabled: Boolean(user?.id) }
   );
 
@@ -169,8 +174,15 @@ const ProviderTelemedicinePage = () => {
           </div>
         </div>
 
+        <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
+
+        {/* A failed request is not an empty list. Say so, instead of "No consultations assigned yet". */}
+        {isError && !data && (
+          <ApiErrorBanner {...classifyApiError(listError, "We could not load your consultations.")} onRetry={() => void refetch()} />
+        )}
+
         {isLoading && <Loading />}
-        {!isLoading && consultations.upcoming.length === 0 && consultations.history.length === 0 && (
+        {!isLoading && !isError && consultations.upcoming.length === 0 && consultations.history.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-white py-12 text-center">
             <Video size={24} className="mb-2 text-slate-300" />
             <p className="text-sm font-semibold text-slate-900">No consultations assigned yet</p>

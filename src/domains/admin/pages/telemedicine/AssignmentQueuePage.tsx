@@ -289,7 +289,7 @@ const AssignmentQueuePage = () => {
   const policyQuery = useTelemedicinePolicy();
   const issuesQuery = useTechnicalIssues({ refetchInterval: 60_000 });
   const consultationsQuery = useBookingList(
-    { isTelemedicine: true, pageSize: 50, preset: "card" },
+    { isTelemedicine: true, pageSize: 100, preset: "card" },
     { refetchInterval: 60_000 }
   );
   const [activeTab, setActiveTab] = useState<WorkspaceTabKey>("queue");

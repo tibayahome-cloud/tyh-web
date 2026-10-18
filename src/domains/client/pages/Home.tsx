@@ -1,3 +1,4 @@
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useEffect, useMemo, useState } from "react";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -372,6 +373,10 @@ const ClientHome = () => {
           hideBackground
           className="pb-0 sm:pb-0 lg:pb-0"
         />
+
+        <div className="px-4 empty:hidden">
+          <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
+        </div>
 
         {/* HEALTH PULSE CHIPS */}
         <section className="px-4 -mt-2 overflow-x-auto no-scrollbar">

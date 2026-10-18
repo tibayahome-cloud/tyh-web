@@ -1,7 +1,9 @@
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
+import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
 import { ProviderFacilityAffiliation } from "../components/ProviderFacilityAffiliation";
 
@@ -50,7 +52,6 @@ const ACTIVE_STATUS_PRIORITY: Record<string, number> = {
   completed_by_provider: 5
 };
 
-const UPCOMING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service"] as const;
 
 const HISTORY_STATUSES = [
   "client_completed",
@@ -172,7 +173,7 @@ const ProviderHome = () => {
 
   const { data: upcomingList, isFetching: upcomingFetching } = useBookingList(
     {
-      statuses: [...UPCOMING_STATUSES],
+      statuses: [...PROVIDER_UPCOMING_STATUSES],
       providerId: user?.id ?? undefined,
       pageSize: 3,
       preset: "card"
@@ -271,6 +272,8 @@ const ProviderHome = () => {
         {/* Non-blocking: every provider predates these fields, and a required answer would
             lock them out of their own dashboard until they filled them in. */}
         <ProviderSetupCard />
+
+        <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
         {/* Intelligence Layer */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

@@ -1,5 +1,7 @@
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import axios from "axios";
+import axios, { isAxiosError, isCancel } from "axios";
+
+import { friendlyApiMessage } from "../utils/errors";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api/v1";
 
@@ -98,6 +100,14 @@ api.interceptors.response.use(
 
       handlers.clear();
       handlers.onUnauthorized?.();
+    }
+
+    // Every screen shows `error.message`, which for axios is "Request failed with status code 400".
+    // Replace it once, here, with the API's explanation or a plain description of what happened.
+    // The original stays on `rawMessage` for logging.
+    if (isAxiosError(error) && !isCancel(error)) {
+      (error as AxiosError & { rawMessage?: string }).rawMessage = error.message;
+      error.message = friendlyApiMessage(error);
     }
 
     throw error;

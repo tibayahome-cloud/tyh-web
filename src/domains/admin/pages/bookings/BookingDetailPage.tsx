@@ -20,9 +20,17 @@ import { Button } from "../../../../shared/components/Button";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import ReassignBookingModal from "../../components/ReassignBookingModal";
 import TelemedicineReassignModal from "../../components/TelemedicineReassignModal";
-import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
-import { ADMIN_CANCELLATION_REASONS, formatCancellationReason } from "../../../../shared/constants/bookings";
+import CancelBookingDialog from "../../components/CancelBookingDialog";
 import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
+
+// Final states: nothing can be cancelled or assigned from here.
+const CLOSED_STATUSES = [
+  "cancelled_by_client",
+  "cancelled_by_admin",
+  "telemedicine_cancelled_payment_review",
+  "fully_completed",
+  "disputed"
+];
 
 const STK_PUSH_ELIGIBLE_STATUSES = ["client_completed", "completed_by_provider"];
 
@@ -36,8 +44,6 @@ const AdminBookingDetailPage = () => {
   const toast = useToast();
   const [reassignOpen, setReassignOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReasonCode, setCancelReasonCode] = useState(ADMIN_CANCELLATION_REASONS[0].value);
-  const [cancelNote, setCancelNote] = useState("");
   const [stkModalOpen, setStkModalOpen] = useState(false);
   const [stkPhone, setStkPhone] = useState("");
   const [stkPhoneError, setStkPhoneError] = useState("");
@@ -63,16 +69,18 @@ const AdminBookingDetailPage = () => {
       !["in_progress", "ended", "expired", "technical_review"].includes(booking.telemedicineSession?.status ?? "")
   );
 
-  const handleCancelConfirm = async () => {
+  const canAssignTelemedicine = Boolean(
+    booking?.isTelemedicine && !booking.provider && booking.status === "telemedicine_paid_pending_assignment"
+  );
+
+  const handleCancelConfirm = async (finalReason: string) => {
     if (!booking) {
       return;
     }
     try {
-      const finalReason = formatCancellationReason(cancelReasonCode, cancelNote);
       await cancelMutation.mutateAsync({ bookingId: booking.id, reason: finalReason });
       toast.showToast({ title: "Booking cancelled", variant: "success" });
       setCancelDialogOpen(false);
-      setCancelNote("");
     } catch (error) {
       toast.showToast({
         title: "Cancellation failed",
@@ -147,10 +155,13 @@ const AdminBookingDetailPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {!booking.isTelemedicine && (
+          {!booking.isTelemedicine && !CLOSED_STATUSES.includes(booking.status) && (
             <Button variant="secondary" onClick={() => setReassignOpen(true)}>
               Reassign provider
             </Button>
+          )}
+          {canAssignTelemedicine && (
+            <Button onClick={() => setReassignOpen(true)}>Assign provider</Button>
           )}
           {canReassignTelemedicine && (
             <Button variant="secondary" onClick={() => setReassignOpen(true)}>
@@ -162,19 +173,27 @@ const AdminBookingDetailPage = () => {
               Request payment (STK push)
             </Button>
           )}
-          <Button
-            variant="secondary"
-            className="border-rose-200 text-rose-600 hover:bg-rose-50"
-            onClick={() => {
-              setCancelReasonCode(ADMIN_CANCELLATION_REASONS[0].value);
-              setCancelNote("");
-              setCancelDialogOpen(true);
-            }}
-          >
-            Cancel booking
-          </Button>
+          {!CLOSED_STATUSES.includes(booking.status) && (
+            <Button
+              variant="secondary"
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+              onClick={() => setCancelDialogOpen(true)}
+            >
+              Cancel booking
+            </Button>
+          )}
         </div>
       </div>
+
+      {booking.status === "telemedicine_cancelled_payment_review" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+          <p className="font-semibold">This booking was cancelled after payment.</p>
+          <p className="mt-1">
+            It cannot be reopened or given a provider. The payment is waiting for a refund decision. If the client still needs a
+            consultation, they need to book a new one.
+          </p>
+        </div>
+      )}
 
       {booking.isTelemedicine ? (
         <Card title="Video consultation" description="Remote appointment details and session state">
@@ -199,7 +218,7 @@ const AdminBookingDetailPage = () => {
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Provider assignment changes for remote consultations are handled from the telemedicine assignment workspace or this booking.
+            Assign or reassign the provider from this page. The telemedicine workspace lists every consultation awaiting a provider.
             <Link className="ml-1 font-semibold text-primary-700 hover:underline" to="/admin/telemedicine">
               Open workspace
             </Link>
@@ -275,6 +294,7 @@ const AdminBookingDetailPage = () => {
         <TelemedicineReassignModal
           bookingId={reassignOpen ? booking.id : null}
           currentProviderName={booking.provider?.fullName}
+          mode={canAssignTelemedicine ? "assign" : "reassign"}
           open={reassignOpen}
           onClose={() => setReassignOpen(false)}
           onSuccess={() => detailQuery.refetch()}
@@ -287,39 +307,13 @@ const AdminBookingDetailPage = () => {
           onSuccess={() => detailQuery.refetch()}
         />
       )}
-      <ConfirmDialog
+      <CancelBookingDialog
         open={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}
         onConfirm={handleCancelConfirm}
         loading={cancelMutation.isPending}
-        title="Cancel booking"
-        description="Let the client and provider know why this booking is being cancelled."
-        confirmLabel="Cancel booking"
-        confirmVariant="secondary"
-      >
-        <label className="mt-3 flex flex-col gap-1 text-sm text-slate-700">
-          <span>Reason</span>
-          <select
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-            value={cancelReasonCode}
-            onChange={(event) => setCancelReasonCode(event.target.value)}
-          >
-            {ADMIN_CANCELLATION_REASONS.map((reason) => (
-              <option key={reason.value} value={reason.value}>
-                {reason.label}
-                {reason.description ? ` — ${reason.description}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <textarea
-          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-          rows={3}
-          value={cancelNote}
-          onChange={(event) => setCancelNote(event.target.value)}
-          placeholder="Internal note (optional)"
-        />
-      </ConfirmDialog>
+        paidTelemedicine={Boolean(booking.isTelemedicine && booking.paidAt)}
+      />
 
       <Dialog
         disablePortal={false}
