@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
 import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
+import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
 import { ProviderFacilityAffiliation } from "../components/ProviderFacilityAffiliation";
 
@@ -106,6 +107,17 @@ const formatTimestamp = (iso?: string | null) => {
   });
 };
 
+// The time the appointment happens, not when the provider accepted it. A remote consultation is anchored
+// to the facility's timezone, so it is formatted there rather than in the provider's own.
+const formatAppointmentTime = (booking: Booking) => {
+  if (booking.scheduledAt) {
+    return booking.isTelemedicine
+      ? formatTelemedicineDateTime(booking.scheduledAt)
+      : formatTimestamp(booking.scheduledAt);
+  }
+  return formatTimestamp(booking.acceptedAt);
+};
+
 const ProviderHome = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -179,7 +191,7 @@ const ProviderHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] }, isFetching: boolean };
+  ) as { data?: { bookings?: Booking[]; meta?: { page?: { total?: number } } }, isFetching: boolean };
 
   const { data: historyList, isFetching: historyFetching } = useBookingList(
     {
@@ -246,6 +258,14 @@ const ProviderHome = () => {
     const items = upcomingList?.bookings ?? [];
     return activeBooking ? items.filter((b) => b.id !== activeBooking.id) : items;
   }, [upcomingList?.bookings, activeBooking]);
+
+  // The list is one page of three, so its length is not the total. Use the server's count, less the active booking
+  // when that one was filtered out of the page.
+  const upcomingListed = upcomingList?.bookings ?? [];
+  const upcomingTotal = Math.max(
+    upcomingBookings.length,
+    (upcomingList?.meta?.page?.total ?? upcomingListed.length) - (upcomingListed.length - upcomingBookings.length)
+  );
 
   const historyBookings = historyList?.bookings ?? [];
   const financialsVisible = providerFinancialsAreVisible(profile);
@@ -480,7 +500,7 @@ const ProviderHome = () => {
           <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Upcoming</h3>
-              <span className="text-[10px] text-slate-400">{upcomingBookings.length} scheduled</span>
+              <span className="text-[10px] text-slate-400">{upcomingTotal} upcoming</span>
             </div>
             {upcomingFetching && !upcomingBookings.length ? (
               <Loading />
@@ -506,7 +526,7 @@ const ProviderHome = () => {
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900 truncate">{booking.service?.name}</p>
                           <p className="text-[11px] text-slate-500">
-                            {booking.client?.fullName} • {formatTimestamp(booking.acceptedAt)}
+                            {booking.client?.fullName} • {formatAppointmentTime(booking)}
                           </p>
                         </div>
                       </div>
