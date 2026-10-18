@@ -11,6 +11,7 @@ import { isAxiosError } from "axios";
 import { Button } from "../../../shared/components/Button";
 import { Card } from "../../../shared/components/Card";
 import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { DeleteAccountDialog } from "../components/DeleteAccountDialog";
 import { FormField } from "../../../shared/components/FormField";
 import { Input } from "../../../shared/components/Input";
 import { Loading } from "../../../shared/components/Loading";
@@ -290,6 +291,7 @@ const UserDetailPage = () => {
 
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [securityBanner, setSecurityBanner] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
@@ -485,18 +487,6 @@ const UserDetailPage = () => {
     onError: (error) => setConfirmError(extractErrorMessage(error)),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      await api.delete(`/users/${userId}`, { data: { reason: "admin_delete" } });
-    },
-    onSuccess: () => {
-      invalidateUserData();
-      navigate("/admin/users");
-      setConfirmState(null);
-    },
-    onError: (error) => setConfirmError(extractErrorMessage(error)),
-  });
-
   const avatarMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
@@ -545,7 +535,6 @@ const UserDetailPage = () => {
   const confirmLoading =
     suspendMutation.isPending ||
     activateMutation.isPending ||
-    deleteMutation.isPending ||
     sessionRevokeMutation.isPending ||
     passwordResetMutation.isPending ||
     twofaDisableMutation.isPending ||
@@ -1007,18 +996,7 @@ const UserDetailPage = () => {
                 </Button>
               )}
               {canDeleteUser && (
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    openConfirm({
-                      title: "Delete user?",
-                      description: `Deleting will revoke sessions and archive ${selectedUser.fullName || "this user"}.`,
-                      confirmLabel: "Delete user",
-                      confirmVariant: "secondary",
-                      action: () => deleteMutation.mutate(),
-                    })
-                  }
-                >
+                <Button variant="secondary" onClick={() => setDeleteOpen(true)}>
                   Delete account
                 </Button>
               )}
@@ -1286,6 +1264,33 @@ const UserDetailPage = () => {
           </Card>
         </section>
       </div>
+
+      {canDeleteUser && selectedUser && (
+        <DeleteAccountDialog
+          open={deleteOpen}
+          userId={String(userId)}
+          userName={selectedUser.fullName || "This user"}
+          onClose={() => setDeleteOpen(false)}
+          onDeleted={() => {
+            setDeleteOpen(false);
+            invalidateUserData();
+            navigate("/admin/users");
+          }}
+          onSuspendInstead={
+            canUpdateUser && selectedUser.status !== "suspended"
+              ? () => {
+                  setDeleteOpen(false);
+                  openConfirm({
+                    title: "Suspend user?",
+                    description: `Suspending prevents ${selectedUser.fullName || "this user"} from signing in until reactivated.`,
+                    confirmLabel: "Suspend user",
+                    action: () => suspendMutation.mutate(),
+                  });
+                }
+              : undefined
+          }
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(confirmState)}

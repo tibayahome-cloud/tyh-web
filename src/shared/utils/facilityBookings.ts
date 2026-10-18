@@ -51,6 +51,15 @@ const ASSIGNABLE = new Set([
 ]);
 export const canAssignStatus = (status: string): boolean => ASSIGNABLE.has(status);
 
+type SessionLike = { providerJoinedAt?: string | null; clientJoinedAt?: string | null } | null | undefined;
+
+// Once either person has joined the video call the consultation is under way, and the API refuses to
+// swap the provider underneath it. Say so instead of offering a button that can only fail.
+export const assignBlockedReason = (booking: { isTelemedicine?: boolean; telemedicineSession?: SessionLike }): string | null =>
+  booking.isTelemedicine && (booking.telemedicineSession?.providerJoinedAt || booking.telemedicineSession?.clientJoinedAt)
+    ? "The video consultation has already started, so the provider can no longer be changed."
+    : null;
+
 export const statusLabel = (status: string): string => {
   const text = status.replace(/^telemedicine_/, "").replace(/_/g, " ");
   return text.charAt(0).toUpperCase() + text.slice(1);

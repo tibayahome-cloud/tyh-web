@@ -21,6 +21,8 @@ import {
   updateFacilityProviderLifecycle
 } from "../../../../shared/libs/facilities";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
+import { TelemedicineSpecialtyPicker } from "../../components/TelemedicineSpecialtyPicker";
+import { holdersBySpecialty, offeredServicesBySpecialty } from "../../../../shared/utils/specialtyContext";
 import {
   fetchTelemedicineAdminServices,
   fetchSelectableTelemedicineSubcategories,
@@ -108,12 +110,16 @@ const ProviderFormFields = ({
   services,
   telemedicineSubcategories,
   staleSubcategories,
+  offeredBySpecialty,
+  holdersBySpecialtyCount,
   onChange
 }: {
   form: ProviderForm;
   services: Array<{ serviceId: string; service?: { name?: string | null } | null }>;
   telemedicineSubcategories: TelemedicineSubcategory[];
   staleSubcategories: StaleSubcategory[];
+  offeredBySpecialty: Map<string, string[]>;
+  holdersBySpecialtyCount: Map<string, number>;
   onChange: (next: ProviderForm) => void;
 }) => {
   const toggleService = (serviceId: string) => {
@@ -133,18 +139,6 @@ const ProviderFormFields = ({
         : [...form.telemedicineSubcategoryIds, subcategoryId]
     });
   };
-
-  const groupedSubcategories = useMemo(() => {
-    const groups = new Map<string, { name: string; items: TelemedicineSubcategory[] }>();
-    telemedicineSubcategories.forEach((subcategory) => {
-      const category = subcategory.category;
-      const key = category?.id ?? "uncategorized";
-      const group = groups.get(key) ?? { name: category?.name ?? "Other", items: [] };
-      group.items.push(subcategory);
-      groups.set(key, group);
-    });
-    return Array.from(groups.values());
-  }, [telemedicineSubcategories]);
 
   return (
     <div className="space-y-4">
@@ -210,25 +204,13 @@ const ProviderFormFields = ({
             </ul>
           </div>
         )}
-        {groupedSubcategories.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">No active telemedicine subcategories are available.</p>
-        ) : (
-          <div className="space-y-3">
-            {groupedSubcategories.map((group) => (
-              <div key={group.name}>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.name}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {group.items.map((subcategory) => (
-                    <label key={subcategory.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                      <input type="checkbox" checked={form.telemedicineSubcategoryIds.includes(subcategory.id)} onChange={() => toggleTelemedicineSubcategory(subcategory.id)} />
-                      {subcategory.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <TelemedicineSpecialtyPicker
+          specialties={telemedicineSubcategories}
+          selectedIds={form.telemedicineSubcategoryIds}
+          onToggle={toggleTelemedicineSubcategory}
+          offered={offeredBySpecialty}
+          holders={holdersBySpecialtyCount}
+        />
       </fieldset>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
@@ -315,6 +297,11 @@ export const FacilityProvidersManager = ({
         : [],
     [telemedicineSubcategoriesQuery.isSuccess, telemedicineSubcategoriesQuery.data, form.telemedicineSubcategoryIds, editingProvider]
   );
+  const offeredBySpecialty = useMemo(
+    () => offeredServicesBySpecialty(servicesQuery.data ?? [], telemedicineServicesQuery.data ?? []),
+    [servicesQuery.data, telemedicineServicesQuery.data]
+  );
+  const holdersBySpecialtyCount = useMemo(() => holdersBySpecialty(providersQuery.data?.providers ?? []), [providersQuery.data?.providers]);
   const invalidateProviders = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "facility-providers", facilityId] });
     onChanged?.();
@@ -430,7 +417,7 @@ export const FacilityProvidersManager = ({
 
       {(showForm || editingProvider) && (
         <Card title={editingProvider ? "Edit provider" : "Add provider"} subtitle={editingProvider ? "Changes apply only to this facility provider." : "The provider will receive an invitation when an email is supplied."}>
-          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} staleSubcategories={staleSubcategories} onChange={setForm} />
+          <ProviderFormFields form={form} services={services} telemedicineSubcategories={telemedicineSubcategoriesQuery.data ?? []} staleSubcategories={staleSubcategories} offeredBySpecialty={offeredBySpecialty} holdersBySpecialtyCount={holdersBySpecialtyCount} onChange={setForm} />
           {(createMutation.error || updateMutation.error) && (
             <p className="mt-4 text-sm text-danger-600">
               {describeProviderSaveError(createMutation.error || updateMutation.error)}

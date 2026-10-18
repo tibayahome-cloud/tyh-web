@@ -11,6 +11,7 @@ import { getApiError } from "../../../shared/utils/errors";
 import {
   BOOKING_GROUPS,
   BOOKING_GROUP_LABEL,
+  assignBlockedReason,
   canAssignStatus,
   groupCount,
   statusFilterFor,
@@ -34,13 +35,14 @@ type Props = {
   providerUserId?: string;
   title?: string;
   description?: string;
-  // The status group the list opens on. A facility opens on what needs attention; one provider's
-  // history reads better from everything.
+  // The status group the list opens on. Everything by default, so a booking is never hidden behind a
+  // filter the viewer did not choose; the chips show how many need attention.
   defaultGroup?: BookingGroup;
 };
 
 const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booking; onAssign?: (booking: Booking) => void; showProvider?: boolean }) => {
   const when = booking.scheduledAt ?? booking.createdAt;
+  const blockedReason = onAssign && canAssignStatus(booking.status) ? assignBlockedReason(booking) : null;
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -77,6 +79,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
           </div>
         )}
       </dl>
+      {blockedReason && <p className="mt-3 text-xs text-slate-600">{blockedReason}</p>}
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         <Link
           to={`/admin/bookings/${booking.id}`}
@@ -85,7 +88,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
         >
           View booking
         </Link>
-        {onAssign && canAssignStatus(booking.status) && (
+        {onAssign && canAssignStatus(booking.status) && !blockedReason && (
           <Button size="sm" variant="outline" onClick={() => onAssign(booking)}>
             {booking.provider ? "Reassign provider" : "Assign provider"}
           </Button>
@@ -98,7 +101,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
 // A facility's bookings, home-based care and telemedicine apart, filtered by what needs doing. For
 // a super admin acting as support when a facility admin is stuck; the facility's own admins see
 // the same list for their facility.
-export const FacilityBookingsPanel = ({ facilityId, onAssign, providerUserId, title, description, defaultGroup = "attention" }: Props) => {
+export const FacilityBookingsPanel = ({ facilityId, onAssign, providerUserId, title, description, defaultGroup = "all" }: Props) => {
   const [kind, setKind] = useState<ServiceKind | null>(null);
   const [group, setGroup] = useState<BookingGroup>(defaultGroup);
   const [page, setPage] = useState(1);

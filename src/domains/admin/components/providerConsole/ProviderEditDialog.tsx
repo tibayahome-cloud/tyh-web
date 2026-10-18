@@ -4,8 +4,10 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "../../../../shared/components/Button";
 import { Input } from "../../../../shared/components/Input";
 import { Modal } from "../../../../shared/components/Modal";
-import { updateFacilityProvider } from "../../../../shared/libs/facilities";
-import { fetchSelectableTelemedicineSubcategories } from "../../../../shared/libs/telemedicineCatalog";
+import { fetchFacilityProviders, fetchFacilityServices, updateFacilityProvider } from "../../../../shared/libs/facilities";
+import { TelemedicineSpecialtyPicker } from "../TelemedicineSpecialtyPicker";
+import { holdersBySpecialty, offeredServicesBySpecialty } from "../../../../shared/utils/specialtyContext";
+import { fetchSelectableTelemedicineSubcategories, fetchTelemedicineAdminServices } from "../../../../shared/libs/telemedicineCatalog";
 import { describeProviderSaveError, findStaleSubcategories } from "../../../../shared/utils/telemedicineSelection";
 
 export type EditableProviderInfo = {
@@ -50,6 +52,29 @@ export const ProviderEditDialog = ({ open, section, provider, onClose, onSaved }
     enabled: open && section === "specialties"
   });
 
+  // The services this facility offers and who holds each specialty, so the new service just added to
+  // the facility is easy to find. Shared cache keys with the facility screens.
+  const facilityServices = useQuery({
+    queryKey: ["admin", "facility-services", provider.facilityId],
+    queryFn: () => fetchFacilityServices(provider.facilityId),
+    enabled: open && section === "specialties"
+  });
+  const catalogServices = useQuery({
+    queryKey: ["telemedicine", "catalog", "services"],
+    queryFn: () => fetchTelemedicineAdminServices(),
+    enabled: open && section === "specialties"
+  });
+  const facilityProviders = useQuery({
+    queryKey: ["admin", "facility-providers", provider.facilityId, ""],
+    queryFn: () => fetchFacilityProviders(provider.facilityId, {}),
+    enabled: open && section === "specialties"
+  });
+  const offered = useMemo(
+    () => offeredServicesBySpecialty(facilityServices.data ?? [], catalogServices.data ?? []),
+    [facilityServices.data, catalogServices.data]
+  );
+  const holders = useMemo(() => holdersBySpecialty(facilityProviders.data?.providers ?? []), [facilityProviders.data]);
+
   const stale = useMemo(
     () =>
       catalog.isSuccess
@@ -61,15 +86,6 @@ export const ProviderEditDialog = ({ open, section, provider, onClose, onSaved }
         : [],
     [catalog.isSuccess, catalog.data, selected, provider]
   );
-
-  const groups = useMemo(() => {
-    const map = new Map<string, Array<{ id: string; name: string }>>();
-    (catalog.data ?? []).forEach((item) => {
-      const key = item.category?.name ?? "Other";
-      map.set(key, [...(map.get(key) ?? []), { id: item.id, name: item.name }]);
-    });
-    return [...map.entries()];
-  }, [catalog.data]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -123,19 +139,13 @@ export const ProviderEditDialog = ({ open, section, provider, onClose, onSaved }
                 ))}
               </div>
             )}
-            {groups.map(([category, items]) => (
-              <fieldset key={category}>
-                <legend className="mb-1 text-sm font-semibold text-slate-700">{category}</legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {items.map((item) => (
-                    <label key={item.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                      <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggle(item.id)} />
-                      {item.name}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ))}
+            <TelemedicineSpecialtyPicker
+              specialties={catalog.data ?? []}
+              selectedIds={selected}
+              onToggle={toggle}
+              offered={offered}
+              holders={holders}
+            />
           </div>
         )}
         {save.error && <p className="text-sm text-danger-600" role="alert">{describeProviderSaveError(save.error)}</p>}

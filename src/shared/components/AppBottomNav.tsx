@@ -23,6 +23,12 @@ export const AppBottomNav = ({ items }: AppBottomNavProps) => {
                     >
                         <div className="relative">
                             {item.icon}
+                            {item.attention && (
+                                <>
+                                    <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                                    <span className="sr-only">Needs your response</span>
+                                </>
+                            )}
                             {item.badge !== undefined && item.badge > 0 && (
                                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-black leading-none text-white ring-2 ring-white">
                                     {item.badge > 99 ? "99+" : item.badge}

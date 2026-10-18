@@ -5,12 +5,14 @@ import { Input } from "../../../shared/components/Input";
 import { Loading } from "../../../shared/components/Loading";
 import { Modal } from "../../../shared/components/Modal";
 import { useToast } from "../../../shared/components/ToastProvider";
-import { useReassignTelemedicineProviderMutation } from "../../../shared/hooks/useTelemedicine";
+import { useAssignProviderMutation, useReassignTelemedicineProviderMutation } from "../../../shared/hooks/useTelemedicine";
 import { useEligibleProviders } from "../../../shared/hooks/useProviders";
 
 type TelemedicineReassignModalProps = {
   bookingId: string | null;
   currentProviderName?: string | null;
+  // "assign" for a paid consultation still waiting for a provider; "reassign" to move a confirmed one.
+  mode?: "assign" | "reassign";
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
@@ -19,6 +21,7 @@ type TelemedicineReassignModalProps = {
 export const TelemedicineReassignModal = ({
   bookingId,
   currentProviderName,
+  mode = "reassign",
   open,
   onClose,
   onSuccess
@@ -32,19 +35,21 @@ export const TelemedicineReassignModal = ({
     enabled: open
   });
   const reassignMutation = useReassignTelemedicineProviderMutation();
+  const assignMutation = useAssignProviderMutation();
+  const activeMutation = mode === "assign" ? assignMutation : reassignMutation;
 
   const handleAssign = async (providerUserId: string) => {
     if (!bookingId) {
       return;
     }
     try {
-      await reassignMutation.mutateAsync({ bookingId, providerUserId });
-      toast.showToast({ title: "Consultation provider reassigned", variant: "success" });
+      await activeMutation.mutateAsync({ bookingId, providerUserId });
+      toast.showToast({ title: mode === "assign" ? "Provider assigned" : "Consultation provider reassigned", variant: "success" });
       onClose();
       onSuccess?.();
     } catch (error) {
       toast.showToast({
-        title: "Reassignment failed",
+        title: mode === "assign" ? "Assignment failed" : "Reassignment failed",
         description: error instanceof Error ? error.message : "Please try again",
         variant: "error"
       });
@@ -52,10 +57,10 @@ export const TelemedicineReassignModal = ({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Reassign consultation provider" maxWidth="md">
+    <Modal open={open} onClose={onClose} title={mode === "assign" ? "Assign consultation provider" : "Reassign consultation provider"} maxWidth="md">
       <div className="space-y-4">
         <p className="text-sm text-slate-500">
-          Choose an eligible provider for this scheduled consultation. The appointment time and client payment stay unchanged.
+          {mode === "assign" ? "Choose an eligible provider who is free at the appointment time. The client has paid and is waiting." : "Choose an eligible provider for this scheduled consultation. The appointment time and client payment stay unchanged."}
         </p>
         {currentProviderName && (
           <p className="text-xs text-slate-500">Current provider: <span className="font-semibold">{currentProviderName}</span></p>
@@ -90,7 +95,7 @@ export const TelemedicineReassignModal = ({
                 <Button
                   variant="secondary"
                   onClick={() => handleAssign(provider.userId)}
-                  loading={reassignMutation.isPending}
+                  loading={activeMutation.isPending}
                 >
                   Assign
                 </Button>
