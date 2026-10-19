@@ -6,6 +6,7 @@
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -31,7 +32,7 @@ describe("RevenueSnapshot", () => {
   it("says the earnings could not be loaded, with a retry, instead of showing KES 0.00", async () => {
     state.earnings = { isLoading: false, isError: true, data: undefined };
     const user = userEvent.setup();
-    render(<RevenueSnapshot />);
+    render(<RevenueSnapshot />, { wrapper: MemoryRouter });
 
     expect(screen.getByText("We could not load your earnings.")).toBeInTheDocument();
     expect(screen.queryByText(/KES.0\.00/)).not.toBeInTheDocument();
@@ -45,9 +46,12 @@ describe("RevenueSnapshot", () => {
       isError: false,
       data: { availableBalanceCents: 0, pendingEarningsCents: 5000, paidOutTotalCents: 120000, currency: "KES" }
     };
-    render(<RevenueSnapshot />);
+    render(<RevenueSnapshot />, { wrapper: MemoryRouter });
     expect(screen.getByText(/KES.0\.00/)).toBeInTheDocument();
     expect(screen.queryByText(/could not load/)).not.toBeInTheDocument();
+    // The one thing to do about the balance is one tap away.
+    expect(screen.getByRole("link", { name: "Withdraw" })).toHaveAttribute("href", "/pro/payments");
+    expect(screen.getByText("Not available yet")).toBeInTheDocument();
   });
 });
 
@@ -58,7 +62,7 @@ describe("PerformanceStats", () => {
 
   it("says 'No ratings yet' for a provider with no reviews, not a rating of 0.0", () => {
     state.analytics = { isLoading: false, isError: false, data: analytics };
-    render(<PerformanceStats />);
+    render(<PerformanceStats />, { wrapper: MemoryRouter });
     expect(screen.getByText("No ratings yet")).toBeInTheDocument();
     expect(screen.getByText("Not ranked yet")).toBeInTheDocument();
     expect(screen.queryByText("0.0")).not.toBeInTheDocument();
@@ -66,7 +70,7 @@ describe("PerformanceStats", () => {
 
   it("shows the rating and rank once there are reviews", () => {
     state.analytics = { isLoading: false, isError: false, data: { ...analytics, rating_avg: 4.66, rating_count: 9, rank: 2 } };
-    render(<PerformanceStats />);
+    render(<PerformanceStats />, { wrapper: MemoryRouter });
     expect(screen.getByText("4.7")).toBeInTheDocument();
     expect(screen.getByText("9 reviews")).toBeInTheDocument();
     expect(screen.getByText("#2")).toBeInTheDocument();
@@ -75,7 +79,7 @@ describe("PerformanceStats", () => {
   it("says the performance could not be loaded, with a retry, instead of showing zeros", async () => {
     state.analytics = { isLoading: false, isError: true, data: undefined };
     const user = userEvent.setup();
-    render(<PerformanceStats />);
+    render(<PerformanceStats />, { wrapper: MemoryRouter });
 
     expect(screen.getByText("We could not load your performance.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Try again" }));
