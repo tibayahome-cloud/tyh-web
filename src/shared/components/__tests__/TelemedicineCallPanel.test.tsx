@@ -124,6 +124,9 @@ describe("TelemedicineCallPanel", () => {
 
     const endButton = await screen.findByRole("button", { name: /end consultation/i });
     fireEvent.click(endButton);
+    // Ending it ends it for the client too, so it asks first.
+    expect(hooks.endSessionMutateAsync).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "End for everyone" }));
 
     await waitFor(() => expect(hooks.endSessionMutateAsync).toHaveBeenCalledWith("booking-1"));
     expect(onLeave).toHaveBeenCalledOnce();
@@ -145,12 +148,67 @@ describe("TelemedicineCallPanel", () => {
     render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
 
     const reconnectButton = await screen.findByRole("button", { name: "Reconnect" });
-    expect(screen.getByText("Network error")).toBeInTheDocument();
+    // A bare "Network error" tells nobody what to do; the message says.
+    expect(screen.getByText(/Check your internet connection, then try again/)).toBeInTheDocument();
 
     fireEvent.click(reconnectButton);
 
     await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
     expect(hooks.joinSessionMutateAsync).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText("Network error")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Check your internet connection, then try again/)).not.toBeInTheDocument();
+  });
+
+  it("switches off the 'open in the app' page so a phone browser shows the call", async () => {
+    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
+
+    expect(FakeJitsiMeetExternalAPI.instances[0].options).toEqual(
+      expect.objectContaining({ configOverwrite: expect.objectContaining({ disableDeepLinking: true }) })
+    );
+  });
+
+  it("asks before ending the consultation, and 'Keep going' leaves it running", async () => {
+    hooks.joinSessionMutateAsync.mockResolvedValue(joinPayload("provider"));
+    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /end consultation/i }));
+    expect(screen.getByRole("alertdialog", { name: "End the consultation" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep going" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(hooks.endSessionMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("tells someone in another app's browser to open the page in Chrome or Safari", async () => {
+    const original = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone) Instagram 300.0" });
+    try {
+      render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+      expect(await screen.findByText(/open this page in Chrome or Safari/i)).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { configurable: true, value: original });
+    }
+  });
+
+  it("does not show that notice in an ordinary browser", async () => {
+    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
+    expect(screen.queryByText(/open this page in Chrome or Safari/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the screen awake during the call and lets go when it ends", async () => {
+    const release = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ release });
+    Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request } });
+    try {
+      const { unmount } = render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+      await waitFor(() => expect(request).toHaveBeenCalledWith("screen"));
+      await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
+
+      unmount();
+      await waitFor(() => expect(release).toHaveBeenCalled());
+    } finally {
+      Object.defineProperty(navigator, "wakeLock", { configurable: true, value: undefined });
+    }
   });
 });
