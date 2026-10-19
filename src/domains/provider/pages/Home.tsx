@@ -6,6 +6,7 @@ import classNames from "classnames";
 import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
+import { WidgetError } from "../../../shared/components/WidgetError";
 import { ProviderFacilityAffiliation } from "../components/ProviderFacilityAffiliation";
 
 import { Card } from "../../../shared/components/Card";
@@ -183,7 +184,7 @@ const ProviderHome = () => {
     }
   }, [activeBooking]);
 
-  const { data: upcomingList, isFetching: upcomingFetching } = useBookingList(
+  const { data: upcomingList, isFetching: upcomingFetching, isError: upcomingError, refetch: refetchUpcoming } = useBookingList(
     {
       statuses: [...PROVIDER_UPCOMING_STATUSES],
       providerId: user?.id ?? undefined,
@@ -191,9 +192,14 @@ const ProviderHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[]; meta?: { page?: { total?: number } } }, isFetching: boolean };
+  ) as {
+    data?: { bookings?: Booking[]; meta?: { page?: { total?: number } } };
+    isFetching: boolean;
+    isError?: boolean;
+    refetch: () => unknown;
+  };
 
-  const { data: historyList, isFetching: historyFetching } = useBookingList(
+  const { data: historyList, isFetching: historyFetching, isError: historyError, refetch: refetchHistory } = useBookingList(
     {
       statuses: [...HISTORY_STATUSES],
       providerId: user?.id ?? undefined,
@@ -201,7 +207,7 @@ const ProviderHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] }, isFetching: boolean };
+  ) as { data?: { bookings?: Booking[] }, isFetching: boolean, isError?: boolean, refetch: () => unknown };
 
   const socket = useSocket();
   const locationAccess = useLocationAccess();
@@ -502,7 +508,9 @@ const ProviderHome = () => {
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Upcoming</h3>
               <span className="text-[10px] text-slate-400">{upcomingTotal} upcoming</span>
             </div>
-            {upcomingFetching && !upcomingBookings.length ? (
+            {upcomingError && !upcomingList ? (
+              <WidgetError what="your upcoming bookings" onRetry={() => void refetchUpcoming()} />
+            ) : upcomingFetching && !upcomingBookings.length ? (
               <Loading />
             ) : upcomingBookings.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -548,7 +556,9 @@ const ProviderHome = () => {
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">History</h3>
               <button onClick={() => navigate('/pro/bookings')} className="text-[10px] text-tiba-blue font-bold">View All</button>
             </div>
-            {historyFetching && !historyBookings.length ? (
+            {historyError && !historyList ? (
+              <WidgetError what="your history" onRetry={() => void refetchHistory()} />
+            ) : historyFetching && !historyBookings.length ? (
               <Loading />
             ) : historyBookings.length > 0 ? (
               <div className="space-y-1">

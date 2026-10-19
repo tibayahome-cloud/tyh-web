@@ -2,6 +2,8 @@ import { Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useProviderEarningsSummary } from "../../../shared/hooks/useWallet";
 import { useMemo } from "react";
 
+import { WidgetError } from "../../../shared/components/WidgetError";
+
 const formatPrice = (amountCents?: number, currency = "KES") => {
     const value = typeof amountCents === "number" ? amountCents / 100 : 0;
     return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value);
@@ -12,7 +14,7 @@ type RevenueSnapshotProps = {
 };
 
 export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotProps) => {
-    const { data: earnings, isLoading } = useProviderEarningsSummary({ enabled: financialsVisible });
+    const { data: earnings, isLoading, isError, refetch } = useProviderEarningsSummary({ enabled: financialsVisible });
 
     const metrics = useMemo(() => {
         if (!earnings) return null;
@@ -33,6 +35,11 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
         );
     }
 
+    // A failed request is not an empty wallet. Showing KES 0.00 here told a provider they had nothing to withdraw.
+    if (isError || !metrics) {
+        return <WidgetError what="your earnings" onRetry={() => void refetch()} />;
+    }
+
     return (
         <div className="group relative overflow-hidden rounded-[40px] border border-white/80 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 transition-all hover:bg-white/60">
             <div className="relative flex items-center justify-between">
@@ -43,7 +50,7 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Available to withdraw</p>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                            {formatPrice(metrics?.balance, metrics?.currency)}
+                            {formatPrice(metrics.balance, metrics.currency)}
                         </h2>
                     </div>
                 </div>
@@ -58,7 +65,7 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
                         <span className="text-[10px] font-bold uppercase tracking-widest">Paid out</span>
                     </div>
                     <p className="mt-1 text-sm font-bold text-slate-900">
-                        {formatPrice(metrics?.paidOut, metrics?.currency)}
+                        {formatPrice(metrics.paidOut, metrics.currency)}
                     </p>
                 </div>
 
@@ -68,7 +75,7 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
                         <span className="text-[10px] font-bold uppercase tracking-widest">Pending earnings</span>
                     </div>
                     <p className="mt-1 text-sm font-bold text-slate-900">
-                        {formatPrice(metrics?.pending, metrics?.currency)}
+                        {formatPrice(metrics.pending, metrics.currency)}
                     </p>
                 </div>
             </div>
