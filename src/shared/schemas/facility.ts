@@ -105,6 +105,18 @@ export type FacilityOverview = {
     providersAvailable: number;
     providersPendingVerification: number;
     activeServices: number;
+    // Open work split by what it is, and what needs a person to act. Null from an API that does not
+    // send them yet: "nothing needs attention" must never be inferred from a missing answer.
+    inProgressBookings: number | null;
+    upcomingBookings: number | null;
+    needsAttention: {
+      unassignedConsultations: number;
+      unattendedConsultations: number;
+      paymentReview: number;
+      awaitingResponse: number;
+      total: number;
+    } | null;
+    asOf: string | null;
   };
   readiness: {
     locationReady: boolean;
