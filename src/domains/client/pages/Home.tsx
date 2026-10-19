@@ -119,6 +119,9 @@ const ClientHome = () => {
   const latestCheckin = checkinsQuery.data?.[0];
   // Show only readings that exist. The heart-rate chip used to read a field that is not on the record, so it
   // always said "-- bpm", and a check-in with no blood pressure showed "undefined/undefined".
+  const checkinDate = latestCheckin?.checkinAt
+    ? new Date(latestCheckin.checkinAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+    : null;
   const hasHeartRate = typeof latestCheckin?.vitals?.heartRate === "number";
   const hasBloodPressure =
     typeof latestCheckin?.vitals?.bpSystolic === "number" && typeof latestCheckin?.vitals?.bpDiastolic === "number";
@@ -203,6 +206,11 @@ const ClientHome = () => {
 
 
   // "—" while loading, and a plain "unavailable" if the request failed, so a failure never looks like a balance.
+  // A finished visit with no rating yet. Asked for here, not left inside a collapsed "Recent activity".
+  const ratingDue = (historyList?.bookings ?? []).find(
+    (b) => (b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed") && !b.feedback?.length
+  );
+
   const walletBalance = walletQuery.data
     ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}`
     : walletQuery.isError
@@ -211,16 +219,6 @@ const ClientHome = () => {
 
 
 
-  useEffect(() => {
-    // Only access window height on client
-    if (typeof window !== "undefined") {
-      const handler = () => {
-        // viewport height logic removed
-      };
-      window.addEventListener("resize", handler);
-      return () => window.removeEventListener("resize", handler);
-    }
-  }, []);
 
   const openBookingDialog = (serviceId?: string) => {
     setBookingServiceId(serviceId ?? null);
@@ -354,7 +352,9 @@ const ClientHome = () => {
           bookingId &&
           (!activeBooking || bookingId === activeBooking.id)
         ) {
-          setCompletionPrompt({ bookingId });
+          // The booking list is refreshed by the live-update service, and the effect on `activeBooking` opens
+          // the prompt from it. Only a booking already loaded can be shown now; a bare id is not a booking.
+          if (activeBooking) setCompletionPrompt(activeBooking);
           setDeclineReason("");
           setCompletionError(null);
         }
@@ -386,8 +386,23 @@ const ClientHome = () => {
           className="pb-0 sm:pb-0 lg:pb-0"
         />
 
-        <div className="px-4 empty:hidden">
+        <div className="flex flex-col gap-3 px-4 empty:hidden">
           <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
+          {ratingDue && (
+            <section aria-label="Rate your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                How was your visit{ratingDue.provider?.fullName ? ` with ${ratingDue.provider.fullName}` : ""}?
+              </p>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setFeedbackPrompt({ bookingId: ratingDue.id, providerName: ratingDue.provider?.fullName || "the provider" })
+                }
+              >
+                Rate your visit
+              </Button>
+            </section>
+          )}
         </div>
 
         {/* HEALTH PULSE CHIPS */}
@@ -414,8 +429,14 @@ const ClientHome = () => {
                 Log Vitals
               </div>
             )}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-[11px] font-bold">
-              {walletBalance}
+            {checkinDate && (hasHeartRate || hasBloodPressure) && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-xs font-semibold">
+                Checked {checkinDate}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-700 rounded-full text-xs font-semibold">
+              <span>Wallet:</span>
+              <span>{walletBalance}</span>
             </div>
           </div>
         </section>
@@ -464,6 +485,30 @@ const ClientHome = () => {
             ) : null}
           </section>
 
+          {/* The first question a client has is "when is my next appointment?", so it comes before the
+              ways to book a new one. */}
+          <section aria-labelledby="upcoming-heading" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 id="upcoming-heading" className="text-base font-semibold text-slate-900">Your next appointments</h2>
+              <button type="button" onClick={() => navigate("/app/bookings")} className="min-h-[44px] px-2 text-sm font-semibold text-tiba-blue">
+                View all
+              </button>
+            </div>
+            <div className="space-y-2">
+              {upcomingQuery.isError && !upcomingList ? (
+                <WidgetError what="your upcoming appointments" onRetry={() => void upcomingQuery.refetch()} />
+              ) : upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
+                upcomingList.bookings.slice(0, 3).map((b) => (
+                  <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-6 text-center">
+                  <p className="text-sm text-slate-600">No upcoming care scheduled</p>
+                </div>
+              )}
+            </div>
+          </section>
+
           <section aria-label="Choose your care" className="border-y border-slate-200 py-4">
             <h2 className="mb-3 text-base font-semibold text-slate-900">How would you like to receive care?</h2>
             <div className="grid gap-3 md:grid-cols-2">
@@ -510,28 +555,7 @@ const ClientHome = () => {
 
           {/* MAIN CONTENT GRID */}
           <div className="grid gap-4 lg:grid-cols-3">
-            {/* UPCOMING BOOKINGS */}
             <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Upcoming</h3>
-                <button onClick={() => navigate("/app/bookings")} className="text-xs font-bold text-tiba-blue">
-                  View All
-                </button>
-              </div>
-              <div className="space-y-2">
-                {upcomingQuery.isError && !upcomingList ? (
-                  <WidgetError what="your upcoming appointments" onRetry={() => void upcomingQuery.refetch()} />
-                ) : upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
-                  upcomingList.bookings.slice(0, 3).map((b) => (
-                    <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
-                  ))
-                ) : (
-                  <div className="py-8 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
-                    <p className="text-sm text-slate-400">No upcoming care scheduled</p>
-                  </div>
-                )}
-              </div>
-
               {/* RECENT ACTIVITY - Collapsed by default */}
               <button
                 onClick={() => setActivityExpanded(!activityExpanded)}

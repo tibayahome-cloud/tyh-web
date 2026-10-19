@@ -109,4 +109,41 @@ describe("client Home", () => {
     renderHome();
     expect(screen.getByText("Balance unavailable")).toBeInTheDocument();
   });
+
+  it("puts the next appointments before the ways to book a new one", () => {
+    renderHome();
+    const upcoming = screen.getByRole("heading", { name: "Your next appointments" });
+    const launcher = screen.getByRole("heading", { name: "How would you like to receive care?" });
+    expect(upcoming.compareDocumentPosition(launcher) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("labels the wallet and dates the readings", () => {
+    state.checkins = {
+      data: [{ checkinAt: "2026-10-12T08:00:00Z", vitals: { heartRate: 72 } }],
+      isLoading: false,
+      isError: false
+    };
+    renderHome();
+    expect(screen.getByText("Wallet:")).toBeInTheDocument();
+    expect(screen.getByText(/^Checked .*12/)).toBeInTheDocument();
+  });
+
+  describe("rating a finished visit", () => {
+    const finished = (feedback: unknown[]) => ({
+      data: { bookings: [{ id: "b9", status: "fully_completed", feedback, provider: { fullName: "Dr Example" } }] }
+    });
+
+    it("asks for a rating at the top, not only inside a collapsed list", () => {
+      state.history = finished([]);
+      renderHome();
+      expect(screen.getByText("How was your visit with Dr Example?")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Rate your visit" })).toBeInTheDocument();
+    });
+
+    it("does not ask again once the visit has been rated", () => {
+      state.history = finished([{ rating: 5 }]);
+      renderHome();
+      expect(screen.queryByText(/How was your visit/)).not.toBeInTheDocument();
+    });
+  });
 });
