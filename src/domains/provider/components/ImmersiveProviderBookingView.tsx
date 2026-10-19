@@ -19,7 +19,7 @@ import PauseIcon from "@mui/icons-material/PauseOutlined";
 import FastForwardIcon from "@mui/icons-material/FastForwardOutlined";
 
 import { Button } from "../../../shared/components/Button";
-import type { Booking } from "../../../shared/schemas/booking";
+import type { Booking, BookingMarkAction } from "../../../shared/schemas/booking";
 import { useMarkBookingMutation } from "../../../shared/hooks/useBookings";
 
 type ImmersiveProviderBookingViewProps = {
@@ -150,7 +150,7 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
     (action: string) => {
       markBooking.mutate({
         bookingId: booking.id,
-        action: action as "en_route" | "nearby" | "arrived" | "start_service" | "complete" | "client_confirmed"
+        action: action as BookingMarkAction
       });
     },
     [booking.id, markBooking]
@@ -557,7 +557,6 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
             {[
               { label: "Booking ID", value: booking.id?.slice(0, 8).toUpperCase() },
               { label: "Service", value: booking.service?.name },
-              { label: "Emergency", value: booking.emergency ? "Yes" : "No" },
               { label: "Scheduled", value: booking.scheduledAt ? new Date(booking.scheduledAt).toLocaleString() : "ASAP" },
             ].filter(d => d.value).map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">

@@ -188,7 +188,7 @@ const TelemedicineCatalogPage = () => {
           ? nextDisplayOrder(categories)
           : kind === "subcategory"
             ? nextDisplayOrder(subcategories)
-            : nextDisplayOrder(services)
+            : services.length
       );
     }
     setForm(next);

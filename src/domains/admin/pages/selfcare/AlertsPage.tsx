@@ -250,7 +250,7 @@ const AdminSelfCareAlertsPage = () => {
                       <p className="text-xs text-slate-400">Provider: {alert.provider.fullName}</p>
                     )}
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${riskTone[alert.riskLevel] ?? riskTone.moderate}`}>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${riskTone[alert.riskLevel ?? "moderate"] ?? riskTone.moderate}`}>
                     {alert.riskLevel}
                   </span>
                 </div>

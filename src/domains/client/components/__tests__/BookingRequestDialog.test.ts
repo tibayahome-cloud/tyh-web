@@ -28,6 +28,7 @@ const facility = (id: string): FacilityDiscoveryItem =>
       currency: "KES",
       estimateDurationMinutes: 45,
       active: true,
+      deliveryMode: "in_person",
       isEmergencyCapable: false,
       service: {
         id: "service-1",
