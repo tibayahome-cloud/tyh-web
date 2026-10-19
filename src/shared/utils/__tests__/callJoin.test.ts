@@ -1,7 +1,7 @@
 import { AxiosError } from "axios";
 import { describe, expect, it } from "vitest";
 
-import { friendlyJoinError, isInAppBrowser } from "../callJoin";
+import { friendlyJoinError, friendlyMediaError, isInAppBrowser, waitingMessage } from "../callJoin";
 
 describe("isInAppBrowser", () => {
   it.each([
@@ -42,5 +42,35 @@ describe("friendlyJoinError", () => {
   it("never leaves a bare technical message", () => {
     expect(friendlyJoinError(new Error("TypeError: x is undefined"))).toMatch(/try again/);
     expect(friendlyJoinError("weird")).toMatch(/try again/);
+  });
+});
+
+describe("friendlyMediaError", () => {
+  const named = (name: string) => Object.assign(new Error("x"), { name });
+
+  it("explains a blocked camera and points at the lock icon", () => {
+    expect(friendlyMediaError(named("NotAllowedError"))).toMatch(/lock icon/i);
+  });
+
+  it("tells an in-app browser user to open Chrome or Safari", () => {
+    expect(friendlyMediaError(named("NotAllowedError"), true)).toMatch(/Chrome or Safari/);
+  });
+
+  it("covers a missing device and a device in use", () => {
+    expect(friendlyMediaError(named("NotFoundError"))).toMatch(/could not find/i);
+    expect(friendlyMediaError(named("NotReadableError"))).toMatch(/another app/i);
+  });
+
+  it("falls back to a next step for anything else", () => {
+    expect(friendlyMediaError(new Error("boom"))).toMatch(/browser settings/i);
+    expect(friendlyMediaError(undefined)).toMatch(/try again/i);
+  });
+});
+
+describe("waitingMessage", () => {
+  it("names the other person by role", () => {
+    expect(waitingMessage("provider")).toMatch(/client/);
+    expect(waitingMessage("client")).toMatch(/your doctor/);
+    expect(waitingMessage(null)).toMatch(/your doctor/);
   });
 });
