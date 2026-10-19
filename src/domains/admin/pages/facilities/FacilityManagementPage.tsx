@@ -257,8 +257,14 @@ const FacilityCard = ({
           <div className="col-span-2">
             <dt className="text-xs font-semibold text-slate-500">Administrators</dt>
             <dd className="mt-0.5">
-              <FacilityAdminSummary facilityId={facility.id} />
+              <FacilityAdminSummary facilityId={facility.id} summary={facility.adminSummary} />
             </dd>
+          </div>
+        )}
+        {facility.activeServiceCount !== null && facility.activeServiceCount !== undefined && (
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Services</dt>
+            <dd className="mt-0.5 text-slate-800">{facility.activeServiceCount} active</dd>
           </div>
         )}
         <div>
