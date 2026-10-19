@@ -1,8 +1,8 @@
 import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
 import { classifyApiError } from "../../../shared/utils/errors";
 import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Video, Calendar as CalendarIcon, Clock } from "lucide-react";
 
@@ -116,7 +116,14 @@ const ProviderTelemedicinePage = () => {
   const toast = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeCallBookingId, setActiveCallBookingId] = useState<string | null>(null);
+  // The Join button on Home sends the provider here with ?join=<booking> so the call opens without another tap. The
+  // call screen asks the server for its own token, which refuses a call that is not open, so no window check here.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeCallBookingId, setActiveCallBookingId] = useState<string | null>(() => searchParams.get("join"));
+  useEffect(() => {
+    if (searchParams.get("join")) setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [reportBookingId, setReportBookingId] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [technicalIssueBookingId, setTechnicalIssueBookingId] = useState<string | null>(null);
