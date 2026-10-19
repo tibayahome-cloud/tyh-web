@@ -13,6 +13,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   profile: { id: "p1", is_available: true, facility: null } as Record<string, unknown>,
   offers: [] as Array<Record<string, unknown>>,
+  active: [] as Array<Record<string, unknown>>,
+  upcoming: [] as Array<Record<string, unknown>>,
+  history: [] as Array<Record<string, unknown>>,
   setAvailable: vi.fn(),
   dismiss: vi.fn()
 }));
@@ -29,7 +32,15 @@ vi.mock("../../hooks/useProviderProfile", () => ({
 }));
 vi.mock("../../../../shared/hooks/useBookings", () => ({
   bookingKeys: { lists: () => ["bookings", "list"] },
-  useBookingList: () => ({ data: { bookings: [] }, isFetching: false, isError: false, refetch: vi.fn() }),
+  useBookingList: (params: { statuses?: string[] }) => {
+    const statuses = params.statuses ?? [];
+    const bookings = statuses.includes("completed_by_provider") && statuses.includes("in_service")
+      ? state.active
+      : statuses.includes("fully_completed")
+        ? state.history
+        : state.upcoming;
+    return { data: { bookings }, isFetching: false, isError: false, refetch: vi.fn() };
+  },
   useAcceptBookingMutation: () => ({ mutate: vi.fn(), isPending: false })
 }));
 vi.mock("../../contexts/BroadcastQueueContext", () => ({
@@ -73,6 +84,9 @@ const before = (first: HTMLElement, second: HTMLElement) =>
 beforeEach(() => {
   state.profile = { id: "p1", is_available: true, facility: null };
   state.offers = [];
+  state.active = [];
+  state.upcoming = [];
+  state.history = [];
   state.setAvailable.mockClear();
   state.dismiss.mockClear();
   sessionStorage.clear();
@@ -143,5 +157,45 @@ describe("provider Home", () => {
   it("no longer repeats the sidebar as a list of quick links", () => {
     renderHome();
     expect(screen.queryByText("Quick Links")).not.toBeInTheDocument();
+  });
+
+  describe("without a mouse", () => {
+    const booking = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      status: "scheduled",
+      scheduledAt: "2026-10-20T09:00:00Z",
+      isTelemedicine: true,
+      service: { name },
+      client: { fullName: "Sample Client" },
+      ...extra
+    });
+
+    it("makes upcoming and history rows buttons the keyboard can reach", () => {
+      state.upcoming = [booking("b1", "Follow-up consultation")];
+      state.history = [booking("b2", "Earlier consultation", { status: "fully_completed" })];
+      renderHome();
+
+      expect(screen.getByRole("button", { name: /Follow-up consultation/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Earlier consultation/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "View all" })).toBeInTheDocument();
+    });
+
+    it("gives the icon-only chat button a name", () => {
+      state.active = [booking("b3", "Home visit", { status: "arrived", isTelemedicine: false })];
+      renderHome();
+      expect(screen.getByRole("button", { name: "Open chat with the client" })).toBeInTheDocument();
+    });
+
+    it("keeps small grey text and all-caps labels off the page", () => {
+      state.upcoming = [booking("b1", "Follow-up consultation")];
+      state.history = [booking("b2", "Earlier consultation", { status: "fully_completed" })];
+      const { container } = renderHome();
+
+      const textElements = Array.from(container.querySelectorAll("*")).filter((el) => !(el instanceof SVGElement));
+      const classes = textElements.map((el) => el.getAttribute("class") ?? "").join(" ");
+      expect(classes).not.toMatch(/text-slate-400/);
+      expect(classes).not.toMatch(/text-\[(9|10|11)px\]/);
+      expect(classes).not.toMatch(/uppercase/);
+    });
   });
 });
