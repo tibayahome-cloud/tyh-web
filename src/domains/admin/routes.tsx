@@ -34,6 +34,7 @@ const FinanceOverviewPage = lazyWithRetry(() => import("./pages/finance/Overview
 const FinancePaymentsPage = lazyWithRetry(() => import("./pages/finance/PaymentsPage"));
 const FinanceWithdrawalsPage = lazyWithRetry(() => import("./pages/finance/WithdrawalsPage"));
 const ReviewQueuePage = lazyWithRetry(() => import("./pages/finance/ReviewQueuePage"));
+const StrandedWalletsPage = lazyWithRetry(() => import("./pages/finance/StrandedWalletsPage"));
 const AdminAccountSettingsPage = lazyWithRetry(() => import("./pages/system/AdminAccountSettingsPage"));
 const SystemSettingsPage = lazyWithRetry(() => import("./pages/system/SystemSettingsPage"));
 const AdminSelfCareAlertsPage = lazyWithRetry(() => import("./pages/selfcare/AlertsPage"));
@@ -112,6 +113,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <FinanceWithdrawalsPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "finance/stranded-wallets",
+        element: platformAdmin(
+          <Suspense fallback={<Loading fullHeight />}>
+            <StrandedWalletsPage />
           </Suspense>
         )
       },
