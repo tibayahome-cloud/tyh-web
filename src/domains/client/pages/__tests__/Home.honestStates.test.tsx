@@ -147,3 +147,48 @@ describe("client Home", () => {
     });
   });
 });
+
+describe("client Home: reachable and readable without a mouse", () => {
+  it("makes the Log vitals chip and both side tiles real buttons", () => {
+    renderHome();
+    expect(screen.getByRole("button", { name: "Log vitals" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Health Pulse/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Check-in/ })).toBeInTheDocument();
+  });
+
+  it("makes a booking card a button the keyboard can reach, with the rating button separate from it", async () => {
+    const user = userEvent.setup();
+    state.upcoming = {
+      data: { bookings: [{ id: "b1", status: "scheduled", scheduledAt: null, isTelemedicine: true, feedback: [], service: { name: "Consultation" } }] }
+    };
+    renderHome();
+
+    const card = screen.getByRole("button", { name: /Consultation/ });
+    card.focus();
+    expect(card).toHaveFocus();
+    await user.keyboard("{Enter}");
+    // Buttons are never nested in one another, which assistive technology cannot read.
+    expect(card.querySelector("button")).toBeNull();
+  });
+
+  it("announces whether Recent activity is open, and what it controls", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    const toggle = screen.getByRole("button", { name: "Recent activity" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "recent-activity");
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById("recent-activity")).not.toBeNull();
+  });
+
+  it("keeps small grey text off the page: nothing is the washed-out slate-400 or under 12px", () => {
+    const { container } = renderHome();
+    const html = container.innerHTML;
+    expect(html).not.toMatch(/text-slate-400/);
+    expect(html).not.toMatch(/text-\[(9|10|11)px\]/);
+    expect(html).not.toMatch(/uppercase/);
+  });
+});

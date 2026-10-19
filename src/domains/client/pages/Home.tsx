@@ -411,23 +411,27 @@ const ClientHome = () => {
             {hasHeartRate || hasBloodPressure ? (
               <>
                 {hasHeartRate && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-bold">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold">
                     <Heart className="w-3 h-3" />
                     {latestCheckin?.vitals?.heartRate} bpm
                   </div>
                 )}
                 {hasBloodPressure && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-[11px] font-bold">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-xs font-semibold">
                     <Activity className="w-3 h-3" />
                     {latestCheckin?.vitals?.bpSystolic}/{latestCheckin?.vitals?.bpDiastolic} mmHg
                   </div>
                 )}
               </>
             ) : (
-              <div onClick={() => navigate("/app/selfcare/checkin")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[11px] font-bold cursor-pointer">
-                <Plus className="w-3 h-3" />
-                Log Vitals
-              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/app/selfcare/checkin")}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
+              >
+                <Plus className="h-3 w-3" aria-hidden="true" />
+                Log vitals
+              </button>
             )}
             {checkinDate && (hasHeartRate || hasBloodPressure) && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-xs font-semibold">
@@ -473,7 +477,7 @@ const ClientHome = () => {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>
-                      <p className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Live</p>
+                      <p className="text-xs font-semibold text-emerald-300">Live</p>
                     </div>
                     <h2 className="mt-1 text-base font-bold text-white">
                       {activeBooking.provider?.fullName?.split(" ")[0] || "Provider"} · {formatBookingStatus(activeBooking.status)}
@@ -558,14 +562,21 @@ const ClientHome = () => {
             <div className="lg:col-span-2 space-y-3">
               {/* RECENT ACTIVITY - Collapsed by default */}
               <button
+                type="button"
                 onClick={() => setActivityExpanded(!activityExpanded)}
-                className="w-full flex items-center justify-between py-2 group"
+                aria-expanded={activityExpanded}
+                aria-controls="recent-activity"
+                className="group flex min-h-[44px] w-full items-center justify-between py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
               >
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Recent Activity</h3>
-                {activityExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                <h3 className="text-sm font-semibold text-slate-800">Recent activity</h3>
+                {activityExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                )}
               </button>
               {activityExpanded && (
-                <div className="space-y-2">
+                <div id="recent-activity" className="space-y-2">
                   {historyQuery.isError && !historyList ? (
                     <WidgetError what="your past activity" onRetry={() => void historyQuery.refetch()} />
                   ) : historyList?.bookings && historyList.bookings.length > 0 ? (
@@ -578,7 +589,7 @@ const ClientHome = () => {
                       />
                     ))
                   ) : (
-                    <p className="text-center py-6 text-xs text-slate-400">No past activity</p>
+                    <p className="py-6 text-center text-sm text-slate-600">No past activity</p>
                   )}
                 </div>
               )}
@@ -586,15 +597,16 @@ const ClientHome = () => {
 
             {/* SIDEBAR: QUICK ACTIONS */}
             <aside className="space-y-3">
-              <div
+              <button
+                type="button"
                 onClick={() => navigate("/app/selfcare")}
-                className="flex items-center gap-3 p-4 rounded-xl bg-white ring-1 ring-slate-100 cursor-pointer hover:ring-slate-200 transition-all"
+                className="flex w-full items-center gap-3 rounded-xl bg-white p-4 text-left ring-1 ring-slate-200 transition-all hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                   <Activity size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-400">Health Pulse</p>
+                  <p className="text-xs text-slate-600">Health Pulse</p>
                   <p className="text-sm font-bold text-slate-900">
                     {latestCheckin?.vitals?.bpSystolic
                       ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}`
@@ -605,22 +617,23 @@ const ClientHome = () => {
                           : "No readings yet"}
                   </p>
                 </div>
-                <ChevronRight size={16} className="text-slate-300" />
-              </div>
+                <ChevronRight size={16} className="text-slate-500" aria-hidden="true" />
+              </button>
 
-              <div
+              <button
+                type="button"
                 onClick={() => navigate("/app/selfcare/checkin")}
-                className="flex items-center gap-3 p-4 rounded-xl bg-slate-900 text-white cursor-pointer hover:bg-slate-800 transition-all"
+                className="flex w-full items-center gap-3 rounded-xl bg-slate-900 p-4 text-left text-white transition-all hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-gold focus-visible:ring-offset-2"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-tiba-gold">
                   <Zap size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-400">Daily</p>
+                  <p className="text-xs text-slate-300">Daily</p>
                   <p className="text-sm font-bold">Check-in</p>
                 </div>
-                <ChevronRight size={16} className="text-slate-600" />
-              </div>
+                <ChevronRight size={16} className="text-slate-300" aria-hidden="true" />
+              </button>
 
               <AIRecommendationsCard />
             </aside>
@@ -645,7 +658,7 @@ const ClientHome = () => {
           </p>
           <div className="mt-6 space-y-4">
             <label className="block">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason for decline (Optional)</span>
+              <span className="text-sm font-medium text-slate-700">Reason for declining (optional)</span>
               <textarea
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
                 rows={3}
@@ -673,7 +686,7 @@ const ClientHome = () => {
                 />
                 <Button
                   variant="ghost"
-                  className="w-full text-xs font-bold text-slate-400"
+                  className="w-full text-sm font-semibold text-slate-600"
                   onClick={() => setShowMpesaManual(false)}
                 >
                   Back to confirmation
@@ -710,7 +723,7 @@ const ClientHome = () => {
           </p>
           <div className="mt-6">
             <label className="block">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason (Optional)</span>
+              <span className="text-sm font-medium text-slate-700">Reason (optional)</span>
               <textarea
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
                 rows={3}
@@ -779,49 +792,40 @@ const BookingCompactCard = ({
       : "—";
 
   return (
-    <div
-      onClick={onClick}
-      className="group flex items-center justify-between gap-3 p-3 rounded-xl bg-white ring-1 ring-slate-100 transition-all hover:ring-slate-200 cursor-pointer"
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-          {booking.isTelemedicine ? <Video size={16} /> : <Calendar size={16} />}
-        </div>
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-slate-900 truncate">
-            {booking.service?.name || "Booking"}
-          </h4>
-          <div className="flex items-center gap-1.5">
-            <span className={classNames("text-[11px] font-bold", theme.className.replace(/bg-\w+-\d+/, ""))}>
+    <div className="group flex items-center gap-2 rounded-xl bg-white ring-1 ring-slate-200 transition-all hover:ring-slate-300 focus-within:ring-2 focus-within:ring-tiba-blue/50">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-3 text-left focus:outline-none"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 transition-colors group-hover:bg-brand-50 group-hover:text-brand-600">
+          {booking.isTelemedicine ? <Video size={16} aria-hidden="true" /> : <Calendar size={16} aria-hidden="true" />}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-slate-900">{booking.service?.name || "Booking"}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5 text-xs">
+            <span className={classNames("font-semibold", theme.className.replace(/bg-\w+-\d+/, ""))}>
               {formatBookingStatus(booking.status)}
             </span>
-            <span className="text-slate-300 text-[10px]">•</span>
-            <p className="text-[11px] text-slate-400">{when}</p>
-          </div>
-        </div>
-      </div>
+            <span className="text-slate-500" aria-hidden="true">•</span>
+            <span className="text-slate-600">{when}</span>
+          </span>
+        </span>
+      </button>
       {showRateButton ? (
         <button
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-[10px] font-bold hover:bg-amber-100 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRate?.();
-          }}
+          type="button"
+          className="mr-3 flex min-h-[44px] items-center gap-1 rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
+          onClick={() => onRate?.()}
         >
-          <StarIcon size={12} />
+          <StarIcon size={12} aria-hidden="true" />
           Rate
         </button>
       ) : (
-        <ChevronRight size={16} className="text-slate-300 group-hover:text-brand-600 transition-colors" />
+        <ChevronRight size={16} className="mr-3 text-slate-500 transition-colors group-hover:text-brand-600" aria-hidden="true" />
       )}
     </div>
   );
 };
-
-
-
-
-
-
 
 export default ClientHome;
