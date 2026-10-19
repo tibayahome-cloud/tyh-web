@@ -12,6 +12,7 @@ import { useMediaQuery } from "../../../shared/hooks/useMediaQuery";
 import { bookingKeys, useBookingList } from "../../../shared/hooks/useBookings";
 import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { StarIcon } from "lucide-react";
 
 import {
@@ -308,6 +309,9 @@ const ProviderBookings = () => {
                         ))}
                 </div>
             </header>
+
+            {/* The Bookings badge counts exactly these, so it must open onto them. */}
+            <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
             <div className="flex flex-wrap gap-2 text-xs text-slate-600">
                 <span className="rounded-full bg-slate-200 px-3 py-1">

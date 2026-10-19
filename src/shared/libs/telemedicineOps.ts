@@ -117,7 +117,9 @@ export const declineReschedule = (requestId: string, note?: string) => respond(r
 // What is waiting on the signed-in person
 // ---------------------------------------------------------------------------
 
-export type AttentionKind = "reschedule_request" | "rebooking_offer";
+// `time_confirmed` is a heads-up with nothing to answer: a consultation of the provider's now has a new
+// confirmed time. It stays listed until it is opened.
+export type AttentionKind = "reschedule_request" | "rebooking_offer" | "time_confirmed";
 
 export type AttentionItem = {
   kind: AttentionKind;
@@ -133,13 +135,16 @@ export type AttentionItem = {
   serviceName: string;
   // The other participant, or the facility for a replacement-time offer.
   fromName: string | null;
+  // True for a heads-up that is dismissed by opening it rather than answered.
+  acknowledgeable: boolean;
 };
 
 const text = (value: unknown): string | null => (typeof value === "string" && value ? value : null);
 
 export const mapAttentionItem = (value: unknown): AttentionItem | null => {
   const raw = (value ?? {}) as Record<string, unknown>;
-  const kind = raw.kind === "reschedule_request" || raw.kind === "rebooking_offer" ? raw.kind : null;
+  const kind =
+    raw.kind === "reschedule_request" || raw.kind === "rebooking_offer" || raw.kind === "time_confirmed" ? raw.kind : null;
   const id = text(raw.id);
   const bookingId = text(raw.booking_id);
   if (!kind || !id || !bookingId) return null;
@@ -154,7 +159,8 @@ export const mapAttentionItem = (value: unknown): AttentionItem | null => {
     currentStartAt: text(raw.current_start_at),
     role: raw.role === "provider" ? "provider" : "client",
     serviceName: text(raw.service_name) ?? "Consultation",
-    fromName: text(raw.from_name)
+    fromName: text(raw.from_name),
+    acknowledgeable: raw.acknowledgeable === true
   };
 };
 
@@ -162,6 +168,10 @@ export const fetchTelemedicineAttention = async (): Promise<AttentionItem[]> => 
   const response = await api.get("/telemedicine/attention");
   const items = (response.data?.data?.items ?? []) as unknown[];
   return items.map(mapAttentionItem).filter((item): item is AttentionItem => item !== null);
+};
+
+export const acknowledgeAttentionItem = async (itemId: string): Promise<void> => {
+  await api.post(`/telemedicine/attention/${itemId}/acknowledge`, {});
 };
 
 export const acceptRebookingOffer = async (bookingId: string): Promise<void> => {

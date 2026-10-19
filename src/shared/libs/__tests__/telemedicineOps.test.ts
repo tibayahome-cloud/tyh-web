@@ -12,7 +12,9 @@ vi.mock("../api", () => ({
 }));
 
 import {
+  acknowledgeAttentionItem,
   fetchPaymentReport,
+  mapAttentionItem,
   fetchProviderPreference,
   fetchReviewQueue,
   proposeReschedule,
@@ -125,5 +127,26 @@ describe("review queue", () => {
 
     const params = mockGet.mock.calls[0][1].params as Record<string, unknown>;
     expect(params["filter[category]"]).toBe("payment_review,no_show");
+  });
+});
+
+describe("attention items", () => {
+  const raw = { id: "i1", booking_id: "b1", proposed_start_at: "2026-10-20T09:00:00Z", role: "provider", service_name: "Consultation" };
+
+  it("reads a confirmed new time as an item that can be dismissed", () => {
+    const item = mapAttentionItem({ ...raw, kind: "time_confirmed", acknowledgeable: true });
+    expect(item?.kind).toBe("time_confirmed");
+    expect(item?.acknowledgeable).toBe(true);
+  });
+
+  it("does not treat a proposal as dismissible, and ignores a kind it does not know", () => {
+    expect(mapAttentionItem({ ...raw, kind: "reschedule_request" })?.acknowledgeable).toBe(false);
+    expect(mapAttentionItem({ ...raw, kind: "something_new" })).toBeNull();
+  });
+
+  it("tells the server which item was opened", async () => {
+    mockPost.mockResolvedValue({ data: {} });
+    await acknowledgeAttentionItem("i1");
+    expect(mockPost).toHaveBeenCalledWith("/telemedicine/attention/i1/acknowledge", {});
   });
 });
