@@ -170,7 +170,7 @@ const ProviderPayments = () => {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setWithdrawDialogOpen(true)}
-            disabled={!wallet || availableToWithdrawCents <= 0 || withdrawMutation.isLoading}
+            disabled={!wallet || availableToWithdrawCents <= 0 || withdrawMutation.isPending}
           >
             Request withdrawal
           </Button>
@@ -312,7 +312,7 @@ const ProviderPayments = () => {
         confirmLabel="Submit"
         onConfirm={handleWithdraw}
         onClose={() => setWithdrawDialogOpen(false)}
-        loading={withdrawMutation.isLoading}
+        loading={withdrawMutation.isPending}
       >
         <Input
           label="Amount"

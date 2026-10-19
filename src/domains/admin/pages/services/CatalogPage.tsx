@@ -214,14 +214,14 @@ export const ServiceCatalogPanel = () => {
               )
             }
           ]}
-          loading={isFetching || mutation.isLoading || deleteMutation.isLoading}
+          loading={isFetching || mutation.isPending || deleteMutation.isPending}
         />
       </Card>
 
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!mutation.isLoading) {
+          if (!mutation.isPending) {
             setModalOpen(false);
             setEditing(null);
           }
@@ -270,10 +270,10 @@ export const ServiceCatalogPanel = () => {
         description="This category will be hidden for all users. Delete only if services are already reassigned."
         confirmLabel="Delete"
         confirmVariant="secondary"
-        loading={deleteMutation.isLoading}
+        loading={deleteMutation.isPending}
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
         onClose={() => {
-          if (!deleteMutation.isLoading) {
+          if (!deleteMutation.isPending) {
             setPendingDelete(null);
           }
         }}

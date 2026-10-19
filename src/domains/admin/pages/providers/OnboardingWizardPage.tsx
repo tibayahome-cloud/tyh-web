@@ -345,13 +345,14 @@ const ProviderOnboardingWizardPage = () => {
         setStep(1);
       } else if (step === 1 && provider && application) {
         const additions = selectedRequirements.filter((reqId) => !existingRequirementIds.has(reqId));
-        const attachedItems = [];
+        const attachedItems: NonNullable<ApplicationPayload["items"]> = [];
         for (const requirementId of additions) {
           const item = await attachRequirementMutation.mutateAsync({
             applicationId: application.id,
             requirementId,
           });
-          attachedItems.push(item);
+          // A requirement that was just attached has not been reviewed yet.
+          attachedItems.push({ status: "pending", ...item });
         }
         if (additions.length > 0) {
           setApplication((prev) =>

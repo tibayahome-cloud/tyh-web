@@ -230,7 +230,7 @@ const ServicesPage = () => {
                     confirmLabel: "Reset"
                   })
                 }
-                disabled={!membership || updateMutation.isLoading || !profile?.verified}
+                disabled={!membership || updateMutation.isPending || !profile?.verified}
               >
                 Reset
               </Button>
@@ -243,7 +243,7 @@ const ServicesPage = () => {
                   })
                 }
                 disabled={!hasChanges || !profile?.verified}
-                loading={updateMutation.isLoading}
+                loading={updateMutation.isPending}
               >
                 Save
               </Button>
