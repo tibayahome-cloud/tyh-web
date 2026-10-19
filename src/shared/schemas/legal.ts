@@ -27,7 +27,7 @@ export const mapLegalConsentSummary = (input: unknown): LegalConsentSummary | nu
   const source = input as Record<string, unknown>;
   const rawDocuments = Array.isArray(source.documents) ? source.documents : [];
   const documents = rawDocuments
-    .map((item) => {
+    .map((item): LegalConsentDocument | null => {
       if (!item || typeof item !== "object") {
         return null;
       }
@@ -38,9 +38,9 @@ export const mapLegalConsentSummary = (input: unknown): LegalConsentSummary | nu
       return {
         type: raw.type,
         version: raw.version,
-        effective_at: typeof raw.effective_at === "string" ? raw.effective_at : undefined,
-        public_url: typeof raw.public_url === "string" ? raw.public_url : undefined,
-        content_sha256: typeof raw.content_sha256 === "string" ? raw.content_sha256 : undefined,
+        ...(typeof raw.effective_at === "string" ? { effective_at: raw.effective_at } : {}),
+        ...(typeof raw.public_url === "string" ? { public_url: raw.public_url } : {}),
+        ...(typeof raw.content_sha256 === "string" ? { content_sha256: raw.content_sha256 } : {}),
         accepted: Boolean(raw.accepted),
         accepted_at: typeof raw.accepted_at === "string" ? raw.accepted_at : null
       };

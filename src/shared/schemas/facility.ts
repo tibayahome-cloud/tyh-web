@@ -271,6 +271,8 @@ export const mapFacility = (payload: unknown): Facility | null => {
   const id = coerceId(raw.id);
   const facilityType = coerceString(raw.facility_type ?? raw.facilityType);
   const status = coerceString(raw.status);
+  const operatingHoursRaw: unknown = raw.operating_hours ?? raw.operatingHours;
+  const operatingHoursSource: unknown[] = Array.isArray(operatingHoursRaw) ? operatingHoursRaw : [];
   if (!id || !isFacilityType(facilityType) || !isFacilityStatus(status)) {
     return null;
   }
@@ -295,7 +297,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     phones: (Array.isArray(raw.phones) ? raw.phones : [])
       .map((phone) => mapFacilityPhone(phone))
       .filter((phone): phone is FacilityPhone => Boolean(phone)),
-    operatingHours: (Array.isArray(raw.operating_hours ?? raw.operatingHours) ? raw.operating_hours ?? raw.operatingHours : [])
+    operatingHours: operatingHoursSource
       .map((hour) => mapFacilityOperatingHour(hour))
       .filter((hour): hour is FacilityOperatingHour => Boolean(hour)),
     services: (Array.isArray(raw.services) ? raw.services : [])
@@ -326,6 +328,7 @@ export const mapFacilityDiscoveryItem = (payload: unknown): FacilityDiscoveryIte
   if (!id || !isFacilityType(facilityType) || !svcRaw || !facilityServiceId || !serviceId) {
     return null;
   }
+  const deliveryModeRaw = coerceString(svcRaw.delivery_mode ?? svcRaw.deliveryMode);
   const service: FacilityService = {
     id: facilityServiceId,
     facilityId: id,
@@ -334,6 +337,7 @@ export const mapFacilityDiscoveryItem = (payload: unknown): FacilityDiscoveryIte
     currency: coerceString(svcRaw.currency) ?? "KES",
     estimateDurationMinutes: coerceNumber(svcRaw.estimate_duration_minutes ?? svcRaw.estimateDurationMinutes),
     active: true,
+    deliveryMode: isDeliveryMode(deliveryModeRaw) ? deliveryModeRaw : "in_person",
     isEmergencyCapable: toBoolean(svcRaw.is_emergency_capable ?? svcRaw.isEmergencyCapable),
     service: mapFacilityServiceSummary(svcRaw.service ?? { ...svcRaw, id: serviceId })
   };

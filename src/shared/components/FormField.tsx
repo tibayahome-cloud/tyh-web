@@ -22,6 +22,6 @@ export function FormField<TFieldValues extends FieldValues>({
   name,
   render
 }: FormFieldProps<TFieldValues>) {
-  return <Controller control={control} name={name} render={({ field, fieldState }) => render({ field, fieldState })} />;
+  return <Controller control={control} name={name} render={({ field, fieldState }) => <>{render({ field, fieldState })}</>} />;
 }
 

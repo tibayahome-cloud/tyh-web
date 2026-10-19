@@ -19,8 +19,8 @@ export const messagingKeys = {
 export const useThreads = () => {
   return useInfiniteQuery({
     queryKey: messagingKeys.threads(),
-    queryFn: ({ pageParam }) => fetchThreads(pageParam as string | undefined),
-    initialPageParam: undefined,
+    queryFn: ({ pageParam }) => fetchThreads(pageParam),
+    initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined
   });
 };
@@ -32,9 +32,9 @@ export const useThreadMessages = (threadId: string | null) => {
       if (!threadId) {
         return Promise.reject(new Error("threadId required"));
       }
-      return fetchThreadMessages(threadId, pageParam as string | undefined);
+      return fetchThreadMessages(threadId, pageParam);
     },
-    initialPageParam: undefined,
+    initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined,
     enabled: Boolean(threadId)
   });
