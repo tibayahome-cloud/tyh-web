@@ -92,14 +92,11 @@ export const GuestBookingDialog = ({
     },
   });
 
-  const handleLocationSelect = (location: { lat: number; lng: number; address?: string }) => {
+  const handleLocationSelect = (location: { lat: number; lng: number }) => {
     setValue("lat", location.lat);
     setValue("lng", location.lng);
-    if (location.address) {
-      setValue("addressText", location.address);
-    }
-    setStep("form");
   };
+  const handleAddressResolved = (address: string) => setValue("addressText", address);
 
   const onSubmit = handleSubmit((values) => {
     createGuestBooking.mutate(values);
@@ -158,8 +155,9 @@ export const GuestBookingDialog = ({
               </p>
               <div className="h-80 rounded-xl overflow-hidden border border-slate-200">
                 <LocationPickerMap
-                  onLocationSelect={handleLocationSelect}
-                  initialLocation={hasLocation ? { lat, lng } : undefined}
+                  value={hasLocation ? { lat, lng } : null}
+                  onChange={handleLocationSelect}
+                  onAddressChange={handleAddressResolved}
                 />
               </div>
               <Button variant="outline" onClick={() => setStep("form")} className="w-full">

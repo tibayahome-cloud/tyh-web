@@ -95,7 +95,7 @@ const AdminBookingQueuePage = () => {
 
   const bookingQuery = useBookingList(
     {
-      statuses: tab.statuses as string[],
+      statuses: [...tab.statuses],
       pageSize: 50,
       preset: "card",
       clientId: appliedFilters.clientId || undefined,
@@ -397,7 +397,7 @@ const AdminBookingQueuePage = () => {
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
                         {booking.status.replace(/_/g, " ")}
                       </span>
-                      {booking.meta?.escalation_at && (
+                      {Boolean(booking.meta?.escalation_at) && (
                         <p className="text-xs font-semibold text-rose-600">Escalation pending</p>
                       )}
                       {tab.key === "disputes" &&

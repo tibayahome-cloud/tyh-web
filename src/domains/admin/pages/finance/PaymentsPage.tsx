@@ -305,7 +305,7 @@ const PaymentsPage = () => {
         dateFrom:  canReadGlobalLedger ? dateFrom || undefined : undefined,
         dateTo:    canReadGlobalLedger ? dateTo || undefined : undefined,
     }),
-    initialPageParam: effectiveFacilityId ? 1 : undefined,
+    initialPageParam: (effectiveFacilityId ? 1 : undefined) as string | number | undefined,
     getNextPageParam: (lastPage) => {
       if (effectiveFacilityId) {
         return lastPage.meta.page.number < lastPage.meta.page.totalPages

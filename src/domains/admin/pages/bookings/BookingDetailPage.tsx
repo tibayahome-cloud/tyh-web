@@ -279,10 +279,10 @@ const AdminBookingDetailPage = () => {
                     <p className="font-semibold text-slate-900">{event.action.replace(/_/g, " ")}</p>
                     <p className="text-xs text-slate-400">{event.at ? new Date(event.at).toLocaleString() : ""}</p>
                   </div>
-                  {event.payload?.reason && (
+                  {Boolean(event.payload?.reason) && (
                     <p className="text-xs text-slate-500">Reason: {String(event.payload.reason)}</p>
                   )}
-                  {event.payload?.note && (
+                  {Boolean(event.payload?.note) && (
                     <p className="text-xs text-slate-500">Note: {String(event.payload.note)}</p>
                   )}
                 </li>

@@ -1,5 +1,5 @@
 import clsx from "classnames";
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "outline";
@@ -10,6 +10,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   loading?: boolean;
   fullWidth?: boolean;
+  /** Decorative icon shown before the label. Give the button a text label too. */
+  icon?: ReactNode;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -35,7 +37,7 @@ const spinnerColorByVariant: Record<ButtonVariant, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", loading, disabled, fullWidth, children, ...rest }, ref) => {
+  ({ className, variant = "primary", size = "md", loading, disabled, fullWidth, icon, children, ...rest }, ref) => {
     const spinnerColor = spinnerColorByVariant[variant];
     return (
       <button
@@ -56,6 +58,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             className={clsx("h-4 w-4 animate-spin rounded-full border-2 border-t-transparent", spinnerColor)}
             aria-hidden
           />
+        )}
+        {icon && (
+          <span className="inline-flex shrink-0" aria-hidden>
+            {icon}
+          </span>
         )}
         <span className="inline-flex items-center gap-1">{children}</span>
       </button>
