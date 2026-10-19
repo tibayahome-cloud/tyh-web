@@ -30,16 +30,11 @@ import { PerformanceStats } from "../components/PerformanceStats";
 import { useUpdateProviderStatus } from "../hooks/useProviderProfile";
 
 import {
-  Power,
   Activity,
   Rocket,
   MessageCircle,
   ArrowRight,
-  Clock,
-  Calendar,
-  ExternalLink,
-  CreditCard,
-  Settings
+  Calendar
 } from "lucide-react";
 
 import type { Booking } from "../../../shared/schemas/booking";
@@ -222,8 +217,8 @@ const ProviderHome = () => {
     updateStatusMutation.mutate(next, {
       onSuccess: () => {
         toast.showToast({
-          title: next ? "System Online" : "System Offline",
-          description: next ? "You are now visible for nearby bookings." : "Standby mode activated.",
+          title: next ? "You are online" : "You are offline",
+          description: next ? "Clients can now request you." : "You will not receive new requests.",
           variant: "success"
         });
       }
@@ -301,17 +296,46 @@ const ProviderHome = () => {
 
         <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
-        {/* Intelligence Layer */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {financialsVisible && (
-          <div className="lg:col-span-4">
-            <RevenueSnapshot financialsVisible={financialsVisible} />
-          </div>
-          )}
-          <div className={financialsVisible ? "lg:col-span-8" : "lg:col-span-12"}>
-            <PerformanceStats />
-          </div>
-        </div>
+        {pendingInvites.length > 0 && (
+          <section aria-labelledby="new-requests-heading" className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
+              <h2 id="new-requests-heading" className="text-sm font-bold text-slate-900">
+                New requests ({pendingInvites.length})
+              </h2>
+            </div>
+            <ul className="mt-3 grid gap-3 md:grid-cols-2">
+              {pendingInvites.map((offer) => (
+                <li key={offer.booking.id} className="flex flex-col gap-3 rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{offer.booking.service?.name}</p>
+                    <p className="text-sm text-slate-600">
+                      {offer.distanceM ? `${(offer.distanceM / 1000).toFixed(1)} km away` : "Distance not known"}
+                      {" · "}
+                      received {formatRelativeTime(offer.receivedAt)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="min-h-[44px] flex-1 text-sm font-semibold"
+                      onClick={() => handleAcceptInvite(offer.booking.id)}
+                      loading={acceptBookingMutation.isPending}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-[44px] text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+                      onClick={() => dismissBroadcast(offer.booking.id)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Live Operations */}
         <div className={classNames(
@@ -368,8 +392,8 @@ const ProviderHome = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-slate-300 shadow-md mb-4">
                   <Rocket className="h-6 w-6" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900">No Active Booking</h2>
-                <p className="mt-1 text-[11px] text-slate-500">Awaiting requests...</p>
+                <h2 className="text-sm font-bold text-slate-900">Nothing in progress right now</h2>
+                <p className="mt-1 text-sm text-slate-600">New requests appear at the top of this page as they arrive.</p>
               </div>
             )}
           </div>
@@ -377,127 +401,43 @@ const ProviderHome = () => {
           <div className={classNames(
             activeBooking ? "space-y-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
           )}>
-            <div className="bg-slate-900 p-4 rounded-xl shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className={classNames(
-                    "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors",
-                    profile?.is_available ? "bg-emerald-500/10 border-emerald-500 text-emerald-500" : "bg-slate-500/10 border-slate-500 text-slate-500"
-                  )}>
-                    <Power className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Status</h3>
-                    <p className={classNames(
-                      "text-[10px] font-bold",
-                      profile?.is_available ? "text-emerald-400" : "text-slate-400"
-                    )}>
-                      {profile?.is_available ? "Online" : "Offline"}
-                    </p>
-                  </div>
+            <section aria-labelledby="availability-heading" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 id="availability-heading" className="text-sm font-bold text-slate-900">Availability</h3>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {profile?.is_available
+                      ? "You are online. Clients can request you."
+                      : "You are offline. Turn this on to receive requests."}
+                  </p>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(profile?.is_available)}
+                  aria-labelledby="availability-heading"
                   onClick={toggleStatus}
                   disabled={updateStatusMutation.isPending}
                   className={classNames(
-                    "relative h-5 w-10 rounded-full transition-colors focus:outline-none",
-                    profile?.is_available ? "bg-emerald-500" : "bg-slate-700"
+                    "relative h-8 w-14 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50 focus-visible:ring-offset-2 disabled:opacity-60",
+                    profile?.is_available ? "bg-emerald-600" : "bg-slate-400"
                   )}
                 >
-                  <div className={classNames(
-                    "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow",
-                    profile?.is_available ? "left-5" : "left-0.5"
-                  )} />
+                  <span
+                    aria-hidden="true"
+                    className={classNames(
+                      "absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform",
+                      profile?.is_available ? "left-7" : "left-1"
+                    )}
+                  />
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                {profile?.is_available
-                  ? "Visible for bookings"
-                  : "Activate to receive invitations"}
-              </p>
-            </div>
+            </section>
 
             <ProviderFacilityAffiliation facility={profile?.facility} />
 
-            <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-tiba-blue text-white">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wide">Quick Links</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Inbox", icon: <MessageCircle className="h-3.5 w-3.5" />, to: "/pro/inbox", color: "bg-blue-50 text-blue-600" },
-                  { label: "Bookings", icon: <Calendar className="h-3.5 w-3.5" />, to: "/pro/bookings", color: "bg-emerald-50 text-emerald-600" },
-                  { label: "Payments", icon: <CreditCard className="h-3.5 w-3.5" />, to: "/pro/payments", color: "bg-amber-50 text-amber-600" },
-                  { label: "Settings", icon: <Settings className="h-3.5 w-3.5" />, to: "/pro/settings", color: "bg-slate-100 text-slate-600" }
-                ].filter((link) => financialsVisible || link.label !== "Payments").map((link) => (
-                  <button
-                    key={link.label}
-                    onClick={() => navigate(link.to)}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 transition-all hover:bg-slate-100"
-                  >
-                    <div className={classNames("flex h-6 w-6 items-center justify-center rounded-md", link.color)}>
-                      {link.icon}
-                    </div>
-                    <span className="text-[11px] font-semibold text-slate-700">{link.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <ClientHealthAlertsCard />
 
-            {pendingInvites.length > 0 && (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white">
-                    <Activity className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900">Live Broadcasts</h3>
-                    <p className="text-[10px] text-amber-600 font-bold">Respond now</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {pendingInvites.map((offer) => (
-                    <article
-                      key={offer.booking.id}
-                      className="flex flex-col gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-100"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{offer.booking.service?.name}</p>
-                          <p className="text-[11px] text-slate-500">
-                            {offer.distanceM ? `${(offer.distanceM / 1000).toFixed(1)} km` : "—"} • {offer.radiusM}m radius
-                          </p>
-                        </div>
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-amber-500 animate-pulse">
-                          <Clock className="h-3 w-3" />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          className="flex-1 h-8 rounded-lg text-[11px] font-bold"
-                          onClick={() => handleAcceptInvite(offer.booking.id)}
-                          loading={acceptBookingMutation.isPending}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="h-8 rounded-lg text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                          onClick={() => dismissBroadcast(offer.booking.id)}
-                        >
-                          Dismiss
-                        </Button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
           </div>
         </div>
 
@@ -591,6 +531,17 @@ const ProviderHome = () => {
                 <p className="text-xs text-slate-400">No history yet</p>
               </div>
             )}
+          </div>
+        </div>
+        {/* What the provider has earned and how they are doing: useful, but not what they open the app to do. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          {financialsVisible && (
+            <div className="lg:col-span-4">
+              <RevenueSnapshot financialsVisible={financialsVisible} />
+            </div>
+          )}
+          <div className={financialsVisible ? "lg:col-span-8" : "lg:col-span-12"}>
+            <PerformanceStats />
           </div>
         </div>
       </div>
