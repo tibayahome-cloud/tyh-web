@@ -69,7 +69,7 @@ export const saveRecentLocation = (input: SaveLocationInput): StoredLocation[] =
       ? input.label.trim()
       : input.addressText?.trim() && input.addressText.trim().length > 0
       ? input.addressText.trim()
-      : `Lat ${input.lat.toFixed(3)}, Lng ${input.lng.toFixed(3)}`;
+      : "Pinned location";
 
   const filtered = entries.filter((entry) => !sameLocation(entry, input));
   const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `loc-${Date.now()}`;

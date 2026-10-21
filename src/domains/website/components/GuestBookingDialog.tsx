@@ -12,6 +12,7 @@ import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { currentLegalDocumentPayload } from "../../../shared/constants/legal";
 import { bookingReference } from "../../../shared/utils/bookingReference";
+import { PlaceLabel } from "../../../shared/components/PlaceLabel";
 
 type GuestBookingDialogProps = {
   open: boolean;
@@ -226,7 +227,7 @@ export const GuestBookingDialog = ({
                 </button>
                 {hasLocation && (
                   <p className="text-xs text-slate-500 mt-1">
-                    Location: {lat.toFixed(4)}, {lng.toFixed(4)}
+                    Location: <PlaceLabel lat={lat} lng={lng} />
                   </p>
                 )}
               </div>

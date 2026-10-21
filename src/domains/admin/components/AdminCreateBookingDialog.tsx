@@ -18,6 +18,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { getApiError } from "../../../shared/utils/errors";
 import { fetchFacilities } from "../../../shared/libs/facilities";
 import { useRbac } from "../../../shared/hooks/useRbac";
+import { PlaceLabel } from "../../../shared/components/PlaceLabel";
 
 type AdminCreateBookingDialogProps = {
   open: boolean;
@@ -409,7 +410,7 @@ export const AdminCreateBookingDialog = ({
               </button>
               {hasLocation && (
                 <p className="text-xs text-slate-500 mt-1">
-                  GPS: {lat?.toFixed(4)}, {lng?.toFixed(4)}
+                  Location: <PlaceLabel lat={lat} lng={lng} />
                 </p>
               )}
             </div>
