@@ -162,8 +162,8 @@ const ServicesPage = () => {
             </div>
           )}
 
-          <section className="space-y-4">
-            <label className="relative block">
+          <section className="flex flex-col gap-3 sm:flex-row">
+            <label className="relative block flex-1">
               <span className="sr-only">Search services</span>
               <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
@@ -176,26 +176,21 @@ const ServicesPage = () => {
             </label>
 
             {tiles.length > 0 && (
-              <div role="group" aria-label="Kind of care" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-                {[{ id: "all", name: "All", count: services?.length ?? 0 }, ...tiles].map((tile) => {
-                  const selected = category === tile.id;
-                  return (
-                    <button
-                      key={tile.id}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => setCategory(tile.id)}
-                      className={classNames(
-                        "inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
-                        selected ? "border-tiba-blue bg-tiba-blue text-white" : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
-                      )}
-                    >
-                      {tile.name}
-                      <span className={classNames("text-xs", selected ? "text-white/90" : "text-slate-600")}>{tile.count}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <label className="block sm:w-72">
+                <span className="sr-only">Kind of care</span>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
+                >
+                  <option value="all">All kinds of care ({services?.length ?? 0})</option>
+                  {tiles.map((tile) => (
+                    <option key={tile.id} value={tile.id}>
+                      {tile.name} ({tile.count})
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
           </section>
 
