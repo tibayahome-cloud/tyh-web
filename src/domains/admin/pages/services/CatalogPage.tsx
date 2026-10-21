@@ -14,7 +14,13 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { api } from "../../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin } from "../../../../shared/libs/fieldInclude";
-import { categoryDescription, type AdminServiceCategory } from "../../utils/serviceCategories";
+import {
+  AMBULANCE_CATEGORY,
+  categoriesOfKind,
+  categoryDescription,
+  type AdminServiceCategory,
+  type ManagedKind
+} from "../../utils/serviceCategories";
 
 type ServiceCategory = AdminServiceCategory;
 
@@ -49,7 +55,7 @@ const useCategoriesQuery = () =>
     }
   });
 
-export const ServiceCatalogPanel = () => {
+export const ServiceCatalogPanel = ({ kind = "home_based" }: { kind?: ManagedKind }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data, isFetching } = useCategoriesQuery();
@@ -164,14 +170,27 @@ export const ServiceCatalogPanel = () => {
     setPendingDelete(category);
   };
 
+  const createAmbulanceCategory = useMutation({
+    mutationFn: async () => {
+      await api.post("/service-categories", { ...AMBULANCE_CATEGORY, description: "Ambulance transport and emergency services" });
+    },
+    onSuccess: () => {
+      toast.showToast({ title: "Ambulance category created", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["admin", "service-categories"] }).catch(() => undefined);
+    },
+    onError: (error: unknown) =>
+      toast.showToast({ title: "Unable to create the category", description: error instanceof Error ? error.message : "Try again.", variant: "error" })
+  });
+
   const rows = useMemo(
     () =>
-      (data ?? []).map((category) => ({
+      categoriesOfKind(data, kind).map((category) => ({
         ...category,
         description: categoryDescription(category)
       })),
-    [data]
+    [data, kind]
   );
+  const ambulanceMissing = kind === "ambulance" && !(data ?? []).some((category) => category.key === AMBULANCE_CATEGORY.key);
 
   const onSubmit = handleSubmit((values) => mutation.mutate(values));
 
@@ -182,7 +201,16 @@ export const ServiceCatalogPanel = () => {
         description="Organize services into manageable groups. Categories help providers navigate available offerings."
       >
         <div className="flex justify-end">
-          <Button onClick={openCreate}>Create category</Button>
+          {kind === "ambulance" ? (
+            // Ambulance is one category on its own; its services belong in it, so there is nothing else to create.
+            ambulanceMissing && (
+              <Button onClick={() => createAmbulanceCategory.mutate()} loading={createAmbulanceCategory.isPending}>
+                Create the Ambulance category
+              </Button>
+            )
+          ) : (
+            <Button onClick={openCreate}>Create category</Button>
+          )}
         </div>
       </Card>
 

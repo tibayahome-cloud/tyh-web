@@ -24,3 +24,23 @@ describe("service categories in the admin catalogue", () => {
     expect(selectableCategories(undefined)).toEqual([]);
   });
 });
+
+import { AMBULANCE_CATEGORY, KIND_LABEL, categoriesOfKind } from "../serviceCategories";
+
+describe("categoriesOfKind: home-based care, ambulance and telemedicine are kept apart", () => {
+  const nursing: AdminServiceCategory = { id: "n", key: "nursing", name: "Nursing", care_type: "home_based" };
+  const ambulance: AdminServiceCategory = { id: "a", key: "ambulance", name: "Ambulance", care_type: "ambulance" };
+  const untyped: AdminServiceCategory = { id: "u", key: "old", name: "Old" };
+
+  it("lists only the categories of the chosen kind, and never the Telemedicine one", () => {
+    const all = [nursing, ambulance, untyped, { ...tele, care_type: "telemedicine" as const }];
+
+    expect(categoriesOfKind(all, "home_based").map((c) => c.id)).toEqual(["n", "u"]);
+    expect(categoriesOfKind(all, "ambulance").map((c) => c.id)).toEqual(["a"]);
+  });
+
+  it("names the kinds in plain words", () => {
+    expect(KIND_LABEL).toEqual({ home_based: "Home-based care", ambulance: "Ambulance", telemedicine: "Telemedicine" });
+    expect(AMBULANCE_CATEGORY.key).toBe("ambulance");
+  });
+});
