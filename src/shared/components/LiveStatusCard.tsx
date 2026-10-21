@@ -86,7 +86,7 @@ export const LiveStatusCard = ({
           <div>
             <p className="text-sm font-semibold text-emerald-800">Live</p>
             <p className="text-sm text-slate-700">
-              Clients can book video consultations with this {subject}.
+              Clients can book telemedicine consultations with this {subject}.
               {nextOpen ? ` Next free time: ${nextOpen}.` : ""}
             </p>
           </div>
@@ -102,7 +102,7 @@ export const LiveStatusCard = ({
         <div>
           <p className="text-sm font-semibold text-amber-900">Not live</p>
           <p className="text-sm text-slate-700">
-            Clients cannot book video consultations with this {subject} yet.
+            Clients cannot book telemedicine consultations with this {subject} yet.
             {status.blockers.length > 1 ? ` ${status.blockers.length} things need fixing.` : ""}
           </p>
         </div>

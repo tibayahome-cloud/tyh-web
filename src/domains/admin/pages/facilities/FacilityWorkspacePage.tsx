@@ -1244,7 +1244,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
         <div className="space-y-6">
       {canReadFacilities && facilityId && (
         <LiveStatusCard
-          title="Live for video consultations"
+          title="Live for telemedicine"
           subject="facility"
           status={liveStatusQuery.data}
           isLoading={liveStatusQuery.isLoading}

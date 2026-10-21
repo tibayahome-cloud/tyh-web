@@ -10,6 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let booking: Record<string, unknown>;
 
+vi.mock("../../../../../shared/hooks/useOpenBookingChat", () => ({
+  useOpenBookingChat: () => ({ openBookingChat: vi.fn(), openingBookingId: null })
+}));
 vi.mock("../../../../../shared/hooks/useBookings", () => ({
   useBookingDetail: () => ({ data: booking, isLoading: false, refetch: vi.fn() }),
   useBookingEvents: () => ({ data: [], isLoading: false }),

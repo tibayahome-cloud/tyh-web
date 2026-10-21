@@ -43,7 +43,7 @@ describe("LiveStatusCard", () => {
     renderCard();
 
     expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.getByText(/Clients can book video consultations with this facility/)).toBeInTheDocument();
+    expect(screen.getByText(/Clients can book telemedicine consultations with this facility/)).toBeInTheDocument();
     expect(screen.getByText(/Next free time:/)).toBeInTheDocument();
   });
 
@@ -69,7 +69,7 @@ describe("LiveStatusCard", () => {
   it("names the provider in the wording for a provider", () => {
     renderCard({ subject: "provider", status: blocked });
 
-    expect(screen.getByText(/Clients cannot book video consultations with this provider yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Clients cannot book telemedicine consultations with this provider yet/)).toBeInTheDocument();
   });
 
   it("shows a loading state, not Live or Not live", () => {

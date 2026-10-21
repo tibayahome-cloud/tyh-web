@@ -34,6 +34,16 @@ describe("BookingListFilters", () => {
     expect(group).toContainElement(screen.getByRole("group", { name: "Booking type" }));
   });
 
+  it("shows no type choice when a list does not use one: the status tabs are the only filter", () => {
+    render(
+      <BookingListFilters statusTabs={TABS} status="all" defaultStatus="all" onStatusChange={vi.fn()} onReset={vi.fn()} />
+    );
+
+    expect(screen.getByRole("tablist", { name: "Booking status" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Booking type" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All types" })).not.toBeInTheDocument();
+  });
+
   it("marks the active status and reports a change", () => {
     const { onStatusChange } = renderFilters({ status: "pending" });
 
@@ -46,9 +56,9 @@ describe("BookingListFilters", () => {
   it("marks the active type and reports a change", () => {
     const { onKindChange } = renderFilters({ kind: "video" });
 
-    expect(screen.getByRole("button", { name: "Video" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Telemedicine" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "All types" })).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Home visit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Home based" }));
     expect(onKindChange).toHaveBeenCalledWith("home");
   });
 
@@ -72,12 +82,13 @@ describe("BookingListFilters", () => {
 });
 
 describe("BookingKindBadge", () => {
-  it("says Video for a video consultation and Home visit for a home visit, in words", () => {
+  it("says Telemedicine for a remote consultation and Home based for a home visit, in words", () => {
     const { unmount } = render(<BookingKindBadge isTelemedicine />);
-    expect(screen.getByText("Video")).toBeInTheDocument();
+    expect(screen.getByText("Telemedicine")).toBeInTheDocument();
+    expect(screen.queryByText(/video/i)).not.toBeInTheDocument();
     unmount();
 
     render(<BookingKindBadge isTelemedicine={false} />);
-    expect(screen.getByText("Home visit")).toBeInTheDocument();
+    expect(screen.getByText("Home based")).toBeInTheDocument();
   });
 });

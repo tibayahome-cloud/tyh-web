@@ -14,6 +14,7 @@ import {
   usePayBookingMutation
 } from "../../../../shared/hooks/useBookings";
 import { useTelemedicineReschedules } from "../../../../shared/hooks/useTelemedicine";
+import { useOpenBookingChat } from "../../../../shared/hooks/useOpenBookingChat";
 import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
@@ -47,11 +48,8 @@ const AdminBookingDetailPage = () => {
   const [stkModalOpen, setStkModalOpen] = useState(false);
   const [stkPhone, setStkPhone] = useState("");
   const [stkPhoneError, setStkPhoneError] = useState("");
-  const dispatchChat = (id: string) => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("chat:open", { detail: { bookingId: id } }));
-    }
-  };
+  const { openBookingChat } = useOpenBookingChat("/admin/conversations");
+  const dispatchChat = (id: string) => void openBookingChat(id);
 
   const booking = detailQuery.data;
   const events = eventsQuery.data ?? [];
@@ -196,7 +194,7 @@ const AdminBookingDetailPage = () => {
       )}
 
       {booking.isTelemedicine ? (
-        <Card title="Video consultation" description="Remote appointment details and session state">
+        <Card title="Telemedicine consultation" description="Remote appointment details and session state">
           <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Appointment</p>

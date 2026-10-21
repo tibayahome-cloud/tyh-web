@@ -20,6 +20,7 @@ import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { useLocationAccess } from "../../../shared/hooks/useLocationAccess";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
@@ -135,6 +136,7 @@ const ProviderHome = () => {
   const { data: profile, isLoading: loadingProfile } = useProviderProfile(user?.id);
   const { queue: broadcastQueue, dismiss: dismissBroadcast } = useBroadcastQueueContext();
   const updateStatusMutation = useUpdateProviderStatus(user?.id);
+  const { openBookingChat } = useOpenBookingChat("/pro/inbox");
   const providerLive = useProviderLiveStatus(user?.id);
   const acceptBookingMutation = useAcceptBookingMutation("detail");
   const location = useLocation();
@@ -292,11 +294,7 @@ const ProviderHome = () => {
 
   if (loadingProfile) return <Loading fullHeight />;
 
-  const dispatchChat = (bookingId: string) => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("chat:open", { detail: { bookingId, role: "provider" } }));
-    }
-  };
+  const dispatchChat = (bookingId: string) => void openBookingChat(bookingId);
 
   return (
     <>

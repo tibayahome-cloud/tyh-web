@@ -34,6 +34,7 @@ const ConsultationRow = ({
   onJoin,
   onReportNoShow,
   onReportTechnicalIssue,
+  onOpenDetails,
   interactive = true
 }: {
   booking: Booking;
@@ -42,6 +43,8 @@ const ConsultationRow = ({
   onJoin: () => void;
   onReportNoShow: () => void;
   onReportTechnicalIssue: () => void;
+  /** Opens the booking: who it is with, when, notes, rescheduling. Offered on every row, past or upcoming. */
+  onOpenDetails: () => void;
   interactive?: boolean;
 }) => {
   const statusTheme = getBookingStatusTheme(booking.status);
@@ -67,8 +70,12 @@ const ConsultationRow = ({
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-slate-900">{booking.service?.name ?? "Consultation"}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <p className="truncate text-base font-semibold text-slate-900">
+          <button type="button" onClick={onOpenDetails} className="max-w-full truncate text-left hover:text-tiba-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue">
+            {booking.service?.name ?? "Consultation"}
+          </button>
+        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-slate-600">
           <span className="flex items-center gap-1">
             <CalendarIcon size={12} />
             {formatTelemedicineDateTime(booking.scheduledAt, timezone)}
@@ -96,6 +103,9 @@ const ConsultationRow = ({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={onOpenDetails}>
+          View details
+        </Button>
         {canReportTechnicalIssue && (
           <Button type="button" size="sm" variant="ghost" onClick={onReportTechnicalIssue}>
             Technical issue
@@ -225,6 +235,7 @@ const ProviderTelemedicinePage = () => {
                 setReportBookingId(booking.id);
               }}
               onReportTechnicalIssue={() => setTechnicalIssueBookingId(booking.id)}
+              onOpenDetails={() => navigate(`/pro/bookings/${booking.id}`)}
             />
           ))}
         </div>
@@ -241,6 +252,7 @@ const ProviderTelemedicinePage = () => {
                 onJoin={() => undefined}
                 onReportNoShow={() => undefined}
                 onReportTechnicalIssue={() => undefined}
+                onOpenDetails={() => navigate(`/pro/bookings/${booking.id}`)}
               />
             ))}
           </div>

@@ -4,8 +4,8 @@ export type BookingKindFilter = "all" | "video" | "home";
 
 export const KIND_OPTIONS: Array<{ key: BookingKindFilter; label: string }> = [
   { key: "all", label: "All types" },
-  { key: "video", label: "Video" },
-  { key: "home", label: "Home visit" }
+  { key: "video", label: "Telemedicine" },
+  { key: "home", label: "Home based" }
 ];
 
 /** The server filter for a kind: undefined for all, true for video, false for home visits. */
@@ -18,8 +18,9 @@ type Props<K extends string> = {
   statusTabs: ReadonlyArray<Tab<K>>;
   status: K;
   onStatusChange: (status: K) => void;
-  kind: BookingKindFilter;
-  onKindChange: (kind: BookingKindFilter) => void;
+  /** Optional second filter. Most lists need only the status tabs; omit these and no type choice is shown. */
+  kind?: BookingKindFilter;
+  onKindChange?: (kind: BookingKindFilter) => void;
   /** Resets to the defaults (all statuses, all types). Offered only while something is filtered. */
   onReset: () => void;
   /** The key of the default status tab, so "Clear filters" knows when there is nothing to clear. */
@@ -27,8 +28,8 @@ type Props<K extends string> = {
   className?: string;
 };
 
-// Every filter on a bookings list in one place: what state it is in (tabs) and what kind it is (video or home
-// visit), with one Clear. Used by each role's booking list so the filters sit and behave the same everywhere.
+// The filters on a bookings list in one place: the status tabs, and optionally the kind (telemedicine or home
+// based), with one Clear. Used by each role's booking list so the filters sit and behave the same everywhere.
 export const BookingListFilters = <K extends string>({
   statusTabs,
   status,
@@ -39,7 +40,8 @@ export const BookingListFilters = <K extends string>({
   defaultStatus,
   className
 }: Props<K>) => {
-  const filtered = status !== defaultStatus || kind !== "all";
+  const showKind = kind !== undefined && onKindChange !== undefined;
+  const filtered = status !== defaultStatus || (showKind && kind !== "all");
 
   return (
     <div role="group" aria-label="Filter bookings" className={classNames("space-y-2", className)}>
@@ -61,35 +63,41 @@ export const BookingListFilters = <K extends string>({
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="group" aria-label="Booking type" className="flex flex-wrap items-center gap-1.5">
-          {KIND_OPTIONS.map((option) => (
+      {(showKind || filtered) && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {showKind ? (
+            <div role="group" aria-label="Booking type" className="flex flex-wrap items-center gap-1.5">
+              {KIND_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={kind === option.key}
+                  onClick={() => onKindChange?.(option.key)}
+                  className={classNames(
+                    "min-h-[40px] rounded-full border px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
+                    kind === option.key
+                      ? "border-tiba-blue bg-tiba-blue text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          {filtered && (
             <button
-              key={option.key}
               type="button"
-              aria-pressed={kind === option.key}
-              onClick={() => onKindChange(option.key)}
-              className={classNames(
-                "min-h-[40px] rounded-full border px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
-                kind === option.key
-                  ? "border-tiba-blue bg-tiba-blue text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-              )}
+              onClick={onReset}
+              className="min-h-[40px] px-2 text-sm font-semibold text-tiba-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
             >
-              {option.label}
+              Clear filters
             </button>
-          ))}
+          )}
         </div>
-        {filtered && (
-          <button
-            type="button"
-            onClick={onReset}
-            className="min-h-[40px] px-2 text-sm font-semibold text-tiba-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 };

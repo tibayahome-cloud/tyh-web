@@ -117,10 +117,10 @@ describe("FacilityBookingsPanel", () => {
     expect(within(first).getByText("Paid")).toBeInTheDocument();
     expect(within(first).getByText("Nurse Joy")).toBeInTheDocument();
     expect(within(first).getByText(/1,500/)).toBeInTheDocument();
-    expect(within(first).queryByText("Video consultation")).not.toBeInTheDocument();
+    expect(within(first).queryByText("Telemedicine")).not.toBeInTheDocument();
 
     const second = screen.getByText("First Medical Consultation").closest("li") as HTMLElement;
-    expect(within(second).getByText("Video consultation")).toBeInTheDocument();
+    expect(within(second).getByText("Telemedicine")).toBeInTheDocument();
     expect(within(second).getByText("Not paid")).toBeInTheDocument();
     expect(within(second).getByText("Unassigned")).toBeInTheDocument();
     expect(within(second).getByText("Waiting")).toBeInTheDocument();

@@ -21,6 +21,7 @@ import { useJoinFromLink } from "../../../shared/hooks/useJoinFromLink";
 import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
 import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
 import { Modal } from "../../../shared/components/Modal";
@@ -52,6 +53,7 @@ const BookingDetailPage = () => {
   const reportNoShowMutation = useReportNoShowMutation();
   const policyQuery = useTelemedicinePolicy();
   const { user } = useAuth();
+  const { openBookingChat } = useOpenBookingChat("/app/inbox");
 
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
@@ -359,7 +361,7 @@ const BookingDetailPage = () => {
               <div className="flex-1 min-w-0">
                 <h5 className="text-sm font-bold text-slate-900 truncate">{booking.provider.fullName}</h5>
                 <div className="mt-2 flex gap-2">
-                  <button className="flex-1 flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors" onClick={() => navigate("/app/inbox")}>
+                  <button className="flex-1 flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors" onClick={() => void openBookingChat(booking.id)}>
                     <MessageCircle className="h-4 w-4" />
                     <span className="text-[10px] font-bold uppercase tracking-wider">Chat</span>
                   </button>
@@ -466,7 +468,7 @@ const BookingDetailPage = () => {
       unattended={booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED}
       onBack={() => navigate(-1)}
       onJoin={() => setCallOpen(true)}
-      onChat={() => navigate("/app/inbox")}
+      onChat={() => void openBookingChat(booking.id)}
       cancel={videoCancel}
       reportNoShow={
         noShow.state === "available" ? () => setNoShowDialogOpen(true) : null
@@ -502,7 +504,7 @@ const BookingDetailPage = () => {
               hideOverlays
               height={mapHeight}
               className="h-full w-full"
-              onOpenChat={() => navigate("/app/inbox")}
+              onOpenChat={() => void openBookingChat(booking.id)}
             />
 
             {/* Overlay Gradient for smooth blending if needed, or keeping it clean */}

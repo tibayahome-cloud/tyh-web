@@ -18,6 +18,9 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
     return { data: { bookings: [], meta: {} }, isLoading: false, isFetching: false };
   }
 }));
+vi.mock("../../../../shared/hooks/useOpenBookingChat", () => ({
+  useOpenBookingChat: () => ({ openBookingChat: vi.fn(), openingBookingId: null })
+}));
 vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "provider-1" } }) }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/components/BookingFeedbackDialog", () => ({ BookingFeedbackDialog: () => null }));

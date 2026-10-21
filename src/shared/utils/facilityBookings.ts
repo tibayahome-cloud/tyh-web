@@ -57,7 +57,7 @@ type SessionLike = { providerJoinedAt?: string | null; clientJoinedAt?: string |
 // swap the provider underneath it. Say so instead of offering a button that can only fail.
 export const assignBlockedReason = (booking: { isTelemedicine?: boolean; telemedicineSession?: SessionLike }): string | null =>
   booking.isTelemedicine && (booking.telemedicineSession?.providerJoinedAt || booking.telemedicineSession?.clientJoinedAt)
-    ? "The video consultation has already started, so the provider can no longer be changed."
+    ? "The telemedicine consultation has already started, so the provider can no longer be changed."
     : null;
 
 export const statusLabel = (status: string): string => {

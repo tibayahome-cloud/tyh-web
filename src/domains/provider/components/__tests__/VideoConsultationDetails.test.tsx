@@ -81,7 +81,7 @@ describe("provider VideoConsultationDetails", () => {
   it("does not offer Join before the call opens, and says when it opens", () => {
     renderPage(135);
 
-    expect(screen.queryByRole("button", { name: /Join video call/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Join call/ })).not.toBeInTheDocument();
     expect(screen.getByText(/The call opens at 13:05, 10 minutes before the appointment/)).toBeInTheDocument();
   });
 
@@ -89,26 +89,26 @@ describe("provider VideoConsultationDetails", () => {
     const onJoin = vi.fn();
     renderPage(5, { onJoin });
 
-    fireEvent.click(screen.getByRole("button", { name: /Join video call/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Join call/ }));
     expect(onJoin).toHaveBeenCalledOnce();
   });
 
   it("switches to Join as time passes, without a reload", () => {
     renderPage(11);
-    expect(screen.queryByRole("button", { name: /Join video call/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Join call/ })).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
 
-    expect(screen.getByRole("button", { name: /Join video call/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Join call/ })).toBeInTheDocument();
   });
 
   it("points at suggesting a new time when nobody joined", () => {
     renderPage(-20, { unattended: true });
 
     expect(screen.getByText(/Nobody joined this consultation. You can suggest a new time below/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Join video call/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Join call/ })).not.toBeInTheDocument();
   });
 
   it("says when earnings arrive only where the provider is shown payment", () => {

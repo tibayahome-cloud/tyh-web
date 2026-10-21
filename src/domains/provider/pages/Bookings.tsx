@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { useMediaQuery } from "../../../shared/hooks/useMediaQuery";
 import { bookingKeys, useBookingList } from "../../../shared/hooks/useBookings";
@@ -213,16 +214,7 @@ const ProviderBookings = () => {
         setFiltersOpen(false);
     };
 
-    const dispatchChat = (bookingId: string) => {
-        if (typeof window === "undefined") {
-            return;
-        }
-        window.dispatchEvent(
-            new CustomEvent("chat:open", {
-                detail: { bookingId, role: "provider" }
-            })
-        );
-    };
+    const { openBookingChat, openingBookingId } = useOpenBookingChat("/pro/inbox");
 
     const filterPanel = (
         <div className="space-y-4 text-left">
@@ -403,7 +395,7 @@ const ProviderBookings = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" className="px-3 py-1 text-xs" onClick={() => dispatchChat(booking.id)}>
+                                                    <Button variant="ghost" className="px-3 py-1 text-xs" onClick={() => void openBookingChat(booking.id)} loading={openingBookingId === booking.id}>
                                                         Chat
                                                     </Button>
                                                     <Button className="px-3 py-1 text-xs" onClick={() => navigate(`/pro/bookings/${booking.id}`)}>
