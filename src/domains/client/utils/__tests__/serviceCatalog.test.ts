@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
+import { serviceImageKey, careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
 
 const svc = (overrides: Partial<CatalogService> = {}): CatalogService => ({
   id: "s",
@@ -79,5 +79,31 @@ describe("careImageKey and free services", () => {
 
   it("does not print KES 0 for a service priced on request", () => {
     expect(formatPrice(0)).toBe("Quote on request");
+  });
+});
+
+describe("serviceImageKey: the photo follows the service, not just its category", () => {
+  const cat = "Nursing & Caregiver Services";
+
+  it("matches what the service is", () => {
+    expect(serviceImageKey("Wound Care at Home", cat)).toMatch(/^nurse/);
+    expect(serviceImageKey("Antenatal Ultrasound Scan", "Diagnostics")).toBe("scan");
+    expect(serviceImageKey("ECG at Home", "Diagnostics")).toBe("ecg");
+    expect(serviceImageKey("Occupational Therapy", "Therapy")).toBe("occupational");
+    expect(serviceImageKey("Speech Therapy", "Therapy")).toBe("speech");
+    expect(serviceImageKey("Cancer Home Care Plan", "Plans")).toBe("cancer");
+    expect(serviceImageKey("Companion Care Visit", "Elderly")).toBe("elderly");
+    expect(serviceImageKey("Laboratory sample collection at home", "Diagnostics")).toBe("lab");
+    expect(serviceImageKey("Equipment Rental/Purchase Inquiry", "Consultations")).toBe("equipment");
+  });
+
+  it("falls back to the kind of care when nothing in the name says more", () => {
+    expect(serviceImageKey("Something unusual", "Therapy & Rehabilitation")).toBe("therapy");
+  });
+
+  it("gives different services different photos where several fit, the same one each time", () => {
+    const keys = ["24-Hour Nursing Care", "Day Nurse Care (8 Hours)", "Night Nurse Care (12 Hours)", "Weekly Nursing Care", "Monthly Nursing Care", "Nurse Visit at Home"].map((n) => serviceImageKey(n, cat));
+    expect(new Set(keys).size).toBeGreaterThan(1);
+    expect(serviceImageKey("Weekly Nursing Care", cat)).toBe(serviceImageKey("Weekly Nursing Care", cat));
   });
 });
