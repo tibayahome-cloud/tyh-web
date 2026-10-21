@@ -33,16 +33,12 @@ import { discoverFacilities } from "../../../shared/libs/facilities";
 import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
 import { VideoConsultationDetails } from "../components/VideoConsultationDetails";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
+import { noShowReportState } from "../../../shared/utils/noShowReport";
 import { isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
-import {
-  BOOKING_STATUS_TELEMEDICINE_UNATTENDED,
-  TELEMEDICINE_DISPUTE_TYPE_NO_SHOW
-} from "../../../shared/schemas/telemedicine";
+import { BOOKING_STATUS_TELEMEDICINE_UNATTENDED } from "../../../shared/schemas/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
-
-const NOT_REPORTABLE_STATUSES = ["cancelled_by_client", "cancelled_by_admin", "fully_completed"];
 
 const TRACKING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service"];
 
@@ -218,8 +214,6 @@ const BookingDetailPage = () => {
       });
     }
   };
-
-  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
 
   // The cutoff is backend policy (scheduled_at - cancellationCutoffMinutes), not a client
   // guess -- until the policy loads, cancellation stays hidden rather than optimistically shown.
@@ -460,8 +454,8 @@ const BookingDetailPage = () => {
       : canCancelAppointment || canCancelBeforeAssignment
         ? { label: "Cancel this appointment", onClick: () => setCancelAppointmentDialogOpen(true), loading: false }
         : null;
-  // "My doctor did not join" only makes sense once the appointment has started.
-  const appointmentStarted = Boolean(booking.scheduledAt) && Date.now() >= new Date(booking.scheduledAt as string).getTime();
+  // "My doctor did not join" is offered only once the call time has passed, you were in the call and the doctor was not.
+  const noShow = noShowReportState(booking, "client", Date.now());
   const videoPage = booking.isTelemedicine ? (
     <VideoConsultationDetails
       booking={booking}
@@ -475,11 +469,9 @@ const BookingDetailPage = () => {
       onChat={() => navigate("/app/inbox")}
       cancel={videoCancel}
       reportNoShow={
-        booking.status === "scheduled" && appointmentStarted && !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status)
-          ? () => setNoShowDialogOpen(true)
-          : null
+        noShow.state === "available" ? () => setNoShowDialogOpen(true) : null
       }
-      noShowReported={booking.status === "scheduled" && Boolean(existingNoShowDispute)}
+      noShowReported={noShow.state === "reported"}
       reportTechnicalIssue={canReportTechnicalIssue ? () => setTechnicalIssueDialogOpen(true) : null}
       reschedule={
         user?.id ? (
