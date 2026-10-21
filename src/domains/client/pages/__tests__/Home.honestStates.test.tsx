@@ -71,25 +71,13 @@ beforeEach(() => {
 });
 
 describe("client Home", () => {
-  it("says there are no readings, not 'Normal', when no vitals were logged", () => {
+  it("shows no vitals or wallet entry points, which led nowhere for a client", () => {
     renderHome();
-    expect(screen.getByText("No readings yet")).toBeInTheDocument();
-    expect(screen.queryByText("Normal")).not.toBeInTheDocument();
-  });
 
-  it("shows the readings that exist, with units, and never a placeholder for the ones that do not", () => {
-    state.checkins = { data: [{ vitals: { heartRate: 72, bpSystolic: 120, bpDiastolic: 80 } }], isLoading: false, isError: false };
-    renderHome();
-    expect(screen.getByText(/72 bpm/)).toBeInTheDocument();
-    expect(screen.getAllByText(/120\/80/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/--/)).not.toBeInTheDocument();
-  });
-
-  it("does not print 'undefined/undefined' for a check-in that has a heart rate but no blood pressure", () => {
-    state.checkins = { data: [{ vitals: { heartRate: 64 } }], isLoading: false, isError: false };
-    renderHome();
-    expect(screen.getByText(/64 bpm/)).toBeInTheDocument();
-    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Log vitals")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Wallet:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Health Pulse")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Check-in/)).not.toBeInTheDocument();
   });
 
   it("says the upcoming appointments could not be loaded, with a retry, instead of 'No upcoming care scheduled'", async () => {
@@ -156,28 +144,11 @@ describe("client Home", () => {
     expect(screen.getByText("No upcoming care scheduled")).toBeInTheDocument();
   });
 
-  it("does not show a failed wallet request as a balance", () => {
-    state.wallet = { data: undefined, isError: true };
-    renderHome();
-    expect(screen.getByText("Balance unavailable")).toBeInTheDocument();
-  });
-
   it("puts the next appointments before the ways to book a new one", () => {
     renderHome();
     const upcoming = screen.getByRole("heading", { name: "Your next appointments" });
     const launcher = screen.getByRole("heading", { name: "How would you like to receive care?" });
     expect(upcoming.compareDocumentPosition(launcher) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("labels the wallet and dates the readings", () => {
-    state.checkins = {
-      data: [{ checkinAt: "2026-10-12T08:00:00Z", vitals: { heartRate: 72 } }],
-      isLoading: false,
-      isError: false
-    };
-    renderHome();
-    expect(screen.getByText("Wallet:")).toBeInTheDocument();
-    expect(screen.getByText(/^Checked .*12/)).toBeInTheDocument();
   });
 
   describe("rating a finished visit", () => {
@@ -201,13 +172,6 @@ describe("client Home", () => {
 });
 
 describe("client Home: reachable and readable without a mouse", () => {
-  it("makes the Log vitals chip and both side tiles real buttons", () => {
-    renderHome();
-    expect(screen.getByRole("button", { name: "Log vitals" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Health Pulse/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Check-in/ })).toBeInTheDocument();
-  });
-
   it("makes a booking card a button the keyboard can reach, with the rating button separate from it", async () => {
     const user = userEvent.setup();
     state.upcoming = {

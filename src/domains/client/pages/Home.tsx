@@ -18,7 +18,6 @@ import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { BookingSearchStatus } from "../components/BookingSearchStatus";
 import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
 import { findBookingUnderPaymentReview } from "../utils/paymentReview";
-import { AIRecommendationsCard } from "../components/AIRecommendationsCard";
 import { ClientPageHeader } from "../components/ClientPageHeader";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useSocket } from "../../../shared/hooks/useSocket";
@@ -28,19 +27,13 @@ import { LocationPermissionBanner } from "../../../shared/components/LocationPer
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
-import { useWalletAccount } from "../../../shared/hooks/useWallet";
 import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import { PaymentRequestNotice } from "../components/PaymentRequestNotice";
-import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
 import {
-  Plus,
   ArrowRight,
-  Activity,
-  Heart,
-  Zap,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -118,18 +111,6 @@ const ClientHome = () => {
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
   // The number the M-Pesa request went to, kept so the follow-up step can say where to look.
-
-  const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
-  const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
-  const latestCheckin = checkinsQuery.data?.[0];
-  // Show only readings that exist. The heart-rate chip used to read a field that is not on the record, so it
-  // always said "-- bpm", and a check-in with no blood pressure showed "undefined/undefined".
-  const checkinDate = latestCheckin?.checkinAt
-    ? new Date(latestCheckin.checkinAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })
-    : null;
-  const hasHeartRate = typeof latestCheckin?.vitals?.heartRate === "number";
-  const hasBloodPressure =
-    typeof latestCheckin?.vitals?.bpSystolic === "number" && typeof latestCheckin?.vitals?.bpDiastolic === "number";
 
   const { data: activeList } = useBookingList(
     {
@@ -223,11 +204,6 @@ const ClientHome = () => {
     (b) => (b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed") && !b.feedback?.length
   );
 
-  const walletBalance = walletQuery.data
-    ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}`
-    : walletQuery.isError
-      ? "Balance unavailable"
-      : "—";
 
 
 
@@ -409,46 +385,6 @@ const ClientHome = () => {
           )}
         </div>
 
-        {/* HEALTH PULSE CHIPS */}
-        <section className="px-4 -mt-2 overflow-x-auto no-scrollbar">
-          <div className="flex gap-2 min-w-max">
-            {hasHeartRate || hasBloodPressure ? (
-              <>
-                {hasHeartRate && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold">
-                    <Heart className="w-3 h-3" />
-                    {latestCheckin?.vitals?.heartRate} bpm
-                  </div>
-                )}
-                {hasBloodPressure && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-xs font-semibold">
-                    <Activity className="w-3 h-3" />
-                    {latestCheckin?.vitals?.bpSystolic}/{latestCheckin?.vitals?.bpDiastolic} mmHg
-                  </div>
-                )}
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => navigate("/app/selfcare/checkin")}
-                className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
-              >
-                <Plus className="h-3 w-3" aria-hidden="true" />
-                Log vitals
-              </button>
-            )}
-            {checkinDate && (hasHeartRate || hasBloodPressure) && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-xs font-semibold">
-                Checked {checkinDate}
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-700 rounded-full text-xs font-semibold">
-              <span>Wallet:</span>
-              <span>{walletBalance}</span>
-            </div>
-          </div>
-        </section>
-
         <div className="flex flex-col gap-4 px-4 sm:px-6">
           {underReview && (
             <PaymentReviewNotice
@@ -574,8 +510,8 @@ const ClientHome = () => {
           />
 
           {/* MAIN CONTENT GRID */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-3">
+          <div className="grid gap-4">
+            <div className="space-y-3">
               {/* RECENT ACTIVITY - Collapsed by default */}
               <button
                 type="button"
@@ -611,48 +547,6 @@ const ClientHome = () => {
               )}
             </div>
 
-            {/* SIDEBAR: QUICK ACTIONS */}
-            <aside className="space-y-3">
-              <button
-                type="button"
-                onClick={() => navigate("/app/selfcare")}
-                className="flex w-full items-center gap-3 rounded-xl bg-white p-4 text-left ring-1 ring-slate-200 transition-all hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                  <Activity size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-600">Health Pulse</p>
-                  <p className="text-sm font-bold text-slate-900">
-                    {latestCheckin?.vitals?.bpSystolic
-                      ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}`
-                      : checkinsQuery.isError
-                        ? "Unavailable"
-                        : checkinsQuery.isLoading
-                          ? "—"
-                          : "No readings yet"}
-                  </p>
-                </div>
-                <ChevronRight size={16} className="text-slate-500" aria-hidden="true" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/app/selfcare/checkin")}
-                className="flex w-full items-center gap-3 rounded-xl bg-slate-900 p-4 text-left text-white transition-all hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-gold focus-visible:ring-offset-2"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-tiba-gold">
-                  <Zap size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-300">Daily</p>
-                  <p className="text-sm font-bold">Check-in</p>
-                </div>
-                <ChevronRight size={16} className="text-slate-300" aria-hidden="true" />
-              </button>
-
-              <AIRecommendationsCard />
-            </aside>
           </div>
         </div>
       </div>
