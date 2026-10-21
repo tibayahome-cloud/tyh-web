@@ -6,6 +6,9 @@ import classNames from "classnames";
 import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
+import { LiveStatusCard, type LiveFix } from "../../../shared/components/LiveStatusCard";
+import { useProviderLiveStatus } from "../../../shared/hooks/useLiveStatus";
+import type { LiveBlocker } from "../../../shared/libs/liveStatus";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
@@ -117,6 +120,13 @@ const formatAppointmentTime = (booking: Booking) => {
   return formatTimestamp(booking.acceptedAt);
 };
 
+// A provider can set their own hours; every other blocker (verification, specialties, telemedicine on) is
+// set by their facility, so they are told that instead of being sent somewhere they cannot act.
+const resolveProviderLiveFix = (blocker: LiveBlocker): LiveFix =>
+  blocker.fix === "provider_availability"
+    ? { label: "Set your hours", to: "/pro/availability" }
+    : { hint: "Your facility admin sets this up." };
+
 const ProviderHome = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -125,6 +135,7 @@ const ProviderHome = () => {
   const { data: profile, isLoading: loadingProfile } = useProviderProfile(user?.id);
   const { queue: broadcastQueue, dismiss: dismissBroadcast } = useBroadcastQueueContext();
   const updateStatusMutation = useUpdateProviderStatus(user?.id);
+  const providerLive = useProviderLiveStatus(user?.id);
   const acceptBookingMutation = useAcceptBookingMutation("detail");
   const location = useLocation();
   const isOnHomePage = location.pathname === "/pro/home" || location.pathname === "/pro";
@@ -301,6 +312,19 @@ const ProviderHome = () => {
         {/* Non-blocking: every provider predates these fields, and a required answer would
             lock them out of their own dashboard until they filled them in. */}
         <ProviderSetupCard />
+
+        {/* Shown only while clients cannot book this provider, so a working provider sees no extra card. */}
+        {providerLive.data && !providerLive.data.live && (
+          <LiveStatusCard
+            title="Clients cannot book you yet"
+            subject="provider"
+            status={providerLive.data}
+            isLoading={false}
+            isError={false}
+            onRetry={() => void providerLive.refetch()}
+            resolveFix={resolveProviderLiveFix}
+          />
+        )}
 
         <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
