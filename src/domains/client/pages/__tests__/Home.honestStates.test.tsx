@@ -29,6 +29,7 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
   useCancelBookingMutation: () => ({ mutateAsync: vi.fn(), isPending: false })
 }));
 vi.mock("../../../../shared/hooks/useWallet", () => ({ useWalletAccount: () => state.wallet }));
+vi.mock("../../../../shared/hooks/useTelemedicine", () => ({ useTelemedicinePolicy: () => ({ data: { joinWindowBeforeMinutes: 10 } }) }));
 vi.mock("../../../../shared/hooks/useSelfCare", () => ({ useSelfCareCheckins: () => state.checkins }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/hooks/useLocationAccess", () => ({
@@ -99,6 +100,54 @@ describe("client Home", () => {
     expect(state.refetchUpcoming).toHaveBeenCalled();
   });
 
+  describe("the next video consultation", () => {
+    const consultation = (extra: Record<string, unknown> = {}) => ({
+      id: "c1",
+      status: "scheduled",
+      isTelemedicine: true,
+      scheduledAt: new Date(Date.now() + 3 * 60 * 60_000).toISOString(),
+      estimateDurationMinutes: 30,
+      feedback: [],
+      service: { name: "Online consultation" },
+      provider: { fullName: "Dr Example" },
+      ...extra
+    });
+
+    it("gets its own card with a countdown, and is not repeated in the list under it", () => {
+      state.upcoming = { data: { bookings: [consultation()] } };
+      renderHome();
+
+      expect(screen.getByRole("heading", { name: "Your video consultation with Dr Example" })).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent(/Starts in/);
+      expect(screen.queryByRole("heading", { name: "Your next appointments" })).not.toBeInTheDocument();
+      expect(screen.queryByText("No upcoming care scheduled")).not.toBeInTheDocument();
+    });
+
+    it("keeps other appointments in the list beneath it", () => {
+      state.upcoming = {
+        data: { bookings: [consultation(), consultation({ id: "h1", isTelemedicine: false, service: { name: "Home visit" } })] }
+      };
+      renderHome();
+
+      expect(screen.getByRole("heading", { name: "Your video consultation with Dr Example" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Your next appointments" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Home visit/ })).toBeInTheDocument();
+    });
+
+    it("has no card for a home visit, or for a consultation that has already finished", () => {
+      state.upcoming = {
+        data: {
+          bookings: [
+            consultation({ id: "h1", isTelemedicine: false }),
+            consultation({ id: "old", scheduledAt: new Date(Date.now() - 5 * 60 * 60_000).toISOString() })
+          ]
+        }
+      };
+      renderHome();
+      expect(screen.queryByRole("heading", { name: /Your video consultation/ })).not.toBeInTheDocument();
+    });
+  });
+
   it("still says nothing is scheduled when the request succeeded with no bookings", () => {
     renderHome();
     expect(screen.getByText("No upcoming care scheduled")).toBeInTheDocument();
@@ -159,11 +208,11 @@ describe("client Home: reachable and readable without a mouse", () => {
   it("makes a booking card a button the keyboard can reach, with the rating button separate from it", async () => {
     const user = userEvent.setup();
     state.upcoming = {
-      data: { bookings: [{ id: "b1", status: "scheduled", scheduledAt: null, isTelemedicine: true, feedback: [], service: { name: "Consultation" } }] }
+      data: { bookings: [{ id: "b1", status: "scheduled", scheduledAt: null, isTelemedicine: false, feedback: [], service: { name: "Home visit" } }] }
     };
     renderHome();
 
-    const card = screen.getByRole("button", { name: /Consultation/ });
+    const card = screen.getByRole("button", { name: /Home visit/ });
     card.focus();
     expect(card).toHaveFocus();
     await user.keyboard("{Enter}");

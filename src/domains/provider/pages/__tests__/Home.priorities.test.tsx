@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+vi.mock("../../../../shared/hooks/useTelemedicine", () => ({ useTelemedicinePolicy: () => ({ data: { joinWindowBeforeMinutes: 10 } }) }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/hooks/useLocationAccess", () => ({ useLocationAccess: () => ({ isGranted: false }) }));
 vi.mock("../../../../shared/hooks/useLiveLocationPublisher", () => ({ useLiveLocationPublisher: () => undefined }));

@@ -18,6 +18,7 @@ import Drawer from "@mui/material/Drawer";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
+import { useJoinFromLink } from "../../../shared/hooks/useJoinFromLink";
 import { useBookingDetail, useCancelBookingMutation, useRerouteBookingMutation } from "../../../shared/hooks/useBookings";
 import { useReportNoShowMutation, useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { useAuth } from "../../../shared/hooks/useAuth";
@@ -77,6 +78,9 @@ const BookingDetailPage = () => {
   }, []);
 
   const booking = detailQuery.data;
+
+  useJoinFromLink(booking, policyQuery.data?.joinWindowBeforeMinutes, () => setCallOpen(true));
+
   const rerouteEligible = Boolean(booking && canConfirmFacilityReroute(booking));
   const alternativeFacilitiesQuery = useQuery({
     queryKey: ["bookings", "reroute-facilities", booking?.id, booking?.facilityId, booking?.service?.id, booking?.lat, booking?.lng],

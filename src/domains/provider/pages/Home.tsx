@@ -7,6 +7,9 @@ import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookin
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
 import { WidgetError } from "../../../shared/components/WidgetError";
+import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
 import { ProviderFacilityAffiliation } from "../components/ProviderFacilityAffiliation";
 
 import { Card } from "../../../shared/components/Card";
@@ -268,6 +271,11 @@ const ProviderHome = () => {
     (upcomingList?.meta?.page?.total ?? upcomingListed.length) - (upcomingListed.length - upcomingBookings.length)
   );
 
+  const policyQuery = useTelemedicinePolicy();
+  const nextConsultation = upcomingBookings.find(
+    (b) => b.isTelemedicine && b.status === "scheduled" && !hasConsultationEnded(b.scheduledAt, b.estimateDurationMinutes)
+  );
+
   const historyBookings = historyList?.bookings ?? [];
   const financialsVisible = providerFinancialsAreVisible(profile);
 
@@ -335,6 +343,16 @@ const ProviderHome = () => {
               ))}
             </ul>
           </section>
+        )}
+
+        {nextConsultation && (
+          <NextConsultationCard
+            booking={nextConsultation}
+            withName={nextConsultation.client?.fullName}
+            joinTo={`/pro/telemedicine?join=${nextConsultation.id}`}
+            detailsTo={`/pro/bookings/${nextConsultation.id}`}
+            joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+          />
         )}
 
         {/* Live Operations */}

@@ -28,6 +28,9 @@ import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/util
 import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
 import { useWalletAccount } from "../../../shared/hooks/useWallet";
+import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import { HomeCarePaymentActions } from "../components/HomeCarePaymentActions";
@@ -175,6 +178,13 @@ const ClientHome = () => {
     { enabled: Boolean(user?.id) }
   ) as { data?: { bookings?: Booking[] }, isLoading: boolean, isError?: boolean, refetch: () => unknown };
   const upcomingList = upcomingQuery.data;
+  const policyQuery = useTelemedicinePolicy();
+  // The soonest booked video consultation that has not finished: it gets its own card with a Join button, and is
+  // not repeated in the list under it.
+  const nextConsultation = (upcomingList?.bookings ?? []).find(
+    (b) => b.isTelemedicine && b.status === "scheduled" && !hasConsultationEnded(b.scheduledAt, b.estimateDurationMinutes)
+  );
+  const otherUpcoming = (upcomingList?.bookings ?? []).filter((b) => b.id !== nextConsultation?.id);
 
   // A payment that arrived for an appointment that could not be honoured. Surfaced above
   // everything else because the client has paid and, without this, has no way of knowing
@@ -491,6 +501,17 @@ const ClientHome = () => {
 
           {/* The first question a client has is "when is my next appointment?", so it comes before the
               ways to book a new one. */}
+          {nextConsultation && (
+            <NextConsultationCard
+              booking={nextConsultation}
+              withName={nextConsultation.provider?.fullName}
+              joinTo={`/app/bookings/${nextConsultation.id}?join=1`}
+              detailsTo={`/app/bookings/${nextConsultation.id}`}
+              joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+            />
+          )}
+
+          {(!nextConsultation || otherUpcoming.length > 0 || upcomingQuery.isError) && (
           <section aria-labelledby="upcoming-heading" className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 id="upcoming-heading" className="text-base font-semibold text-slate-900">Your next appointments</h2>
@@ -501,8 +522,8 @@ const ClientHome = () => {
             <div className="space-y-2">
               {upcomingQuery.isError && !upcomingList ? (
                 <WidgetError what="your upcoming appointments" onRetry={() => void upcomingQuery.refetch()} />
-              ) : upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
-                upcomingList.bookings.slice(0, 3).map((b) => (
+              ) : otherUpcoming.length > 0 ? (
+                otherUpcoming.slice(0, 3).map((b) => (
                   <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
                 ))
               ) : (
@@ -512,6 +533,7 @@ const ClientHome = () => {
               )}
             </div>
           </section>
+          )}
 
           <section aria-label="Choose your care" className="border-y border-slate-200 py-4">
             <h2 className="mb-3 text-base font-semibold text-slate-900">How would you like to receive care?</h2>
