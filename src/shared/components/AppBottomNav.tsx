@@ -35,7 +35,7 @@ export const AppBottomNav = ({ items }: AppBottomNavProps) => {
                                 </span>
                             )}
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider leading-none">
+                        <span className="block max-w-full truncate px-1 text-center text-[11px] font-semibold leading-none">
                             {item.label}
                         </span>
                     </NavLink>
