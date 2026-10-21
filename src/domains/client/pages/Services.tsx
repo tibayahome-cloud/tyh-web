@@ -31,7 +31,7 @@ import maternityImg from "../../../assets/images/telemedicine/maternity-care.web
 import chronicImg from "../../../assets/images/telemedicine/chronic-disease-care.webp";
 import checkupImg from "../../../assets/images/telemedicine/general-consultation.webp";
 import equipmentImg from "../../../assets/images/telemedicine/medication-review.webp";
-import { serviceImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
+import { photoForService, serviceImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
 
 type Envelope<T> = {
   data: T;
@@ -75,8 +75,16 @@ const CARE_IMAGES = {
   equipment: equipmentImg
 } as const;
 
-const serviceImage = (serviceName: string, categoryName: string | null | undefined) =>
-  CARE_IMAGES[serviceImageKey(serviceName, categoryName)];
+// Photos made for one service are dropped in src/assets/images/services/<service key>.webp (see the README there) and
+// are used automatically; a service without one gets the closest stock photo.
+const SERVICE_PHOTOS: Record<string, string> = Object.fromEntries(
+  Object.entries(import.meta.glob("../../../assets/images/services/*.{webp,jpg,jpeg,png}", { eager: true, import: "default" })).map(
+    ([path, url]) => [path.split("/").pop()!.replace(/\.[^.]+$/, ""), url as string]
+  )
+);
+
+const serviceImage = (service: { key: string; name: string; category?: { name: string } | null }) =>
+  photoForService(service.key, SERVICE_PHOTOS, CARE_IMAGES[serviceImageKey(service.name, service.category?.name)]);
 
 const ServicesPage = () => {
   const navigate = useNavigate();
@@ -212,7 +220,7 @@ const ServicesPage = () => {
                 {filteredServices.map((service) => (
                   <li key={service.id} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
                     <Link to={`/app/services/${service.id}`} aria-label={`${service.name}, details`} className="relative block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-tiba-blue">
-                      <img src={serviceImage(service.name, service.category?.name)} alt="" loading="lazy" className="aspect-[16/9] w-full object-cover" />
+                      <img src={serviceImage(service)} alt="" loading="lazy" className="aspect-[16/9] w-full object-cover" />
                       {service.is_emergency_capable && (
                         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white">
                           <Zap aria-hidden="true" size={12} /> Urgent

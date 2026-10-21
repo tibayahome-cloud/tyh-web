@@ -1,5 +1,7 @@
 export type CatalogService = {
   id: string;
+  /** Stable name of the service, also the name of its photo file. */
+  key: string;
   name: string;
   description?: string | null;
   base_price_cents: number;
@@ -54,6 +56,13 @@ export const filterServices = (services: CatalogService[], filters: CatalogFilte
 /** "KES 1,500": the unit spelled out and no empty cents, the same on every device. */
 export const formatPrice = (cents: number): string =>
   cents > 0 ? `KES ${Math.round(cents / 100).toLocaleString("en-US")}` : "Quote on request";
+
+/** The photo file for a service: a file named after the service key wins; otherwise the best-matching stock photo. */
+export const photoForService = (
+  serviceKey: string,
+  photosByKey: Record<string, string>,
+  fallback: string
+): string => photosByKey[serviceKey] ?? fallback;
 
 export type CareImageKey =
   | "nurse" | "nurse-2" | "nurse-3" | "elderly" | "therapy" | "physio" | "occupational" | "speech" | "lab" | "scan"
