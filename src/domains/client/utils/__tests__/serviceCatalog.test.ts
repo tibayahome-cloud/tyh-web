@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { serviceImageKey, careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
+import { photoForService, serviceImageKey, careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
 
 const svc = (overrides: Partial<CatalogService> = {}): CatalogService => ({
   id: "s",
+  key: "wound_care_home",
   name: "Wound dressing",
   description: null,
   base_price_cents: 150000,
@@ -105,5 +106,12 @@ describe("serviceImageKey: the photo follows the service, not just its category"
     const keys = ["24-Hour Nursing Care", "Day Nurse Care (8 Hours)", "Night Nurse Care (12 Hours)", "Weekly Nursing Care", "Monthly Nursing Care", "Nurse Visit at Home"].map((n) => serviceImageKey(n, cat));
     expect(new Set(keys).size).toBeGreaterThan(1);
     expect(serviceImageKey("Weekly Nursing Care", cat)).toBe(serviceImageKey("Weekly Nursing Care", cat));
+  });
+});
+
+describe("photoForService", () => {
+  it("uses the photo made for the service when there is one, and the stock photo otherwise", () => {
+    expect(photoForService("ecg_home", { ecg_home: "/ecg.webp" }, "/stock.png")).toBe("/ecg.webp");
+    expect(photoForService("speech_therapy", { ecg_home: "/ecg.webp" }, "/stock.png")).toBe("/stock.png");
   });
 });
