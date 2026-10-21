@@ -1,9 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import classNames from "classnames";
 import { Link, useNavigate } from "react-router-dom";
 import { Clock, Search, SlidersHorizontal, Zap, X } from "lucide-react";
-import Drawer from "@mui/material/Drawer";
 
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
@@ -31,7 +29,22 @@ import maternityImg from "../../../assets/images/telemedicine/maternity-care.web
 import chronicImg from "../../../assets/images/telemedicine/chronic-disease-care.webp";
 import checkupImg from "../../../assets/images/telemedicine/general-consultation.webp";
 import equipmentImg from "../../../assets/images/telemedicine/medication-review.webp";
-import { photoForService, serviceImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
+import { ServiceFilterSheet } from "../components/ServiceFilterSheet";
+import {
+  CARE_GROUPS,
+  NO_FILTERS,
+  PRICE_BANDS,
+  activeFilterCount,
+  filterServices,
+  formatPrice,
+  groupTiles,
+  isHomeService,
+  photoForService,
+  serviceImageKey,
+  type CareGroupId,
+  type CatalogFilters,
+  type CatalogService
+} from "../utils/serviceCatalog";
 
 type Envelope<T> = {
   data: T;
@@ -86,37 +99,48 @@ const SERVICE_PHOTOS: Record<string, string> = Object.fromEntries(
 const serviceImage = (service: { key: string; name: string; category?: { name: string } | null }) =>
   photoForService(service.key, SERVICE_PHOTOS, CARE_IMAGES[serviceImageKey(service.name, service.category?.name)]);
 
+const GROUP_IMAGES: Record<CareGroupId, string> = {
+  nursing: nurseImg,
+  elderly: elderlyImg,
+  therapy: therapyImg,
+  checkups: labImg,
+  plans: homeImg,
+  other: home2Img
+};
+
+const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }) => (
+  <span className="inline-flex min-h-[36px] items-center gap-1 rounded-full bg-sky-50 pl-3 pr-1 text-sm font-medium text-slate-900 ring-1 ring-sky-200">
+    {label}
+    <button
+      type="button"
+      onClick={onRemove}
+      aria-label={`Remove filter ${label}`}
+      className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+    >
+      <X aria-hidden="true" size={14} />
+    </button>
+  </span>
+);
+
 const ServicesPage = () => {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [emergencyOnly, setEmergencyOnly] = useState(false);
-  const [minPrice, setMinPrice] = useState<number | "">("");
-  const [maxPrice, setMaxPrice] = useState<number | "">("");
+  const [filters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   const servicesQuery = useServices();
   const services = servicesQuery.data;
 
-  const tiles = useMemo(() => categoryTiles(services ?? []), [services]);
-  const filteredServices = useMemo(
-    () => filterServices(services ?? [], { search, categoryId: category, emergencyOnly, minPrice, maxPrice }),
-    [services, search, category, emergencyOnly, minPrice, maxPrice]
-  );
+  const groups = useMemo(() => groupTiles(services ?? []), [services]);
+  const filteredServices = useMemo(() => filterServices(services ?? [], filters), [services, filters]);
+  const filterCount = activeFilterCount(filters);
 
   if (servicesQuery.isLoading) {
     return <Loading fullHeight />;
   }
 
-  const resetFilters = () => {
-    setSearch("");
-    setCategory("all");
-    setMinPrice("");
-    setMaxPrice("");
-    setEmergencyOnly(false);
-  };
+  const resetFilters = () => setFilters(NO_FILTERS);
 
   const openBookingDialog = (serviceId: string) => {
     setSelectedServiceId(serviceId);
@@ -128,8 +152,6 @@ const ServicesPage = () => {
     navigate(`/app/bookings/${bookingId}`);
   };
 
-  const activeFiltersCount = [emergencyOnly, minPrice !== "", maxPrice !== ""].filter(Boolean).length;
-
   return (
     <AppLayout fullWidth showHeader={false} disablePadding>
       <div className="flex flex-col gap-4 pb-20">
@@ -137,19 +159,6 @@ const ServicesPage = () => {
           <div>
             <h1 className="type-h2 text-slate-900">Care Marketplace</h1>
           </div>
-          <button
-            type="button"
-            aria-label="Filters"
-            onClick={() => setFilterDrawerOpen(true)}
-            className="relative flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-all active:scale-95"
-          >
-            <SlidersHorizontal size={18} />
-            {activeFiltersCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white shadow-lg">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
         </div>
 
         <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
@@ -162,35 +171,48 @@ const ServicesPage = () => {
             </div>
           )}
 
-          <section className="flex flex-col gap-3 sm:flex-row">
-            <label className="relative block flex-1">
-              <span className="sr-only">Search services</span>
-              <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search for services (e.g. Nursing, Physiotherapy)"
-                className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-              />
-            </label>
-
-            {tiles.length > 0 && (
-              <label className="block sm:w-72">
-                <span className="sr-only">Kind of care</span>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-                >
-                  <option value="all">All kinds of care ({services?.length ?? 0})</option>
-                  {tiles.map((tile) => (
-                    <option key={tile.id} value={tile.id}>
-                      {tile.name} ({tile.count})
-                    </option>
-                  ))}
-                </select>
+          <section className="space-y-3">
+            <div className="flex gap-2">
+              <label className="relative block flex-1">
+                <span className="sr-only">Search services</span>
+                <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="search"
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                  placeholder="Search for services (e.g. Nursing, Physiotherapy)"
+                  className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
+                />
               </label>
+              <button
+                type="button"
+                onClick={() => setFilterSheetOpen(true)}
+                aria-haspopup="dialog"
+                className="inline-flex h-12 shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+              >
+                <SlidersHorizontal aria-hidden="true" size={18} />
+                Filters
+                {filterCount > 0 && (
+                  <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-tiba-blue px-1.5 text-xs font-semibold text-white">
+                    {filterCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {filterCount > 0 && (
+              <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+                {filters.groupId !== "all" && (
+                  <FilterChip label={CARE_GROUPS.find((g) => g.id === filters.groupId)?.name ?? ""} onRemove={() => setFilters((f) => ({ ...f, groupId: "all" }))} />
+                )}
+                {filters.urgentOnly && <FilterChip label="Urgent care" onRemove={() => setFilters((f) => ({ ...f, urgentOnly: false }))} />}
+                {filters.priceBand !== "any" && (
+                  <FilterChip label={PRICE_BANDS.find((b) => b.id === filters.priceBand)?.label ?? ""} onRemove={() => setFilters((f) => ({ ...f, priceBand: "any" }))} />
+                )}
+                <button type="button" onClick={() => setFilters((f) => ({ ...NO_FILTERS, search: f.search }))} className="min-h-[44px] px-2 text-sm font-semibold text-tiba-blue underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue">
+                  Clear all
+                </button>
+              </div>
             )}
           </section>
 
@@ -242,107 +264,16 @@ const ServicesPage = () => {
         </div>
       </div>
 
-      {/* FILTER DRAWER */}
-      <Drawer
-        anchor="right"
-        open={filterDrawerOpen}
-        onClose={() => setFilterDrawerOpen(false)}
-        PaperProps={{
-          sx: { width: { xs: "100%", sm: 400 }, borderRadius: { xs: 0, sm: "40px 0 0 40px" } }
-        }}
-      >
-        <div className="flex h-full flex-col p-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black text-slate-900">Filters</h2>
-            <button
-              onClick={() => setFilterDrawerOpen(false)}
-              className="h-10 w-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-all"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="mt-10 flex-1 space-y-8">
-            {/* EMERGENCY TOGGLE */}
-            <div className="space-y-4">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Urgency</p>
-              <button
-                onClick={() => setEmergencyOnly(!emergencyOnly)}
-                className={classNames(
-                  "flex w-full items-center justify-between rounded-3xl border p-5 transition-all",
-                  emergencyOnly
-                    ? "border-rose-500 bg-rose-50/50 shadow-lg ring-1 ring-rose-500"
-                    : "border-slate-100 bg-slate-50/50 grayscale hover:grayscale-0"
-                )}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={classNames(
-                    "flex h-12 w-12 items-center justify-center rounded-2xl shadow-inner",
-                    emergencyOnly ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-400"
-                  )}>
-                    <Zap size={24} fill={emergencyOnly ? "currentColor" : "none"} />
-                  </div>
-                  <div className="text-left">
-                    <p className={classNames("font-black", emergencyOnly ? "text-rose-900" : "text-slate-900")}>Emergency Only</p>
-                    <p className="text-[10px] font-bold text-slate-500">Show only instant response services</p>
-                  </div>
-                </div>
-                <div className={classNames(
-                  "h-6 w-10 rounded-full transition-all flex items-center px-1",
-                  emergencyOnly ? "bg-rose-500" : "bg-slate-200"
-                )}>
-                  <div className={classNames(
-                    "h-4 w-4 rounded-full bg-white shadow-sm transition-all",
-                    emergencyOnly ? "translate-x-4" : "translate-x-0"
-                  )} />
-                </div>
-              </button>
-            </div>
-
-            {/* PRICE RANGE */}
-            <div className="space-y-4">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Budget (KES)</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 pl-1">Min Price</label>
-                  <input
-                    type="number"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : "")}
-                    placeholder="0"
-                    className="w-full h-14 rounded-2xl bg-slate-50 border-slate-100 px-5 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 transition-all border shadow-inner"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 pl-1">Max Price</label>
-                  <input
-                    type="number"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : "")}
-                    placeholder="Any"
-                    className="w-full h-14 rounded-2xl bg-slate-50 border-slate-100 px-5 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 transition-all border shadow-inner"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-10 flex gap-4 pt-8 border-t border-slate-100">
-            <button
-              onClick={resetFilters}
-              className="h-14 flex-1 rounded-2xl bg-slate-50 text-[11px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-100 active:scale-95"
-            >
-              Reset
-            </button>
-            <button
-              onClick={() => setFilterDrawerOpen(false)}
-              className="h-14 flex-[2] rounded-2xl bg-slate-900 text-[11px] font-black uppercase tracking-widest text-white shadow-xl transition-all hover:bg-brand-600 active:scale-95"
-            >
-              Apply Filters
-            </button>
-          </div>
-        </div>
-      </Drawer>
+      <ServiceFilterSheet
+        open={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        filters={filters}
+        onApply={setFilters}
+        groups={groups}
+        services={services ?? []}
+        imageForGroup={(id) => GROUP_IMAGES[id]}
+        allImage={homeImg}
+      />
 
       <BookingRequestDialog
         open={bookingDialogOpen}

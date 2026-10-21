@@ -12,43 +12,80 @@ export type CatalogService = {
   category?: { id: string; name: string } | null;
 };
 
-export type CategoryTile = { id: string; name: string; count: number };
-
 /**
  * This page is for care that comes to you (nursing, elderly care, ambulance and the like). Video consultations have
  * their own Telemedicine screen, so a service that exists only as a remote consultation is not listed here.
  */
 export const isHomeService = (service: CatalogService): boolean => service.active && !service.remote_capable;
 
-/** One tile per kind of care that has something to book, biggest first, so an empty category never shows. */
-export const categoryTiles = (services: CatalogService[]): CategoryTile[] => {
-  const byId = new Map<string, CategoryTile>();
-  services.forEach((service) => {
-    const category = service.category;
-    if (!category) return;
-    const tile = byId.get(category.id) ?? { id: category.id, name: category.name, count: 0 };
-    tile.count += 1;
-    byId.set(category.id, tile);
-  });
-  return [...byId.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+export type CareGroupId = "nursing" | "elderly" | "therapy" | "checkups" | "plans" | "other";
+
+export const CARE_GROUPS: Array<{ id: CareGroupId; name: string }> = [
+  { id: "nursing", name: "Nursing & doctor visits" },
+  { id: "elderly", name: "Elderly & palliative care" },
+  { id: "therapy", name: "Therapy & rehabilitation" },
+  { id: "checkups", name: "Check-ups & diagnostics" },
+  { id: "plans", name: "Care plans & memberships" },
+  { id: "other", name: "Other care" }
+];
+
+/**
+ * The ten or so catalogue categories are too many to choose from, so clients see five plain groups. The catalogue keeps
+ * its own categories; this only decides which group a category is shown under, by the words in its name.
+ */
+export const careGroupOf = (categoryName: string | null | undefined): CareGroupId => {
+  const name = (categoryName ?? "").toLowerCase();
+  if (/plan|membership|subscription|tibacare/.test(name)) return "plans";
+  if (/elder|assisted|palliative|oncolog/.test(name)) return "elderly";
+  if (/therapy|rehab/.test(name)) return "therapy";
+  if (/diagnos|corporate|executive|monitor|lab/.test(name)) return "checkups";
+  if (/nurs|caregiver|doctor|consult|post-hospital|recovery/.test(name)) return "nursing";
+  return "other";
 };
+
+export type GroupTile = { id: CareGroupId; name: string; count: number };
+
+/** One entry per group that has something to book, in a fixed, familiar order. */
+export const groupTiles = (services: CatalogService[]): GroupTile[] => {
+  const counts = new Map<CareGroupId, number>();
+  services.forEach((service) => {
+    const id = careGroupOf(service.category?.name);
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  });
+  return CARE_GROUPS.filter((group) => counts.has(group.id)).map((group) => ({ ...group, count: counts.get(group.id) ?? 0 }));
+};
+
+export type PriceBand = "any" | "low" | "mid" | "high";
+
+export const PRICE_BANDS: Array<{ id: PriceBand; label: string; min: number; max: number }> = [
+  { id: "any", label: "Any price", min: 0, max: Infinity },
+  { id: "low", label: "Under KES 2,000", min: 0, max: 199_999 },
+  { id: "mid", label: "KES 2,000 to 5,000", min: 200_000, max: 500_000 },
+  { id: "high", label: "Over KES 5,000", min: 500_001, max: Infinity }
+];
 
 export type CatalogFilters = {
   search: string;
-  categoryId: string;
-  emergencyOnly: boolean;
-  minPrice: number | "";
-  maxPrice: number | "";
+  groupId: CareGroupId | "all";
+  urgentOnly: boolean;
+  priceBand: PriceBand;
 };
+
+export const NO_FILTERS: CatalogFilters = { search: "", groupId: "all", urgentOnly: false, priceBand: "any" };
+
+/** How many sheet filters are on (the search box is separate), for the badge on the Filters button. */
+export const activeFilterCount = (filters: CatalogFilters): number =>
+  [filters.groupId !== "all", filters.urgentOnly, filters.priceBand !== "any"].filter(Boolean).length;
 
 export const filterServices = (services: CatalogService[], filters: CatalogFilters): CatalogService[] => {
   const needle = filters.search.trim().toLowerCase();
+  const band = PRICE_BANDS.find((entry) => entry.id === filters.priceBand) ?? PRICE_BANDS[0];
   return services.filter((service) => {
-    if (filters.categoryId !== "all" && service.category?.id !== filters.categoryId) return false;
-    if (filters.emergencyOnly && !service.is_emergency_capable) return false;
+    if (filters.groupId !== "all" && careGroupOf(service.category?.name) !== filters.groupId) return false;
+    if (filters.urgentOnly && !service.is_emergency_capable) return false;
     if (needle && !`${service.name} ${service.description ?? ""} ${service.category?.name ?? ""}`.toLowerCase().includes(needle)) return false;
-    if (filters.minPrice !== "" && service.base_price_cents < Number(filters.minPrice) * 100) return false;
-    if (filters.maxPrice !== "" && service.base_price_cents > Number(filters.maxPrice) * 100) return false;
+    // A service priced on request (zero) is never hidden by a price band.
+    if (service.base_price_cents > 0 && (service.base_price_cents < band.min || service.base_price_cents > band.max)) return false;
     return true;
   });
 };
