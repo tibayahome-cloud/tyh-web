@@ -188,7 +188,7 @@ const ProviderSelfCarePage = () => {
     createThread
       .mutateAsync({
         scope: "provider_support",
-        title: `Self-care alert ${alert.id.slice(0, 6)}`,
+        title: "Self-care alert",
         participants: [
           { userId: user.id, roleHint: "provider" },
           { userId: alert.clientUserId, roleHint: "client" }

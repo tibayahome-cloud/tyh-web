@@ -248,7 +248,7 @@ const ProviderHome = () => {
         dismissBroadcast(bookingId);
         toast.showToast({
           title: "Booking Accepted",
-          description: `Booking #${booking.id.slice(0, 6)} is now active.`,
+          description: "Your booking is now active.",
           variant: "success"
         });
         navigate(`/pro/bookings/${booking.id}`);

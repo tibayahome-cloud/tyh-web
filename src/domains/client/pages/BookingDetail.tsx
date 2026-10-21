@@ -40,6 +40,7 @@ import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils
 import { BOOKING_STATUS_TELEMEDICINE_UNATTENDED } from "../../../shared/schemas/telemedicine";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { canConfirmFacilityReroute } from "../utils/reroute";
+import { bookingReference } from "../../../shared/utils/bookingReference";
 
 const TRACKING_STATUSES = ["accepted", "en_route", "nearby", "arrived", "in_service"];
 
@@ -285,8 +286,16 @@ const BookingDetailPage = () => {
       <div className="space-y-3 border-b border-slate-100 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Reference</p>
-            <p className="font-mono text-sm font-bold text-slate-700">#{booking.id.slice(0, 8).toUpperCase()}</p>
+            <p className="text-sm text-slate-700">
+              Reference <span className="font-mono font-semibold text-slate-900">{bookingReference(booking.id)}</span>
+              <button
+                type="button"
+                onClick={() => void navigator.clipboard?.writeText(bookingReference(booking.id)).catch(() => undefined)}
+                className="ml-2 min-h-[44px] rounded-lg px-2 text-sm font-semibold text-tiba-blue underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+              >
+                Copy
+              </button>
+            </p>
           </div>
           <span className={classNames(
             "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
@@ -457,7 +466,7 @@ const BookingDetailPage = () => {
         ? { label: "Cancel this appointment", onClick: () => setCancelAppointmentDialogOpen(true), loading: false }
         : null;
   // "My doctor did not join" is offered only once the call time has passed, you were in the call and the doctor was not.
-  const noShow = noShowReportState(booking, "client", Date.now());
+  const noShow = noShowReportState(booking, "client", Date.now(), policyQuery.data?.noShowGraceMinutes);
   const videoPage = booking.isTelemedicine ? (
     <VideoConsultationDetails
       booking={booking}

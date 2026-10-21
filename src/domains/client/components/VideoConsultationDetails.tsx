@@ -7,6 +7,7 @@ import type { Booking } from "../../../shared/schemas/booking";
 import { consultationDateLabel, consultationTimeRange, describeTimezone, joinOpensAt } from "../../../shared/utils/consultationTime";
 import { describeStart } from "../../../shared/utils/joinCountdown";
 import { isWithinJoinWindow } from "../../../shared/utils/telemedicine";
+import { bookingReference } from "../../../shared/utils/bookingReference";
 
 type Props = {
   booking: Booking;
@@ -67,7 +68,7 @@ export const VideoConsultationDetails = ({
   const countdown = describeStart(booking.scheduledAt, now);
   const joinOpen = isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, now, joinWindowBeforeMinutes);
   const opensAt = joinOpensAt(booking.scheduledAt, joinWindowBeforeMinutes, timezone);
-  const reference = booking.id.slice(0, 8).toUpperCase();
+  const reference = bookingReference(booking.id);
   const doctor = booking.provider;
 
   return (

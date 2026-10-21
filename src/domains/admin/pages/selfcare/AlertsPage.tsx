@@ -130,7 +130,7 @@ const AdminSelfCareAlertsPage = () => {
     createThread
       .mutateAsync({
         scope: "admin",
-        title: `Self-care alert ${alert.id.slice(0, 6)}`,
+        title: "Self-care alert",
         participants: [
           { userId: user.id, roleHint: "admin" },
           { userId: targetId, roleHint: target }

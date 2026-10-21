@@ -51,6 +51,7 @@ import {
   groupSlotsByFacilityLocalDate,
   TELEMEDICINE_DEFAULT_TIMEZONE
 } from "../../../shared/utils/telemedicine";
+import { bookingReference } from "../../../shared/utils/bookingReference";
 
 type TelemedicineRequestDialogProps = {
   open: boolean;
@@ -960,7 +961,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     <p className="text-sm text-slate-600">Waiting for M-Pesa confirmation...</p>
                     <MpesaPaymentInstructions
                       amountCents={selectedFacility.priceCents}
-                      accountNumber={hold?.bookingId?.slice(0, 8).toUpperCase() ?? "TELEMED"}
+                      accountNumber={(hold?.bookingId ? bookingReference(hold.bookingId) : "TELEMED")}
                     />
                   </div>
                 )}

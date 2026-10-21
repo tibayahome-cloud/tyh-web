@@ -11,6 +11,7 @@ import { FormField } from "../../../shared/components/FormField";
 import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { currentLegalDocumentPayload } from "../../../shared/constants/legal";
+import { bookingReference } from "../../../shared/utils/bookingReference";
 
 type GuestBookingDialogProps = {
   open: boolean;
@@ -139,7 +140,7 @@ export const GuestBookingDialog = ({
               </p>
               {bookingId && (
                 <p className="text-sm text-slate-500">
-                  Booking ID: <span className="font-mono">{bookingId.slice(0, 8)}</span>
+                  Booking ID: <span className="font-mono">{bookingReference(bookingId)}</span>
                 </p>
               )}
               <Button onClick={handleClose} className="mt-6">
