@@ -76,9 +76,14 @@ describe("PlacePicker", () => {
   });
 
   it("searches by name, lists matches, and picks one with the keyboard", async () => {
+    const suggestion = (primary: string, place: { name: string; coords: { lat: number; lng: number } }) => ({
+      primary,
+      secondary: "Kilimani, Nairobi",
+      resolve: async () => place
+    });
     geo.search.mockResolvedValue([
-      { name: "Yaya Centre, Kilimani, Nairobi", coords: { lat: -1.29, lng: 36.79 } },
-      { name: "Yaya Towers, Kilimani, Nairobi", coords: { lat: -1.3, lng: 36.8 } }
+      suggestion("Yaya Centre", { name: "Yaya Centre, Kilimani, Nairobi", coords: { lat: -1.29, lng: 36.79 } }),
+      suggestion("Yaya Towers", { name: "Yaya Towers, Kilimani, Nairobi", coords: { lat: -1.3, lng: 36.8 } })
     ]);
     const onChange = vi.fn();
     render(<PlacePicker value={null} onChange={onChange} />);
@@ -90,7 +95,9 @@ describe("PlacePicker", () => {
     fireEvent.keyDown(box, { key: "ArrowDown" });
     fireEvent.keyDown(box, { key: "Enter" });
 
-    expect(onChange).toHaveBeenCalledWith({ name: "Yaya Towers, Kilimani, Nairobi", coords: { lat: -1.3, lng: 36.8 } }, "search");
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith({ name: "Yaya Towers, Kilimani, Nairobi", coords: { lat: -1.3, lng: 36.8 } }, "search")
+    );
   });
 
   it("says when nothing matches", async () => {
