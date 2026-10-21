@@ -9,6 +9,7 @@ import { ApiErrorBanner } from "../../../../shared/components/ApiErrorBanner";
 import { StickyFilterBar } from "../../../../shared/components/StickyFilterBar";
 import { TechnicalIssueReviewList } from "../../../../shared/components/TechnicalIssueReviewList";
 import { useToast } from "../../../../shared/components/ToastProvider";
+import { TimeSlotPicker } from "../../../../shared/components/TimeSlotPicker";
 import {
   useAssignProviderMutation,
   useAssignmentQueue,
@@ -18,7 +19,6 @@ import {
 } from "../../../../shared/hooks/useTelemedicine";
 import { useBookingList } from "../../../../shared/hooks/useBookings";
 import {
-  facilityLocalToUtcIso,
   formatTelemedicineDateTime,
   splitTelemedicineBookings
 } from "../../../../shared/utils/telemedicine";
@@ -78,25 +78,17 @@ const AssignProviderAction = ({ booking }: { booking: TelemedicineAssignmentBook
   );
 };
 
-const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+const OfferNewTimeAction = ({ booking }: { booking: TelemedicineAssignmentBooking }) => {
   const toast = useToast();
-  const [proposedStartAt, setProposedStartAt] = useState("");
+  const [proposedStartAt, setProposedStartAt] = useState<string | null>(null);
   const [offerError, setOfferError] = useState<ClassifiedApiError | null>(null);
   const proposeMutation = useProposeRebookingMutation();
 
   const handleOffer = async () => {
-    if (!proposedStartAt || !timezone) return;
+    if (!proposedStartAt) return;
     setOfferError(null);
-    // datetime-local carries no zone. Resolving it against the browser's would be right only
-    // for an operator who happens to be in the facility's timezone, and silently wrong -- with
-    // no error to notice -- for one who is not. The zone comes from the telemedicine policy.
-    const isoWithZone = facilityLocalToUtcIso(proposedStartAt, timezone);
-    if (!isoWithZone) {
-      setOfferError({ category: "bad_request", message: "That is not a valid date and time." });
-      return;
-    }
     try {
-      await proposeMutation.mutateAsync({ bookingId: booking.id, proposedStartAt: isoWithZone });
+      await proposeMutation.mutateAsync({ bookingId: booking.id, proposedStartAt });
       toast.showToast({ title: "New time offered to the client", variant: "success" });
     } catch (error) {
       setOfferError(classifyApiError(error, "Unable to offer that time."));
@@ -104,31 +96,22 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
   };
 
   return (
-    <div className="flex flex-col items-stretch gap-2 sm:items-end">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="datetime-local"
-          value={proposedStartAt}
-          onChange={(event) => setProposedStartAt(event.target.value)}
-          aria-label={`Choose a replacement time for ${booking.serviceName ?? "consultation"} with ${booking.clientFullName ?? "client"}`}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
-        />
-        <Button
-          size="sm"
-          // Held back until the policy resolves rather than falling back to the browser's zone:
-          // a guessed timezone books a real appointment at the wrong hour.
-          disabled={!proposedStartAt || !timezone}
-          loading={proposeMutation.isPending}
-          onClick={handleOffer}
-        >
-          Offer new time
-        </Button>
-      </div>
-      <p className="text-[11px] text-slate-500 sm:text-right">
-        {timezone
-          ? `Times are in the facility's timezone (${timezone}). The client is asked to accept, and is not charged again.`
-          : "Loading the facility's timezone…"}
-      </p>
+    <div className="flex w-full flex-col items-stretch gap-3 sm:max-w-md">
+      <TimeSlotPicker
+        bookingId={booking.id}
+        value={proposedStartAt}
+        onChange={setProposedStartAt}
+        label={`New time for ${booking.clientFullName ?? "the client"}`}
+      />
+      <p className="text-sm text-slate-600">The client is asked to accept, and is not charged again.</p>
+      <Button
+        className="self-start"
+        disabled={!proposedStartAt}
+        loading={proposeMutation.isPending}
+        onClick={handleOffer}
+      >
+        Offer this time
+      </Button>
       {offerError && <ApiErrorBanner category={offerError.category} message={offerError.message} />}
     </div>
   );
@@ -178,20 +161,20 @@ const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssi
 // One action per row, chosen by the backend rather than guessed here. A booking whose slot
 // lapsed used to render an Assign button the API would always reject -- the operator saw a
 // provider they could pick and an error every time they picked one.
-const AssignmentRowAction = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+const AssignmentRowAction = ({ booking }: { booking: TelemedicineAssignmentBooking }) => {
   if (booking.recoveryState === "assignable") return <AssignProviderAction booking={booking} />;
-  if (booking.recoveryState === "needs_rebooking") return <OfferNewTimeAction booking={booking} timezone={timezone} />;
+  if (booking.recoveryState === "needs_rebooking") return <OfferNewTimeAction booking={booking} />;
   if (booking.recoveryState === "awaiting_client") {
-    return <span className="text-xs font-semibold text-slate-500">Awaiting client</span>;
+    return <span className="text-sm font-semibold text-slate-600">Awaiting client</span>;
   }
   return null;
 };
 
 const AssignmentQueueRow = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => (
-  <div className="grid grid-cols-1 gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-x-6">
+  <div className="grid grid-cols-1 gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] md:items-start md:gap-x-6">
     <AssignmentRowDetails booking={booking} timezone={timezone} />
     <div className="flex md:justify-end">
-      <AssignmentRowAction booking={booking} timezone={timezone} />
+      <AssignmentRowAction booking={booking} />
     </div>
   </div>
 );
@@ -287,13 +270,13 @@ const SummaryStat = ({
     // every poll tick would be noise, not information.
     <div
       role="group"
-      className={`rounded-xl border px-3 py-2 ${toneClass}`}
+      className={`rounded-xl border px-4 py-3 ${toneClass}`}
       aria-label={`${value} ${label}`}
     >
-      <p aria-hidden="true" className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
+      <p aria-hidden="true" className="text-sm font-medium">
         {label}
       </p>
-      <p aria-hidden="true" className="text-xl font-bold tabular-nums">
+      <p aria-hidden="true" className="text-2xl font-bold tabular-nums">
         {value}
       </p>
     </div>

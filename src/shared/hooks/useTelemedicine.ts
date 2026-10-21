@@ -22,7 +22,7 @@ import {
   reassignProvider,
   reviewTechnicalIssue
 } from "../libs/telemedicine";
-import { fetchRescheduleRequests } from "../libs/telemedicineOps";
+import { fetchRescheduleRequests, fetchRescheduleSlots } from "../libs/telemedicineOps";
 import type { TechnicalIssueCategory, TelemedicineHold } from "../schemas/telemedicine";
 import { bookingKeys } from "./useBookings";
 
@@ -300,5 +300,25 @@ export const useReassignTelemedicineProviderMutation = () => {
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
     }
+  });
+};
+
+/** How far ahead a replacement time can be chosen. */
+export const RESCHEDULE_LOOKAHEAD_DAYS = 14;
+
+const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+
+/**
+ * Open times for moving one consultation. The window starts at today's UTC date, which is never later than the
+ * facility's own date, and the server drops anything already past, so an early start only costs a few empty hours.
+ */
+export const useRescheduleSlots = (bookingId: string | null, options?: { enabled?: boolean }) => {
+  const start = isoDay(new Date());
+  const end = isoDay(new Date(Date.now() + RESCHEDULE_LOOKAHEAD_DAYS * 86_400_000));
+  return useQuery({
+    queryKey: ["telemedicine", "reschedule-slots", bookingId ?? "none", start],
+    queryFn: () => fetchRescheduleSlots(bookingId as string, start, end),
+    enabled: Boolean(bookingId) && (options?.enabled ?? true),
+    staleTime: 30_000
   });
 };

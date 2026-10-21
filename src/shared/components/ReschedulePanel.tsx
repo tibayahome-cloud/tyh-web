@@ -11,6 +11,7 @@ import {
   type RescheduleRequest
 } from "../libs/telemedicineOps";
 import { Button } from "./Button";
+import { TimeSlotPicker } from "./TimeSlotPicker";
 
 type Props = {
   bookingId: string;
@@ -47,7 +48,7 @@ const formatWhen = (iso: string | null) =>
  */
 export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Props) => {
   const queryClient = useQueryClient();
-  const [proposedAt, setProposedAt] = useState("");
+  const [proposedAt, setProposedAt] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -66,9 +67,9 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
   };
 
   const propose = useMutation({
-    mutationFn: () => proposeReschedule(bookingId, new Date(proposedAt).toISOString(), reason || undefined),
+    mutationFn: () => proposeReschedule(bookingId, proposedAt as string, reason || undefined),
     onSuccess: () => {
-      setProposedAt("");
+      setProposedAt(null);
       setReason("");
       setError(null);
       refresh();
@@ -153,15 +154,8 @@ export const ReschedulePanel = ({ bookingId, currentUserId, canReschedule }: Pro
       ) : (
         canReschedule && (
           <div className="mt-3 space-y-2">
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700">Propose a new time</span>
-              <input
-                type="datetime-local"
-                value={proposedAt}
-                onChange={(event) => setProposedAt(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              />
-            </label>
+            <p className="text-sm font-medium text-slate-700">Propose a new time</p>
+            <TimeSlotPicker bookingId={bookingId} value={proposedAt} onChange={setProposedAt} label="Proposed time" />
             <input
               type="text"
               value={reason}
