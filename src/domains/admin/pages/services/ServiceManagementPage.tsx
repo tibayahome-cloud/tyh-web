@@ -73,11 +73,11 @@ const ServiceManagementPage = () => {
               aria-checked={selected}
               onClick={() => chooseKind(key)}
               className={classNames(
-                "flex min-h-[72px] items-center gap-3 rounded-2xl border p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                selected ? "border-primary-600 bg-primary-50" : "border-slate-200 bg-white hover:bg-slate-50"
+                "flex min-h-[72px] items-center gap-3 rounded-2xl border p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
+                selected ? "border-tiba-blue bg-sky-50 ring-1 ring-tiba-blue" : "border-slate-200 bg-white hover:bg-slate-50"
               )}
             >
-              <span className={classNames("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", selected ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-700")}>
+              <span className={classNames("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", selected ? "bg-tiba-blue text-white" : "bg-slate-100 text-slate-700")}>
                 <Icon aria-hidden="true" size={22} />
               </span>
               <span className="min-w-0">
@@ -102,8 +102,8 @@ const ServiceManagementPage = () => {
               aria-selected={tab === entry.key}
               onClick={() => setTab(entry.key)}
               className={classNames(
-                "min-h-[40px] rounded-full border px-4 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                tab === entry.key ? "border-primary-200 bg-primary-50 text-primary-800" : "border-transparent text-slate-700 hover:text-primary-700"
+                "min-h-[40px] rounded-full border px-4 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
+                tab === entry.key ? "border-tiba-blue bg-sky-50 text-tiba-blue" : "border-transparent text-slate-700 hover:text-tiba-blue"
               )}
             >
               {entry.label}
