@@ -58,13 +58,14 @@ const normalizeLocation = (value: unknown): MonitoringLocation | null => {
   if (!value || typeof value !== "object") {
     return null;
   }
-  const lat = typeof value.lat === "number" ? value.lat : null;
-  const lng = typeof value.lng === "number" ? value.lng : null;
+  const record = value as Record<string, unknown>;
+  const lat = typeof record.lat === "number" ? record.lat : null;
+  const lng = typeof record.lng === "number" ? record.lng : null;
   const recordedAt =
-    typeof value.recorded_at === "string"
-      ? value.recorded_at
-      : typeof value.recordedAt === "string"
-        ? value.recordedAt
+    typeof record.recorded_at === "string"
+      ? record.recorded_at
+      : typeof record.recordedAt === "string"
+        ? record.recordedAt
         : null;
   if (lat === null || lng === null) {
     return null;
@@ -131,7 +132,9 @@ const mapMonitoringResponse = (payload: unknown): MonitoringMapPayload => {
       distanceToDestinationM:
         typeof booking.distance_to_destination_m === "number" ? booking.distance_to_destination_m : null,
       priorityScore: typeof booking.priority_score === "number" ? booking.priority_score : null,
-      timestamps: toRecord(booking.timestamps),
+      timestamps: Object.fromEntries(
+        Object.entries(toRecord(booking.timestamps)).map(([key, value]) => [key, typeof value === "string" ? value : null])
+      ),
       meta: toRecord(booking.meta ?? booking.meta_data)
     };
   });

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { PaymentListParams, PaymentListResult } from "../libs/payments";
 import { fetchAdminPayment, fetchAdminPayments, fetchPaymentSummary, retryPayment } from "../libs/payments";
@@ -32,7 +32,7 @@ export const useAdminPayments = (params: PaymentListParams, options?: { enabled?
   return useQuery<PaymentListResult>({
     queryKey: paymentKeys.adminList(normalized),
     queryFn: () => fetchAdminPayments(params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled: options?.enabled ?? true
   });
 };
