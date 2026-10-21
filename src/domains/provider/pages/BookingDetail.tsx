@@ -11,6 +11,7 @@ import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCa
 import { useJoinFromLink } from "../../../shared/hooks/useJoinFromLink";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { VideoConsultationDetails } from "../components/VideoConsultationDetails";
+import { PaymentRequestPanel } from "../../../shared/components/PaymentRequestPanel";
 import { useBookingDetail, useMarkBookingMutation } from "../../../shared/hooks/useBookings";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
@@ -54,8 +55,8 @@ const ACTION_COPY: Record<
     action: "complete"
   },
   completed_by_provider: {
-    label: "Awaiting Client Confirmation",
-    helper: "We have notified the client to confirm and pay."
+    label: "Ask the client to pay",
+    helper: "They approve the payment on their phone."
   },
   client_completed: {
     label: "Job Finished",
@@ -435,6 +436,9 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
         </div>
 
         <div className="space-y-8">
+          {booking.status === "completed_by_provider" ? (
+            <PaymentRequestPanel bookingId={booking.id} clientName={booking.client?.fullName ?? "the client"} tone="dark" />
+          ) : (
           <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30 mb-2">Next step</p>
             <div className="flex items-center justify-between gap-4">
@@ -450,6 +454,7 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
             </div>
             <p className="mt-2 text-xs font-medium text-slate-400">{actionCopy.helper}</p>
           </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <button

@@ -31,19 +31,18 @@ vi.mock("../../../../shared/components/NeedsYourResponse", () => ({ NeedsYourRes
 vi.mock("../../../../shared/components/BookingFeedbackDialog", () => ({ BookingFeedbackDialog: () => null }));
 vi.mock("../../../../shared/components/BookingLiveMapCard", () => ({ BookingLiveMapCard: () => null }));
 vi.mock("../../../../shared/components/LocationPermissionBanner", () => ({ LocationPermissionBanner: () => null }));
-vi.mock("../../../../shared/components/MpesaPaymentInstructions", () => ({ MpesaPaymentInstructions: () => null }));
 vi.mock("../../components/BookingRequestDialog", () => ({ BookingRequestDialog: () => null }));
 vi.mock("../../components/BookingSearchStatus", () => ({ BookingSearchStatus: () => null }));
 vi.mock("../../components/PaymentReviewNotice", () => ({ PaymentReviewNotice: () => null }));
 vi.mock("../../components/AIRecommendationsCard", () => ({ AIRecommendationsCard: () => null }));
 vi.mock("../../components/ClientPageHeader", () => ({ ClientPageHeader: () => null }));
 vi.mock("../../components/ImmersiveBookingView", () => ({ default: () => null }));
-vi.mock("../../components/HomeCarePaymentActions", () => ({ HomeCarePaymentActions: () => <button type="button">Confirm &amp; pay</button> }));
+vi.mock("../../components/PaymentRequestNotice", () => ({ PaymentRequestNotice: () => <p>payment request status</p> }));
 
 import ClientHome from "../Home";
 
 /**
- * The "Confirm Service" prompt could not be closed: closing cleared its fields but not the prompt, and an effect
+ * The "Payment for your visit" prompt could not be closed: closing cleared its fields but not the prompt, and an effect
  * reopened it on every refresh, so a client whose provider had finished could not use the app until they paid or
  * declined. It now closes, stays closed, and leaves a reminder on the page that brings it back.
  */
@@ -72,13 +71,14 @@ beforeEach(() => {
   state.checkins = { data: [], isLoading: false, isError: false };
 });
 
-describe("client Home: confirm your visit", () => {
+describe("client Home: payment for your visit", () => {
   it("opens the prompt when the provider has finished, with a visible way to put it away", () => {
     renderHome();
 
-    expect(screen.getByRole("heading", { name: /Confirm Service/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Payment for your visit/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Decide later" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Report a problem" })).toBeInTheDocument();
+    expect(screen.getByText("payment request status")).toBeInTheDocument();
   });
 
   it("closes from the Close button", async () => {
@@ -86,24 +86,25 @@ describe("client Home: confirm your visit", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
-    await waitFor(() => expect(screen.queryByRole("heading", { name: /Confirm Service/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Payment for your visit/ })).not.toBeInTheDocument());
   });
 
-  it("closes from Decide later and from Escape", async () => {
-    const { unmount } = renderHome();
-    fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: /Confirm Service/ })).not.toBeInTheDocument());
-    unmount();
+  it("closes from Not now", async () => {
+    renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Payment for your visit/ })).not.toBeInTheDocument());
+  });
 
+  it("closes from Escape", async () => {
     renderHome();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("heading", { name: /Confirm Service/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Payment for your visit/ })).not.toBeInTheDocument());
   });
 
   it("stays closed when the page refreshes its data", async () => {
     const { rerender } = renderHome();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: /Confirm Service/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Payment for your visit/ })).not.toBeInTheDocument());
 
     // The list is refetched and returns a new object for the same booking.
     state.active = [{ ...completed }];
@@ -113,26 +114,45 @@ describe("client Home: confirm your visit", () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByRole("heading", { name: /Confirm Service/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Payment for your visit/ })).not.toBeInTheDocument();
   });
 
   it("leaves a reminder on the page, and the reminder brings the prompt back", async () => {
     renderHome();
-    expect(screen.queryByRole("region", { name: "Confirm your visit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Payment for your visit" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    const reminder = await screen.findByRole("region", { name: "Confirm your visit" });
+    const reminder = await screen.findByRole("region", { name: "Payment for your visit" });
     expect(reminder).toHaveTextContent("Your visit with Dr Example is complete");
 
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and pay" }));
-    expect(await screen.findByRole("heading", { name: /Confirm Service/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View payment" }));
+    expect(await screen.findByRole("heading", { name: /Payment for your visit/ })).toBeInTheDocument();
   });
 
   it("shows no prompt and no reminder when the visit is not awaiting confirmation", () => {
     state.active = [{ ...completed, status: "in_service" }];
     renderHome();
 
-    expect(screen.queryByRole("heading", { name: /Confirm Service/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Confirm your visit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Payment for your visit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Payment for your visit" })).not.toBeInTheDocument();
+  });
+});
+
+describe("client Home: the client no longer pays by typing a number", () => {
+  it("offers no number field or confirm-and-pay button, only a way to report a problem", () => {
+    renderHome();
+
+    expect(screen.queryByRole("button", { name: /confirm/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /phone|number/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Report a problem" })).toBeInTheDocument();
+  });
+
+  it("asks what went wrong before sending a report", () => {
+    renderHome();
+
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+
+    expect(screen.getByLabelText("What went wrong?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send report" })).toBeInTheDocument();
   });
 });

@@ -32,10 +32,8 @@ import { useWalletAccount } from "../../../shared/hooks/useWallet";
 import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
-import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { WidgetError } from "../../../shared/components/WidgetError";
-import { HomeCarePaymentActions } from "../components/HomeCarePaymentActions";
-import { formatMsisdn } from "../utils/payerPhone";
+import { PaymentRequestNotice } from "../components/PaymentRequestNotice";
 import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
 import {
   Plus,
@@ -109,6 +107,7 @@ const ClientHome = () => {
   const [declineReason, setDeclineReason] = useState("");
   const [completionError, setCompletionError] = useState<string | null>(null);
   const [showMpesaManual, setShowMpesaManual] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -119,8 +118,6 @@ const ClientHome = () => {
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
   // The number the M-Pesa request went to, kept so the follow-up step can say where to look.
-  const [chargedTo, setChargedTo] = useState<string | null>(null);
-  const [paymentFailed, setPaymentFailed] = useState(false);
 
   const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
   const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
@@ -255,42 +252,13 @@ const ClientHome = () => {
     setCompletionPrompt(null);
     setCompletionError(null);
     setShowMpesaManual(false);
-    setPaymentFailed(false);
-    setChargedTo(null);
+    setReporting(false);
   };
 
   const closeCancelPrompt = () => {
     setCancelPrompt(null);
     setCancelReason("");
     setCancelError(null);
-  };
-
-  // `phone` arrives validated and normalised from the payment form; a different number is used for
-  // this request only and is never saved to the client's profile.
-  const handleConfirmCompletion = async (phone: string) => {
-    if (!completionPrompt) return;
-
-    setCompletionError(null);
-    setPaymentFailed(false);
-
-    try {
-      await confirmCompletion.mutateAsync({
-        bookingId: completionPrompt.id,
-        decision: "confirm",
-        phone
-      });
-      toast.showToast({
-        title: "Payment requested",
-        description: `Check ${formatMsisdn(phone)} to approve the M-Pesa payment.`,
-        variant: "success"
-      });
-      setChargedTo(formatMsisdn(phone));
-      setShowMpesaManual(true);
-      setCompletionError(null);
-    } catch (error) {
-      setPaymentFailed(true);
-      setCompletionError(error instanceof Error ? error.message : "Unable to confirm completion. Try again.");
-    }
   };
 
   const handleDeclineCompletion = async () => {
@@ -309,8 +277,8 @@ const ClientHome = () => {
         reason: declineReason.trim()
       });
       toast.showToast({
-        title: "Thanks for the feedback",
-        description: "Support has been notified about the issue.",
+        title: "Problem reported",
+        description: "Support has been told and will look into it.",
         variant: "info"
       });
       closeCompletionPrompt();
@@ -409,9 +377,9 @@ const ClientHome = () => {
         <div className="flex flex-col gap-3 px-4 empty:hidden">
           <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
           {activeBooking?.status === "completed_by_provider" && !completionPrompt && (
-            <section aria-label="Confirm your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <section aria-label="Payment for your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-slate-900">
-                Your visit{activeBooking.provider?.fullName ? ` with ${activeBooking.provider.fullName}` : ""} is complete. Confirm it and pay.
+                Your visit{activeBooking.provider?.fullName ? ` with ${activeBooking.provider.fullName}` : ""} is complete. See your payment request.
               </p>
               <Button
                 size="sm"
@@ -420,7 +388,7 @@ const ClientHome = () => {
                   setCompletionPrompt(activeBooking);
                 }}
               >
-                Confirm and pay
+                View payment
               </Button>
             </section>
           )}
@@ -700,7 +668,7 @@ const ClientHome = () => {
         fullWidth
       >
         <DialogTitle className="flex items-start justify-between gap-3 text-xl font-bold text-slate-900">
-          Confirm Service
+          Payment for your visit
           <button
             type="button"
             onClick={closeCompletionPrompt}
@@ -712,63 +680,52 @@ const ClientHome = () => {
           </button>
         </DialogTitle>
         <DialogContent>
-          <p className="text-sm text-slate-500 leading-relaxed">
-            Your provider marked the booking as complete. Please confirm if everything was handled to your satisfaction.
-          </p>
-          <div className="mt-6 space-y-4">
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Reason for declining (optional)</span>
+          {completionPrompt && (
+            <PaymentRequestNotice
+              bookingId={completionPrompt.id}
+              providerName={completionPrompt.provider?.fullName ?? null}
+              showManual={showMpesaManual}
+              onToggleManual={() => setShowMpesaManual((value) => !value)}
+            />
+          )}
+          {reporting && (
+            <label className="mt-5 block">
+              <span className="text-sm font-medium text-slate-800">What went wrong?</span>
               <textarea
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none"
                 rows={3}
                 value={declineReason}
                 onChange={(event) => setDeclineReason(event.target.value)}
-                placeholder="Tell us what went wrong..."
+                placeholder="For example, the visit did not happen or was not finished"
                 disabled={confirmCompletion.isPending}
               />
             </label>
-          </div>
-          {completionError && <p className="mt-3 text-xs font-semibold text-rose-500 px-1">{completionError}</p>}
+          )}
+          {completionError && <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{completionError}</p>}
         </DialogContent>
         <DialogActions className="p-4 flex-col">
-          <div className="w-full">
-            {showMpesaManual ? (
-              <div className="space-y-4">
-                <p className="text-xs font-medium text-slate-500 text-center animate-pulse" role="status">
-                  {chargedTo
-                    ? `We sent the payment request to ${chargedTo}. If it does not appear, pay manually:`
-                    : "Waiting for the M-Pesa request. If it does not appear, pay manually:"}
-                </p>
-                <MpesaPaymentInstructions
-                  amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
-                  accountNumber={completionPrompt?.id.slice(0, 8).toUpperCase() ?? activeBooking?.id.slice(0, 8).toUpperCase() ?? "BOOKING"}
-                />
-                <Button
-                  variant="ghost"
-                  className="w-full text-sm font-semibold text-slate-600"
-                  onClick={() => setShowMpesaManual(false)}
-                >
-                  Back to confirmation
-                </Button>
-              </div>
+          <div className="w-full space-y-2">
+            {reporting ? (
+              <Button
+                className="min-h-[44px] w-full"
+                variant="secondary"
+                loading={confirmCompletion.isPending}
+                onClick={handleDeclineCompletion}
+              >
+                Send report
+              </Button>
             ) : (
-              <HomeCarePaymentActions
-                savedPhone={user?.phone}
-                amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
-                isPending={confirmCompletion.isPending}
-                failed={paymentFailed}
-                resetKey={completionPrompt?.id ?? null}
-                onConfirm={handleConfirmCompletion}
-                onDecline={handleDeclineCompletion}
-              />
+              <Button className="min-h-[44px] w-full" variant="secondary" onClick={() => setReporting(true)}>
+                Report a problem
+              </Button>
             )}
             <Button
               variant="ghost"
-              className="mt-2 min-h-[44px] w-full text-sm font-semibold text-slate-600"
+              className="min-h-[44px] w-full text-sm font-semibold text-slate-700"
               onClick={closeCompletionPrompt}
               disabled={confirmCompletion.isPending}
             >
-              {showMpesaManual ? "Close" : "Decide later"}
+              Not now
             </Button>
           </div>
         </DialogActions>

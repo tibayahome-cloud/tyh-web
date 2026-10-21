@@ -21,6 +21,7 @@ import FastForwardIcon from "@mui/icons-material/FastForwardOutlined";
 import { Button } from "../../../shared/components/Button";
 import type { Booking, BookingMarkAction } from "../../../shared/schemas/booking";
 import { useMarkBookingMutation } from "../../../shared/hooks/useBookings";
+import { PaymentRequestPanel } from "../../../shared/components/PaymentRequestPanel";
 
 type ImmersiveProviderBookingViewProps = {
   booking: Booking;
@@ -93,10 +94,8 @@ const WORKFLOW: WorkflowStep[] = [
   {
     status: "completed_by_provider",
     label: "Completed",
-    description: "Awaiting client confirmation and payment.",
+    description: "Ask the client to pay. They approve the payment on their phone.",
     icon: <DoneAllIcon />,
-    action: "client_confirmed",
-    actionLabel: "Request Payment (STK Push)",
     color: "text-slate-600",
     bgColor: "bg-slate-50 border-slate-100"
   }
@@ -570,7 +569,9 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
 
       {/* Fixed action bar at bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe-bottom" style={{ background: "linear-gradient(to top, #0f172a 70%, transparent)" }}>
-        {currentStep?.action ? (
+        {booking.status === "completed_by_provider" ? (
+          <PaymentRequestPanel bookingId={booking.id} clientName={clientName} tone="dark" />
+        ) : currentStep?.action ? (
           <Button
             onClick={() => handleAction(currentStep.action!)}
             loading={markBooking.isPending}
