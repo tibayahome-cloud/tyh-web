@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const ambulance = vi.hoisted(() => ({ has: false }));
 const state = vi.hoisted(() => ({
   upcoming: {} as Record<string, unknown>,
   history: {} as Record<string, unknown>,
@@ -34,6 +35,7 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
 vi.mock("../../../../shared/hooks/useWallet", () => ({ useWalletAccount: () => state.wallet }));
 vi.mock("../../../../shared/hooks/useTelemedicine", () => ({ useTelemedicinePolicy: () => ({ data: { joinWindowBeforeMinutes: 10 } }) }));
 vi.mock("../../../../shared/hooks/useSelfCare", () => ({ useSelfCareCheckins: () => state.checkins }));
+vi.mock("../../hooks/useHasAmbulanceService", () => ({ useHasAmbulanceService: () => ambulance.has }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/hooks/useLocationAccess", () => ({
   useLocationAccess: () => ({ status: "granted", error: null, requestAccess: vi.fn() })
@@ -68,6 +70,24 @@ beforeEach(() => {
   state.history = { data: { bookings: [] } };
   state.wallet = { data: { currency: "KES", balanceCents: 250000 }, isError: false };
   state.checkins = { data: [], isLoading: false, isError: false };
+});
+
+describe("client Home: the ways to book", () => {
+  it("opens the Services page from Book home care, and shows no ambulance button when there is no ambulance service", () => {
+    ambulance.has = false;
+    renderHome();
+
+    expect(screen.getByRole("button", { name: /Book home care/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ambulance/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the ambulance button once the catalogue has an ambulance service", () => {
+    ambulance.has = true;
+    renderHome();
+
+    expect(screen.getByRole("button", { name: /Request an ambulance/ })).toBeInTheDocument();
+    ambulance.has = false;
+  });
 });
 
 describe("client Home", () => {

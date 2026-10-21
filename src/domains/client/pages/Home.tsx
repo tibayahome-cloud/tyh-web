@@ -45,6 +45,7 @@ import {
   Video
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
+import { useHasAmbulanceService } from "../hooks/useHasAmbulanceService";
 
 // A popup on a phone keeps a margin all round and never taller than the screen; its content scrolls inside.
 const FIT_PHONE_PAPER = { borderRadius: "24px", p: 1, m: 2, width: "calc(100% - 32px)", maxHeight: "calc(100dvh - 32px)" } as const;
@@ -94,6 +95,7 @@ const ClientHome = () => {
   const socket = useSocket();
   const locationAccess = useLocationAccess();
   const confirmCompletion = useConfirmBookingMutation("detail");
+  const hasAmbulance = useHasAmbulanceService();
   const cancelBookingMutation = useCancelBookingMutation("detail");
   const [completionPrompt, setCompletionPrompt] = useState<Booking | null>(null);
   // The booking whose confirm-and-pay prompt the client put away. It is not opened again by itself; a reminder on the
@@ -489,18 +491,21 @@ const ClientHome = () => {
                   </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <button type="button" onClick={() => openBookingDialog()}
-                    className="flex min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                  <button type="button" onClick={() => navigate("/app/services")}
+                    className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
                     <House className="h-5 w-5 shrink-0 text-tiba-gold" />
-                    <span className="min-w-0 flex-1 text-sm font-semibold">Book Home Care</span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold">Book home care</span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
                   </button>
-                  <button type="button" onClick={() => openBookingDialog()}
-                    className="flex min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
-                    <Ambulance className="h-5 w-5 shrink-0 text-tiba-gold" />
-                    <span className="min-w-0 flex-1 text-sm font-semibold">Request an Ambulance</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
-                  </button>
+                  {/* Only when the catalogue has an ambulance service: a button that opens a list with none in it only confuses. */}
+                  {hasAmbulance && (
+                    <button type="button" onClick={() => navigate("/app/services?group=ambulance")}
+                      className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                      <Ambulance className="h-5 w-5 shrink-0 text-tiba-gold" />
+                      <span className="min-w-0 flex-1 text-sm font-semibold">Request an ambulance</span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

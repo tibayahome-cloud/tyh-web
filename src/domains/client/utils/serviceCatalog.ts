@@ -9,6 +9,8 @@ export type CatalogService = {
   is_emergency_capable: boolean;
   active: boolean;
   remote_capable?: boolean;
+  /** From the API: telemedicine, home_based or ambulance. */
+  care_type?: "telemedicine" | "home_based" | "ambulance";
   category?: { id: string; name: string } | null;
 };
 
@@ -16,11 +18,12 @@ export type CatalogService = {
  * This page is for care that comes to you (nursing, elderly care, ambulance and the like). Video consultations have
  * their own Telemedicine screen, so a service that exists only as a remote consultation is not listed here.
  */
-export const isHomeService = (service: CatalogService): boolean => service.active && !service.remote_capable;
+export const isHomeService = (service: CatalogService): boolean => service.active && !service.remote_capable && service.care_type !== "telemedicine";
 
-export type CareGroupId = "nursing" | "elderly" | "therapy" | "checkups" | "plans" | "other";
+export type CareGroupId = "ambulance" | "nursing" | "elderly" | "therapy" | "checkups" | "plans" | "other";
 
 export const CARE_GROUPS: Array<{ id: CareGroupId; name: string }> = [
+  { id: "ambulance", name: "Ambulance" },
   { id: "nursing", name: "Nursing & doctor visits" },
   { id: "elderly", name: "Elderly & palliative care" },
   { id: "therapy", name: "Therapy & rehabilitation" },
@@ -43,13 +46,17 @@ export const careGroupOf = (categoryName: string | null | undefined): CareGroupI
   return "other";
 };
 
+/** The group a service is shown under: an ambulance is its own group whatever its category, otherwise by category. */
+export const careGroupOfService = (service: CatalogService): CareGroupId =>
+  service.care_type === "ambulance" ? "ambulance" : careGroupOf(service.category?.name);
+
 export type GroupTile = { id: CareGroupId; name: string; count: number };
 
 /** One entry per group that has something to book, in a fixed, familiar order. */
 export const groupTiles = (services: CatalogService[]): GroupTile[] => {
   const counts = new Map<CareGroupId, number>();
   services.forEach((service) => {
-    const id = careGroupOf(service.category?.name);
+    const id = careGroupOfService(service);
     counts.set(id, (counts.get(id) ?? 0) + 1);
   });
   return CARE_GROUPS.filter((group) => counts.has(group.id)).map((group) => ({ ...group, count: counts.get(group.id) ?? 0 }));
@@ -81,7 +88,7 @@ export const filterServices = (services: CatalogService[], filters: CatalogFilte
   const needle = filters.search.trim().toLowerCase();
   const band = PRICE_BANDS.find((entry) => entry.id === filters.priceBand) ?? PRICE_BANDS[0];
   return services.filter((service) => {
-    if (filters.groupId !== "all" && careGroupOf(service.category?.name) !== filters.groupId) return false;
+    if (filters.groupId !== "all" && careGroupOfService(service) !== filters.groupId) return false;
     if (filters.urgentOnly && !service.is_emergency_capable) return false;
     if (needle && !`${service.name} ${service.description ?? ""} ${service.category?.name ?? ""}`.toLowerCase().includes(needle)) return false;
     // A service priced on request (zero) is never hidden by a price band.

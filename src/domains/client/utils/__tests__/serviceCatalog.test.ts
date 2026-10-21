@@ -161,3 +161,17 @@ describe("photoForService", () => {
     expect(photoForService("speech_therapy", { ecg_home: "/ecg.webp" }, "/stock.png")).toBe("/stock.png");
   });
 });
+
+describe("an ambulance service is its own group", () => {
+  it("is grouped as Ambulance whatever its category says, and counted separately", () => {
+    const tiles = groupTiles([svc({ id: "1" }), svc({ id: "2", care_type: "ambulance", category: { id: "x", name: "Elderly & Assisted Living" } })]);
+
+    expect(tiles.map((t) => t.id)).toEqual(["ambulance", "nursing"]);
+    expect(filterServices([svc({ id: "2", care_type: "ambulance" })], { ...NO_FILTERS, groupId: "ambulance" })).toHaveLength(1);
+  });
+
+  it("never lists a telemedicine service on the home care page", () => {
+    expect(isHomeService(svc({ care_type: "telemedicine" }))).toBe(false);
+    expect(isHomeService(svc({ care_type: "home_based" }))).toBe(true);
+  });
+});
