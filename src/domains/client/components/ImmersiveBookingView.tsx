@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import classNames from "classnames";
 import CloseIcon from "@mui/icons-material/CloseOutlined";
@@ -12,6 +13,7 @@ import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCar
 import { Button } from "../../../shared/components/Button";
 import type { Booking } from "../../../shared/schemas/booking";
 import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
+import { PaymentRequestNotice } from "./PaymentRequestNotice";
 
 // Status progression for the journey
 const STATUS_STEPS = [
@@ -47,6 +49,7 @@ type ImmersiveBookingViewProps = {
 export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: ImmersiveBookingViewProps) => {
     const navigate = useNavigate();
     const [sheetExpanded, setSheetExpanded] = useState(false);
+    const [showManual, setShowManual] = useState(false);
 
     const currentStepIndex = useMemo(() => getStepIndex(booking.status), [booking.status]);
     const statusTheme = getBookingStatusTheme(booking.status);
@@ -88,8 +91,9 @@ export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: Immersive
         setTouchStart(null);
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900">
+    // In its own layer above the app bar and the bottom menu, so nothing of the page sits over the sheet or the close button.
+    return createPortal(
+        <div role="dialog" aria-modal="true" aria-label="Your booking" className="fixed inset-0 z-[1200] flex flex-col bg-neutral-900">
             {/* Full-Screen Map or Completion View */}
             <div className="relative flex-1">
                 {showMap ? (
@@ -101,24 +105,33 @@ export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: Immersive
                         className="h-full w-full"
                     />
                 ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center bg-white p-6 text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-4 shadow-sm">
+                    <div className="flex h-full w-full flex-col items-center overflow-y-auto bg-white px-5 pb-6 pt-44 text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm">
                             <CheckCircleIcon className="h-8 w-8" />
                         </div>
-                        <h2 className="text-xl font-bold text-slate-900">Service Finished</h2>
-                        <p className="mt-1 text-sm text-slate-500">The provider has completed your request.</p>
-                        <p className="text-[11px] text-slate-400 mt-2 font-medium">Please confirm completion in the sheet below.</p>
+                        <h2 className="text-xl font-bold text-slate-900">Service finished</h2>
+                        <p className="mt-1 text-sm text-slate-700">{providerName} has completed your visit.</p>
+                        <div className="mt-5 w-full max-w-sm text-left">
+                            <PaymentRequestNotice
+                                bookingId={booking.id}
+                                providerName={booking.provider?.fullName ?? null}
+                                showManual={showManual}
+                                onToggleManual={() => setShowManual((value) => !value)}
+                            />
+                        </div>
                     </div>
                 )}
 
                 {/* Top Bar */}
-                <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-4">
+                <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-4 pt-[max(16px,env(safe-area-inset-top))]">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 shadow-lg backdrop-blur"
+                        aria-label="Close and go back to the home page"
+                        className="flex h-11 items-center gap-1.5 rounded-full bg-white/95 pl-3 pr-4 text-sm font-semibold text-neutral-800 shadow-lg backdrop-blur focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
                     >
-                        <CloseIcon className="h-5 w-5 text-neutral-700" />
+                        <CloseIcon className="h-5 w-5" />
+                        Close
                     </button>
 
                     {/* Status Badge */}
@@ -128,7 +141,7 @@ export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: Immersive
                 </div>
 
                 {/* Status Progress Steps */}
-                <div className="absolute left-4 right-4 top-20 z-10">
+                <div className="absolute left-4 right-4 top-[calc(4.5rem+env(safe-area-inset-top))] z-10">
                     <div className="rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur">
                         <div className="flex items-center justify-between">
                             {STATUS_STEPS.map((step, index) => {
@@ -153,7 +166,7 @@ export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: Immersive
                                         </div>
                                         {/* Step Label */}
                                         <span
-                                            className={classNames("mt-1 text-[9px] font-semibold", {
+                                            className={classNames("mt-1 text-xs font-semibold", {
                                                 "text-brand-600": isCurrent,
                                                 "text-emerald-600": isCompleted,
                                                 "text-neutral-400": isPending
@@ -182,16 +195,22 @@ export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: Immersive
             {/* Bottom Sheet */}
             <div
                 className={classNames(
-                    "relative rounded-t-3xl bg-white shadow-2xl transition-all duration-300",
-                    sheetExpanded ? "h-[55vh]" : "h-auto"
+                    "relative max-h-[75dvh] overflow-y-auto rounded-t-3xl bg-white pb-[max(12px,env(safe-area-inset-bottom))] shadow-2xl transition-all duration-300 motion-reduce:transition-none",
+                    sheetExpanded ? "h-[55dvh]" : "h-auto"
                 )}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
             >
                 {/* Drag Handle */}
-                <div className="flex justify-center py-3">
-                    <div className="h-1 w-10 rounded-full bg-neutral-300" />
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setSheetExpanded((open) => !open)}
+                    aria-expanded={sheetExpanded}
+                    aria-label={sheetExpanded ? "Show less" : "Show more about this booking"}
+                    className="flex min-h-[44px] w-full items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                >
+                    <span className="h-1 w-10 rounded-full bg-neutral-300" />
+                </button>
 
                 {/* Provider Info */}
                 <div className="px-5 pb-5">
@@ -279,7 +298,8 @@ export const ImmersiveBookingView = ({ booking, onClose, onOpenChat }: Immersive
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
