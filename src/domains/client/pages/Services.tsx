@@ -2,21 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import classNames from "classnames";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Accessibility,
-  Ambulance,
-  Clock,
-  HeartPulse,
-  House,
-  Layers,
-  Pill,
-  Search,
-  SlidersHorizontal,
-  Stethoscope,
-  Syringe,
-  Zap,
-  X
-} from "lucide-react";
+import { Clock, Search, SlidersHorizontal, Zap, X } from "lucide-react";
 import Drawer from "@mui/material/Drawer";
 
 import { Button } from "../../../shared/components/Button";
@@ -25,7 +11,14 @@ import { api } from "../../../shared/libs/api";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { AppLayout } from "../../../shared/components/AppLayout";
-import { categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
+import nurseImg from "../../../assets/images/service-nurse.png";
+import elderlyImg from "../../../assets/images/service-elderly.png";
+import therapyImg from "../../../assets/images/service-therapy.png";
+import labImg from "../../../assets/images/lab-sample-collection.png";
+import doctorImg from "../../../assets/images/service-doctor.png";
+import ambulanceImg from "../../../assets/images/service-ambulance.png";
+import homeImg from "../../../assets/images/hero-home.png";
+import { careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
 
 type Envelope<T> = {
   data: T;
@@ -46,16 +39,17 @@ const useServices = () =>
     }
   });
 
-const categoryIcon = (name: string) => {
-  const key = name.toLowerCase();
-  if (key.includes("ambulance") || key.includes("emergency")) return Ambulance;
-  if (key.includes("nurs") || key.includes("caregiver")) return Syringe;
-  if (key.includes("elder") || key.includes("assisted")) return Accessibility;
-  if (key.includes("therapy") || key.includes("rehab")) return HeartPulse;
-  if (key.includes("diagnos") || key.includes("lab")) return Pill;
-  if (key.includes("doctor") || key.includes("visit")) return Stethoscope;
-  return House;
-};
+const CARE_IMAGES = {
+  nurse: nurseImg,
+  elderly: elderlyImg,
+  therapy: therapyImg,
+  lab: labImg,
+  doctor: doctorImg,
+  ambulance: ambulanceImg,
+  home: homeImg
+} as const;
+
+const careImage = (categoryName: string | null | undefined) => CARE_IMAGES[careImageKey(categoryName)];
 
 const ServicesPage = () => {
   const navigate = useNavigate();
@@ -147,9 +141,8 @@ const ServicesPage = () => {
             </label>
 
             {tiles.length > 0 && (
-              <div role="group" aria-label="Kind of care" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div role="group" aria-label="Kind of care" className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
                 {[{ id: "all", name: "All care", count: services?.length ?? 0 }, ...tiles].map((tile) => {
-                  const Icon = tile.id === "all" ? Layers : categoryIcon(tile.name);
                   const selected = category === tile.id;
                   return (
                     <button
@@ -158,16 +151,15 @@ const ServicesPage = () => {
                       aria-pressed={selected}
                       onClick={() => setCategory(tile.id)}
                       className={classNames(
-                        "flex min-h-[64px] items-center gap-3 rounded-xl border p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
-                        selected ? "border-tiba-blue bg-sky-50" : "border-slate-200 bg-white hover:bg-slate-50"
+                        "group relative h-28 w-40 shrink-0 overflow-hidden rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2",
+                        selected ? "ring-2 ring-tiba-blue ring-offset-2" : ""
                       )}
                     >
-                      <span className={classNames("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", selected ? "bg-tiba-blue text-white" : "bg-slate-100 text-slate-700")}>
-                        <Icon aria-hidden="true" size={20} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-slate-900">{tile.name}</span>
-                        <span className="block text-sm text-slate-600">{tile.count} {tile.count === 1 ? "service" : "services"}</span>
+                      <img src={tile.id === "all" ? homeImg : careImage(tile.name)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent" />
+                      <span className="absolute inset-x-0 bottom-0 p-3">
+                        <span className="block text-sm font-semibold leading-tight text-white">{tile.name}</span>
+                        <span className="block text-xs text-white/90">{tile.count}</span>
                       </span>
                     </button>
                   );
@@ -193,55 +185,31 @@ const ServicesPage = () => {
                 )}
               </div>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredServices.map((service) => {
-                  const Icon = categoryIcon(service.category?.name ?? "");
-                  return (
-                    <li key={service.id} className="flex flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                      <div className="flex items-start gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                          <Icon aria-hidden="true" size={22} />
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredServices.map((service) => (
+                  <li key={service.id} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                    <Link to={`/app/services/${service.id}`} aria-label={`${service.name}, details`} className="relative block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-tiba-blue">
+                      <img src={careImage(service.category?.name)} alt="" loading="lazy" className="aspect-[16/9] w-full object-cover" />
+                      {service.is_emergency_capable && (
+                        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white">
+                          <Zap aria-hidden="true" size={12} /> Urgent
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-base font-semibold text-slate-900">{service.name}</h3>
-                          {service.description && <p className="mt-0.5 line-clamp-2 text-sm text-slate-700">{service.description}</p>}
-                        </div>
+                      )}
+                    </Link>
+                    <div className="p-4">
+                      <h3 className="line-clamp-2 text-base font-semibold text-slate-900">{service.name}</h3>
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-700">
+                        <Clock aria-hidden="true" size={14} /> {service.default_estimate_minutes} min
+                      </p>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-lg font-bold text-slate-900">{formatPrice(service.base_price_cents)}</p>
+                        <Button type="button" className="min-h-[44px] px-6" onClick={() => openBookingDialog(service.id)}>
+                          Book
+                        </Button>
                       </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-900">
-                          <House aria-hidden="true" size={14} /> Home visit
-                        </span>
-                        {service.is_emergency_capable && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 font-semibold text-rose-900">
-                            <Zap aria-hidden="true" size={14} /> Urgent
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1">
-                          <Clock aria-hidden="true" size={14} /> {service.default_estimate_minutes} min
-                        </span>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                        <p className="text-base font-bold text-slate-900">
-                          <span className="text-sm font-normal text-slate-600">from </span>
-                          {formatPrice(service.base_price_cents)}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={`/app/services/${service.id}`}
-                            className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
-                          >
-                            Details
-                          </Link>
-                          <Button type="button" className="min-h-[44px]" onClick={() => openBookingDialog(service.id)}>
-                            Book
-                          </Button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+                    </div>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
