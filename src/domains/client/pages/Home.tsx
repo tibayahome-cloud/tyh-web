@@ -102,6 +102,9 @@ const ClientHome = () => {
   const confirmCompletion = useConfirmBookingMutation("detail");
   const cancelBookingMutation = useCancelBookingMutation("detail");
   const [completionPrompt, setCompletionPrompt] = useState<Booking | null>(null);
+  // The booking whose confirm-and-pay prompt the client put away. It is not opened again by itself; a reminder on the
+  // page brings it back. Without this the prompt could not be closed, and reopened on every refresh.
+  const [dismissedCompletionId, setDismissedCompletionId] = useState<string | null>(null);
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [completionError, setCompletionError] = useState<string | null>(null);
@@ -198,11 +201,11 @@ const ClientHome = () => {
     ...(upcomingList?.bookings ?? [])
   ]);
   useEffect(() => {
-    if (activeBooking?.status === "completed_by_provider") {
+    if (activeBooking?.status === "completed_by_provider" && activeBooking.id !== dismissedCompletionId) {
       setCompletionPrompt(activeBooking);
       setCompletionError(null);
     }
-  }, [activeBooking]);
+  }, [activeBooking, dismissedCompletionId]);
 
   const historyQuery = useBookingList(
     {
@@ -248,6 +251,8 @@ const ClientHome = () => {
   };
 
   const closeCompletionPrompt = () => {
+    setDismissedCompletionId(completionPrompt?.id ?? null);
+    setCompletionPrompt(null);
     setCompletionError(null);
     setShowMpesaManual(false);
     setPaymentFailed(false);
@@ -366,7 +371,10 @@ const ClientHome = () => {
         ) {
           // The booking list is refreshed by the live-update service, and the effect on `activeBooking` opens
           // the prompt from it. Only a booking already loaded can be shown now; a bare id is not a booking.
-          if (activeBooking) setCompletionPrompt(activeBooking);
+          if (activeBooking) {
+            setDismissedCompletionId(null);
+            setCompletionPrompt(activeBooking);
+          }
           setDeclineReason("");
           setCompletionError(null);
         }
@@ -400,6 +408,22 @@ const ClientHome = () => {
 
         <div className="flex flex-col gap-3 px-4 empty:hidden">
           <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
+          {activeBooking?.status === "completed_by_provider" && !completionPrompt && (
+            <section aria-label="Confirm your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                Your visit{activeBooking.provider?.fullName ? ` with ${activeBooking.provider.fullName}` : ""} is complete. Confirm it and pay.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setDismissedCompletionId(null);
+                  setCompletionPrompt(activeBooking);
+                }}
+              >
+                Confirm and pay
+              </Button>
+            </section>
+          )}
           {ratingDue && (
             <section aria-label="Rate your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-slate-900">
@@ -675,7 +699,18 @@ const ClientHome = () => {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle className="text-xl font-bold text-slate-900">Confirm Service</DialogTitle>
+        <DialogTitle className="flex items-start justify-between gap-3 text-xl font-bold text-slate-900">
+          Confirm Service
+          <button
+            type="button"
+            onClick={closeCompletionPrompt}
+            disabled={confirmCompletion.isPending}
+            aria-label="Close"
+            className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue disabled:opacity-50"
+          >
+            <span aria-hidden="true" className="text-2xl leading-none">&times;</span>
+          </button>
+        </DialogTitle>
         <DialogContent>
           <p className="text-sm text-slate-500 leading-relaxed">
             Your provider marked the booking as complete. Please confirm if everything was handled to your satisfaction.
@@ -727,6 +762,14 @@ const ClientHome = () => {
                 onDecline={handleDeclineCompletion}
               />
             )}
+            <Button
+              variant="ghost"
+              className="mt-2 min-h-[44px] w-full text-sm font-semibold text-slate-600"
+              onClick={closeCompletionPrompt}
+              disabled={confirmCompletion.isPending}
+            >
+              {showMpesaManual ? "Close" : "Decide later"}
+            </Button>
           </div>
         </DialogActions>
       </Dialog>
