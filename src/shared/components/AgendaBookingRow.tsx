@@ -1,13 +1,20 @@
 import classNames from "classnames";
 import { ChevronRight, Clock, MapPin, Star } from "lucide-react";
 
-import { BookingKindBadge } from "../../../shared/components/BookingKindBadge";
-import type { Booking } from "../../../shared/schemas/booking";
-import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
+import type { Booking } from "../schemas/booking";
+import { getBookingStatusTheme } from "../utils/bookingStatus";
 import type { AgendaDay } from "../utils/agendaDates";
+import { BookingKindBadge } from "./BookingKindBadge";
+
+/** The person on the other side of the booking: the doctor for a client, the client for a provider. */
+export type AgendaParty = { fullName?: string | null; avatarUrl?: string | null } | null | undefined;
 
 type Props = {
   booking: Booking;
+  /** Who the booking is with, from the point of view of whoever is looking. */
+  party: AgendaParty;
+  /** Said when there is no one yet. Defaults to finding a doctor (telemedicine) or a provider (home visit). */
+  missingPartyText?: string;
   day: AgendaDay;
   /** Show the date rail. Only the first booking of a day shows it, so the rail reads as one entry per day. */
   showDate: boolean;
@@ -21,7 +28,7 @@ type Props = {
 // One booking in the agenda: the date on a rail at the left, then what it is, when, who with, and its state. The
 // whole row opens the booking; the service name is the real button (stretched over the row) so it works by keyboard
 // and screen reader, and Rate sits above it.
-export const AgendaBookingRow = ({ booking, day, showDate, showYear, onOpen, onRate, onPrefetch }: Props) => {
+export const AgendaBookingRow = ({ booking, party, missingPartyText, day, showDate, showYear, onOpen, onRate, onPrefetch }: Props) => {
   const theme = getBookingStatusTheme(booking.status);
   const place = booking.isTelemedicine ? null : booking.addressText;
 
@@ -76,19 +83,21 @@ export const AgendaBookingRow = ({ booking, day, showDate, showYear, onOpen, onR
           </p>
 
           <div className="mt-2 flex items-center justify-between gap-2">
-            {booking.provider ? (
+            {party ? (
               <div className="flex min-w-0 items-center gap-2">
-                {booking.provider.avatarUrl ? (
-                  <img src={booking.provider.avatarUrl} alt="" className="h-6 w-6 rounded-md object-cover" />
+                {party.avatarUrl ? (
+                  <img src={party.avatarUrl} alt="" className="h-6 w-6 rounded-md object-cover" />
                 ) : (
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-100 text-xs font-bold text-brand-700">
-                    {booking.provider.fullName?.charAt(0) || "D"}
+                    {party.fullName?.charAt(0) || "?"}
                   </span>
                 )}
-                <span className="truncate text-sm font-medium text-slate-800">{booking.provider.fullName}</span>
+                <span className="truncate text-sm font-medium text-slate-800">{party.fullName}</span>
               </div>
             ) : (
-              <span className="text-sm italic text-slate-600">{booking.isTelemedicine ? "Finding a doctor..." : "Finding a provider..."}</span>
+              <span className="text-sm italic text-slate-600">
+                {missingPartyText ?? (booking.isTelemedicine ? "Finding a doctor..." : "Finding a provider...")}
+              </span>
             )}
             {onRate ? (
               <button

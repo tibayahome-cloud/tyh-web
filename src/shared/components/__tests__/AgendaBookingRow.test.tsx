@@ -21,7 +21,7 @@ const booking = (overrides: Record<string, unknown> = {}) =>
 const renderRow = (props: Record<string, unknown> = {}, bookingOverrides: Record<string, unknown> = {}) =>
   render(
     <ul>
-      <AgendaBookingRow booking={booking(bookingOverrides)} day={DAY} showDate onOpen={vi.fn()} {...props} />
+      <AgendaBookingRow booking={booking(bookingOverrides)} party={(booking(bookingOverrides) as { provider: unknown }).provider as never} day={DAY} showDate onOpen={vi.fn()} {...props} />
     </ul>
   );
 
@@ -64,12 +64,25 @@ describe("AgendaBookingRow", () => {
     expect(screen.queryByText(/not specified/i)).not.toBeInTheDocument();
   });
 
+  it("shows the other side of the booking it is given, whoever that is", () => {
+    renderRow({ party: { fullName: "Amina Client", avatarUrl: null } });
+
+    expect(screen.getByText("Amina Client")).toBeInTheDocument();
+    expect(screen.queryByText("Dr Example")).not.toBeInTheDocument();
+  });
+
+  it("says what to say when there is no one yet, and lets the page choose the words", () => {
+    renderRow({ party: null, missingPartyText: "Waiting for a client" });
+
+    expect(screen.getByText("Waiting for a client")).toBeInTheDocument();
+  });
+
   it("says a doctor or a provider is being found, by kind", () => {
-    const { unmount } = renderRow({}, { provider: null });
+    const { unmount } = renderRow({ party: null }, { provider: null });
     expect(screen.getByText("Finding a doctor...")).toBeInTheDocument();
     unmount();
 
-    renderRow({}, { provider: null, isTelemedicine: false });
+    renderRow({ party: null }, { provider: null, isTelemedicine: false });
     expect(screen.getByText("Finding a provider...")).toBeInTheDocument();
   });
 

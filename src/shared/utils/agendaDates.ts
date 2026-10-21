@@ -1,4 +1,4 @@
-import type { Booking } from "../../../shared/schemas/booking";
+import type { Booking } from "../schemas/booking";
 
 // The date rail of an agenda row. A video consultation is anchored to the facility's timezone and a home visit
 // happens wherever the client is, so each uses its own zone. A booking with no appointment yet (still being

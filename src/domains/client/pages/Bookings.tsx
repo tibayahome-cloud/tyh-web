@@ -12,8 +12,8 @@ import { useNow } from "../../../shared/hooks/useNow";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { prefetchBooking } from "../../../shared/libs/query";
 import type { Booking } from "../../../shared/schemas/booking";
-import { AgendaBookingRow } from "../components/AgendaBookingRow";
-import { agendaDay } from "../utils/agendaDates";
+import { AgendaBookingRow } from "../../../shared/components/AgendaBookingRow";
+import { agendaDay } from "../../../shared/utils/agendaDates";
 import {
   EARLIER_BOOKING_STATUSES,
   OPEN_BOOKING_STATUSES,
@@ -50,6 +50,7 @@ const AgendaList = ({ bookings, timezone, showYear, onOpen, rateFor }: AgendaLis
         <AgendaBookingRow
           key={booking.id}
           booking={booking}
+          party={booking.provider}
           day={day}
           showDate={!previous || previous.key !== day.key}
           showYear={showYear}

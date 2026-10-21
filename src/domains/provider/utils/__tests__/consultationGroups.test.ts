@@ -70,6 +70,10 @@ describe("ordering and the one to feature", () => {
     expect(pickNowConsultation([booking({ scheduledAt: at(-120) })], NOW)).toBeNull();
   });
 
+  it("does not feature a home visit, only a telemedicine consultation", () => {
+    expect(pickNowConsultation([booking({ isTelemedicine: false })], NOW)).toBeNull();
+  });
+
   it("does not feature an unattended or unassigned consultation", () => {
     expect(pickNowConsultation([booking({ status: "telemedicine_unattended" })], NOW)).toBeNull();
     expect(pickNowConsultation([], NOW)).toBeNull();
