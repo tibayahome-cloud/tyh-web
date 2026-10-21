@@ -80,6 +80,6 @@ describe("TechnicalIssueDialog", () => {
 
   it("never claims a refund or resolution in its copy", () => {
     render(<TechnicalIssueDialog open bookingId="booking-1" onClose={vi.fn()} />);
-    expect(screen.getByText(/doesn't request a refund/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not request a refund/i)).toBeInTheDocument();
   });
 });

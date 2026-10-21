@@ -1345,7 +1345,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       <Modal
         open={settingsModalOpen}
         title="Edit facility operations settings"
-        description="Manage facility contact numbers and operating hours. Facility identity, email, and location are managed by a super admin."
+        description="Manage facility contact numbers and operating hours. To change the facility name, email or location, contact support."
         onClose={() => setSettingsModalOpen(false)}
         maxWidth="lg"
       >

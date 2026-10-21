@@ -66,10 +66,11 @@ export const VideoConsultationDetails = ({
   const dateLabel = consultationDateLabel(booking.scheduledAt, timezone);
   const timeRange = consultationTimeRange(booking.scheduledAt, booking.estimateDurationMinutes, timezone);
   const countdown = describeStart(booking.scheduledAt, now);
-  const joinOpen = isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, now, joinWindowBeforeMinutes);
+  const doctor = booking.provider;
+  // There is nothing to join until a doctor is assigned, whatever the clock says.
+  const joinOpen = Boolean(doctor) && isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, now, joinWindowBeforeMinutes);
   const opensAt = joinOpensAt(booking.scheduledAt, joinWindowBeforeMinutes, timezone);
   const reference = bookingReference(booking.id);
-  const doctor = booking.provider;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-12 pt-20">
@@ -107,7 +108,7 @@ export const VideoConsultationDetails = ({
                 {timeRange} <span className="text-sm text-slate-500">({describeTimezone(timezone)})</span>
               </p>
             )}
-            {countdown && (
+            {countdown && doctor && (
               <p role="status" className="mt-2 text-sm font-semibold text-tiba-blue">
                 {countdown}
               </p>
@@ -150,6 +151,10 @@ export const VideoConsultationDetails = ({
           <Button type="button" className="min-h-[56px] w-full text-base" icon={<Video className="h-5 w-5" />} onClick={onJoin}>
             Join call
           </Button>
+        ) : !doctor ? (
+          <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            There is no call to join yet because a doctor has not been assigned. We will tell you as soon as one is. If the time no longer suits you, you can suggest a new one or cancel below.
+          </p>
         ) : (
           <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             {opensAt

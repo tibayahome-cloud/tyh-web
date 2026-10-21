@@ -287,7 +287,7 @@ export const TECHNICAL_ISSUE_CATEGORY_LABEL: Record<TechnicalIssueCategory, stri
   audio: "Audio",
   video: "Video",
   browser: "Browser",
-  jitsi: "Jitsi / call platform",
+  jitsi: "The call system",
   other: "Other"
 };
 

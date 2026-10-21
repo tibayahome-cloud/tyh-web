@@ -157,6 +157,6 @@ describe("mapFacilityProfileError", () => {
   });
 
   it("explains a refusal for a non-super-admin", () => {
-    expect(mapFacilityProfileError(httpError(403, "Forbidden")).message).toMatch(/super admin/i);
+    expect(mapFacilityProfileError(httpError(403, "Forbidden")).message).toMatch(/contact support/i);
   });
 });
