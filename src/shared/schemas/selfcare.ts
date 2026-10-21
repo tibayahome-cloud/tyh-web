@@ -21,6 +21,8 @@ export interface SelfCareProfile {
     consentAi: boolean;
     consentDataSharing: boolean;
     primaryGoals: string | null;
+    status: string;
+    lastCheckinAt: string | null;
     preferences: {
         notification_channel: string;
         quiet_hours: string;
@@ -35,6 +37,7 @@ export interface SelfCareCheckin {
     sleepHours: number | null;
     waterIntakeLens: number | null;
     notes: string | null;
+    symptoms: Array<{ label: string }>;
     checkinAt: string;
     aiRiskLevel?: string | null;
     recommendation?: {
@@ -63,7 +66,7 @@ export interface SelfCareCheckin {
 }
 
 export interface SelfCareCheckinInput {
-    mood: string;
+    mood?: string;
     note?: string;
     symptoms?: string[];
     checkedAt?: string;
@@ -91,6 +94,9 @@ export interface SelfCareAlert {
     reason?: string;
     client?: UserResource | null;
     clientUserId?: string;
+    providerUserId?: string;
+    provider?: UserResource | null;
+    channel?: string | null;
     recommendation?: {
         summary: string;
         steps: Array<{ title: string; description: string }>;
@@ -120,6 +126,11 @@ interface RawSelfCarePayload {
     consentDataSharing?: boolean;
     primary_goals?: string;
     primaryGoals?: string;
+    last_checkin_at?: string;
+    symptoms?: unknown[];
+    channel?: string;
+    provider?: unknown;
+    provider_user_id?: string;
     preferences?: {
         notification_channel?: string;
         notificationChannel?: string;
@@ -168,7 +179,7 @@ interface RawSelfCarePayload {
     alert_type?: string;
     severity?: "low" | "medium" | "high" | "critical";
     message?: string;
-    status?: "pending" | "acknowledged" | "resolved";
+    status?: string;
     resolved_at?: string;
     resolved_by?: string;
     risk_level?: string;
@@ -203,6 +214,8 @@ export const mapSelfCareProfile = (payload: unknown): SelfCareProfile | null => 
         consentAi: Boolean(raw.consent_ai ?? raw.consentAi),
         consentDataSharing: Boolean(raw.consent_data_sharing ?? raw.consentDataSharing),
         primaryGoals: coerceString(raw.primary_goals ?? raw.primaryGoals),
+        status: coerceString(raw.status) || "active",
+        lastCheckinAt: coerceDate(raw.last_checkin_at),
         preferences: raw.preferences ? {
             notification_channel: coerceString(raw.preferences.notification_channel || raw.preferences.notificationChannel) || "push",
             quiet_hours: coerceString(raw.preferences.quiet_hours || raw.preferences.quietHours) || ""
@@ -226,6 +239,11 @@ export const mapSelfCareCheckin = (payload: unknown): SelfCareCheckin | null => 
         sleepHours: raw.sleep_hours != null ? Number(raw.sleep_hours) : null,
         waterIntakeLens: raw.water_intake_lens != null ? Number(raw.water_intake_lens) : null,
         notes: coerceString(raw.notes),
+        symptoms: (Array.isArray(raw.symptoms) ? raw.symptoms : []).flatMap((item) => {
+            const entry = typeof item === "string" ? { label: item } : toObject(item);
+            const label = coerceString(entry.label ?? entry.name ?? entry.key);
+            return label ? [{ label }] : [];
+        }),
         checkinAt: coerceDate(raw.checkin_at) || new Date().toISOString(),
         checkedAt: coerceDate(raw.checkin_at || raw.checked_at) || new Date().toISOString(),
         aiRiskLevel: coerceString(raw.ai_risk_level),
@@ -272,6 +290,9 @@ export const mapSelfCareAlert = (payload: unknown): SelfCareAlert | null => {
         reason: coerceString(raw.reason),
         client: raw.client ? mapUserResource(raw.client) : null,
         clientUserId: coerceId(raw.client_user_id || raw.user_id),
+        providerUserId: coerceId(raw.provider_user_id) ?? undefined,
+        provider: raw.provider ? mapUserResource(raw.provider) : null,
+        channel: coerceString(raw.channel),
         recommendation: raw.recommendation ? {
             summary: coerceString(raw.recommendation.summary) || "",
             steps: Array.isArray(raw.recommendation.steps) ? raw.recommendation.steps.map(s => ({

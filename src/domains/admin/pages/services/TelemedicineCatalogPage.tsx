@@ -53,8 +53,8 @@ const slugify = (value: string, fallback: string) => {
   return key || `${fallback}-${Date.now()}`;
 };
 
-const nextDisplayOrder = (items: Array<{ displayOrder: number }>) =>
-  items.reduce((highest, item) => Math.max(highest, item.displayOrder), -1) + 1;
+const nextDisplayOrder = (items: Array<{ displayOrder?: number }>) =>
+  items.reduce((highest, item) => Math.max(highest, item.displayOrder ?? 0), -1) + 1;
 
 const editorExamples: Record<EditorKind, { name: string; description: string }> = {
   category: {
@@ -188,7 +188,7 @@ const TelemedicineCatalogPage = () => {
           ? nextDisplayOrder(categories)
           : kind === "subcategory"
             ? nextDisplayOrder(subcategories)
-            : nextDisplayOrder(services)
+            : services.length
       );
     }
     setForm(next);

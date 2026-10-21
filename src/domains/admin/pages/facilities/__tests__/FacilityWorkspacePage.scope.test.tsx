@@ -79,7 +79,7 @@ const facilityFactory = (overrides: Partial<Facility> = {}): Facility => ({
   services: [],
   admins: [],
   ...overrides
-});
+} as Facility);
 
 const renderAtFacility = (facilityId: string) => {
   const queryClient = new QueryClient({

@@ -529,7 +529,7 @@ const ApplicationReviewPage = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => setEditItem(item)}
-                      disabled={updateItemValueMutation.isLoading}
+                      disabled={updateItemValueMutation.isPending}
                     >
                       Edit response
                     </Button>
@@ -544,7 +544,7 @@ const ApplicationReviewPage = () => {
                           status: "verified"
                         })
                       }
-                      disabled={updateItemStatusMutation.isLoading}
+                      disabled={updateItemStatusMutation.isPending}
                     >
                       Mark verified
                     </Button>
@@ -557,7 +557,7 @@ const ApplicationReviewPage = () => {
                         setRejectItem(item);
                         setRejectReason("");
                       }}
-                      disabled={updateItemStatusMutation.isLoading}
+                      disabled={updateItemStatusMutation.isPending}
                     >
                       Reject item
                     </Button>
@@ -570,7 +570,7 @@ const ApplicationReviewPage = () => {
                         setResubmitItem(item);
                         setResubmitNote("");
                       }}
-                      disabled={requestResubmissionMutation.isLoading}
+                      disabled={requestResubmissionMutation.isPending}
                     >
                       Request resubmission
                     </Button>
@@ -603,14 +603,14 @@ const ApplicationReviewPage = () => {
             <Button
               variant="secondary"
               onClick={() => setShowRejectDialog(true)}
-              disabled={reviewApplicationMutation.isLoading}
+              disabled={reviewApplicationMutation.isPending}
             >
               Reject application
             </Button>
             <Button
               onClick={handleApprove}
-              disabled={!allVerified || reviewApplicationMutation.isLoading}
-              loading={reviewApplicationMutation.isLoading}
+              disabled={!allVerified || reviewApplicationMutation.isPending}
+              loading={reviewApplicationMutation.isPending}
             >
               Approve application
             </Button>
@@ -669,8 +669,8 @@ const ApplicationReviewPage = () => {
                   note: newRequirementNote
                 })
               }
-              disabled={!selectedRequirementId || addRequirementMutation.isLoading}
-              loading={addRequirementMutation.isLoading}
+              disabled={!selectedRequirementId || addRequirementMutation.isPending}
+              loading={addRequirementMutation.isPending}
             >
               Add requirement
             </Button>
@@ -713,7 +713,7 @@ const ApplicationReviewPage = () => {
                   });
                 }
               }}
-              loading={updateItemValueMutation.isLoading}
+              loading={updateItemValueMutation.isPending}
             >
               Save changes
             </Button>
@@ -807,7 +807,7 @@ const ApplicationReviewPage = () => {
                   });
                 }
               }}
-              loading={requestResubmissionMutation.isLoading}
+              loading={requestResubmissionMutation.isPending}
             >
               Send request
             </Button>
@@ -848,7 +848,7 @@ const ApplicationReviewPage = () => {
               variant="secondary"
               onClick={handleRejectItem}
               disabled={!rejectReason.trim()}
-              loading={updateItemStatusMutation.isLoading}
+              loading={updateItemStatusMutation.isPending}
             >
               Reject requirement
             </Button>
@@ -862,7 +862,7 @@ const ApplicationReviewPage = () => {
         description="Share clear notes so the provider understands what to improve."
         confirmLabel="Reject application"
         confirmVariant="secondary"
-        loading={reviewApplicationMutation.isLoading}
+        loading={reviewApplicationMutation.isPending}
         onConfirm={handleRejectApplication}
         onClose={() => setShowRejectDialog(false)}
         error={!decisionNotes.trim() ? "Decision notes are required when rejecting the application." : undefined}

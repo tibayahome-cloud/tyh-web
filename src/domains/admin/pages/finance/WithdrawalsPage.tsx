@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -85,7 +85,7 @@ const WithdrawalsPage = () => {
           size: PAGE_SIZE,
           status: statusFilter === "all" ? undefined : statusFilter
         }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled: canReadGlobalLedger || Boolean(facilityId)
   });
 

@@ -50,7 +50,7 @@ export const mapAvailableServices = (offerings: FacilityServiceOffering[]): Serv
   offerings
     .filter((offering) => offering.active)
     .map((offering) => offering.service)
-    .filter((service): service is Service => Boolean(service) && service.active);
+    .filter((service): service is Service => service != null && service.active);
 
 // Only the provider's own facility's active offerings are selectable, not the entire global
 // catalog: a service without an active offering at this facility cannot actually be assigned.
@@ -230,7 +230,7 @@ const ServicesPage = () => {
                     confirmLabel: "Reset"
                   })
                 }
-                disabled={!membership || updateMutation.isLoading || !profile?.verified}
+                disabled={!membership || updateMutation.isPending || !profile?.verified}
               >
                 Reset
               </Button>
@@ -243,7 +243,7 @@ const ServicesPage = () => {
                   })
                 }
                 disabled={!hasChanges || !profile?.verified}
-                loading={updateMutation.isLoading}
+                loading={updateMutation.isPending}
               >
                 Save
               </Button>

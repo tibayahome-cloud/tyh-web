@@ -227,7 +227,7 @@ const SelfCarePage = () => {
     createCheckin
       .mutateAsync({
         mood: checkinForm.mood || undefined,
-        notes: checkinForm.note || undefined,
+        note: checkinForm.note || undefined,
         symptoms: checkinForm.symptoms.split(/[,]/).map((e) => e.trim()).filter(Boolean),
         vitals
       })
@@ -394,7 +394,7 @@ const SelfCarePage = () => {
                                         Mood: {moodOptions.find(m => m.label === entry.mood)?.label ?? entry.mood}
                                       </div>
                                     )}
-                                    {entry.symptoms && entry.symptoms.length > 0 && (
+                                    {entry.symptoms.length > 0 && (
                                       <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 text-[9px] font-bold">
                                         {entry.symptoms.length} Symptoms
                                       </div>

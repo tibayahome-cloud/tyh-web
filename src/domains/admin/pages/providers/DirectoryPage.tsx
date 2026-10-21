@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -171,7 +171,7 @@ type ConfirmState =
       title: string;
       description?: string;
       confirmLabel: string;
-      confirmVariant?: "primary" | "secondary" | "danger";
+      confirmVariant?: "primary" | "secondary" | "ghost";
       action: () => void;
     }
   | null;
@@ -193,7 +193,7 @@ const defaultPage: PageMeta = {
 
 const mapRows = (providers: Provider[], page: PageMeta): ProviderGridRow[] => {
   return providers.map((provider, index) => {
-    const user = provider.user ?? {};
+    const user: Partial<ProviderUser> = provider.user ?? {};
     const ratingAvgRaw = typeof provider.rating_avg === "number" ? provider.rating_avg : Number(provider.rating_avg ?? 0);
     const ratingCount = provider.rating_count ?? 0;
     const ratingLabel = ratingCount > 0 ? `${ratingAvgRaw.toFixed(2)} (${ratingCount})` : "No ratings";
@@ -229,7 +229,7 @@ const useProviderListQuery = (
   pageSize: number,
   onlyEmergency: boolean,
 ): { data: ProviderListResult | undefined; isLoading: boolean; isFetching: boolean } =>
-  useQuery({
+  useQuery<ProviderListResult>({
     queryKey: ["admin", "providers", "list", { status, search, page, pageSize, onlyEmergency }],
     queryFn: async () => {
       const params: Record<string, string> = {
@@ -272,7 +272,7 @@ const useProviderListQuery = (
         page: normalisedPage,
       };
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 
@@ -519,7 +519,7 @@ useEffect(() => {
     if (!filtersOpen || isMobileFilters) {
       return;
     }
-    const handleClickAway = (event: MouseEvent) => {
+    const handleClickAway = (event: globalThis.MouseEvent) => {
       if (!filterMenuRef.current) {
         return;
       }

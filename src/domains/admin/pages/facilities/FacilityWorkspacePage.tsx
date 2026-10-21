@@ -886,7 +886,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       updateFacility(String(facilityId), {
         phones: form.phones.map((phone) => ({
           phone: phone.phone.trim(),
-          label: phone.label.trim() || null,
+          label: phone.label?.trim() || null,
           isPrimary: phone.isPrimary
         })),
         operatingHours: form.operatingHours

@@ -188,14 +188,11 @@ export const AdminCreateBookingDialog = ({
     },
   });
 
-  const handleLocationSelect = (location: { lat: number; lng: number; address?: string }) => {
+  const handleLocationSelect = (location: { lat: number; lng: number }) => {
     setValue("lat", location.lat);
     setValue("lng", location.lng);
-    if (location.address) {
-      setValue("addressText", location.address);
-    }
-    setShowMap(false);
   };
+  const handleAddressResolved = (address: string) => setValue("addressText", address);
 
   const handleUserSelect = (user: UserSearchResult) => {
     setSelectedUser(user);
@@ -224,8 +221,9 @@ export const AdminCreateBookingDialog = ({
             <p className="text-sm text-slate-600">Tap to set client location</p>
             <div className="h-80 rounded-xl overflow-hidden border">
               <LocationPickerMap
-                onLocationSelect={handleLocationSelect}
-                initialLocation={hasLocation ? { lat, lng } : undefined}
+                value={hasLocation ? { lat, lng } : null}
+                onChange={handleLocationSelect}
+                onAddressChange={handleAddressResolved}
               />
             </div>
             <Button variant="outline" onClick={() => setShowMap(false)} className="w-full">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GridColDef } from "@mui/x-data-grid";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -253,7 +253,7 @@ const useUserListQuery = (status: string, search: string, page: number, pageSize
         },
       };
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
 const MetricCard = ({ label, primary, secondary }: { label: string; primary: string; secondary?: string }) => (

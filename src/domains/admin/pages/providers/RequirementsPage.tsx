@@ -228,7 +228,7 @@ export const ProviderRequirementsPanel = () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "provider-requirements"] });
     }
   });
-  const { mutate: toggleActive, isLoading: toggleActiveLoading } = toggleActiveMutation;
+  const { mutate: toggleActive, isPending: toggleActiveLoading } = toggleActiveMutation;
 
   const confirmDelete = useCallback((requirement: RequirementType) => {
     setPendingDelete(requirement);
@@ -399,7 +399,7 @@ export const ProviderRequirementsPanel = () => {
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!mutation.isLoading) {
+          if (!mutation.isPending) {
             setModalOpen(false);
             setEditing(null);
           }
@@ -512,10 +512,10 @@ export const ProviderRequirementsPanel = () => {
         description="Providers will no longer be asked to supply this document or field in new applications."
         confirmLabel="Delete"
         confirmVariant="secondary"
-        loading={deleteMutation.isLoading}
+        loading={deleteMutation.isPending}
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
         onClose={() => {
-          if (!deleteMutation.isLoading) {
+          if (!deleteMutation.isPending) {
             setPendingDelete(null);
           }
         }}
