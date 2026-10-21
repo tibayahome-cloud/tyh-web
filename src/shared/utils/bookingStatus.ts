@@ -58,6 +58,9 @@ export const getBookingStatusTheme = (status: string) => {
   );
 };
 
+/** Every booking status the app has a label for, so a list can prove it places each one in a filter. */
+export const KNOWN_BOOKING_STATUSES = Object.keys(STATUS_THEMES);
+
 export const formatBookingStatus = (status: string) => getBookingStatusTheme(status).label;
 
 export const getSessionStatusTheme = (status: string) => {
