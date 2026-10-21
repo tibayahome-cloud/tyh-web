@@ -20,11 +20,20 @@ import { getBookingStatusTheme, getSessionStatusTheme } from "../../../shared/ut
 import {
   formatTelemedicineDateTime,
   isWithinJoinWindow,
-  isWithinTechnicalIssueReportWindow,
-  splitTelemedicineBookings
+  isWithinTechnicalIssueReportWindow
 } from "../../../shared/utils/telemedicine";
 import type { Booking } from "../../../shared/schemas/booking";
 import { describeWait } from "../../../shared/utils/joinCountdown";
+import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { useNow } from "../../../shared/hooks/useNow";
+import {
+  isEarlierConsultation,
+  needsYouForConsultation,
+  pickNowConsultation,
+  sortEarlier,
+  sortOpen,
+  type ProviderNeedsItem
+} from "../utils/consultationGroups";
 import { noShowReportState } from "../../../shared/utils/noShowReport";
 
 const ConsultationRow = ({
@@ -153,7 +162,22 @@ const ProviderTelemedicinePage = () => {
     { enabled: Boolean(user?.id) }
   );
 
-  const consultations = useMemo(() => splitTelemedicineBookings((data?.bookings ?? []).filter((booking) => booking.isTelemedicine)), [data]);
+  const now = useNow(30_000);
+  const [earlierOpen, setEarlierOpen] = useState(false);
+  const [earlierShown, setEarlierShown] = useState(10);
+  const all = useMemo(() => (data?.bookings ?? []).filter((booking) => booking.isTelemedicine), [data]);
+  const open = useMemo(() => sortOpen(all.filter((booking) => !isEarlierConsultation(booking))), [all]);
+  const earlier = useMemo(() => sortEarlier(all.filter(isEarlierConsultation)), [all]);
+  const nowBooking = useMemo(() => pickNowConsultation(open, now), [open, now]);
+  const needsYou = useMemo<ProviderNeedsItem[]>(
+    () => open.map((booking) => needsYouForConsultation(booking, now)).filter((item): item is ProviderNeedsItem => item !== null),
+    [open, now]
+  );
+  // What is featured or listed under "Needs you" is not repeated under "Coming up".
+  const comingUp = useMemo(() => {
+    const shown = new Set<string>([...needsYou.map((item) => item.booking.id), ...(nowBooking ? [nowBooking.id] : [])]);
+    return open.filter((booking) => !shown.has(booking.id));
+  }, [open, needsYou, nowBooking]);
 
   const handleReportNoShow = async () => {
     if (!reportBookingId) return;
@@ -162,7 +186,7 @@ const ProviderTelemedicinePage = () => {
       await reportNoShowMutation.mutateAsync(reportBookingId);
       setReportBookingId(null);
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
-      toast.showToast({ title: "Reported", description: "Admin.ops will review this appointment.", variant: "info" });
+      toast.showToast({ title: "Reported", description: "Our team will review this appointment.", variant: "info" });
     } catch (error) {
       setReportError(error instanceof Error ? error.message : "Please try again.");
     }
@@ -174,7 +198,7 @@ const ProviderTelemedicinePage = () => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-900">Telemedicine</h1>
-            <p className="text-sm text-slate-500">Your upcoming and past remote consultations.</p>
+            <p className="text-sm text-slate-600">The call to join first, then what is coming up.</p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
@@ -190,14 +214,12 @@ const ProviderTelemedicinePage = () => {
               </Button>
             </div>
             {dataUpdatedAt > 0 && (
-              <span className="text-[10px] text-slate-400">
+              <span className="text-xs text-slate-600">
                 Updated {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
         </div>
-
-        <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
         {/* A failed request is not an empty list. Say so, instead of "No consultations assigned yet". */}
         {isError && !data && (
@@ -205,13 +227,12 @@ const ProviderTelemedicinePage = () => {
         )}
 
         {isLoading && <Loading />}
-        {!isLoading && !isError && consultations.upcoming.length === 0 && consultations.history.length === 0 && (
+        {!isLoading && !isError && open.length === 0 && earlier.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-white py-12 text-center">
-            <Video size={24} className="mb-2 text-slate-300" />
-            <p className="text-sm font-semibold text-slate-900">No consultations assigned yet</p>
-            <p className="mt-1 max-w-xs text-xs text-slate-500">
-              Assigned remote consultations will show up here once admin.ops assigns them to you.
-              Clients can only book you during the hours you set.
+            <Video size={24} className="mb-2 text-slate-400" aria-hidden="true" />
+            <p className="text-base font-semibold text-slate-900">No consultations assigned yet</p>
+            <p className="mt-1 max-w-xs text-sm text-slate-600">
+              Consultations appear here once your facility assigns them to you. Clients can only book you during the hours you set.
             </p>
             <Button type="button" size="sm" variant="outline" className="mt-4" onClick={() => navigate("/pro/availability")}>
               <Clock size={14} />
@@ -219,43 +240,124 @@ const ProviderTelemedicinePage = () => {
             </Button>
           </div>
         )}
-        {!isLoading && consultations.upcoming.length === 0 && consultations.history.length > 0 && (
-          <p className="rounded-2xl border border-slate-100 bg-white px-4 py-6 text-sm text-slate-500">No upcoming consultations.</p>
-        )}
-        <div className="grid gap-3">
-          {consultations.upcoming.map((booking) => (
-            <ConsultationRow
-              key={booking.id}
-              booking={booking}
-              timezone={policyQuery.data?.defaultTimezone}
-              joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
-              onJoin={() => setActiveCallBookingId(booking.id)}
-              onReportNoShow={() => {
-                setReportError(null);
-                setReportBookingId(booking.id);
-              }}
-              onReportTechnicalIssue={() => setTechnicalIssueBookingId(booking.id)}
-              onOpenDetails={() => navigate(`/pro/bookings/${booking.id}`)}
-            />
-          ))}
-        </div>
-        {!isLoading && consultations.history.length > 0 && (
-          <div className="mt-2 space-y-3">
-            <h2 className="text-sm font-semibold text-slate-700">Consultation history</h2>
-            {consultations.history.map((booking) => (
-              <ConsultationRow
-                key={booking.id}
-                booking={booking}
-                timezone={policyQuery.data?.defaultTimezone}
+
+        {!isLoading && (data || !isError) && (
+          <>
+            {nowBooking && (
+              <NextConsultationCard
+                booking={nowBooking}
+                withName={nowBooking.client?.fullName}
+                onJoin={() => setActiveCallBookingId(nowBooking.id)}
+                detailsTo={`/pro/bookings/${nowBooking.id}`}
                 joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
-                interactive={false}
-                onJoin={() => undefined}
-                onReportNoShow={() => undefined}
-                onReportTechnicalIssue={() => undefined}
-                onOpenDetails={() => navigate(`/pro/bookings/${booking.id}`)}
               />
-            ))}
-          </div>
+            )}
+
+            <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
+
+            {needsYou.length > 0 && (
+              <section aria-label="Needs you" className="space-y-3">
+                <h2 className="text-base font-semibold text-slate-900">Needs you</h2>
+                <ul className="space-y-2">
+                  {needsYou.map((item) => (
+                    <li
+                      key={`${item.kind}-${item.booking.id}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+                    >
+                      <p className="text-sm font-medium text-amber-950">{item.message}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (item.kind === "report") {
+                            setReportError(null);
+                            setReportBookingId(item.booking.id);
+                          } else {
+                            navigate(`/pro/bookings/${item.booking.id}`);
+                          }
+                        }}
+                        className="min-h-[44px] shrink-0 rounded-lg bg-white px-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                      >
+                        {item.action}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {(open.length > 0 || earlier.length > 0) && (
+              <section aria-label="Coming up" className="space-y-3">
+                <h2 className="text-base font-semibold text-slate-900">
+                  Coming up{comingUp.length > 0 && <span className="ml-1.5 font-normal text-slate-600">({comingUp.length})</span>}
+                </h2>
+                {comingUp.length === 0 ? (
+                  <p className="text-sm text-slate-600">{nowBooking || needsYou.length > 0 ? "Nothing else is coming up." : "Nothing is coming up."}</p>
+                ) : (
+                  <div className="grid gap-3">
+                    {comingUp.map((booking) => (
+                      <ConsultationRow
+                        key={booking.id}
+                        booking={booking}
+                        timezone={policyQuery.data?.defaultTimezone}
+                        joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+                        onJoin={() => setActiveCallBookingId(booking.id)}
+                        onReportNoShow={() => {
+                          setReportError(null);
+                          setReportBookingId(booking.id);
+                        }}
+                        onReportTechnicalIssue={() => setTechnicalIssueBookingId(booking.id)}
+                        onOpenDetails={() => navigate(`/pro/bookings/${booking.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {earlier.length > 0 && (
+              <section aria-label="Earlier" className="space-y-3">
+                <h2 className="text-base font-semibold text-slate-900">
+                  <button
+                    type="button"
+                    aria-expanded={earlierOpen}
+                    aria-controls="earlier-consultations"
+                    onClick={() => setEarlierOpen((value) => !value)}
+                    className="-mx-2 flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-left hover:text-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                  >
+                    Earlier
+                    <span className="font-normal text-slate-600">({earlier.length})</span>
+                    <span className="text-sm font-semibold text-tiba-blue">{earlierOpen ? "Hide" : "Show"}</span>
+                  </button>
+                </h2>
+                {earlierOpen && (
+                  <div id="earlier-consultations" className="grid gap-3">
+                    {earlier.slice(0, earlierShown).map((booking) => (
+                      <ConsultationRow
+                        key={booking.id}
+                        booking={booking}
+                        timezone={policyQuery.data?.defaultTimezone}
+                        joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+                        interactive={false}
+                        onJoin={() => undefined}
+                        onReportNoShow={() => undefined}
+                        onReportTechnicalIssue={() => undefined}
+                        onOpenDetails={() => navigate(`/pro/bookings/${booking.id}`)}
+                      />
+                    ))}
+                    {earlierShown < earlier.length && (
+                      <button
+                        type="button"
+                        onClick={() => setEarlierShown((count) => count + 10)}
+                        className="min-h-[44px] justify-self-start rounded-xl border-2 border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:border-tiba-blue hover:text-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                      >
+                        Show more
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
         )}
       </div>
 
