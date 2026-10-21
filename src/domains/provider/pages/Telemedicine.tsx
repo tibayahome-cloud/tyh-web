@@ -24,9 +24,8 @@ import {
   splitTelemedicineBookings
 } from "../../../shared/utils/telemedicine";
 import type { Booking } from "../../../shared/schemas/booking";
-import { TELEMEDICINE_DISPUTE_TYPE_NO_SHOW } from "../../../shared/schemas/telemedicine";
-
-const NOT_REPORTABLE_STATUSES = ["cancelled_by_client", "cancelled_by_admin", "fully_completed"];
+import { describeWait } from "../../../shared/utils/joinCountdown";
+import { noShowReportState } from "../../../shared/utils/noShowReport";
 
 const ConsultationRow = ({
   booking,
@@ -49,8 +48,9 @@ const ConsultationRow = ({
   const sessionTheme = booking.telemedicineSession ? getSessionStatusTheme(booking.telemedicineSession.status) : null;
   const withinWindow = interactive && isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), joinWindowBeforeMinutes);
   const canJoin = booking.status === "scheduled" && withinWindow;
-  const existingNoShowDispute = booking.disputes.find((dispute) => dispute.disputeType === TELEMEDICINE_DISPUTE_TYPE_NO_SHOW);
-  const canReportNoShow = interactive && !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status);
+  // "Client didn't join" is offered only once the call time has passed, the provider was in the call and the
+  // client was not. Before that there is nothing to report (and the server would refuse).
+  const noShow = interactive ? noShowReportState(booking, "provider", Date.now()) : ({ state: "unavailable" } as const);
   // Reporting stays open for 24h after the call ends -- a longer, separate window from joining.
   const canReportTechnicalIssue = interactive && isWithinTechnicalIssueReportWindow(
     booking.scheduledAt,
@@ -77,14 +77,20 @@ const ConsultationRow = ({
           {booking.estimateDurationMinutes && <span>{booking.estimateDurationMinutes} min</span>}
         </div>
         {minutesUntilJoinable !== null && minutesUntilJoinable > 0 && (
-          <p className="mt-1 text-[11px] text-slate-400">Joinable in {minutesUntilJoinable} min</p>
+          <p className="mt-1 text-sm text-slate-600">The call opens in {describeWait(minutesUntilJoinable)}</p>
+        )}
+        {noShow.state === "waiting" && (
+          <p className="mt-1 text-sm text-slate-600">
+            If your client has not joined by{" "}
+            {formatTelemedicineDateTime(new Date(noShow.at).toISOString(), timezone, { hour: "2-digit", minute: "2-digit", hour12: false })}, you can report it here.
+          </p>
         )}
         <div className="mt-2 flex flex-wrap gap-1.5">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusTheme.className}`}>{statusTheme.label}</span>
           {sessionTheme && (
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sessionTheme.className}`}>{sessionTheme.label}</span>
           )}
-          {existingNoShowDispute && (
+          {noShow.state === "reported" && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Reported, pending review</span>
           )}
         </div>
@@ -95,7 +101,7 @@ const ConsultationRow = ({
             Technical issue
           </Button>
         )}
-        {canReportNoShow && (
+        {noShow.state === "available" && (
           <Button type="button" size="sm" variant="ghost" onClick={onReportNoShow}>
             Client didn't join
           </Button>
@@ -259,7 +265,7 @@ const ProviderTelemedicinePage = () => {
         onConfirm={handleReportNoShow}
         loading={reportNoShowMutation.isPending}
         title="Report a problem"
-        description="Let admin.ops know if the client didn't join for this appointment. This flags the appointment for review."
+        description="Tell our team your client did not join this appointment. This flags it for review. It does not change any payment by itself."
         confirmLabel="Report"
         confirmVariant="secondary"
         error={reportError ?? undefined}

@@ -16,3 +16,17 @@ export const describeStart = (scheduledAt: string | null | undefined, now: numbe
   if (minutes === 0) return "Starting now";
   return `Started ${Math.abs(minutes)} min ago`;
 };
+
+// How long until the call opens, for the line under a consultation that is not open yet: "12 min", "3 h 17 min",
+// "2 days". Minutes alone ("1544 min") are not something a person can read.
+export const describeWait = (minutes: number): string => {
+  const total = Math.max(0, Math.round(minutes));
+  if (total < 60) return `${total} min`;
+  if (total < 24 * 60) {
+    const hours = Math.floor(total / 60);
+    const rest = total % 60;
+    return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+  }
+  const days = Math.round(total / (24 * 60));
+  return days === 1 ? "1 day" : `${days} days`;
+};
