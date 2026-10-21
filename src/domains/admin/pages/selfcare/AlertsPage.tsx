@@ -142,11 +142,7 @@ const AdminSelfCareAlertsPage = () => {
           description: "We opened a conversation in your inbox.",
           variant: "info"
         });
-        if (thread?.bookingId) {
-          window.dispatchEvent(new CustomEvent("chat:open", { detail: { bookingId: thread.bookingId } }));
-        } else {
-          navigate("/admin/conversations");
-        }
+        navigate(thread?.id ? `/admin/conversations/${thread.id}` : "/admin/conversations");
       })
       .catch((error) => {
         showToast({

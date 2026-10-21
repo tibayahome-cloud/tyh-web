@@ -11,7 +11,7 @@ import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { BookingKindBadge } from "../../../shared/components/BookingKindBadge";
-import { BookingListFilters, kindToIsTelemedicine, type BookingKindFilter } from "../../../shared/components/BookingListFilters";
+import { BookingListFilters } from "../../../shared/components/BookingListFilters";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import type { Booking } from "../../../shared/schemas/booking";
 import { AppLayout } from "../../../shared/components/AppLayout";
@@ -158,20 +158,15 @@ const BookingsPage = () => {
     const { user } = useAuth();
     const policyQuery = useTelemedicinePolicy();
     const [activeTab, setActiveTab] = useState<ClientBookingTabKey>("all");
-    const [kind, setKind] = useState<BookingKindFilter>("all");
     const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
 
     const activeTabConfig = CLIENT_BOOKING_TABS.find((tab) => tab.key === activeTab)!;
-    const resetFilters = () => {
-        setActiveTab("all");
-        setKind("all");
-    };
+    const resetFilters = () => setActiveTab("all");
 
     const { data, isLoading, isError, refetch } = useBookingList(
         {
             clientId: user?.id ?? undefined,
             statuses: activeTabConfig.statuses.length > 0 ? [...activeTabConfig.statuses] : undefined,
-            isTelemedicine: kindToIsTelemedicine(kind),
             pageSize: PAGE_SIZE,
             preset: "card"
         },
@@ -183,12 +178,10 @@ const BookingsPage = () => {
         return result?.bookings ?? [];
     }, [data]);
 
-    const filtered = activeTab !== "all" || kind !== "all";
-    const emptyMessage = (() => {
-        if (!filtered) return "Your bookings will appear here once you book.";
-        const what = kind === "video" ? "video consultations" : kind === "home" ? "home visits" : "bookings";
-        return activeTab === "all" ? `No ${what} yet.` : `No ${activeTabConfig.label.toLowerCase()} ${what}. This tab shows bookings ${activeTabConfig.meaning}.`;
-    })();
+    const filtered = activeTab !== "all";
+    const emptyMessage = filtered
+        ? `No ${activeTabConfig.label.toLowerCase()} bookings. This tab shows bookings ${activeTabConfig.meaning}.`
+        : "Your bookings will appear here once you book.";
 
     return (
         <AppLayout fullWidth showHeader={false} disablePadding>
@@ -202,8 +195,6 @@ const BookingsPage = () => {
                         statusTabs={CLIENT_BOOKING_TABS}
                         status={activeTab}
                         onStatusChange={setActiveTab}
-                        kind={kind}
-                        onKindChange={setKind}
                         onReset={resetFilters}
                         defaultStatus="all"
                     />

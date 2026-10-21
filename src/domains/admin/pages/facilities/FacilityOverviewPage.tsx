@@ -198,7 +198,7 @@ const FacilityOverviewPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">{facility.name}</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Open work including video consultations{updated ? `. Updated ${updated}.` : "."}
+            Open work including telemedicine consultations{updated ? `. Updated ${updated}.` : "."}
             <button
               type="button"
               onClick={() => void overviewQuery.refetch()}
@@ -217,7 +217,7 @@ const FacilityOverviewPage = () => {
       {metrics.needsAttention && <NeedsAttention attention={metrics.needsAttention} />}
 
       <LiveStatusCard
-        title="Live for video consultations"
+        title="Live for telemedicine"
         subject="facility"
         status={liveStatusQuery.data}
         isLoading={liveStatusQuery.isLoading}

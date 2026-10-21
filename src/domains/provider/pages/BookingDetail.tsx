@@ -13,6 +13,7 @@ import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/util
 import { VideoConsultationDetails } from "../components/VideoConsultationDetails";
 import { useBookingDetail, useMarkBookingMutation } from "../../../shared/hooks/useBookings";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { Loading } from "../../../shared/components/Loading";
 import { Card } from "../../../shared/components/Card";
@@ -97,16 +98,10 @@ const ProviderBookingDetailPage = () => {
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
   const [isStepsPaneOpen, setIsStepsPaneOpen] = useState(false);
 
+  const { openBookingChat } = useOpenBookingChat("/pro/inbox");
   const openChat = useCallback(() => {
-    if (!booking?.id || typeof window === "undefined") {
-      return;
-    }
-    window.dispatchEvent(
-      new CustomEvent("chat:open", {
-        detail: { bookingId: booking.id, role: "provider" }
-      })
-    );
-  }, [booking?.id]);
+    if (booking?.id) void openBookingChat(booking.id);
+  }, [booking?.id, openBookingChat]);
 
   const currentStep = navSteps[0];
   const nextStep = navSteps[1];

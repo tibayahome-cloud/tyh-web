@@ -35,7 +35,7 @@ export const NextConsultationCard = ({ booking, withName, joinTo, detailsTo, joi
         </span>
         <div className="min-w-0">
           <h2 id={`next-consultation-${booking.id}`} className="text-base font-semibold text-slate-900">
-            Your video consultation{withName ? ` with ${withName}` : ""}
+            Your telemedicine consultation{withName ? ` with ${withName}` : ""}
           </h2>
           <p className="text-sm text-slate-700">
             {booking.service?.name ? `${booking.service.name}. ` : ""}
@@ -55,7 +55,7 @@ export const NextConsultationCard = ({ booking, withName, joinTo, detailsTo, joi
           className="mt-4 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl bg-tiba-blue px-4 text-base font-semibold text-white hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2"
         >
           <Video className="h-5 w-5" aria-hidden="true" />
-          Join video call
+          Join call
         </Link>
       ) : (
         <p className="mt-3 text-sm text-slate-700">

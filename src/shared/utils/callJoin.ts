@@ -16,7 +16,7 @@ export const friendlyJoinError = (err: unknown): string => {
   if (isAxiosError(err)) return getApiError(err, "We could not join the call. Try again.");
   const message = err instanceof Error ? err.message : "";
   if (/video call script/i.test(message)) {
-    return "We could not load the video call. Check your internet connection and try again.";
+    return "We could not load the call. Check your internet connection and try again.";
   }
   if (/permission|notallowed|denied/i.test(message)) {
     return "Allow the camera and microphone for this site in your browser settings, then try again.";

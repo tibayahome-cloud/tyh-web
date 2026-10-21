@@ -5,7 +5,8 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -45,9 +46,12 @@ const consultation = (minutesFromNow: number, session: Record<string, unknown> |
 const renderPage = (booking: unknown) => {
   list.state = { isLoading: false, isError: false, data: { bookings: [booking] }, error: null };
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/pro/telemedicine"]}>
       <QueryClientProvider client={new QueryClient()}>
-        <ProviderTelemedicinePage />
+        <Routes>
+          <Route path="/pro/telemedicine" element={<ProviderTelemedicinePage />} />
+          <Route path="/pro/bookings/:id" element={<div>booking details page</div>} />
+        </Routes>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -94,5 +98,23 @@ describe("provider Telemedicine: client did not join", () => {
 
     expect(screen.queryByRole("button", { name: /Client didn't join/ })).not.toBeInTheDocument();
     expect(screen.getByText("Reported, pending review")).toBeInTheDocument();
+  });
+});
+
+describe("provider Telemedicine: opening a consultation", () => {
+  it("opens the booking from the View details button", () => {
+    renderPage(consultation(197, null));
+
+    fireEvent.click(screen.getByRole("button", { name: "View details" }));
+
+    expect(screen.getByText("booking details page")).toBeInTheDocument();
+  });
+
+  it("opens the booking from the consultation's name too", () => {
+    renderPage(consultation(197, null));
+
+    fireEvent.click(screen.getByRole("button", { name: "Video consultation" }));
+
+    expect(screen.getByText("booking details page")).toBeInTheDocument();
   });
 });

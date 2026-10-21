@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../../shared/components/Button";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { useBookingList, useConfirmBookingMutation, useCancelBookingMutation } from "../../../shared/hooks/useBookings";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { AppLayout } from "../../../shared/components/AppLayout";
@@ -91,6 +92,7 @@ const HISTORY_STATUSES = [
 
 const ClientHome = () => {
   const { user } = useAuth();
+  const { openBookingChat } = useOpenBookingChat("/app/inbox");
   const navigate = useNavigate();
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [bookingServiceId, setBookingServiceId] = useState<string | null>(null);
@@ -383,7 +385,7 @@ const ClientHome = () => {
         <ImmersiveBookingView
           booking={activeBooking}
           onClose={() => setIsTracking(false)}
-          onOpenChat={() => navigate("/app/inbox")}
+          onOpenChat={() => void openBookingChat(activeBooking.id)}
         />
       )}
 
@@ -543,7 +545,7 @@ const ClientHome = () => {
                 <Video className="h-6 w-6 shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-base font-semibold">Talk to a Doctor Online</span>
-                  <span className="mt-1 block text-sm text-white/90">A video consultation. No home visit needed.</span>
+                  <span className="mt-1 block text-sm text-white/90">A consultation by call or video. No home visit needed.</span>
                 </span>
                 <ArrowRight className="h-5 w-5 shrink-0" />
               </button>

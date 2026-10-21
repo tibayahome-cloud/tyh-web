@@ -84,7 +84,7 @@ const ClientTelemedicinePage = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900">Telemedicine</h1>
-            <p className="text-sm text-slate-500">See a provider by video call, no need to visit in person.</p>
+            <p className="text-sm text-slate-500">See a provider remotely by call or video. No need to visit in person.</p>
           </div>
           <Button type="button" onClick={() => setDialogOpen(true)}>
             <Video size={16} />

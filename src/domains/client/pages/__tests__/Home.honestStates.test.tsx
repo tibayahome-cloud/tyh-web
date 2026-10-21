@@ -17,6 +17,9 @@ const state = vi.hoisted(() => ({
   refetchUpcoming: vi.fn()
 }));
 
+vi.mock("../../../../shared/hooks/useOpenBookingChat", () => ({
+  useOpenBookingChat: () => ({ openBookingChat: vi.fn(), openingBookingId: null })
+}));
 vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "c1", phone: "+254700000001" } }) }));
 vi.mock("../../../../shared/hooks/useBookings", () => ({
   useBookingList: (params: { statuses?: string[] }) => {
@@ -117,7 +120,7 @@ describe("client Home", () => {
       state.upcoming = { data: { bookings: [consultation()] } };
       renderHome();
 
-      expect(screen.getByRole("heading", { name: "Your video consultation with Dr Example" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Your telemedicine consultation with Dr Example" })).toBeInTheDocument();
       expect(screen.getByRole("status")).toHaveTextContent(/Starts in/);
       expect(screen.queryByRole("heading", { name: "Your next appointments" })).not.toBeInTheDocument();
       expect(screen.queryByText("No upcoming care scheduled")).not.toBeInTheDocument();
@@ -129,7 +132,7 @@ describe("client Home", () => {
       };
       renderHome();
 
-      expect(screen.getByRole("heading", { name: "Your video consultation with Dr Example" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Your telemedicine consultation with Dr Example" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Your next appointments" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Home visit/ })).toBeInTheDocument();
     });
@@ -144,7 +147,7 @@ describe("client Home", () => {
         }
       };
       renderHome();
-      expect(screen.queryByRole("heading", { name: /Your video consultation/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Your telemedicine consultation/ })).not.toBeInTheDocument();
     });
   });
 

@@ -61,13 +61,13 @@ beforeEach(() => {
 });
 
 describe("client My bookings", () => {
-  it("tells video from home visits with a badge, and shows a place only for a home visit", () => {
+  it("tells telemedicine from home based bookings with a badge, and shows a place only for a home based one", () => {
     renderPage();
 
     const videoCard = screen.getByRole("button", { name: "Video consultation" }).closest("article") as HTMLElement;
     const homeCard = screen.getByRole("button", { name: "Home nursing visit" }).closest("article") as HTMLElement;
-    expect(within(videoCard).getByText("Video")).toBeInTheDocument();
-    expect(within(homeCard).getByText("Home visit")).toBeInTheDocument();
+    expect(within(videoCard).getByText("Telemedicine")).toBeInTheDocument();
+    expect(within(homeCard).getByText("Home based")).toBeInTheDocument();
     expect(within(homeCard).getByText("Kilimani, Nairobi")).toBeInTheDocument();
     expect(screen.queryByText(/location not specified/i)).not.toBeInTheDocument();
   });
@@ -90,29 +90,35 @@ describe("client My bookings", () => {
   it("asks for every booking at first, with no filters", () => {
     renderPage();
 
-    expect(lastParams()).toMatchObject({ clientId: "c1", statuses: undefined, isTelemedicine: undefined });
+    expect(lastParams()).toMatchObject({ clientId: "c1", statuses: undefined });
+    expect(lastParams()).not.toHaveProperty("isTelemedicine");
   });
 
-  it("sends the status tab and the type choice together as the one request", () => {
+  it("has one filter: the status tabs. There is no second row of type chips", () => {
+    renderPage();
+
+    expect(screen.getByRole("tablist", { name: "Booking status" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Booking type" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All types" })).not.toBeInTheDocument();
+  });
+
+  it("sends the status tab as the request's status filter", () => {
     renderPage();
 
     fireEvent.click(screen.getByRole("tab", { name: "Pending" }));
     expect(lastParams().statuses).toEqual(expect.arrayContaining(["requested", "telemedicine_paid_pending_assignment"]));
-
-    fireEvent.click(screen.getByRole("button", { name: "Video" }));
-    expect(lastParams()).toMatchObject({ isTelemedicine: true });
-    expect(lastParams().statuses).toEqual(expect.arrayContaining(["requested"]));
+    expect(lastParams().isTelemedicine).toBeUndefined();
   });
 
-  it("explains an empty filtered list in words and clears the filters", () => {
+  it("explains an empty tab in words and clears the filter", () => {
     state.list = { data: { bookings: [] }, isLoading: false, isError: false, refetch: vi.fn() };
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: "Video" }));
-    expect(screen.getByText(/No video consultations yet/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
+    expect(screen.getByText(/No completed bookings/)).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Clear filters" })[0]);
-    expect(lastParams()).toMatchObject({ statuses: undefined, isTelemedicine: undefined });
+    expect(lastParams()).toMatchObject({ statuses: undefined });
   });
 
   it("shows an error with a retry, not an empty list, when the request fails", () => {

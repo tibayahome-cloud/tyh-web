@@ -37,20 +37,20 @@ afterEach(() => vi.useRealTimers());
 describe("NextConsultationCard", () => {
   it("says who it is with, what it is, and how long to wait", () => {
     renderCard(135);
-    expect(screen.getByRole("heading", { name: "Your video consultation with Dr Example" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your telemedicine consultation with Dr Example" })).toBeInTheDocument();
     expect(screen.getByText(/Follow-up consultation/)).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Starts in 2 h 15 min");
   });
 
   it("does not offer Join before the call opens, and says when it will", () => {
     renderCard(135);
-    expect(screen.queryByRole("link", { name: "Join video call" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Join call" })).not.toBeInTheDocument();
     expect(screen.getByText(/The call opens 10 minutes before the start/)).toBeInTheDocument();
   });
 
   it("offers one large Join button once the call is open, pointing where it was told", () => {
     renderCard(8);
-    const join = screen.getByRole("link", { name: "Join video call" });
+    const join = screen.getByRole("link", { name: "Join call" });
     expect(join).toHaveAttribute("href", "/app/bookings/b1?join=1");
     expect(join.className).toMatch(/min-h-\[56px\]/);
     expect(screen.queryByText(/The call opens/)).not.toBeInTheDocument();
@@ -58,19 +58,19 @@ describe("NextConsultationCard", () => {
 
   it("still offers Join a few minutes after the start", () => {
     renderCard(-5);
-    expect(screen.getByRole("link", { name: "Join video call" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Join call" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Started 5 min ago");
   });
 
   it("counts down and turns into the Join button without a reload", () => {
     renderCard(12);
-    expect(screen.queryByRole("link", { name: "Join video call" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Join call" })).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(4 * 60_000);
     });
 
-    expect(screen.getByRole("link", { name: "Join video call" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Join call" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Starts in 8 min");
   });
 

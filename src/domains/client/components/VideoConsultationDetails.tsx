@@ -82,8 +82,8 @@ export const VideoConsultationDetails = ({
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold text-slate-900">Video consultation</h1>
-          {booking.service?.name && booking.service.name !== "Video consultation" && (
+          <h1 className="truncate text-xl font-bold text-slate-900">Telemedicine consultation</h1>
+          {booking.service?.name && booking.service.name !== "Telemedicine consultation" && booking.service.name !== "Video consultation" && (
             <p className="truncate text-sm text-slate-600">{booking.service.name}</p>
           )}
         </div>
@@ -147,7 +147,7 @@ export const VideoConsultationDetails = ({
           </p>
         ) : joinOpen ? (
           <Button type="button" className="min-h-[56px] w-full text-base" icon={<Video className="h-5 w-5" />} onClick={onJoin}>
-            Join video call
+            Join call
           </Button>
         ) : (
           <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
