@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
+import { careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
 
 const svc = (overrides: Partial<CatalogService> = {}): CatalogService => ({
   id: "s",
@@ -62,5 +62,22 @@ describe("filterServices", () => {
 describe("formatPrice", () => {
   it("spells out the unit with no empty cents", () => {
     expect(formatPrice(150000)).toBe("KES 1,500");
+  });
+});
+
+describe("careImageKey and free services", () => {
+  it("picks a photo for each kind of care, and a safe default for a new one", () => {
+    expect(careImageKey("Nursing & Caregiver Services")).toBe("nurse");
+    expect(careImageKey("Elderly & Assisted Living")).toBe("elderly");
+    expect(careImageKey("Therapy & Rehabilitation")).toBe("therapy");
+    expect(careImageKey("Diagnostics & Monitoring")).toBe("lab");
+    expect(careImageKey("Ambulance")).toBe("ambulance");
+    expect(careImageKey("Doctor & Nurse Home Visits")).toBe("doctor");
+    expect(careImageKey("Something new")).toBe("home");
+    expect(careImageKey(null)).toBe("home");
+  });
+
+  it("does not print KES 0 for a service priced on request", () => {
+    expect(formatPrice(0)).toBe("Quote on request");
   });
 });

@@ -52,4 +52,19 @@ export const filterServices = (services: CatalogService[], filters: CatalogFilte
 };
 
 /** "KES 1,500": the unit spelled out and no empty cents, the same on every device. */
-export const formatPrice = (cents: number): string => `KES ${Math.round(cents / 100).toLocaleString("en-US")}`;
+export const formatPrice = (cents: number): string =>
+  cents > 0 ? `KES ${Math.round(cents / 100).toLocaleString("en-US")}` : "Quote on request";
+
+export type CareImageKey = "nurse" | "elderly" | "therapy" | "lab" | "doctor" | "ambulance" | "home";
+
+/** Which photo stands for a kind of care. Matching is by words in the category name, so a new category still gets one. */
+export const careImageKey = (categoryName: string | null | undefined): CareImageKey => {
+  const name = (categoryName ?? "").toLowerCase();
+  if (name.includes("ambulance") || name.includes("emergency")) return "ambulance";
+  if (name.includes("elder") || name.includes("assisted") || name.includes("palliative")) return "elderly";
+  if (name.includes("therapy") || name.includes("rehab")) return "therapy";
+  if (name.includes("diagnos") || name.includes("lab")) return "lab";
+  if (name.includes("doctor") || name.includes("consult") || name.includes("corporate")) return "doctor";
+  if (name.includes("nurs") || name.includes("caregiver") || name.includes("post-hospital")) return "nurse";
+  return "home";
+};

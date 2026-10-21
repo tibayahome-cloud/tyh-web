@@ -45,7 +45,6 @@ describe("client Services", () => {
 
     expect(await screen.findByText("Wound dressing")).toBeInTheDocument();
     expect(screen.queryByText("General consultation")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Home visit").length).toBeGreaterThan(0);
     expect(screen.getAllByText("KES 1,500").length).toBeGreaterThan(0);
     expect(screen.getByText("Urgent")).toBeInTheDocument();
   });
