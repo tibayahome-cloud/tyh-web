@@ -55,7 +55,41 @@ export const filterServices = (services: CatalogService[], filters: CatalogFilte
 export const formatPrice = (cents: number): string =>
   cents > 0 ? `KES ${Math.round(cents / 100).toLocaleString("en-US")}` : "Quote on request";
 
-export type CareImageKey = "nurse" | "elderly" | "therapy" | "lab" | "doctor" | "ambulance" | "home";
+export type CareImageKey =
+  | "nurse" | "nurse-2" | "nurse-3" | "elderly" | "therapy" | "physio" | "occupational" | "speech" | "lab" | "scan"
+  | "ecg" | "doctor" | "ambulance" | "home" | "home-2" | "cancer" | "maternity" | "chronic" | "checkup" | "equipment";
+
+const RULES: Array<[RegExp, CareImageKey | CareImageKey[]]> = [
+  [/ambulance/, "ambulance"],
+  [/ultrasound|\bscan\b|imaging/, "scan"],
+  [/ecg|vital sign|monitor/, "ecg"],
+  [/laborator|sample|blood test/, "lab"],
+  [/cancer|oncolog|palliative/, "cancer"],
+  [/antenatal|maternity|prenatal|postnatal/, "maternity"],
+  [/chronic/, "chronic"],
+  [/occupational/, "occupational"],
+  [/speech|child development/, "speech"],
+  [/physio|stroke|rehab/, ["physio", "therapy"]],
+  [/executive|annual|check-?up|health package/, "checkup"],
+  [/equipment/, "equipment"],
+  [/companion|elderly|assisted|day care/, "elderly"],
+  [/iv therapy|catheter|tube|wound|injection|nurse|nursing|24-hour/, ["nurse", "nurse-2", "nurse-3"]],
+  [/membership|plan|tibacare/, ["home", "home-2"]]
+];
+
+const spread = (name: string, count: number) => [...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % count;
+
+/**
+ * The photo for one service, chosen by what the service is (a wound dressing gets a nurse, an ultrasound gets a scan),
+ * falling back to its kind of care. Where several photos fit, the service name picks one so neighbours do not repeat.
+ */
+export const serviceImageKey = (serviceName: string, categoryName?: string | null): CareImageKey => {
+  const name = serviceName.toLowerCase();
+  for (const [pattern, key] of RULES) {
+    if (pattern.test(name)) return Array.isArray(key) ? key[spread(name, key.length)] : key;
+  }
+  return careImageKey(categoryName);
+};
 
 /** Which photo stands for a kind of care. Matching is by words in the category name, so a new category still gets one. */
 export const careImageKey = (categoryName: string | null | undefined): CareImageKey => {

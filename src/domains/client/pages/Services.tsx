@@ -12,13 +12,26 @@ import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import nurseImg from "../../../assets/images/service-nurse.png";
+import nurse2Img from "../../../assets/images/service-nurse_.png";
+import nurse3Img from "../../../assets/images/nursing.png";
 import elderlyImg from "../../../assets/images/service-elderly.png";
 import therapyImg from "../../../assets/images/service-therapy.png";
 import labImg from "../../../assets/images/lab-sample-collection.png";
 import doctorImg from "../../../assets/images/service-doctor.png";
 import ambulanceImg from "../../../assets/images/service-ambulance.png";
 import homeImg from "../../../assets/images/hero-home.png";
-import { careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
+import home2Img from "../../../assets/images/hero.png";
+import physioImg from "../../../assets/images/telemedicine/physiotherapy.webp";
+import occupationalImg from "../../../assets/images/telemedicine/generated/occupational-therapy-consultation.webp";
+import speechImg from "../../../assets/images/telemedicine/child-growth-review.webp";
+import scanImg from "../../../assets/images/telemedicine/imaging-review.webp";
+import ecgImg from "../../../assets/images/telemedicine/lab-results-review.webp";
+import cancerImg from "../../../assets/images/telemedicine/cancer-care.webp";
+import maternityImg from "../../../assets/images/telemedicine/maternity-care.webp";
+import chronicImg from "../../../assets/images/telemedicine/chronic-disease-care.webp";
+import checkupImg from "../../../assets/images/telemedicine/general-consultation.webp";
+import equipmentImg from "../../../assets/images/telemedicine/medication-review.webp";
+import { serviceImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
 
 type Envelope<T> = {
   data: T;
@@ -41,15 +54,29 @@ const useServices = () =>
 
 const CARE_IMAGES = {
   nurse: nurseImg,
+  "nurse-2": nurse2Img,
+  "nurse-3": nurse3Img,
   elderly: elderlyImg,
   therapy: therapyImg,
+  physio: physioImg,
+  occupational: occupationalImg,
+  speech: speechImg,
   lab: labImg,
+  scan: scanImg,
+  ecg: ecgImg,
   doctor: doctorImg,
   ambulance: ambulanceImg,
-  home: homeImg
+  home: homeImg,
+  "home-2": home2Img,
+  cancer: cancerImg,
+  maternity: maternityImg,
+  chronic: chronicImg,
+  checkup: checkupImg,
+  equipment: equipmentImg
 } as const;
 
-const careImage = (categoryName: string | null | undefined) => CARE_IMAGES[careImageKey(categoryName)];
+const serviceImage = (serviceName: string, categoryName: string | null | undefined) =>
+  CARE_IMAGES[serviceImageKey(serviceName, categoryName)];
 
 const ServicesPage = () => {
   const navigate = useNavigate();
@@ -141,8 +168,8 @@ const ServicesPage = () => {
             </label>
 
             {tiles.length > 0 && (
-              <div role="group" aria-label="Kind of care" className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
-                {[{ id: "all", name: "All care", count: services?.length ?? 0 }, ...tiles].map((tile) => {
+              <div role="group" aria-label="Kind of care" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+                {[{ id: "all", name: "All", count: services?.length ?? 0 }, ...tiles].map((tile) => {
                   const selected = category === tile.id;
                   return (
                     <button
@@ -151,16 +178,12 @@ const ServicesPage = () => {
                       aria-pressed={selected}
                       onClick={() => setCategory(tile.id)}
                       className={classNames(
-                        "group relative h-28 w-40 shrink-0 overflow-hidden rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2",
-                        selected ? "ring-2 ring-tiba-blue ring-offset-2" : ""
+                        "inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
+                        selected ? "border-tiba-blue bg-tiba-blue text-white" : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                       )}
                     >
-                      <img src={tile.id === "all" ? homeImg : careImage(tile.name)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                      <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent" />
-                      <span className="absolute inset-x-0 bottom-0 p-3">
-                        <span className="block text-sm font-semibold leading-tight text-white">{tile.name}</span>
-                        <span className="block text-xs text-white/90">{tile.count}</span>
-                      </span>
+                      {tile.name}
+                      <span className={classNames("text-xs", selected ? "text-white/90" : "text-slate-600")}>{tile.count}</span>
                     </button>
                   );
                 })}
@@ -189,7 +212,7 @@ const ServicesPage = () => {
                 {filteredServices.map((service) => (
                   <li key={service.id} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
                     <Link to={`/app/services/${service.id}`} aria-label={`${service.name}, details`} className="relative block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-tiba-blue">
-                      <img src={careImage(service.category?.name)} alt="" loading="lazy" className="aspect-[16/9] w-full object-cover" />
+                      <img src={serviceImage(service.name, service.category?.name)} alt="" loading="lazy" className="aspect-[16/9] w-full object-cover" />
                       {service.is_emergency_capable && (
                         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white">
                           <Zap aria-hidden="true" size={12} /> Urgent
