@@ -23,3 +23,28 @@ export const friendlyJoinError = (err: unknown): string => {
   }
   return "We could not join the call. Check your internet connection, then try again.";
 };
+
+// Why the camera or microphone could not be switched on, with the next step. `name` is the DOMException
+// name the browser reports; the in-app browser case is called out because it is the most common cause.
+export const friendlyMediaError = (err: unknown, inAppBrowser = false): string => {
+  const name = err instanceof Error ? err.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
+    return inAppBrowser
+      ? "This app is blocking your camera and microphone. Open this page in Chrome or Safari and try again."
+      : "Camera or microphone is blocked. Tap the lock icon next to the address, allow both, then try again.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") {
+    return "We could not find a camera or microphone on this device. Plug one in or try another device.";
+  }
+  if (name === "NotReadableError" || name === "AbortError" || name === "TrackStartError") {
+    return "Another app is using your camera or microphone. Close it, then try again.";
+  }
+  return "We could not switch on your camera and microphone. Check your browser settings, then try again.";
+};
+
+// The line shown while you are the only one in the call. Names the other person by role so a client
+// reads "your doctor" and a provider reads "the client".
+export const waitingMessage = (role: string | null | undefined): string =>
+  role === "provider"
+    ? "Waiting for the client to join. Stay on this screen."
+    : "Waiting for your doctor to join. Stay on this screen.";

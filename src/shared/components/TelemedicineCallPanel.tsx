@@ -6,10 +6,12 @@ import { Loading } from "./Loading";
 import { useAuth } from "../hooks/useAuth";
 import { useConfirmSessionJoinMutation, useEndSessionMutation, useJoinSessionMutation } from "../hooks/useTelemedicine";
 import type { TelemedicineSessionJoin } from "../schemas/telemedicine";
-import { friendlyJoinError, isInAppBrowser } from "../utils/callJoin";
+import { friendlyJoinError, isInAppBrowser, waitingMessage } from "../utils/callJoin";
+import { PreCallCheck } from "./PreCallCheck";
 
 interface JitsiMeetExternalAPIInstance {
   dispose: () => void;
+  getNumberOfParticipants?: () => number;
   addEventListener: (event: string, listener: (...args: unknown[]) => void) => void;
 }
 
@@ -68,7 +70,11 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<JitsiMeetExternalAPIInstance | null>(null);
   const hasLeftRef = useRef(false);
+  // "check" is the camera and microphone step; the call itself only starts once the person taps Join.
+  const [stage, setStage] = useState<"check" | "call">("check");
   const [loading, setLoading] = useState(true);
+  // True while nobody else is in the room, so the screen can say who we are waiting for.
+  const [alone, setAlone] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [endError, setEndError] = useState<string | null>(null);
   const [joinDetails, setJoinDetails] = useState<TelemedicineSessionJoin | null>(null);
@@ -101,6 +107,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   };
 
   useEffect(() => {
+    if (stage !== "call") return;
     let cancelled = false;
     hasLeftRef.current = false;
 
@@ -137,9 +144,13 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
         // This is the real attendance signal: a token was issued above, but that only proves
         // authorization, not that the browser actually reached the room (blocked WebRTC, the
         // Jitsi deployment being down, etc. can all fail silently after the token is minted).
+        const refreshAlone = () => setAlone((api.getNumberOfParticipants?.() ?? 1) <= 1);
         const handleJoined = () => {
           confirmJoinMutation.mutate(bookingId);
+          refreshAlone();
         };
+        api.addEventListener("participantJoined", refreshAlone);
+        api.addEventListener("participantLeft", refreshAlone);
         api.addEventListener("readyToClose", leaveLocalCall);
         api.addEventListener("videoConferenceLeft", leaveLocalCall);
         api.addEventListener("videoConferenceJoined", handleJoined);
@@ -163,12 +174,12 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
     // join/end mutations are stable identities from react-query and re-running on every render
     // would tear down and rejoin the call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId, connectionAttempt]);
+  }, [bookingId, connectionAttempt, stage]);
 
   // Keep the phone awake while the call is up; a screen that dims mid-consultation drops the video. Not
   // every browser has this, and refusing it is harmless, so every failure is ignored.
   useEffect(() => {
-    if (loading || connectionError) return;
+    if (stage !== "call" || loading || connectionError) return;
     type Sentinel = { release: () => Promise<void> };
     let sentinel: Sentinel | null = null;
     let cancelled = false;
@@ -193,7 +204,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
       document.removeEventListener("visibilitychange", onVisible);
       void sentinel?.release().catch(() => undefined);
     };
-  }, [loading, connectionError]);
+  }, [stage, loading, connectionError]);
 
   const handleManualLeave = () => {
     leaveLocalCall();
@@ -270,7 +281,15 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
         </div>
       )}
       {endError && <div className="bg-red-950 px-4 py-2 text-sm font-medium text-red-100">{endError}</div>}
-      {loading && (
+      {stage === "check" && (
+        <PreCallCheck inAppBrowser={inAppBrowser} onJoin={() => setStage("call")} onCancel={onLeave} />
+      )}
+      {stage === "call" && alone && !loading && !connectionError && (
+        <div role="status" className="bg-sky-900 px-4 py-2 text-center text-sm font-medium text-sky-50">
+          {waitingMessage(joinDetails?.role)}
+        </div>
+      )}
+      {stage === "call" && loading && (
         <div className="flex flex-1 items-center justify-center text-white">
           <Loading label="Connecting to your consultation…" />
         </div>
@@ -291,7 +310,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
       <div
         ref={containerRef}
         className="min-h-0 flex-1 overflow-hidden"
-        style={{ display: loading || connectionError ? "none" : "block" }}
+        style={{ display: stage !== "call" || loading || connectionError ? "none" : "block" }}
       />
     </div>
   );

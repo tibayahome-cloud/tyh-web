@@ -36,6 +36,7 @@ class FakeJitsiMeetExternalAPI {
   options: Record<string, unknown>;
   listeners: Record<string, JitsiListener[]> = {};
   dispose = vi.fn();
+  participants = 1;
 
   constructor(domain: string, options: Record<string, unknown>) {
     this.domain = domain;
@@ -47,12 +48,24 @@ class FakeJitsiMeetExternalAPI {
     this.listeners[event] = [...(this.listeners[event] ?? []), listener];
   }
 
+  getNumberOfParticipants() {
+    return this.participants;
+  }
+
   emit(event: string) {
     for (const listener of this.listeners[event] ?? []) {
       listener();
     }
   }
 }
+
+// The call now starts after a camera and microphone check, so every test goes through that step first.
+const renderCall = async (ui: React.ReactElement) => {
+  const view = render(ui);
+  fireEvent.click(screen.getByRole("button", { name: "Allow camera and microphone" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Join now" }));
+  return view;
+};
 
 const joinPayload = (role: "client" | "provider" = "client") => ({
   sessionId: "session-1",
@@ -67,6 +80,17 @@ const joinPayload = (role: "client" | "provider" = "client") => ({
 
 describe("TelemedicineCallPanel", () => {
   beforeEach(() => {
+    const track = { stop: vi.fn() };
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [track],
+          getVideoTracks: () => [track],
+          getAudioTracks: () => [track]
+        })
+      }
+    });
     FakeJitsiMeetExternalAPI.instances = [];
     hooks.confirmJoinMutate.mockReset();
     hooks.endSessionMutateAsync.mockReset();
@@ -86,7 +110,7 @@ describe("TelemedicineCallPanel", () => {
 
   it("keeps Jitsi leave events local so a dropped call can be rejoined", async () => {
     const onLeave = vi.fn();
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={onLeave} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={onLeave} />);
 
     await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
 
@@ -101,7 +125,7 @@ describe("TelemedicineCallPanel", () => {
   });
 
   it("applies TYH branding overrides to the Jitsi iframe", async () => {
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
 
     await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
 
@@ -120,7 +144,7 @@ describe("TelemedicineCallPanel", () => {
   it("only shows final consultation completion to providers", async () => {
     const onLeave = vi.fn();
     hooks.joinSessionMutateAsync.mockResolvedValue(joinPayload("provider"));
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={onLeave} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={onLeave} />);
 
     const endButton = await screen.findByRole("button", { name: /end consultation/i });
     fireEvent.click(endButton);
@@ -133,7 +157,7 @@ describe("TelemedicineCallPanel", () => {
   });
 
   it("does not show final consultation completion to clients", async () => {
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
 
     await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
 
@@ -145,7 +169,7 @@ describe("TelemedicineCallPanel", () => {
     hooks.joinSessionMutateAsync.mockRejectedValueOnce(new Error("Network error"));
     hooks.joinSessionMutateAsync.mockResolvedValueOnce(joinPayload());
 
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
 
     const reconnectButton = await screen.findByRole("button", { name: "Reconnect" });
     // A bare "Network error" tells nobody what to do; the message says.
@@ -159,7 +183,7 @@ describe("TelemedicineCallPanel", () => {
   });
 
   it("switches off the 'open in the app' page so a phone browser shows the call", async () => {
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
     await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
 
     expect(FakeJitsiMeetExternalAPI.instances[0].options).toEqual(
@@ -169,7 +193,7 @@ describe("TelemedicineCallPanel", () => {
 
   it("asks before ending the consultation, and 'Keep going' leaves it running", async () => {
     hooks.joinSessionMutateAsync.mockResolvedValue(joinPayload("provider"));
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /end consultation/i }));
     expect(screen.getByRole("alertdialog", { name: "End the consultation" })).toBeInTheDocument();
@@ -183,7 +207,7 @@ describe("TelemedicineCallPanel", () => {
     const original = navigator.userAgent;
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone) Instagram 300.0" });
     try {
-      render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+      await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
       expect(await screen.findByText(/open this page in Chrome or Safari/i)).toBeInTheDocument();
     } finally {
       Object.defineProperty(navigator, "userAgent", { configurable: true, value: original });
@@ -191,7 +215,7 @@ describe("TelemedicineCallPanel", () => {
   });
 
   it("does not show that notice in an ordinary browser", async () => {
-    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
     await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
     expect(screen.queryByText(/open this page in Chrome or Safari/i)).not.toBeInTheDocument();
   });
@@ -201,7 +225,7 @@ describe("TelemedicineCallPanel", () => {
     const request = vi.fn().mockResolvedValue({ release });
     Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request } });
     try {
-      const { unmount } = render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+      const { unmount } = await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
       await waitFor(() => expect(request).toHaveBeenCalledWith("screen"));
       await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
 
@@ -210,5 +234,31 @@ describe("TelemedicineCallPanel", () => {
     } finally {
       Object.defineProperty(navigator, "wakeLock", { configurable: true, value: undefined });
     }
+  });
+  it("does not start the call until the person taps Join now", async () => {
+    render(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    expect(screen.getByText("Before you join")).toBeInTheDocument();
+    expect(hooks.joinSessionMutateAsync).not.toHaveBeenCalled();
+    expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(0);
+  });
+
+  it("says who it is waiting for while alone, and stops once they arrive", async () => {
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
+    const api = FakeJitsiMeetExternalAPI.instances[0];
+    act(() => api.emit("videoConferenceJoined"));
+    expect(await screen.findByText(/Waiting for your doctor to join/i)).toBeInTheDocument();
+
+    api.participants = 2;
+    act(() => api.emit("participantJoined"));
+    await waitFor(() => expect(screen.queryByText(/Waiting for your doctor/i)).not.toBeInTheDocument());
+  });
+
+  it("tells a provider they are waiting for the client", async () => {
+    hooks.joinSessionMutateAsync.mockResolvedValue(joinPayload("provider"));
+    await renderCall(<TelemedicineCallPanel bookingId="booking-1" onLeave={vi.fn()} />);
+    await waitFor(() => expect(FakeJitsiMeetExternalAPI.instances).toHaveLength(1));
+    act(() => FakeJitsiMeetExternalAPI.instances[0].emit("videoConferenceJoined"));
+    expect(await screen.findByText(/Waiting for the client to join/i)).toBeInTheDocument();
   });
 });
