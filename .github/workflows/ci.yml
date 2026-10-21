@@ -25,6 +25,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # A worktree's node_modules is a symlink, and the old `node_modules/` ignore rule does not
+      # match a symlink, so one was committed by accident (70f7cc9). Fail fast if any symlink or
+      # dependency/worktree folder is tracked.
+      - name: Reject tracked symlinks and dependency folders
+        run: |
+          bad=$( { git ls-files -s | awk '$1 == "120000" {print $4}'; git ls-files | grep -E '(^|/)(node_modules|\.worktrees)(/|$)' || true; } | sort -u)
+          if [ -n "$bad" ]; then
+            echo "These paths must not be committed:"
+            echo "$bad"
+            exit 1
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
