@@ -554,7 +554,6 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
         {showDetails && (
           <div className="rounded-3xl bg-white/10 p-5 border border-white/10 space-y-3">
             {[
-              { label: "Booking ID", value: booking.id?.slice(0, 8).toUpperCase() },
               { label: "Service", value: booking.service?.name },
               { label: "Scheduled", value: booking.scheduledAt ? new Date(booking.scheduledAt).toLocaleString() : "ASAP" },
             ].filter(d => d.value).map(({ label, value }) => (

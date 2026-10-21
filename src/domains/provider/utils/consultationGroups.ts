@@ -67,11 +67,11 @@ export type ProviderNeedsKind = "new_time" | "report";
 
 export type ProviderNeedsItem = { kind: ProviderNeedsKind; booking: Booking; message: string; action: string };
 
-export const needsYouForConsultation = (booking: Booking, now: number): ProviderNeedsItem | null => {
+export const needsYouForConsultation = (booking: Booking, now: number, graceMinutes?: number): ProviderNeedsItem | null => {
   if (booking.status === "telemedicine_unattended") {
     return { kind: "new_time", booking, message: "Nobody joined. Suggest a new time", action: "Choose a time" };
   }
-  if (noShowReportState(booking, "provider", now).state === "available") {
+  if (noShowReportState(booking, "provider", now, graceMinutes).state === "available") {
     const who = booking.client?.fullName;
     return { kind: "report", booking, message: `${who ?? "Your client"} has not joined. You can report it`, action: "Report" };
   }

@@ -242,7 +242,7 @@ const ClientHome = () => {
     setBookingServiceId(null);
     toast.showToast({
       title: "Booking requested",
-      description: `We are matching you with a nearby provider (ref ${bookingId.slice(0, 6)}…).`,
+      description: "We are matching you with a nearby provider.",
       variant: "info"
     });
   };
@@ -329,7 +329,7 @@ const ClientHome = () => {
         const label = formatBookingStatus(statusRaw);
         toast.showToast({
           title: label,
-          description: `Booking${bookingId ? ` #${bookingId.slice(0, 6)}` : ""} updated.`,
+          description: "Your booking was updated.",
           variant: statusRaw === "accepted" ? "success" : "info"
         });
         if (

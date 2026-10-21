@@ -21,6 +21,12 @@ import { prefetchBooking } from "../../../shared/libs/query";
 import { classifyApiError } from "../../../shared/utils/errors";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
 
+// What a payment line refers to, in words, never the id behind it.
+const referenceTypeLabel = (type: string | null | undefined) => {
+  const normalized = (type ?? "").replace(/_/g, " ").trim();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "—";
+};
+
 const formatCurrency = (amountCents: number | undefined, currency = "KES") => {
   const value = typeof amountCents === "number" ? amountCents / 100 : 0;
   try {
@@ -263,7 +269,7 @@ const ProviderPayments = () => {
                       <td className="px-4 py-4 text-xs text-neutral-500">
                         {txn.referenceType ? (
                           <span className="rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-bold uppercase">
-                            {txn.referenceType} #{txn.referenceId?.slice(0, 8) ?? "—"}
+                            {referenceTypeLabel(txn.referenceType)}
                           </span>
                         ) : "—"}
                       </td>

@@ -40,6 +40,7 @@ const ConsultationRow = ({
   booking,
   timezone,
   joinWindowBeforeMinutes,
+  noShowGraceMinutes,
   onJoin,
   onReportNoShow,
   onReportTechnicalIssue,
@@ -49,6 +50,7 @@ const ConsultationRow = ({
   booking: Booking;
   timezone: string | undefined;
   joinWindowBeforeMinutes: number | undefined;
+  noShowGraceMinutes?: number;
   onJoin: () => void;
   onReportNoShow: () => void;
   onReportTechnicalIssue: () => void;
@@ -62,7 +64,7 @@ const ConsultationRow = ({
   const canJoin = booking.status === "scheduled" && withinWindow;
   // "Client didn't join" is offered only once the call time has passed, the provider was in the call and the
   // client was not. Before that there is nothing to report (and the server would refuse).
-  const noShow = interactive ? noShowReportState(booking, "provider", Date.now()) : ({ state: "unavailable" } as const);
+  const noShow = interactive ? noShowReportState(booking, "provider", Date.now(), noShowGraceMinutes) : ({ state: "unavailable" } as const);
   // Reporting stays open for 24h after the call ends -- a longer, separate window from joining.
   const canReportTechnicalIssue = interactive && isWithinTechnicalIssueReportWindow(
     booking.scheduledAt,
@@ -170,7 +172,7 @@ const ProviderTelemedicinePage = () => {
   const earlier = useMemo(() => sortEarlier(all.filter(isEarlierConsultation)), [all]);
   const nowBooking = useMemo(() => pickNowConsultation(open, now), [open, now]);
   const needsYou = useMemo<ProviderNeedsItem[]>(
-    () => open.map((booking) => needsYouForConsultation(booking, now)).filter((item): item is ProviderNeedsItem => item !== null),
+    () => open.map((booking) => needsYouForConsultation(booking, now, policyQuery.data?.noShowGraceMinutes)).filter((item): item is ProviderNeedsItem => item !== null),
     [open, now]
   );
   // What is featured or listed under "Needs you" is not repeated under "Coming up".
@@ -300,6 +302,7 @@ const ProviderTelemedicinePage = () => {
                         booking={booking}
                         timezone={policyQuery.data?.defaultTimezone}
                         joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+                        noShowGraceMinutes={policyQuery.data?.noShowGraceMinutes}
                         onJoin={() => setActiveCallBookingId(booking.id)}
                         onReportNoShow={() => {
                           setReportError(null);
@@ -337,6 +340,7 @@ const ProviderTelemedicinePage = () => {
                         booking={booking}
                         timezone={policyQuery.data?.defaultTimezone}
                         joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+                        noShowGraceMinutes={policyQuery.data?.noShowGraceMinutes}
                         interactive={false}
                         onJoin={() => undefined}
                         onReportNoShow={() => undefined}

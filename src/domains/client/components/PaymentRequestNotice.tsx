@@ -2,6 +2,7 @@ import { Clock, AlertTriangle, Hourglass } from "lucide-react";
 
 import { Button } from "../../../shared/components/Button";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
+import { bookingReference } from "../../../shared/utils/bookingReference";
 import { usePaymentRequest } from "../../../shared/hooks/usePaymentRequest";
 
 type Props = {
@@ -81,7 +82,7 @@ export const PaymentRequestNotice = ({ bookingId, providerName, showManual, onTo
         {showManual ? "Hide manual payment steps" : "Not seeing the prompt? Pay manually"}
       </Button>
       {showManual && (
-        <MpesaPaymentInstructions amountCents={amountCents} accountNumber={bookingId.slice(0, 8).toUpperCase()} />
+        <MpesaPaymentInstructions amountCents={amountCents} accountNumber={bookingReference(bookingId)} />
       )}
     </div>
   );

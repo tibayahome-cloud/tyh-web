@@ -70,3 +70,20 @@ describe("noShowReportState", () => {
     expect(noShowReportableAt({ scheduledAt: "not a date" })).toBeNull();
   });
 });
+
+describe("the grace period comes from the server's policy", () => {
+  const base = {
+    isTelemedicine: true,
+    status: "scheduled",
+    scheduledAt: "2026-10-22T08:00:00Z",
+    disputes: [],
+    telemedicineSession: { providerJoinedAt: "2026-10-22T08:01:00Z", clientJoinedAt: null }
+  } as never;
+
+  it("opens reporting later when the server's grace is longer than the default", () => {
+    const at12Minutes = new Date("2026-10-22T08:12:00Z").getTime();
+
+    expect(noShowReportState(base, "provider", at12Minutes).state).toBe("available");
+    expect(noShowReportState(base, "provider", at12Minutes, 15).state).toBe("waiting");
+  });
+});
