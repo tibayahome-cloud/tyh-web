@@ -858,7 +858,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
             {!slotsQuery.isLoading && !slotsQuery.isError && (slotsQuery.data?.slots ?? []).length === 0 && (
               <p className="text-sm text-slate-500">
-                No open appointments in the next {WEEK_LENGTH} days at this facility.
+                No open appointments in the next {WEEK_LENGTH} days at this facility. Try another facility, or check
+                back later.
               </p>
             )}
             {!slotsQuery.isLoading && !slotsQuery.isError && slotsForActiveDate.length === 0 &&

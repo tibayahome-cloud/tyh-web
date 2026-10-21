@@ -11,6 +11,9 @@ import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
 import { ApiErrorBanner } from "../../../../shared/components/ApiErrorBanner";
 import { fetchFacilityOverview } from "../../../../shared/libs/facilities";
+import { LiveStatusCard, type LiveFix } from "../../../../shared/components/LiveStatusCard";
+import { useFacilityLiveStatus } from "../../../../shared/hooks/useLiveStatus";
+import type { LiveBlocker } from "../../../../shared/libs/liveStatus";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import type { FacilityOverview } from "../../../../shared/schemas/facility";
 import { useAdminFacilityScope } from "../finance/paymentAccess";
@@ -127,6 +130,7 @@ const NeedsAttention = ({ attention }: { attention: Attention }) => {
 const FacilityOverviewPage = () => {
   const facilitiesQuery = useAdminFacilityScope(true);
   const facilityId = facilitiesQuery.facility?.id;
+  const liveStatusQuery = useFacilityLiveStatus(facilityId);
   const overviewQuery = useQuery({
     queryKey: ["admin", "facility-overview", facilityId],
     queryFn: () => fetchFacilityOverview(facilityId as string),
@@ -167,6 +171,21 @@ const FacilityOverviewPage = () => {
   const { facility, metrics, readiness } = overviewQuery.data;
   const updated = formatUpdated(metrics.asOf);
   const workspace = `/admin/facilities/${facility.id}`;
+  // A facility admin can open services and providers; the rest is a platform admin's to change.
+  const resolveLiveFix = (blocker: LiveBlocker): LiveFix => {
+    switch (blocker.fix) {
+      case "facility_services":
+        return { label: "Open services", to: workspace };
+      case "facility_providers":
+      case "provider_availability":
+        return { label: "Open providers", to: "/admin/facility/providers" };
+      case "facility_status":
+      case "facility_location":
+        return { hint: "Ask a platform admin." };
+      default:
+        return { hint: "Check the facility settings." };
+    }
+  };
   const readinessItems = [
     { label: "Location", ready: readiness.locationReady, icon: <RoomIcon fontSize="small" /> },
     { label: "Contacts", ready: readiness.contactReady, icon: <BusinessIcon fontSize="small" /> },
@@ -196,6 +215,16 @@ const FacilityOverviewPage = () => {
       </div>
 
       {metrics.needsAttention && <NeedsAttention attention={metrics.needsAttention} />}
+
+      <LiveStatusCard
+        title="Live for video consultations"
+        subject="facility"
+        status={liveStatusQuery.data}
+        isLoading={liveStatusQuery.isLoading}
+        isError={liveStatusQuery.isError}
+        onRetry={() => void liveStatusQuery.refetch()}
+        resolveFix={resolveLiveFix}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric
