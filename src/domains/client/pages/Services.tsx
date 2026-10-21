@@ -3,88 +3,59 @@ import { useQuery } from "@tanstack/react-query";
 import classNames from "classnames";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Sparkles,
-  ShieldCheck,
-  Timer,
-  Zap,
+  Accessibility,
+  Ambulance,
+  Clock,
+  HeartPulse,
+  House,
+  Layers,
+  Pill,
   Search,
   SlidersHorizontal,
-  X,
-  ChevronRight,
-  Heart,
-  ArrowRight,
-  CalendarDays
+  Stethoscope,
+  Syringe,
+  Zap,
+  X
 } from "lucide-react";
 import Drawer from "@mui/material/Drawer";
 
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
 import { api } from "../../../shared/libs/api";
-import { buildFieldParams, serviceCategoryAdmin, svcCard } from "../../../shared/libs/fieldInclude";
+import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { AppLayout } from "../../../shared/components/AppLayout";
-import { ClientPageHeader } from "../components/ClientPageHeader";
-
-type ServiceCategory = {
-  id: string;
-  name: string;
-};
-
-type Service = {
-  id: string;
-  key: string;
-  name: string;
-  description?: string | null;
-  base_price_cents: number;
-  default_estimate_minutes: number;
-  is_emergency_capable: boolean;
-  active: boolean;
-  category?: {
-    id: string;
-    name: string;
-  };
-};
+import { categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../utils/serviceCatalog";
 
 type Envelope<T> = {
   data: T;
 };
 
-const useCategories = () =>
+const useServices = () =>
   useQuery({
-    queryKey: ["client", "service-categories"],
-    queryFn: async () => {
-      const response = await api.get<Envelope<ServiceCategory[]>>("/service-categories", {
-        params: buildFieldParams(serviceCategoryAdmin)
-      });
-      return response.data.data;
-    }
-  });
-
-const useServices = (filters: { category?: string; emergency?: boolean }) =>
-  useQuery({
-    queryKey: ["client", "services", filters],
+    queryKey: ["client", "services", "home-care"],
     queryFn: async () => {
       const params: Record<string, string> = {
         ...buildFieldParams(svcCard),
-        // Only show services a facility can actually deliver right now, not every globally
-        // active catalog definition (e.g. a newly approved service request with no configured
-        // facility offering yet).
+        // Only services a facility can actually deliver right now, not every active catalogue definition.
         "filter[active]": "true",
         "filter[has_active_offering]": "true"
       };
-      if (filters.category && filters.category !== "all") {
-        params["filter[category_id]"] = filters.category;
-      }
-      if (filters.emergency) {
-        params["filter[emergency]"] = "true";
-      }
-      const response = await api.get<Envelope<Service[]>>("/services", { params });
-      return response.data.data.filter((service) => service.active);
+      const response = await api.get<Envelope<CatalogService[]>>("/services", { params });
+      return response.data.data.filter(isHomeService);
     }
   });
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: "KES" }).format(value / 100);
+const categoryIcon = (name: string) => {
+  const key = name.toLowerCase();
+  if (key.includes("ambulance") || key.includes("emergency")) return Ambulance;
+  if (key.includes("nurs") || key.includes("caregiver")) return Syringe;
+  if (key.includes("elder") || key.includes("assisted")) return Accessibility;
+  if (key.includes("therapy") || key.includes("rehab")) return HeartPulse;
+  if (key.includes("diagnos") || key.includes("lab")) return Pill;
+  if (key.includes("doctor") || key.includes("visit")) return Stethoscope;
+  return House;
+};
 
 const ServicesPage = () => {
   const navigate = useNavigate();
@@ -97,39 +68,22 @@ const ServicesPage = () => {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-  const { data: categories, isLoading: loadingCategories } = useCategories();
-  const { data: services, isLoading: loadingServices, isFetching } = useServices({
-    category,
-    emergency: emergencyOnly
-  });
+  const servicesQuery = useServices();
+  const services = servicesQuery.data;
 
-  const categoryOptions = useMemo(() => {
-    const base = [{ id: "all", name: "All Services" }, ...(categories ?? [])];
-    return base;
-  }, [categories]);
+  const tiles = useMemo(() => categoryTiles(services ?? []), [services]);
+  const filteredServices = useMemo(
+    () => filterServices(services ?? [], { search, categoryId: category, emergencyOnly, minPrice, maxPrice }),
+    [services, search, category, emergencyOnly, minPrice, maxPrice]
+  );
 
-  const filteredServices = useMemo(() => {
-    const items = services ?? [];
-    return items.filter((service) => {
-      if (search && !service.name.toLowerCase().includes(search.toLowerCase())) {
-        return false;
-      }
-      const price = service.base_price_cents;
-      if (minPrice !== "" && price < Number(minPrice) * 100) {
-        return false;
-      }
-      if (maxPrice !== "" && price > Number(maxPrice) * 100) {
-        return false;
-      }
-      return true;
-    });
-  }, [services, search, minPrice, maxPrice]);
-
-  if (loadingCategories || loadingServices) {
+  if (servicesQuery.isLoading) {
     return <Loading fullHeight />;
   }
 
   const resetFilters = () => {
+    setSearch("");
+    setCategory("all");
     setMinPrice("");
     setMaxPrice("");
     setEmergencyOnly(false);
@@ -155,8 +109,10 @@ const ServicesPage = () => {
             <h1 className="type-h2 text-slate-900">Care Marketplace</h1>
           </div>
           <button
+            type="button"
+            aria-label="Filters"
             onClick={() => setFilterDrawerOpen(true)}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-all active:scale-95"
+            className="relative flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-all active:scale-95"
           >
             <SlidersHorizontal size={18} />
             {activeFiltersCount > 0 && (
@@ -168,130 +124,126 @@ const ServicesPage = () => {
         </div>
 
         <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
-          {/* SEARCH & QUICK FILTERS */}
-          <section className="space-y-3">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-brand-600" />
+          {servicesQuery.isError && (
+            <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+              <p className="font-semibold">We could not load the services.</p>
+              <Button type="button" size="sm" variant="secondary" className="mt-2 min-h-[44px]" onClick={() => servicesQuery.refetch()}>
+                Try again
+              </Button>
+            </div>
+          )}
+
+          <section className="space-y-4">
+            <label className="relative block">
+              <span className="sr-only">Search services</span>
+              <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
-                type="text"
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search for services (e.g. Nursing, Physiotherapy)"
-                className="w-full h-12 rounded-lg bg-white border border-slate-100 pl-12 pr-4 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600/10 focus:border-brand-600/20 transition-all shadow-sm"
+                className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
               />
-            </div>
+            </label>
 
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-              {categoryOptions.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setCategory(item.id)}
-                  className={classNames(
-                    "shrink-0 rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-                    category === item.id
-                      ? "bg-slate-900 text-white shadow-md"
-                      : "bg-white text-slate-500 border border-slate-100 hover:border-slate-200"
-                  )}
-                >
-                  {item.name}
-                </button>
-              ))}
-            </div>
+            {tiles.length > 0 && (
+              <div role="group" aria-label="Kind of care" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {[{ id: "all", name: "All care", count: services?.length ?? 0 }, ...tiles].map((tile) => {
+                  const Icon = tile.id === "all" ? Layers : categoryIcon(tile.name);
+                  const selected = category === tile.id;
+                  return (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setCategory(tile.id)}
+                      className={classNames(
+                        "flex min-h-[64px] items-center gap-3 rounded-xl border p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
+                        selected ? "border-tiba-blue bg-sky-50" : "border-slate-200 bg-white hover:bg-slate-50"
+                      )}
+                    >
+                      <span className={classNames("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", selected ? "bg-tiba-blue text-white" : "bg-slate-100 text-slate-700")}>
+                        <Icon aria-hidden="true" size={20} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-slate-900">{tile.name}</span>
+                        <span className="block text-sm text-slate-600">{tile.count} {tile.count === 1 ? "service" : "services"}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
-          {/* SERVICE GRID */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                {isFetching && (
-                  <p className="text-xs font-bold text-brand-600 animate-pulse">Refreshing...</p>
+          <section aria-label="Services" className="space-y-4">
+            {filteredServices.length === 0 && !servicesQuery.isError ? (
+              <div className="py-16 text-center">
+                <Search aria-hidden="true" size={36} className="mx-auto text-slate-400" />
+                <h3 className="mt-4 text-base font-semibold text-slate-900">
+                  {services && services.length === 0 ? "No care services are available yet" : "Nothing matches"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-700">
+                  {services && services.length === 0 ? "Check back soon, or talk to a doctor online from the Telemedicine tab." : "Try a different word or clear the filters."}
+                </p>
+                {services && services.length > 0 && (
+                  <Button variant="secondary" className="mt-5 min-h-[44px]" onClick={resetFilters}>
+                    Clear filters
+                  </Button>
                 )}
               </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredServices.length === 0 ? (
-                <div className="col-span-full py-20 text-center">
-                  <div className="mb-6 flex h-24 w-24 mx-auto items-center justify-center rounded-[2.5rem] bg-slate-50 text-slate-300">
-                    <Search size={40} />
-                  </div>
-                  <h3 className="type-h3 text-slate-900">No results found</h3>
-                  <p className="mt-2 type-body text-slate-500">
-                    Try adjusting your search or filters.
-                  </p>
-                  <Button variant="ghost" className="mt-8" onClick={resetFilters}>
-                    Clear all filters
-                  </Button>
-                </div>
-              ) : (
-                filteredServices.map((service) => (
-                  <article
-                    key={service.id}
-                    className="group flex flex-col overflow-hidden rounded-lg bg-white p-2 shadow-sm ring-1 ring-slate-100 transition-all hover:shadow-md hover:-translate-y-0.5"
-                  >
-                    <div className="relative h-28 overflow-hidden rounded-lg bg-slate-50">
-                      <div className="absolute inset-0 bg-brand-linear opacity-0 transition-opacity group-hover:opacity-10" />
-                      <div className="absolute inset-0 flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
-                        <div className="h-12 w-12 rounded-lg bg-white shadow-lg flex items-center justify-center text-brand-600">
-                          {service.category?.name?.toLowerCase().includes("nurse") ? <ShieldCheck size={24} /> : <Heart size={24} />}
-                        </div>
-                      </div>
-
-                      {service.is_emergency_capable && (
-                        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[8px] font-bold uppercase tracking-widest text-white shadow-lg">
-                          <Zap size={10} fill="currentColor" />
-                          Emergency
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-1 flex-col p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          {service.category?.name ?? "General"}
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredServices.map((service) => {
+                  const Icon = categoryIcon(service.category?.name ?? "");
+                  return (
+                    <li key={service.id} className="flex flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                          <Icon aria-hidden="true" size={22} />
                         </span>
-                        <div className="flex items-center gap-0.5 text-slate-500">
-                          <Timer size={10} className="text-slate-400" />
-                          <span className="text-[10px] font-bold">{service.default_estimate_minutes} min</span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base font-semibold text-slate-900">{service.name}</h3>
+                          {service.description && <p className="mt-0.5 line-clamp-2 text-sm text-slate-700">{service.description}</p>}
                         </div>
                       </div>
 
-                      <h3 className="text-sm font-bold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-1">
-                        {service.name}
-                      </h3>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-900">
+                          <House aria-hidden="true" size={14} /> Home visit
+                        </span>
+                        {service.is_emergency_capable && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 font-semibold text-rose-900">
+                            <Zap aria-hidden="true" size={14} /> Urgent
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1">
+                          <Clock aria-hidden="true" size={14} /> {service.default_estimate_minutes} min
+                        </span>
+                      </div>
 
-                      {service.description && (
-                        <p className="mt-1 text-xs text-slate-500 line-clamp-1">
-                          {service.description}
+                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                        <p className="text-base font-bold text-slate-900">
+                          <span className="text-sm font-normal text-slate-600">from </span>
+                          {formatPrice(service.base_price_cents)}
                         </p>
-                      )}
-
-                      <div className="mt-auto pt-3 border-t border-slate-50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-[8px] font-bold text-slate-300 uppercase">From</p>
-                            <p className="text-sm font-bold text-brand-600">{formatCurrency(service.base_price_cents)}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Link to={`/app/services/${service.id}`}>
-                              <button className="h-8 w-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center transition-all hover:bg-slate-100 hover:text-brand-600 active:scale-95 ring-1 ring-slate-100">
-                                <ChevronRight size={14} />
-                              </button>
-                            </Link>
-                            <button
-                              onClick={() => openBookingDialog(service.id)}
-                              className="h-8 rounded-lg bg-slate-900 px-3 text-[10px] font-bold uppercase text-white shadow-sm transition-all hover:bg-brand-600 active:scale-95"
-                            >
-                              Book
-                            </button>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/app/services/${service.id}`}
+                            className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                          >
+                            Details
+                          </Link>
+                          <Button type="button" className="min-h-[44px]" onClick={() => openBookingDialog(service.id)}>
+                            Book
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         </div>
       </div>
