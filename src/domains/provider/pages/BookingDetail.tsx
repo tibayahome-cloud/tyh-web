@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Clock, MapPin, MessageCircle, Phone, Navigation, X, List } from "lucide-react";
 import type { NavigationStep } from "../../../shared/components/BookingLiveMapCard";
 import classNames from "classnames";
@@ -7,6 +7,10 @@ import classNames from "classnames";
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingLiveMapCard } from "../../../shared/components/BookingLiveMapCard";
 import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
+import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
+import { useJoinFromLink } from "../../../shared/hooks/useJoinFromLink";
+import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
+import { VideoConsultationDetails } from "../components/VideoConsultationDetails";
 import { useBookingDetail, useMarkBookingMutation } from "../../../shared/hooks/useBookings";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
@@ -69,6 +73,8 @@ const ACTION_COPY: Record<
 const ProviderBookingDetailPage = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [callOpen, setCallOpen] = useState(false);
   const profileQuery = useProviderProfile(user?.id);
   const detailQuery = useBookingDetail(bookingId ?? null, "detail");
   const policyQuery = useTelemedicinePolicy();
@@ -83,6 +89,9 @@ const ProviderBookingDetailPage = () => {
         Date.now() <
           new Date(booking.scheduledAt as string).getTime() -
             (policyQuery.data?.cancellationCutoffMinutes ?? 0) * 60_000));
+
+  // A link sent to the provider (`?join=1`) opens the call once its window is open, as on the Home page.
+  useJoinFromLink(booking, policyQuery.data?.joinWindowBeforeMinutes, () => setCallOpen(true));
 
   const [navSteps, setNavSteps] = useState<NavigationStep[]>([]);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
@@ -113,19 +122,62 @@ const ProviderBookingDetailPage = () => {
   if (!booking) {
     return (
       <AppLayout fullWidth showHeader={false}>
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
-          <p className="font-semibold text-rose-600 mb-2">
-            Error: {detailQuery.error ? (detailQuery.error as any).message || String(detailQuery.error) : "Booking not found."}
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center">
+          <p className="text-base font-semibold text-slate-900">We could not open this booking.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            It may have been removed, or the connection dropped. Check your connection and try again.
           </p>
-          <p>
-            bookingId: <code className="bg-slate-100 px-1 rounded">{bookingId}</code>
-          </p>
-          <p className="mt-4">
-            <Link className="text-primary-600 font-semibold underline" to="/pro/home">
-              Return home
+          <div className="mt-5 flex justify-center gap-3">
+            <Button type="button" variant="secondary" onClick={() => void detailQuery.refetch()}>
+              Try again
+            </Button>
+            <Link to="/pro/bookings">
+              <Button type="button" variant="outline">
+                Back to bookings
+              </Button>
             </Link>
-          </p>
+          </div>
         </div>
+      </AppLayout>
+    );
+  }
+
+  if (booking.isTelemedicine) {
+    const theme = getBookingStatusTheme(booking.status);
+    const notesStatuses = ["scheduled", "completed_by_provider", "client_completed", "client_confirmed", "fully_completed", "paid"];
+    return (
+      <AppLayout fullWidth showHeader={false}>
+        <VideoConsultationDetails
+          booking={booking}
+          timezone={policyQuery.data?.defaultTimezone}
+          joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+          statusLabel={formatBookingStatus(booking.status)}
+          statusClassName={theme.className}
+          unattended={booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED}
+          showPayoutNote={financialsVisible}
+          onBack={() => navigate(-1)}
+          onJoin={() => setCallOpen(true)}
+          onChat={openChat}
+          reschedule={
+            user?.id ? (
+              <ReschedulePanel bookingId={booking.id} currentUserId={String(user.id)} canReschedule={canReschedule} />
+            ) : null
+          }
+          notes={
+            notesStatuses.includes(booking.status) ? (
+              <BookingNotesPanel bookingId={booking.id} serviceId={booking.service?.id} isProvider={true} />
+            ) : null
+          }
+        />
+        {callOpen && (
+          <TelemedicineCallPanel
+            bookingId={booking.id}
+            onLeave={() => {
+              setCallOpen(false);
+              void detailQuery.refetch();
+            }}
+          />
+        )}
       </AppLayout>
     );
   }
@@ -158,7 +210,7 @@ const ProviderBookingDetailPage = () => {
                     <Navigation className="h-6 w-6" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Current Manoeuver</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Next turn</p>
                     <p className="truncate text-sm font-bold text-white">{currentStep.instruction}</p>
                     <p className="mt-0.5 text-[10px] font-bold text-brand-400">
                       {currentStep.distanceText} {currentStep.durationText ? `· ${currentStep.durationText}` : ""}
@@ -201,25 +253,25 @@ const ProviderBookingDetailPage = () => {
             <Card title="Booking briefing" className="border-white/80 bg-white/40 shadow-xl backdrop-blur-md ring-1 ring-black/5">
               <div className="space-y-4">
                 <InfoRow
-                  label="Service Vector"
+                  label="Service"
                   value={booking.service?.name ?? "—"}
                   helper={booking.service?.category?.name ?? undefined}
                   icon={<div className="h-1.5 w-1.5 rounded-full bg-brand-500" />}
                 />
                 <InfoRow
-                  label="Target Location"
-                  value={booking.addressText ?? "Shared when nearby"}
+                  label="Where"
+                  value={booking.addressText ?? "The address is shown when you are close"}
                   icon={<MapPin className="h-3.5 w-3.5 text-slate-400" />}
                 />
                 <InfoRow
                   label="Duration"
                   value={booking.estimateDurationMinutes ? `Est. ${booking.estimateDurationMinutes} min` : "—"}
-                  helper={financialsVisible ? "Earnings credited to wallet after completion" : "Facility manages payout details"}
+                  helper={financialsVisible ? "Earnings are credited to your wallet after completion" : undefined}
                   icon={<Clock className="h-3.5 w-3.5 text-slate-400" />}
                 />
-                <InfoRow label="Protocol Status" value={booking.status.replace(/_/g, " ")} />
+                <InfoRow label="Status" value={formatBookingStatus(booking.status)} />
                 <div className="pt-4 border-t border-slate-100">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-2">Primary Unit</p>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-2">Client</p>
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-900 font-bold">
                       {booking.client?.fullName?.charAt(0)}
@@ -264,8 +316,8 @@ const ProviderBookingDetailPage = () => {
               <div className="flex h-full flex-col">
                 <div className="flex items-center justify-between border-b border-slate-100 p-6">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900">Intelligence Feed</h3>
-                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Route Log</p>
+                    <h3 className="text-xl font-bold text-slate-900">Directions</h3>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Step by step</p>
                   </div>
                   <button
                     onClick={() => setIsStepsPaneOpen(false)}
@@ -380,8 +432,8 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
               <Navigation className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-widest">Protocol Sync</h3>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tactical Control</p>
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest">Your next step</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Booking controls</p>
             </div>
           </div>
           <div className="h-2 w-2 rounded-full bg-brand-500 animate-pulse shadow-[0_0_10px_#22c55e]" />
@@ -389,7 +441,7 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
 
         <div className="space-y-8">
           <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30 mb-2">Next Authorization</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30 mb-2">Next step</p>
             <div className="flex items-center justify-between gap-4">
               <p className="text-lg font-bold text-white">{actionCopy.label}</p>
               <Button
@@ -412,7 +464,7 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 shadow-xl group-hover:scale-110 transition-transform">
                 <MessageCircle className="h-6 w-6" />
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Intelligence Link</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Message</span>
             </button>
 
             <button
@@ -423,7 +475,7 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 shadow-xl group-hover:scale-110 transition-transform">
                 <Phone className="h-6 w-6" />
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Voice Comm</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Call client</span>
             </button>
 
             <button
@@ -434,7 +486,7 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 shadow-xl group-hover:scale-110 transition-transform">
                 <MapPin className="h-6 w-6" />
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Waypoint Sync</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Open in Maps</span>
             </button>
 
             <a
@@ -444,7 +496,7 @@ const ProviderControls = ({ booking, onOpenChat }: ProviderControlsProps) => {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-500/10 text-slate-400 shadow-xl group-hover:scale-110 transition-transform">
                 <List className="h-6 w-6" />
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Booking Log</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">History</span>
             </a>
           </div>
         </div>
