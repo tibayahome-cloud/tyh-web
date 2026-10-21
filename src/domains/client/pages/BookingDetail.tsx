@@ -10,8 +10,7 @@ import {
   ArrowRight,
   Info as InfoIcon,
   Star as StarIcon,
-  RefreshCw,
-  Video
+  RefreshCw
 } from "lucide-react";
 import classNames from "classnames";
 import Drawer from "@mui/material/Drawer";
@@ -32,8 +31,9 @@ import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
 import { TelemedicineCallPanel } from "../../../shared/components/TelemedicineCallPanel";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { ReschedulePanel } from "../../../shared/components/ReschedulePanel";
+import { VideoConsultationDetails } from "../components/VideoConsultationDetails";
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
-import { formatTelemedicineDateTime, isWithinJoinWindow, isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
+import { isWithinTechnicalIssueReportWindow } from "../../../shared/utils/telemedicine";
 import { classifyApiError, type ClassifiedApiError } from "../../../shared/utils/errors";
 import {
   BOOKING_STATUS_TELEMEDICINE_UNATTENDED,
@@ -100,7 +100,7 @@ const BookingDetailPage = () => {
   const showMap = booking && TRACKING_STATUSES.includes(booking.status) && Boolean(booking.provider);
 
   useEffect(() => {
-    if (booking && !showMap) {
+    if (booking && !showMap && !booking.isTelemedicine) {
       setSheetExpanded(true);
     }
   }, [booking, showMap]);
@@ -171,7 +171,7 @@ const BookingDetailPage = () => {
       setNoShowDialogOpen(false);
       toast.showToast({
         title: "Reported",
-        description: "Admin.ops will review this appointment.",
+        description: "Our team will review this appointment.",
         variant: "info"
       });
     } catch (error) {
@@ -243,6 +243,43 @@ const BookingDetailPage = () => {
     booking.isTelemedicine &&
     (booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED || canCancelAppointment);
 
+  const FeedbackSection = () => (
+    <>
+      {booking.feedback && booking.feedback.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Reviews & Rating</h4>
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm space-y-4">
+            {booking.feedback.map((f) => (
+              <div key={f.id} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <StarIcon
+                          key={s}
+                          className={`h-3 w-3 ${s <= f.score ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-900">{f.rater?.fullName}</span>
+                  </div>
+                  <span className="text-[9px] text-slate-400">
+                    {f.ratedAt ? new Date(f.ratedAt).toLocaleDateString() : ""}
+                  </span>
+                </div>
+                {f.comment && (
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    "{f.comment}"
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   const BookingDetailsContent = () => (
     <div className="space-y-6 p-6 pb-12">
       {booking.paymentReviewPending && (
@@ -264,23 +301,25 @@ const BookingDetailPage = () => {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">{booking.service?.name ?? "Service Booking"}</h1>
-          <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-            <span className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
-              {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '—'}
-            </span>
-            {booking.scheduledAt && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            {booking.createdAt && (
               <span className="flex items-center gap-1">
-                {/* A remote appointment is anchored to the facility's timezone, not wherever the
-                    client's device happens to be; an in-person visit is wherever the client is,
-                    so browser-local time is the correct display for that case. */}
-                •{" "}
-                {booking.isTelemedicine
-                  ? formatTelemedicineDateTime(booking.scheduledAt, policyQuery.data?.defaultTimezone, {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  })
-                  : new Date(booking.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                <Calendar className="h-3.5 w-3.5" />
+                Requested {new Date(booking.createdAt).toLocaleDateString()}
+              </span>
+            )}
+            {/* An in-person visit happens wherever the client is, so the device's own time is right here.
+                Video consultations have their own page, anchored to the facility's timezone. */}
+            {booking.scheduledAt && (
+              <span className="font-semibold text-slate-700">
+                Visit{" "}
+                {new Date(booking.scheduledAt).toLocaleString([], {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })}
               </span>
             )}
           </div>
@@ -363,115 +402,7 @@ const BookingDetailPage = () => {
         </div>
       </div>
 
-      {/* Feedback */}
-      {booking.feedback && booking.feedback.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Reviews & Rating</h4>
-          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm space-y-4">
-            {booking.feedback.map((f) => (
-              <div key={f.id} className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="flex">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <StarIcon
-                          key={s}
-                          className={`h-3 w-3 ${s <= f.score ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-900">{f.rater?.fullName}</span>
-                  </div>
-                  <span className="text-[9px] text-slate-400">
-                    {f.ratedAt ? new Date(f.ratedAt).toLocaleDateString() : ""}
-                  </span>
-                </div>
-                {f.comment && (
-                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    "{f.comment}"
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Telemedicine join call */}
-      {booking.isTelemedicine && (
-        <div className="space-y-3">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Video consultation</h4>
-          {booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED ? (
-            <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
-              This consultation was unattended. You can propose a new time below.
-            </p>
-          ) : isWithinJoinWindow(
-            booking.scheduledAt,
-            booking.estimateDurationMinutes,
-            Date.now(),
-            policyQuery.data?.joinWindowBeforeMinutes
-          ) ? (
-            <Button
-              type="button"
-              className="w-full h-12 rounded-xl text-xs font-bold"
-              onClick={() => setCallOpen(true)}
-            >
-              <Video className="h-4 w-4" />
-              Join video call
-            </Button>
-          ) : (
-            <p className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500">
-              {policyQuery.data
-                ? `The call opens ${policyQuery.data.joinWindowBeforeMinutes} minutes before your appointment time.`
-                : "The call opens shortly before your appointment time."}
-            </p>
-          )}
-          {booking.status === "scheduled" && existingNoShowDispute ? (
-            <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs text-amber-700">
-              You reported a problem with this appointment. Admin.ops is reviewing it.
-            </p>
-          ) : (
-            booking.status === "scheduled" && !NOT_REPORTABLE_STATUSES.includes(booking.status) && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
-                onClick={() => setNoShowDialogOpen(true)}
-              >
-                The provider didn't show up
-              </Button>
-            )
-          )}
-          {booking.isTelemedicine && user?.id && (
-            <ReschedulePanel
-              bookingId={booking.id}
-              currentUserId={String(user.id)}
-              canReschedule={canReschedule}
-            />
-          )}
-
-          {canReportTechnicalIssue && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
-              onClick={() => setTechnicalIssueDialogOpen(true)}
-            >
-              Report a technical issue
-            </Button>
-          )}
-          {canCancelAppointment && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full h-10 rounded-xl text-xs font-semibold text-slate-500 hover:text-danger-600"
-              onClick={() => setCancelAppointmentDialogOpen(true)}
-            >
-              Cancel this appointment
-            </Button>
-          )}
-        </div>
-      )}
+      <FeedbackSection />
 
       {/* Actions */}
       <div className="pt-4 space-y-3">
@@ -517,6 +448,50 @@ const BookingDetailPage = () => {
     </div>
   );
 
+  // Video consultations are not about a place, so they get their own page: when, who, what to do now.
+  const isUnpaidRequest = booking.isTelemedicine && booking.status === "telemedicine_payment_pending";
+  const canCancelBeforeAssignment =
+    booking.isTelemedicine &&
+    !booking.provider &&
+    !["cancelled_by_client", "cancelled_by_admin", "completed_by_provider", "client_confirmed", "fully_completed"].includes(booking.status);
+  const videoCancel =
+    isUnpaidRequest
+      ? { label: "Remove unpaid request", onClick: handleCancel, loading: cancelMutation.isPending }
+      : canCancelAppointment || canCancelBeforeAssignment
+        ? { label: "Cancel this appointment", onClick: () => setCancelAppointmentDialogOpen(true), loading: false }
+        : null;
+  // "My doctor did not join" only makes sense once the appointment has started.
+  const appointmentStarted = Boolean(booking.scheduledAt) && Date.now() >= new Date(booking.scheduledAt as string).getTime();
+  const videoPage = booking.isTelemedicine ? (
+    <VideoConsultationDetails
+      booking={booking}
+      timezone={policyQuery.data?.defaultTimezone}
+      joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+      statusLabel={formatBookingStatus(booking.status)}
+      statusClassName={theme.className}
+      unattended={booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED}
+      onBack={() => navigate(-1)}
+      onJoin={() => setCallOpen(true)}
+      onChat={() => navigate("/app/inbox")}
+      cancel={videoCancel}
+      reportNoShow={
+        booking.status === "scheduled" && appointmentStarted && !existingNoShowDispute && !NOT_REPORTABLE_STATUSES.includes(booking.status)
+          ? () => setNoShowDialogOpen(true)
+          : null
+      }
+      noShowReported={booking.status === "scheduled" && Boolean(existingNoShowDispute)}
+      reportTechnicalIssue={canReportTechnicalIssue ? () => setTechnicalIssueDialogOpen(true) : null}
+      reschedule={
+        user?.id ? (
+          <ReschedulePanel bookingId={booking.id} currentUserId={String(user.id)} canReschedule={canReschedule} />
+        ) : null
+      }
+      paymentNotice={booking.paymentReviewPending ? <PaymentReviewNotice /> : null}
+      feedback={<FeedbackSection />}
+      onBackToBookings={() => navigate("/app/bookings")}
+    />
+  ) : null;
+
   return (
     <AppLayout fullWidth showHeader={false} disablePadding>
       <div className="relative w-full bg-slate-50" style={{ minHeight: '100vh' }}>
@@ -560,6 +535,8 @@ const BookingDetailPage = () => {
               </button>
             </div>
           </div>
+        ) : videoPage ? (
+          videoPage
         ) : (
           // Placeholder if no map available (e.g. cancelled/history view) - Should ideally not happen often with logic above, 
           // but ensures layout consistency. 
@@ -585,7 +562,7 @@ const BookingDetailPage = () => {
         {/* Side Drawer */}
         <Drawer
           anchor="right"
-          open={sheetExpanded}
+          open={sheetExpanded && !booking.isTelemedicine}
           onClose={() => setSheetExpanded(false)}
           PaperProps={{
             sx: { width: "100%", maxWidth: "400px", background: "#f8fafc" }
@@ -686,7 +663,7 @@ const BookingDetailPage = () => {
           onConfirm={handleReportNoShow}
           loading={reportNoShowMutation.isPending}
           title="Report a problem"
-          description="Let admin.ops know if the provider didn't join for this appointment. This flags the appointment for review -- it doesn't request a refund by itself."
+          description="Tell our team if your doctor did not join this appointment. This flags it for review. It does not ask for a refund by itself."
           confirmLabel="Report"
           confirmVariant="secondary"
           error={noShowError ?? undefined}
@@ -719,7 +696,7 @@ const BookingDetailPage = () => {
           onReported={() =>
             toast.showToast({
               title: "Reported",
-              description: "Admin.ops will review this technical issue.",
+              description: "Our team will review this technical problem.",
               variant: "info"
             })
           }
