@@ -116,8 +116,25 @@ describe("review queue", () => {
   it("refuses to resolve without a reason, before the round trip", async () => {
     // The backend requires it. Failing here means the operator finds out at the form rather
     // than after a request that was always going to be rejected.
-    await expect(resolveReviewItem("payment_review", "d1", "   ")).rejects.toThrow("reason is required");
+    await expect(resolveReviewItem("payment_review", "d1", { reason: "   ", outcome: "no_action" })).rejects.toThrow("reason is required");
     expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("refuses to resolve without a chosen outcome, before the round trip", async () => {
+    await expect(resolveReviewItem("payment_review", "d1", { reason: "ok", outcome: "" })).rejects.toThrow("Choose what to do");
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("sends the outcome and, for a refund, the amount the screen showed", async () => {
+    mockPost.mockResolvedValueOnce({ data: { data: { outcome: "refund_full" } } });
+
+    await resolveReviewItem("payment_review", "d1", { reason: "client asked", outcome: "refund_full", refundAmountCents: 150000 });
+
+    expect(mockPost).toHaveBeenCalledWith("/admin/payments/reviews/payment_review/d1/resolve", {
+      reason: "client asked",
+      outcome: "refund_full",
+      refund_amount_cents: 150000
+    });
   });
 
   it("passes categories as a comma separated filter", async () => {

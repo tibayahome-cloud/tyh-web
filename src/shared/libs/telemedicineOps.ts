@@ -288,7 +288,11 @@ export type ReviewCategory =
   | "cancellation_payment_review"
   | "no_show"
   | "technical_issue"
-  | "reschedule_escalation";
+  | "reschedule_escalation"
+  | "provider_earnings_complaint";
+
+/** One decision the operator may choose for an item, with what it does, supplied by the server. */
+export type ReviewOutcome = { key: string; label: string; effect: string };
 
 export type ReviewItem = {
   category: ReviewCategory;
@@ -300,6 +304,13 @@ export type ReviewItem = {
   paymentId: string | null;
   openedAt: string | null;
   summary: string | null;
+  clientName: string | null;
+  providerName: string | null;
+  serviceName: string | null;
+  outcomes: ReviewOutcome[];
+  /** What a full refund would send back, when the item has a payment that can be refunded. */
+  refundableAmountCents: number | null;
+  refundableCurrency: string | null;
 };
 
 const mapReviewItem = (raw: Record<string, any>): ReviewItem => ({
@@ -311,7 +322,13 @@ const mapReviewItem = (raw: Record<string, any>): ReviewItem => ({
   scheduledAt: raw.scheduled_at ?? null,
   paymentId: raw.payment_id ?? null,
   openedAt: raw.opened_at ?? null,
-  summary: raw.summary ?? null
+  summary: raw.summary ?? null,
+  clientName: raw.client_name ?? null,
+  providerName: raw.provider_name ?? null,
+  serviceName: raw.service_name ?? null,
+  outcomes: Array.isArray(raw.outcomes) ? raw.outcomes : [],
+  refundableAmountCents: typeof raw.refundable_amount_cents === "number" ? raw.refundable_amount_cents : null,
+  refundableCurrency: raw.refundable_currency ?? null
 });
 
 export const fetchReviewQueue = async (categories?: ReviewCategory[]): Promise<ReviewItem[]> => {
@@ -322,22 +339,31 @@ export const fetchReviewQueue = async (categories?: ReviewCategory[]): Promise<R
   return rows.map(mapReviewItem);
 };
 
+export type ReviewResolution = {
+  outcome: string;
+  refund: { requested: boolean; payment_id: string | null; amount_cents: number | null; currency: string | null; already_requested: boolean };
+};
+
 /**
- * Close one review item. A reason is required by the backend, so it is required here rather
- * than sent empty and rejected -- the caller finds out at the form, not after a round trip.
+ * Close one review item with an outcome chosen from the item's own list. A reason is required by the backend, so it is
+ * required here rather than sent empty and rejected. A refund must carry the amount the screen showed: the server
+ * refuses if the payment is no longer that amount.
  */
 export const resolveReviewItem = async (
   category: ReviewCategory,
   itemId: string,
-  reason: string,
-  outcome?: string
-) => {
-  if (!reason.trim()) {
+  input: { reason: string; outcome: string; refundAmountCents?: number | null }
+): Promise<ReviewResolution> => {
+  if (!input.reason.trim()) {
     throw new Error("A reason is required to resolve a review item");
   }
+  if (!input.outcome) {
+    throw new Error("Choose what to do");
+  }
   const response = await api.post(`/admin/payments/reviews/${category}/${itemId}/resolve`, {
-    reason,
-    outcome: outcome ?? ""
+    reason: input.reason,
+    outcome: input.outcome,
+    refund_amount_cents: input.refundAmountCents ?? undefined
   });
   return response.data?.data;
 };
