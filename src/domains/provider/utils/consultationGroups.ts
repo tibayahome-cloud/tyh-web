@@ -57,7 +57,7 @@ const GRACE_AFTER_START_MS = 30 * 60_000;
 /** The consultation to feature: the soonest scheduled one that has not been over for long. */
 export const pickNowConsultation = (open: readonly Booking[], now: number): Booking | null =>
   open.find((booking) => {
-    if (booking.status !== "scheduled" || !booking.scheduledAt) return false;
+    if (!booking.isTelemedicine || booking.status !== "scheduled" || !booking.scheduledAt) return false;
     const start = new Date(booking.scheduledAt).getTime();
     const duration = (booking.estimateDurationMinutes ?? 30) * 60_000;
     return !Number.isNaN(start) && start + duration + GRACE_AFTER_START_MS >= now;
