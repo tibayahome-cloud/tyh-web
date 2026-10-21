@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { photoForService, serviceImageKey, careImageKey, categoryTiles, filterServices, formatPrice, isHomeService, type CatalogService } from "../serviceCatalog";
+import {
+  NO_FILTERS,
+  activeFilterCount,
+  careGroupOf,
+  careImageKey,
+  filterServices,
+  formatPrice,
+  groupTiles,
+  isHomeService,
+  photoForService,
+  serviceImageKey,
+  type CatalogService
+} from "../serviceCatalog";
 
 const svc = (overrides: Partial<CatalogService> = {}): CatalogService => ({
   id: "s",
@@ -26,37 +38,71 @@ describe("isHomeService", () => {
   });
 });
 
-describe("categoryTiles", () => {
-  it("makes one tile per kind of care with its count, biggest first, and never an empty one", () => {
-    const tiles = categoryTiles([
-      svc({ id: "1" }),
-      svc({ id: "2", category: { id: "c-elder", name: "Elderly care" } }),
-      svc({ id: "3" })
+describe("careGroupOf: ten catalogue categories become five plain groups", () => {
+  it("places every category the catalogue has today", () => {
+    const expected: Record<string, string> = {
+      "Nursing & Caregiver Services": "nursing",
+      "Doctor & Nurse Home Visits": "nursing",
+      Consultations: "nursing",
+      "Post-Hospitalization & Recovery Care": "nursing",
+      "Elderly & Assisted Living": "elderly",
+      "Palliative & Oncology Care": "elderly",
+      "Therapy & Rehabilitation": "therapy",
+      "Diagnostics & Monitoring": "checkups",
+      "Corporate & Executive Health": "checkups",
+      "TibaCare Monthly Care Plans": "plans",
+      "Membership & Subscription Plans": "plans"
+    };
+    Object.entries(expected).forEach(([name, group]) => expect(careGroupOf(name), name).toBe(group));
+  });
+
+  it("puts a category it has never seen under Other care, not nowhere", () => {
+    expect(careGroupOf("Something new")).toBe("other");
+    expect(careGroupOf(null)).toBe("other");
+  });
+});
+
+describe("groupTiles", () => {
+  it("lists each group that has something to book, with its count, in a fixed order", () => {
+    const tiles = groupTiles([
+      svc({ id: "1", category: { id: "a", name: "Membership & Subscription Plans" } }),
+      svc({ id: "2" }),
+      svc({ id: "3", category: { id: "b", name: "Doctor & Nurse Home Visits" } })
     ]);
 
-    expect(tiles).toEqual([
-      { id: "c-nurse", name: "Nursing & Caregiver Services", count: 2 },
-      { id: "c-elder", name: "Elderly care", count: 1 }
-    ]);
+    expect(tiles.map((t) => [t.id, t.count])).toEqual([["nursing", 2], ["plans", 1]]);
   });
 });
 
 describe("filterServices", () => {
   const list = [
     svc({ id: "1", name: "Wound dressing" }),
-    svc({ id: "2", name: "Ambulance transfer", is_emergency_capable: true, base_price_cents: 500000, category: { id: "c-amb", name: "Ambulance" } })
+    svc({ id: "2", name: "Ambulance transfer", is_emergency_capable: true, base_price_cents: 600000, category: { id: "c-amb", name: "Elderly & Assisted Living" } }),
+    svc({ id: "3", name: "Quote only", base_price_cents: 0 })
   ];
 
-  it("filters by kind of care, urgency and price", () => {
-    expect(filterServices(list, { ...ALL, categoryId: "c-amb" }).map((s) => s.id)).toEqual(["2"]);
-    expect(filterServices(list, { ...ALL, emergencyOnly: true }).map((s) => s.id)).toEqual(["2"]);
-    expect(filterServices(list, { ...ALL, maxPrice: 2000 }).map((s) => s.id)).toEqual(["1"]);
-    expect(filterServices(list, { ...ALL, minPrice: 2000 }).map((s) => s.id)).toEqual(["2"]);
+  it("filters by group, urgency and price band", () => {
+    expect(filterServices(list, { ...NO_FILTERS, groupId: "elderly" }).map((s) => s.id)).toEqual(["2"]);
+    expect(filterServices(list, { ...NO_FILTERS, urgentOnly: true }).map((s) => s.id)).toEqual(["2"]);
+    expect(filterServices(list, { ...NO_FILTERS, priceBand: "low" }).map((s) => s.id)).toEqual(["1", "3"]);
+    expect(filterServices(list, { ...NO_FILTERS, priceBand: "high" }).map((s) => s.id)).toEqual(["2", "3"]);
+  });
+
+  it("never hides a service priced on request because of a price band", () => {
+    expect(filterServices(list, { ...NO_FILTERS, priceBand: "mid" }).map((s) => s.id)).toEqual(["3"]);
   });
 
   it("searches the name, description and kind of care", () => {
-    expect(filterServices(list, { ...ALL, search: "ambulance" }).map((s) => s.id)).toEqual(["2"]);
-    expect(filterServices(list, { ...ALL, search: "nursing" }).map((s) => s.id)).toEqual(["1"]);
+    expect(filterServices(list, { ...NO_FILTERS, search: "ambulance" }).map((s) => s.id)).toEqual(["2"]);
+    expect(filterServices(list, { ...NO_FILTERS, search: "nursing" }).map((s) => s.id)).toEqual(["1", "3"]);
+  });
+});
+
+describe("activeFilterCount", () => {
+  it("counts sheet filters that are on, not the search box", () => {
+    expect(activeFilterCount(NO_FILTERS)).toBe(0);
+    expect(activeFilterCount({ ...NO_FILTERS, search: "x" })).toBe(0);
+    expect(activeFilterCount({ search: "", groupId: "nursing", urgentOnly: true, priceBand: "low" })).toBe(3);
   });
 });
 

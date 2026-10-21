@@ -36,7 +36,7 @@ const renderPage = () =>
   );
 
 beforeEach(() => {
-  api.services = [svc("a", "Wound dressing"), svc("v", "General consultation", { remote_capable: true }), svc("e", "Ambulance transfer", { is_emergency_capable: true, category: { id: "c2", name: "Ambulance" } })];
+  api.services = [svc("a", "Wound dressing"), svc("v", "General consultation", { remote_capable: true }), svc("e", "Ambulance transfer", { is_emergency_capable: true, category: { id: "c2", name: "Elderly & Assisted Living" } })];
 });
 
 describe("client Services", () => {
@@ -49,16 +49,33 @@ describe("client Services", () => {
     expect(screen.getByText("Urgent")).toBeInTheDocument();
   });
 
-  it("offers every kind of care in one list, with counts, and narrows the list when one is chosen", async () => {
+  it("keeps filters behind one button, with the count of those that are on", async () => {
+    renderPage();
+    await screen.findByText("Wound dressing");
+    expect(screen.getByRole("button", { name: /Filters/ })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Nursing & doctor visits/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ service/ }));
+
+    expect(screen.getByRole("button", { name: /Filters/ })).toHaveTextContent("1");
+    expect(screen.getByLabelText("Active filters")).toBeInTheDocument();
+  });
+
+  it("narrows to a group, shows it as a removable chip, and clears it", async () => {
     renderPage();
     await screen.findByText("Wound dressing");
 
-    const options = Array.from((screen.getByLabelText("Kind of care") as HTMLSelectElement).options).map((o) => o.text);
-    expect(options).toEqual(["All kinds of care (2)", "Ambulance (1)", "Nursing & Caregiver Services (1)"]);
-    fireEvent.change(screen.getByLabelText("Kind of care"), { target: { value: "c2" } });
+    fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Elderly & palliative care/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 service" }));
 
     expect(screen.getByText("Ambulance transfer")).toBeInTheDocument();
     expect(screen.queryByText("Wound dressing")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove filter Elderly & palliative care" }));
+    expect(screen.getByText("Wound dressing")).toBeInTheDocument();
   });
 
   it("opens booking from the Book button", async () => {
