@@ -34,6 +34,7 @@ import { discoverFacilities } from "../../../shared/libs/facilities";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { BookingRequestMode, FacilityDiscoveryItem } from "../../../shared/schemas/facility";
 import { PlacePicker } from "./PlacePicker";
+import { CareTypeBadge, toCareType } from "../../../shared/components/CareTypeBadge";
 import { loadRecentLocations, saveRecentLocation, type StoredLocation } from "../../../shared/utils/recentLocations";
 import { Stepper } from "../../../shared/components/Stepper";
 import { isCoordinateText, UNNAMED_PLACE, type Place } from "../../../shared/utils/geocoding";
@@ -54,6 +55,7 @@ type ServiceOption = {
   default_estimate_minutes: number;
   is_emergency_capable: boolean;
   active?: boolean;
+  care_type?: "telemedicine" | "home_based" | "ambulance";
 };
 
 type LocationSource = "none" | "map" | "current" | "saved" | "search";
@@ -142,7 +144,9 @@ const useServiceOptions = (enabled: boolean) =>
           // Match the client Services browser: only offer services a facility can actually
           // deliver right now, not every globally active catalog definition.
           "filter[active]": "true",
-          "filter[has_active_offering]": "true"
+          "filter[has_active_offering]": "true",
+          // The same services as the Services page: care that comes to you, never a video consultation.
+          "filter[care_type]": "home_based,ambulance"
         }
       });
       return response.data.data.filter((service) => service.active ?? true);
@@ -642,14 +646,12 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                               service.name.toLowerCase().includes("heart") ? <Heart size={16} /> : <Activity size={16} />}
                         </div>
                         <h3 className="text-sm font-bold text-slate-900 leading-tight">{service.name}</h3>
-                        <p className="mt-0.5 text-[10px] text-slate-500 line-clamp-1">
-                          {service.description ?? "Professional healthcare"}
-                        </p>
+                        <CareTypeBadge careType={toCareType(service.care_type)} className="mt-1 self-start" />
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-xs font-bold text-tiba-blue">
-                            From {formatCurrency(service.base_price_cents)}
+                            {service.base_price_cents > 0 ? `KES ${Math.round(service.base_price_cents / 100).toLocaleString("en-US")}` : "Quote on request"}
                           </span>
-                          <span className="text-[10px] text-slate-400">{service.default_estimate_minutes} min</span>
+                          <span className="text-xs text-slate-600">{service.default_estimate_minutes} min</span>
                         </div>
                       </button>
                     ))}

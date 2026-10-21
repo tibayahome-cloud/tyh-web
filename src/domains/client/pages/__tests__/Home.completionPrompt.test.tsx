@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const ambulance = vi.hoisted(() => ({ has: false }));
 const state = vi.hoisted(() => ({
   active: [] as unknown[],
   wallet: {} as Record<string, unknown>,
@@ -21,6 +22,7 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
 vi.mock("../../../../shared/hooks/useWallet", () => ({ useWalletAccount: () => state.wallet }));
 vi.mock("../../../../shared/hooks/useTelemedicine", () => ({ useTelemedicinePolicy: () => ({ data: { joinWindowBeforeMinutes: 10 } }) }));
 vi.mock("../../../../shared/hooks/useSelfCare", () => ({ useSelfCareCheckins: () => state.checkins }));
+vi.mock("../../hooks/useHasAmbulanceService", () => ({ useHasAmbulanceService: () => ambulance.has }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/hooks/useLocationAccess", () => ({
   useLocationAccess: () => ({ status: "granted", error: null, requestAccess: vi.fn() })

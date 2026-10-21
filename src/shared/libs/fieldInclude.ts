@@ -71,7 +71,8 @@ export const svcCard: FieldPreset = {
     "default_estimate_minutes",
     "is_emergency_capable",
     "active",
-    "remote_capable"
+    "remote_capable",
+    "care_type"
   ],
   includes: {
     category: {

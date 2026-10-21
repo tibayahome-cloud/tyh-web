@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Clock, Search, SlidersHorizontal, Zap, X } from "lucide-react";
 
 import { Button } from "../../../shared/components/Button";
@@ -29,6 +29,7 @@ import maternityImg from "../../../assets/images/telemedicine/maternity-care.web
 import chronicImg from "../../../assets/images/telemedicine/chronic-disease-care.webp";
 import checkupImg from "../../../assets/images/telemedicine/general-consultation.webp";
 import equipmentImg from "../../../assets/images/telemedicine/medication-review.webp";
+import { CareTypeBadge, toCareType } from "../../../shared/components/CareTypeBadge";
 import { ServiceFilterSheet } from "../components/ServiceFilterSheet";
 import {
   CARE_GROUPS,
@@ -58,7 +59,9 @@ const useServices = () =>
         ...buildFieldParams(svcCard),
         // Only services a facility can actually deliver right now, not every active catalogue definition.
         "filter[active]": "true",
-        "filter[has_active_offering]": "true"
+        "filter[has_active_offering]": "true",
+        // Care that comes to you. Video consultations are on the Telemedicine tab.
+        "filter[care_type]": "home_based,ambulance"
       };
       const response = await api.get<Envelope<CatalogService[]>>("/services", { params });
       return response.data.data.filter(isHomeService);
@@ -100,6 +103,7 @@ const serviceImage = (service: { key: string; name: string; category?: { name: s
   photoForService(service.key, SERVICE_PHOTOS, CARE_IMAGES[serviceImageKey(service.name, service.category?.name)]);
 
 const GROUP_IMAGES: Record<CareGroupId, string> = {
+  ambulance: ambulanceImg,
   nursing: nurseImg,
   elderly: elderlyImg,
   therapy: therapyImg,
@@ -124,7 +128,13 @@ const FilterChip = ({ label, onRemove }: { label: string; onRemove: () => void }
 
 const ServicesPage = () => {
   const navigate = useNavigate();
-  const [filters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
+  const [searchParams] = useSearchParams();
+  const requestedGroup = searchParams.get("group");
+  // The Home screen can open this page already showing one kind of care, for example ?group=ambulance.
+  const [filters, setFilters] = useState<CatalogFilters>(() => ({
+    ...NO_FILTERS,
+    groupId: CARE_GROUPS.some((group) => group.id === requestedGroup) ? (requestedGroup as CareGroupId) : "all"
+  }));
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -246,9 +256,12 @@ const ServicesPage = () => {
                     </Link>
                     <div className="p-4">
                       <h3 className="line-clamp-2 text-base font-semibold text-slate-900">{service.name}</h3>
-                      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-700">
-                        <Clock aria-hidden="true" size={14} /> {service.default_estimate_minutes} min
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                        <CareTypeBadge careType={toCareType(service.care_type)} />
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock aria-hidden="true" size={14} /> {service.default_estimate_minutes} min
+                        </span>
+                      </div>
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <p className="text-lg font-bold text-slate-900">{formatPrice(service.base_price_cents)}</p>
                         <Button type="button" className="min-h-[44px] px-6" onClick={() => openBookingDialog(service.id)}>
