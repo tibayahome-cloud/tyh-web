@@ -71,30 +71,98 @@ export const reverseGeocode = async (coords: Coords, signal?: AbortSignal): Prom
   }
 };
 
-/** Places matching what someone typed, in Kenya, best first. Empty when nothing matches or the service cannot be reached. */
-export const searchPlaces = async (query: string, signal?: AbortSignal): Promise<Place[]> => {
+/** A match for what someone typed. Its point is looked up only when it is chosen, which is what Google's suggestions need. */
+export type PlaceSuggestion = {
+  /** What to show: "502 Lower Kabete Road". */
+  primary: string;
+  /** Where it is, in smaller text: "Kabete, Nairobi". */
+  secondary?: string;
+  resolve: () => Promise<Place | null>;
+};
+
+type PlacesApi = {
+  AutocompleteService: new () => {
+    getPlacePredictions: (request: Record<string, unknown>) => Promise<{
+      predictions: Array<{ place_id: string; description: string; structured_formatting?: { main_text: string; secondary_text?: string } }>;
+    }>;
+  };
+  PlacesService: new (el: HTMLElement) => {
+    getDetails: (
+      request: Record<string, unknown>,
+      callback: (place: { name?: string; formatted_address?: string; geometry?: { location: { lat: () => number; lng: () => number } }; address_components?: Array<{ long_name: string; types: string[] }> } | null, status: string) => void
+    ) => void;
+  };
+  AutocompleteSessionToken: new () => unknown;
+};
+
+const placesApi = (): PlacesApi | null => {
+  const places = (globalThis as unknown as { google?: { maps?: { places?: PlacesApi } } }).google?.maps?.places;
+  return places?.AutocompleteService && places.PlacesService ? places : null;
+};
+
+// One session per typed search, so a search plus its pick is billed as one.
+let sessionToken: unknown = null;
+const sessionFor = (places: PlacesApi) => (sessionToken ??= new places.AutocompleteSessionToken());
+
+/** Nairobi, to rank nearby results first without hiding the rest of Kenya. */
+const NAIROBI = { lat: -1.286389, lng: 36.817223 };
+
+const googleSuggestions = async (text: string, places: PlacesApi): Promise<PlaceSuggestion[]> => {
+  const maps = (globalThis as unknown as { google: { maps: { places: PlacesApi } } }).google.maps;
+  const { predictions } = await new places.AutocompleteService().getPlacePredictions({
+    input: text,
+    componentRestrictions: { country: "ke" },
+    sessionToken: sessionFor(places),
+    locationBias: { center: NAIROBI, radius: 50000 }
+  });
+  return (predictions ?? []).slice(0, 6).map((prediction) => ({
+    primary: prediction.structured_formatting?.main_text ?? prediction.description.split(",")[0],
+    secondary: prediction.structured_formatting?.secondary_text,
+    resolve: () =>
+      new Promise<Place | null>((resolve) => {
+        const service = new maps.places.PlacesService(document.createElement("div"));
+        service.getDetails(
+          { placeId: prediction.place_id, fields: ["name", "formatted_address", "geometry", "address_components"], sessionToken: sessionFor(places) },
+          (place, status) => {
+            sessionToken = null;
+            const location = place?.geometry?.location;
+            if (status !== "OK" || !place || !location) return resolve(null);
+            const name = [prediction.structured_formatting?.main_text ?? place.name, prediction.structured_formatting?.secondary_text?.split(",")[0]]
+              .filter((part, index, all): part is string => Boolean(part) && all.indexOf(part) === index)
+              .join(", ");
+            resolve({ name: name || shortPlaceName(googleParts(place.address_components), place.formatted_address), coords: { lat: location.lat(), lng: location.lng() } });
+          }
+        );
+      })
+  }));
+};
+
+/**
+ * Places matching what someone typed, in Kenya, best first. Google Places finds buildings, estates and businesses the
+ * way Maps, Uber and Bolt do; without Google loaded, OpenStreetMap is used, which knows far fewer Kenyan streets.
+ */
+export const searchPlaces = async (query: string, signal?: AbortSignal): Promise<PlaceSuggestion[]> => {
   const text = query.trim();
   if (text.length < 3) return [];
-  const google = googleGeocoder();
+  const places = placesApi();
   try {
-    if (google) {
-      const { results } = await google.geocode({ address: text, region: "ke", componentRestrictions: { country: "KE" } });
-      return (results ?? []).slice(0, 5).map((r) => ({
-        name: shortPlaceName(googleParts(r.address_components), r.formatted_address),
-        coords: { lat: r.geometry.location.lat(), lng: r.geometry.location.lng() }
-      }));
-    }
+    if (places) return await googleSuggestions(text, places);
     const response = await fetch(
       `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=ke&accept-language=en&q=${encodeURIComponent(text)}`,
       { signal }
     );
     if (!response.ok) return [];
     const rows = (await response.json()) as Array<{ lat: string; lon: string; address?: AddressParts; display_name?: string }>;
-    return rows.map((row) => ({
-      name: shortPlaceName(row.address ?? {}, row.display_name),
-      coords: { lat: Number(row.lat), lng: Number(row.lon) }
-    }));
+    return rows.map((row) => {
+      const name = shortPlaceName(row.address ?? {}, row.display_name);
+      const [primary, ...rest] = name.split(", ");
+      const place: Place = { name, coords: { lat: Number(row.lat), lng: Number(row.lon) } };
+      return { primary, secondary: rest.join(", ") || undefined, resolve: async () => place };
+    });
   } catch {
     return [];
   }
 };
+
+/** True once the Google Maps script with Places has loaded, so callers can wait for the better source. */
+export const googlePlacesReady = (): boolean => placesApi() !== null;
