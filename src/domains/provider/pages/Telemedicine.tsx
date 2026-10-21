@@ -394,7 +394,7 @@ const ProviderTelemedicinePage = () => {
         bookingId={technicalIssueBookingId ?? ""}
         onClose={() => setTechnicalIssueBookingId(null)}
         onReported={() =>
-          toast.showToast({ title: "Reported", description: "Admin.ops will review this technical issue.", variant: "info" })
+          toast.showToast({ title: "Reported", description: "Our team will look into this problem.", variant: "info" })
         }
       />
     </AppLayout>

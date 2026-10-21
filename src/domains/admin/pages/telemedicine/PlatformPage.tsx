@@ -30,7 +30,7 @@ const TelemedicinePlatformPage = () => {
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Telemedicine platform health</h1>
         <p className="text-sm text-slate-500">
-          Policy configuration and Jitsi operational status across every facility.{" "}
+          Policy configuration and call system status across every facility.{" "}
           <Link to="/admin/telemedicine" className="font-medium text-tiba-blue hover:underline">
             View the operational assignment queue
           </Link>
@@ -73,11 +73,11 @@ const TelemedicinePlatformPage = () => {
           ) : null}
         </Card>
 
-        <Card title="Jitsi operational health">
+        <Card title="Call system health">
           {healthQuery.isLoading ? (
-            <Loading label="Checking Jitsi health…" />
+            <Loading label="Checking the call system…" />
           ) : healthQuery.isError ? (
-            <ApiErrorBanner {...classifyApiError(healthQuery.error, "Unable to reach the Jitsi health check.")} />
+            <ApiErrorBanner {...classifyApiError(healthQuery.error, "Unable to reach the call system health check.")} />
           ) : healthQuery.data ? (
             <div className="space-y-3">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${healthTone}`}>

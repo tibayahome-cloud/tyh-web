@@ -503,7 +503,7 @@ const FacilityProvidersPage = () => {
       </Card>
     );
   }
-  if (!facilityId) return <Card title="Providers" description="Your admin.ops account is not linked to exactly one facility." />;
+  if (!facilityId) return <Card title="Providers" description="Your account is not linked to a facility yet. Contact support." />;
   return <FacilityProvidersManager facilityId={facilityId} />;
 };
 

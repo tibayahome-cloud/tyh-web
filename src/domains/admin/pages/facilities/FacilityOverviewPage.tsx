@@ -154,7 +154,7 @@ const FacilityOverviewPage = () => {
     );
   }
   if (!facilityId) {
-    return <Card title="Overview" description="Your admin.ops account is not linked to exactly one facility." />;
+    return <Card title="Overview" description="Your account is not linked to a facility yet. Contact support." />;
   }
   if (overviewQuery.isError) {
     return (

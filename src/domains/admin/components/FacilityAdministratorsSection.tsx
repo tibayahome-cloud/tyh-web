@@ -199,7 +199,7 @@ export const FacilityAdministratorsSection = ({ facilityId }: Props) => {
           <Loading />
         ) : forbidden ? (
           <p className="text-sm text-slate-700" role="alert">
-            You do not have permission to manage this facility's administrators. Only a super admin can.
+            You do not have permission to manage this facility's administrators. Contact support.
           </p>
         ) : adminsQuery.isError ? (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

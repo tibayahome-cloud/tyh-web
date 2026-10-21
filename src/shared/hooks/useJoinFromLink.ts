@@ -8,6 +8,8 @@ type JoinableBooking = {
   isTelemedicine: boolean;
   scheduledAt: string | null;
   estimateDurationMinutes: number | null;
+  /** Null while no doctor is assigned: there is nothing to join then. */
+  provider?: unknown | null;
 };
 
 // Arriving at a booking with ?join=1 (the Join button on Home) opens the call once the booking has loaded and its
@@ -25,6 +27,7 @@ export const useJoinFromLink = (
     if (!requested || !booking) return;
     if (
       booking.isTelemedicine &&
+      booking.provider !== null &&
       isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, Date.now(), joinWindowBeforeMinutes)
     ) {
       onJoin();

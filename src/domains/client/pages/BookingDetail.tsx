@@ -236,8 +236,10 @@ const BookingDetailPage = () => {
   // Same window as cancellation, and for the same reason: once the consultation is under way
   // the appointment is no longer a plan to negotiate. The backend refuses either way, so this
   // only decides whether to offer something that would be rejected.
+  // A time can only be negotiated with an assigned doctor; before that the server refuses, so the panel is not offered.
   const canReschedule =
     booking.isTelemedicine &&
+    Boolean(booking.provider) &&
     (booking.status === BOOKING_STATUS_TELEMEDICINE_UNATTENDED || canCancelAppointment);
 
   const FeedbackSection = () => (

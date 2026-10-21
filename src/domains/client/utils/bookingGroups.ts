@@ -98,7 +98,8 @@ export const pickNextConsultation = (comingUp: readonly Booking[], now: number):
   const GRACE_AFTER_START_MS = 30 * 60_000;
   return (
     comingUp.find((booking) => {
-      if (!booking.isTelemedicine || !NEXT_STATUSES.includes(booking.status) || !booking.scheduledAt) return false;
+      // Nothing to join until a doctor is assigned, so an unassigned request is never "next".
+      if (!booking.isTelemedicine || !booking.provider || !NEXT_STATUSES.includes(booking.status) || !booking.scheduledAt) return false;
       const start = new Date(booking.scheduledAt).getTime();
       return !Number.isNaN(start) && start + GRACE_AFTER_START_MS >= now;
     }) ?? null

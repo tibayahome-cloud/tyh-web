@@ -90,6 +90,10 @@ describe("ordering", () => {
 });
 
 describe("pickNextConsultation", () => {
+  it("never features a request that has no doctor yet, because there is nothing to join", () => {
+    expect(pickNextConsultation([booking({ provider: null, scheduledAt: minutes(-10) })], NOW)).toBeNull();
+  });
+
   it("features the soonest scheduled telemedicine booking", () => {
     const a = booking({ id: "a", scheduledAt: minutes(20) });
     const b = booking({ id: "b", scheduledAt: minutes(120) });
