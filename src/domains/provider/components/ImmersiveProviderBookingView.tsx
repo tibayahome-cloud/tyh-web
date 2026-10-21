@@ -22,6 +22,7 @@ import { Button } from "../../../shared/components/Button";
 import type { Booking, BookingMarkAction } from "../../../shared/schemas/booking";
 import { useMarkBookingMutation } from "../../../shared/hooks/useBookings";
 import { PaymentRequestPanel } from "../../../shared/components/PaymentRequestPanel";
+import { PlaceLabel } from "../../../shared/components/PlaceLabel";
 
 type ImmersiveProviderBookingViewProps = {
   booking: Booking;
@@ -475,8 +476,8 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
                 {booking.addressText || "Client's Location"}
               </p>
               {booking.lat && booking.lng && !booking.addressText && (
-                <p className="text-xs text-white/30 mt-0.5 font-mono">
-                  {booking.lat.toFixed(4)}, {booking.lng.toFixed(4)}
+                <p className="text-xs text-white/60 mt-0.5">
+                  Near <PlaceLabel lat={booking.lat} lng={booking.lng} />
                 </p>
               )}
             </div>

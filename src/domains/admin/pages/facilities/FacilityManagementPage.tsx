@@ -34,6 +34,7 @@ import { useRbac } from "../../../../shared/hooks/useRbac";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import LocationPickerMap from "../../../../shared/components/LocationPickerMap";
 import { SUPPORTED_COUNTRIES } from "../../../../shared/constants/region";
+import { PlaceLabel } from "../../../../shared/components/PlaceLabel";
 
 type CreateFormState = {
   name: string;
@@ -797,7 +798,7 @@ const FacilityManagementPage = () => {
               height={280}
             />
             {locationError && <p className="mt-2 text-sm text-danger-600" role="alert">{locationError}</p>}
-            {form.lat && form.lng && <p className="mt-2 text-xs text-slate-500">Location selected: {Number(form.lat).toFixed(5)}, {Number(form.lng).toFixed(5)}</p>}
+            {form.lat && form.lng && <p className="mt-2 text-xs text-slate-500">Location selected: <PlaceLabel lat={Number(form.lat)} lng={Number(form.lng)} /></p>}
             <div className="mt-4">
               <Input
                 label="Building, floor, suite or room (optional)"

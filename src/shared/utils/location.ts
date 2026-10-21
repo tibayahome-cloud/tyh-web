@@ -1,19 +1,3 @@
-const formatCardinal = (value: number, positiveLabel: string, negativeLabel: string) => {
-  const absValue = Math.abs(value);
-  const direction = value >= 0 ? positiveLabel : negativeLabel;
-  return `${absValue.toFixed(4)}° ${direction}`;
-};
-
-export const formatLatLngLabel = (lat: number, lng: number) => {
-  const latLabel = formatCardinal(lat, "N", "S");
-  const lngLabel = formatCardinal(lng, "E", "W");
-  return `${latLabel} · ${lngLabel}`;
-};
-
-export const formatDecimalLocation = (lat: number, lng: number) => {
-  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-};
-
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
 /**
