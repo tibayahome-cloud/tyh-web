@@ -12,7 +12,8 @@ const hooks = vi.hoisted(() => ({
   useProposeRebookingMutation: vi.fn(),
   useTechnicalIssues: vi.fn(),
   useTelemedicinePolicy: vi.fn(),
-  useBookingList: vi.fn()
+  useBookingList: vi.fn(),
+  useRescheduleSlots: vi.fn()
 }));
 
 vi.mock("../../../../../shared/hooks/useTelemedicine", () => ({
@@ -20,7 +21,8 @@ vi.mock("../../../../../shared/hooks/useTelemedicine", () => ({
   useAssignProviderMutation: hooks.useAssignProviderMutation,
   useProposeRebookingMutation: hooks.useProposeRebookingMutation,
   useTechnicalIssues: hooks.useTechnicalIssues,
-  useTelemedicinePolicy: hooks.useTelemedicinePolicy
+  useTelemedicinePolicy: hooks.useTelemedicinePolicy,
+  useRescheduleSlots: hooks.useRescheduleSlots
 }));
 
 vi.mock("../../../../../shared/hooks/useBookings", () => ({
@@ -108,6 +110,7 @@ beforeEach(() => {
   hooks.useProposeRebookingMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   hooks.useTechnicalIssues.mockReturnValue({ data: [], isLoading: false });
   hooks.useTelemedicinePolicy.mockReturnValue({ data: { defaultTimezone: "Africa/Nairobi" } });
+  hooks.useRescheduleSlots.mockReturnValue({ isPending: true, isError: false, data: undefined });
   hooks.useBookingList.mockReturnValue({ data: { bookings: [] }, isLoading: false, isError: false });
 });
 
@@ -116,7 +119,7 @@ describe("AssignmentQueuePage recovery states", () => {
     renderQueue([booking()]);
 
     expect(screen.getByRole("button", { name: "Assign" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Offer new time" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Offer this time" })).not.toBeInTheDocument();
   });
 
   it("offers a replacement time, not Assign, once the slot has lapsed", () => {
@@ -124,7 +127,7 @@ describe("AssignmentQueuePage recovery states", () => {
     // the backend refuses with "No active hold protects this booking's slot".
     renderQueue([booking({ recoveryState: "needs_rebooking", paymentReviewPending: true, assignableProviders: [] })]);
 
-    expect(screen.getByRole("button", { name: "Offer new time" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Offer this time" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
     expect(screen.getByText(/slot was released before a provider was assigned/i)).toBeInTheDocument();
   });
@@ -143,7 +146,7 @@ describe("AssignmentQueuePage recovery states", () => {
     const panel = screen.getByRole("tabpanel", { name: /action queue/i });
     expect(within(panel).getByText("Awaiting client")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Offer new time" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Offer this time" })).not.toBeInTheDocument();
   });
 
   it("exposes no hold or dispute identifiers on the card", () => {
@@ -179,9 +182,9 @@ describe("assignment queue error state", () => {
   });
 });
 
-describe("offering a replacement time from outside the facility's timezone", () => {
+describe("offering a replacement time from a list of real times", () => {
   // Node re-reads process.env.TZ on assignment, so this moves the ambient zone the way sitting
-  // at a machine in New York would. The submitted instant must not depend on it.
+  // at a machine in New York would. The chosen instant and the times shown must not depend on it.
   const ORIGINAL_TZ = process.env.TZ;
 
   beforeAll(() => {
@@ -192,39 +195,49 @@ describe("offering a replacement time from outside the facility's timezone", () 
     process.env.TZ = ORIGINAL_TZ;
   });
 
-  it("submits the instant the chosen facility-local time names, not the operator's own", async () => {
+  beforeEach(() => {
+    hooks.useRescheduleSlots.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        timezone: "Africa/Nairobi",
+        slots: [
+          { startAt: "2026-09-10T06:00:00.000Z", endAt: "2026-09-10T06:30:00.000Z" },
+          { startAt: "2026-09-10T07:00:00.000Z", endAt: "2026-09-10T07:30:00.000Z" }
+        ]
+      }
+    });
+  });
+
+  it("submits the instant of the time chosen, shown in the facility's time not the operator's", async () => {
     const mutateAsync = vi.fn().mockResolvedValue({});
     hooks.useProposeRebookingMutation.mockReturnValue({ mutateAsync, isPending: false });
     renderQueue([booking({ recoveryState: "needs_rebooking", assignableProviders: [] })]);
 
-    fireEvent.change(screen.getByLabelText(/Choose a replacement time/i), {
-      target: { value: "2026-09-10T09:00" }
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Offer new time" }));
+    // 06:00 UTC is 09:00 in Nairobi, whatever the machine's own zone says.
+    fireEvent.click(screen.getByRole("radio", { name: "09:00" }));
+    fireEvent.click(screen.getByRole("button", { name: "Offer this time" }));
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
-    // 09:00 in Nairobi (UTC+3), not 09:00 in New York.
-    expect(mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ proposedStartAt: "2026-09-10T06:00:00.000Z" })
-    );
+    expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ proposedStartAt: "2026-09-10T06:00:00.000Z" }));
   });
 
-  it("tells the operator which timezone the picker is in", () => {
+  it("tells the operator which timezone the times are in", () => {
     renderQueue([booking({ recoveryState: "needs_rebooking", assignableProviders: [] })]);
 
-    expect(screen.getByText(/Africa\/Nairobi/)).toBeInTheDocument();
+    expect(screen.getByText(/Shown in Nairobi time/)).toBeInTheDocument();
   });
 
-  it("will not offer a time until the facility timezone is known", () => {
-    // Guessing the browser's zone here books a real appointment at the wrong hour, so the
-    // action waits for the policy rather than falling back.
-    hooks.useTelemedicinePolicy.mockReturnValue({ data: undefined });
+  it("will not offer anything until a time is chosen", () => {
     renderQueue([booking({ recoveryState: "needs_rebooking", assignableProviders: [] })]);
 
-    fireEvent.change(screen.getByLabelText(/Choose a replacement time/i), {
-      target: { value: "2026-09-10T09:00" }
-    });
-    expect(screen.getByRole("button", { name: "Offer new time" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Offer this time" })).toBeDisabled();
+  });
+
+  it("uses no calendar field, so no time can be typed that nobody could take", () => {
+    const { container } = renderQueue([booking({ recoveryState: "needs_rebooking", assignableProviders: [] })]);
+
+    expect(container.querySelector('input[type="datetime-local"]')).toBeNull();
   });
 });
 

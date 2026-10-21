@@ -5,7 +5,6 @@ import { Plus } from "lucide-react";
 import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
-import { Input } from "../../../../shared/components/Input";
 import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import { useBookingList, useCancelBookingMutation } from "../../../../shared/hooks/useBookings";

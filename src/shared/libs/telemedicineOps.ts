@@ -90,6 +90,27 @@ export const fetchRescheduleRequests = async (bookingId: string): Promise<Resche
   return rows.map(mapReschedule);
 };
 
+export type RescheduleSlots = { slots: Array<{ startAt: string; endAt: string }>; timezone: string | null };
+
+/** Times that could be offered for this consultation, limited to what its assigned provider can actually take. */
+export const fetchRescheduleSlots = async (
+  bookingId: string,
+  startDate: string,
+  endDate: string
+): Promise<RescheduleSlots> => {
+  const response = await api.get(`/telemedicine/bookings/${bookingId}/reschedule-slots`, {
+    params: { start_date: startDate, end_date: endDate }
+  });
+  const rows = Array.isArray(response.data?.data) ? (response.data.data as Array<Record<string, unknown>>) : [];
+  const meta = (response.data?.meta ?? {}) as Record<string, unknown>;
+  return {
+    slots: rows
+      .filter((row) => typeof row.start_at === "string" && typeof row.end_at === "string")
+      .map((row) => ({ startAt: String(row.start_at), endAt: String(row.end_at) })),
+    timezone: typeof meta.timezone === "string" && meta.timezone ? meta.timezone : null
+  };
+};
+
 export const proposeReschedule = async (
   bookingId: string,
   proposedStartAt: string,
