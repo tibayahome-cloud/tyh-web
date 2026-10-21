@@ -89,7 +89,7 @@ const ConsultationRow = ({
         {noShow.state === "waiting" && (
           <p className="mt-1 text-sm text-slate-600">
             If your client has not joined by{" "}
-            {formatTelemedicineDateTime(new Date(noShow.at).toISOString(), timezone, { hour: "2-digit", minute: "2-digit", hour12: false })}, you can report it here.
+            {formatTelemedicineDateTime(new Date(noShow.at).toISOString(), timezone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}, you can report it here.
           </p>
         )}
         <div className="mt-2 flex flex-wrap gap-1.5">
