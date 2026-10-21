@@ -35,6 +35,12 @@ describe("consultationTime", () => {
     expect(joinOpensAt(START, undefined, "Africa/Nairobi")).toBeNull();
   });
 
+  it("writes midnight as 00:30, never 24:30 (some runtimes do that with a 12-hour flag)", () => {
+    // 21:30Z is 00:30 the next day in Nairobi.
+    expect(consultationTimeRange("2026-10-21T21:30:00Z", 30, "Africa/Nairobi")).toBe("00:30 to 01:00");
+    expect(joinOpensAt("2026-10-21T21:10:00Z", 10, "Africa/Nairobi")).toBe("00:00");
+  });
+
   it("returns nothing for a missing or invalid time", () => {
     expect(consultationDateLabel(null, "Africa/Nairobi")).toBeNull();
     expect(consultationDateLabel("not a date", "Africa/Nairobi")).toBeNull();

@@ -23,7 +23,7 @@ const parts = (iso: string, timeZone: string | undefined) => {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
     ...(timeZone ? { timeZone } : {})
   });
   const out: Record<string, string> = {};

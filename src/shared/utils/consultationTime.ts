@@ -16,7 +16,7 @@ export const consultationDateLabel = (scheduledAt: string | null | undefined, ti
   return formatTelemedicineDateTime(scheduledAt, timezone, { weekday: "long", day: "numeric", month: "long" });
 };
 
-const timeOnly = { hour: "2-digit", minute: "2-digit", hour12: false } as const;
+const timeOnly = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" } as const;
 
 /** "11:40 to 12:10", or just the start when the length is unknown. */
 export const consultationTimeRange = (
