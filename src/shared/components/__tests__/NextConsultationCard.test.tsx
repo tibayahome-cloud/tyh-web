@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -77,5 +77,15 @@ describe("NextConsultationCard", () => {
   it("always offers the booking details", () => {
     renderCard(135);
     expect(screen.getByRole("link", { name: "View booking details" })).toHaveAttribute("href", "/app/bookings/b1");
+  });
+
+  it("joins in place with a button when the page opens the call itself", () => {
+    const onJoin = vi.fn();
+    renderCard(5, { joinTo: undefined, onJoin });
+
+    expect(screen.queryByRole("link", { name: "Join call" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Join call" }));
+
+    expect(onJoin).toHaveBeenCalledOnce();
   });
 });

@@ -546,4 +546,55 @@ describe("mobile-safe rendering", () => {
     expect(row).toBeInTheDocument();
     expect(row?.className).toMatch(/md:grid-cols-/);
   });
+
+  describe("what needs the admin comes first", () => {
+    const minutesFromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+
+    it("puts requests waiting for a provider above new-time offers, and both above requests waiting on the client", () => {
+      renderQueue([
+        booking({ id: "w", recoveryState: "awaiting_client", assignableProviders: [], scheduledAt: minutesFromNow(10) }),
+        booking({ id: "r", recoveryState: "needs_rebooking", assignableProviders: [], scheduledAt: minutesFromNow(20) }),
+        booking({ id: "a", recoveryState: "assignable", scheduledAt: minutesFromNow(600) })
+      ]);
+
+      const assign = screen.getByRole("region", { name: "Assign a provider" });
+      const rebook = screen.getByRole("region", { name: "Offer a new time" });
+      const waiting = screen.getByRole("region", { name: "Waiting for the client" });
+      expect(assign.compareDocumentPosition(rebook) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(rebook.compareDocumentPosition(waiting) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(assign).getByRole("heading", { name: /Assign a provider \(1\)/ })).toBeInTheDocument();
+    });
+
+    it("lists requests with the soonest appointment first, so a late arrival that starts sooner is at the top", () => {
+      renderQueue([
+        booking({ id: "later", clientFullName: "Later Client", scheduledAt: minutesFromNow(600) }),
+        booking({ id: "soon", clientFullName: "Soon Client", scheduledAt: minutesFromNow(25) })
+      ]);
+
+      const names = within(screen.getByRole("region", { name: "Assign a provider" })).getAllByText(/ Client$/).map((el) => el.textContent);
+      expect(names).toEqual(["Soon Client", "Later Client"]);
+    });
+
+    it("tags a request that has already started as Assign now, and one starting soon with how long", () => {
+      renderQueue([
+        booking({ id: "late", scheduledAt: minutesFromNow(-12) }),
+        booking({ id: "soon", scheduledAt: minutesFromNow(25) })
+      ]);
+
+      expect(screen.getByText(/Started \d+ min ago\. Assign now/)).toBeInTheDocument();
+      expect(screen.getByText(/Starts in 2\d min/)).toBeInTheDocument();
+    });
+
+    it("does not show the raw booking id", () => {
+      renderQueue([booking()]);
+
+      expect(screen.queryByText("0c429cf5-9443-4b24-b2a1-e63a8da8d3ae")).not.toBeInTheDocument();
+    });
+
+    it("does not tag a request that is waiting on the client as urgent", () => {
+      renderQueue([booking({ recoveryState: "awaiting_client", assignableProviders: [], scheduledAt: minutesFromNow(-12) })]);
+
+      expect(screen.queryByText(/Assign now/)).not.toBeInTheDocument();
+    });
+  });
 });

@@ -10,8 +10,10 @@ type Props = {
   booking: Booking;
   // Who the person is meeting, in the words for their side ("Dr Example" for a client, the client for a provider).
   withName: string | null | undefined;
-  // Where "Join" goes. The booking page opens the call itself when it is sent here.
-  joinTo: string;
+  // Where "Join" goes. The booking page opens the call itself when it is sent here. A page that opens the call in
+  // place passes `onJoin` instead, and Join is a button.
+  joinTo?: string;
+  onJoin?: () => void;
   detailsTo: string;
   joinWindowBeforeMinutes?: number;
 };
@@ -19,7 +21,7 @@ type Props = {
 // The next video consultation, with the one thing to do about it. Before the call opens it says how long to
 // wait and when it opens; once it opens the Join button is large and is the only action. A phone user used to
 // have to find the booking, scroll to a small button, and guess whether the call had opened.
-export const NextConsultationCard = ({ booking, withName, joinTo, detailsTo, joinWindowBeforeMinutes }: Props) => {
+export const NextConsultationCard = ({ booking, withName, joinTo, onJoin, detailsTo, joinWindowBeforeMinutes }: Props) => {
   const now = useNow();
   const open = isWithinJoinWindow(booking.scheduledAt, booking.estimateDurationMinutes, now, joinWindowBeforeMinutes);
   const countdown = describeStart(booking.scheduledAt, now);
@@ -50,13 +52,24 @@ export const NextConsultationCard = ({ booking, withName, joinTo, detailsTo, joi
       </div>
 
       {open ? (
-        <Link
-          to={joinTo}
-          className="mt-4 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl bg-tiba-blue px-4 text-base font-semibold text-white hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2"
-        >
-          <Video className="h-5 w-5" aria-hidden="true" />
-          Join call
-        </Link>
+        onJoin ? (
+          <button
+            type="button"
+            onClick={onJoin}
+            className="mt-4 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl bg-tiba-blue px-4 text-base font-semibold text-white hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2"
+          >
+            <Video className="h-5 w-5" aria-hidden="true" />
+            Join call
+          </button>
+        ) : (
+          <Link
+            to={joinTo ?? detailsTo}
+            className="mt-4 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl bg-tiba-blue px-4 text-base font-semibold text-white hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2"
+          >
+            <Video className="h-5 w-5" aria-hidden="true" />
+            Join call
+          </Link>
+        )
       ) : (
         <p className="mt-3 text-sm text-slate-700">
           The call opens {joinWindowBeforeMinutes ?? 10} minutes before the start. This button appears here when it does.

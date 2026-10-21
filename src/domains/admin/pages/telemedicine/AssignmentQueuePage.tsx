@@ -24,6 +24,8 @@ import {
 } from "../../../../shared/utils/telemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../../shared/utils/bookingStatus";
 import { PreferenceSummary } from "../../components/PreferenceSummary";
+import { useNow } from "../../../../shared/hooks/useNow";
+import { groupAssignmentQueue, requestUrgency, type Urgency } from "../../utils/assignmentQueueGroups";
 import { classifyApiError, type ClassifiedApiError } from "../../../../shared/utils/errors";
 import type { Booking } from "../../../../shared/schemas/booking";
 import type { TelemedicineAssignmentBooking } from "../../../../shared/schemas/telemedicine";
@@ -135,14 +137,28 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
 // The descriptive half of an assignment-queue row, shared by the desktop grid layout and the
 // mobile stack so each booking (and its PreferenceSummary fetch) mounts exactly once -- CSS
 // reflows this between a table-like two-column row and a stacked card, no duplicate DOM tree.
-const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => (
+const URGENCY_CLASSES: Record<Urgency["tone"], string> = {
+  overdue: "bg-rose-100 text-rose-900",
+  soon: "bg-amber-100 text-amber-900",
+  later: "bg-slate-100 text-slate-700"
+};
+
+const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+  const now = useNow(30_000);
+  // How pressing it is, in words, on requests the admin has to act on. A request waiting on the client is not urgent.
+  const urgency = booking.recoveryState === "awaiting_client" ? null : requestUrgency(booking, now);
+  return (
   <div className="min-w-0">
-    <p className="font-semibold text-slate-900">{booking.serviceName ?? "Consultation"}</p>
-    <p className="text-xs text-slate-400">{booking.id}</p>
-    <p className="text-sm text-slate-700">{booking.clientFullName ?? booking.clientUserId}</p>
-    <p className="text-xs text-slate-500">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
+    {urgency && (
+      <p role="status" className={`mb-1.5 inline-flex rounded-full px-2.5 py-0.5 text-sm font-semibold ${URGENCY_CLASSES[urgency.tone]}`}>
+        {urgency.label}
+      </p>
+    )}
+    <p className="text-base font-semibold text-slate-900">{booking.serviceName ?? "Consultation"}</p>
+    <p className="text-sm text-slate-700">{booking.clientFullName ?? "Client"}</p>
+    <p className="text-sm text-slate-600">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
     {booking.recoveryState !== "assignable" && (
-      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
         {booking.recoveryState === "awaiting_client"
           ? "A replacement time has been offered. Waiting for the client to accept."
           : "This appointment's slot was released before a provider was assigned. Offer the client another time, or refund the payment from the review queue."}
@@ -151,12 +167,13 @@ const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssi
     <PreferenceSummary bookingId={booking.id} />
     <Link
       to={`/admin/bookings/${booking.id}`}
-      className="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline"
+      className="mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
     >
       View consultation details
     </Link>
   </div>
-);
+  );
+};
 
 // One action per row, chosen by the backend rather than guessed here. A booking whose slot
 // lapsed used to render an Assign button the API would always reject -- the operator saw a
@@ -301,6 +318,7 @@ const AssignmentQueuePage = () => {
   const [consultationFilter, setConsultationFilter] = useState<ConsultationFilterKey>("upcoming");
 
   const bookings = queueQuery.data ?? [];
+  const queueGroups = groupAssignmentQueue(bookings);
   const consultations = (consultationsQuery.data?.bookings ?? []).filter((booking) => booking.isTelemedicine);
   const { upcoming: notYetHistoricalConsultations, history: consultationHistory } = splitTelemedicineBookings(consultations);
   const activeConsultations = notYetHistoricalConsultations.filter(isConsultationInSession);
@@ -459,16 +477,32 @@ const AssignmentQueuePage = () => {
             ) : bookings.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">No consultations waiting for assignment.</p>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {/* Column header only where there's room for the action column to read as a
-                    column; the mobile stack below md doesn't need one repeated per row. */}
-                <div className="hidden bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:gap-x-6">
-                  <span>Consultation</span>
-                  <span className="text-right">Action</span>
-                </div>
-                {bookings.map((booking) => (
-                  <AssignmentQueueRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
-                ))}
+              <div className="space-y-6 p-4 sm:p-6">
+                {([
+                  { key: "assign", title: "Assign a provider", note: "Soonest appointment first", items: queueGroups.assign, quiet: false },
+                  { key: "rebook", title: "Offer a new time", note: "Offer the client another time", items: queueGroups.rebook, quiet: false },
+                  { key: "waiting", title: "Waiting for the client", note: "A replacement time was offered. Nothing to do yet", items: queueGroups.waiting, quiet: true }
+                ] as const)
+                  .filter((group) => group.items.length > 0)
+                  .map((group) => (
+                    <section key={group.key} aria-label={group.title} className="space-y-2">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <h2 className={group.quiet ? "text-base font-semibold text-slate-700" : "text-lg font-bold text-slate-900"}>
+                          {group.title} <span className="font-normal text-slate-600">({group.items.length})</span>
+                        </h2>
+                        <p className="text-sm text-slate-600">{group.note}</p>
+                      </div>
+                      <div
+                        className={`divide-y divide-slate-100 rounded-2xl border ${
+                          group.quiet ? "border-slate-100 bg-slate-50" : "border-slate-200 bg-white shadow-sm"
+                        }`}
+                      >
+                        {group.items.map((booking) => (
+                          <AssignmentQueueRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
               </div>
             )}
           </Card>
