@@ -15,6 +15,7 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { api } from "../../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin, svcCard } from "../../../../shared/libs/fieldInclude";
+import { selectableCategories } from "../../utils/serviceCategories";
 
 type ServiceCategory = {
   id: string;
@@ -381,7 +382,7 @@ export const ServiceListPanel = () => {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 >
                   <option value="">Select category</option>
-                  {categories?.map((category) => (
+                  {selectableCategories(categories, field.value as string).map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
                     </option>

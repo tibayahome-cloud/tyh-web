@@ -14,13 +14,9 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { api } from "../../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin } from "../../../../shared/libs/fieldInclude";
+import { categoryDescription, type AdminServiceCategory } from "../../utils/serviceCategories";
 
-type ServiceCategory = {
-  id: string;
-  key: string;
-  name: string;
-  description?: string | null;
-};
+type ServiceCategory = AdminServiceCategory;
 
 type Envelope<T> = {
   data: T;
@@ -172,7 +168,7 @@ export const ServiceCatalogPanel = () => {
     () =>
       (data ?? []).map((category) => ({
         ...category,
-        description: category.description || "—"
+        description: categoryDescription(category)
       })),
     [data]
   );
@@ -200,18 +196,22 @@ export const ServiceCatalogPanel = () => {
             {
               field: "actions",
               headerName: "",
-              minWidth: 160,
+              minWidth: 200,
               sortable: false,
-              renderCell: (params) => (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => openEdit(params.row)}>
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => confirmDelete(params.row)}>
-                    Delete
-                  </Button>
-                </div>
-              )
+              renderCell: (params) =>
+                params.row.is_system ? (
+                  // The category that holds video consultations: changing it here could break live services.
+                  <span className="text-sm text-slate-600">Managed in Telemedicine</span>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => openEdit(params.row)}>
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => confirmDelete(params.row)}>
+                      Delete
+                    </Button>
+                  </div>
+                )
             }
           ]}
           loading={isFetching || mutation.isPending || deleteMutation.isPending}

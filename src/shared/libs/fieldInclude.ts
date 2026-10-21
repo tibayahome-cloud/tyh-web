@@ -327,7 +327,7 @@ export const providerApplicationAdmin: FieldPreset = {
 
 export const serviceCategoryAdmin: FieldPreset = {
   resource: "service_categories",
-  fields: ["id", "key", "name", "description"],
+  fields: ["id", "key", "name", "description", "is_system"],
   includes: {}
 };
 
