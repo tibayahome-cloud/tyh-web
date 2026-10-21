@@ -91,7 +91,14 @@ export const FacilitySchema = z.object({
   phones: z.array(FacilityPhoneSchema),
   operatingHours: z.array(FacilityOperatingHourSchema),
   services: z.array(FacilityServiceSchema),
-  admins: z.array(FacilityAdminSchema)
+  admins: z.array(FacilityAdminSchema),
+  // Only on the platform admin's facility list: counts for the row, so it need not load each facility's
+  // services and administrators. Absent (null) from an API that does not send them.
+  activeServiceCount: z.number().int().nullable().optional(),
+  adminSummary: z
+    .object({ active: z.number().int(), pendingSetup: z.number().int(), suspended: z.number().int() })
+    .nullable()
+    .optional()
 });
 
 export type Facility = z.infer<typeof FacilitySchema>;
@@ -266,6 +273,16 @@ export const mapFacilityAdmin = (payload: unknown): FacilityAdmin | null => {
   };
 };
 
+const mapAdminSummary = (value: unknown): Facility["adminSummary"] => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  return {
+    active: coerceNumber(raw.active) ?? 0,
+    pendingSetup: coerceNumber(raw.pending_setup ?? raw.pendingSetup) ?? 0,
+    suspended: coerceNumber(raw.suspended) ?? 0
+  };
+};
+
 export const mapFacility = (payload: unknown): Facility | null => {
   const raw = toResourceRecord(payload);
   const id = coerceId(raw.id);
@@ -303,7 +320,9 @@ export const mapFacility = (payload: unknown): Facility | null => {
       .filter((service): service is FacilityService => Boolean(service)),
     admins: (Array.isArray(raw.admins) ? raw.admins : [])
       .map((admin) => mapFacilityAdmin(admin))
-      .filter((admin): admin is FacilityAdmin => Boolean(admin))
+      .filter((admin): admin is FacilityAdmin => Boolean(admin)),
+    activeServiceCount: coerceNumber(raw.active_service_count ?? raw.activeServiceCount),
+    adminSummary: mapAdminSummary(raw.admin_summary ?? raw.adminSummary)
   };
 };
 
