@@ -2,6 +2,8 @@ import clsx from "classnames";
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
 
+import { withoutOverriddenColours } from "../utils/overrideClasses";
+
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   label?: string;
@@ -26,7 +28,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             ref={ref}
             className={clsx(
-              "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition-all",
+              "w-full rounded-xl px-4 py-3 text-base shadow-sm transition-all",
+              withoutOverriddenColours("border border-slate-200 bg-white text-slate-900", clsx(className, error && "border-red-400")),
               "focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20",
               "placeholder:text-slate-400",
               icon && "pl-10",
