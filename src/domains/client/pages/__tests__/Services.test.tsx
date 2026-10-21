@@ -49,11 +49,13 @@ describe("client Services", () => {
     expect(screen.getByText("Urgent")).toBeInTheDocument();
   });
 
-  it("offers a tile per kind of care and narrows the list when one is chosen", async () => {
+  it("offers every kind of care in one list, with counts, and narrows the list when one is chosen", async () => {
     renderPage();
     await screen.findByText("Wound dressing");
 
-    fireEvent.click(screen.getByRole("button", { name: /Ambulance/ }));
+    const options = Array.from((screen.getByLabelText("Kind of care") as HTMLSelectElement).options).map((o) => o.text);
+    expect(options).toEqual(["All kinds of care (2)", "Ambulance (1)", "Nursing & Caregiver Services (1)"]);
+    fireEvent.change(screen.getByLabelText("Kind of care"), { target: { value: "c2" } });
 
     expect(screen.getByText("Ambulance transfer")).toBeInTheDocument();
     expect(screen.queryByText("Wound dressing")).not.toBeInTheDocument();
