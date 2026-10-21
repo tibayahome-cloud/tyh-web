@@ -2,6 +2,8 @@ import clsx from "classnames";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
 
+import { withoutOverriddenColours } from "../utils/overrideClasses";
+
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "outline";
 export type ButtonSize = "sm" | "md" | "lg";
 
@@ -29,22 +31,16 @@ const sizeStyles: Record<ButtonSize, string> = {
   lg: "px-6 py-3 text-base"
 };
 
-const spinnerColorByVariant: Record<ButtonVariant, string> = {
-  primary: "border-white",
-  secondary: "border-white",
-  ghost: "border-tiba-blue",
-  outline: "border-tiba-blue"
-};
-
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", loading, disabled, fullWidth, icon, children, ...rest }, ref) => {
-    const spinnerColor = spinnerColorByVariant[variant];
     return (
       <button
         ref={ref}
         className={clsx(
           "inline-flex items-center justify-center gap-2 rounded-xl font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95",
-          variantStyles[variant],
+          // The caller's background, text and border colours replace the variant's, so a page can restyle a
+          // button without the variant's own colour winning in the stylesheet.
+          withoutOverriddenColours(variantStyles[variant], className),
           sizeStyles[size],
           fullWidth && "w-full",
           className
@@ -55,7 +51,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading && (
           <span
-            className={clsx("h-4 w-4 animate-spin rounded-full border-2 border-t-transparent", spinnerColor)}
+            className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
             aria-hidden
           />
         )}
