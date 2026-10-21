@@ -14,17 +14,24 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 let inputRenderCount = 0;
 
-vi.mock("../../../../../shared/components/Input", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../shared/components/Input")>();
+vi.mock("../../../components/EntityPicker", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../components/EntityPicker")>();
   return {
     ...actual,
-    Input: (props: Record<string, unknown>) => {
+    EntityPicker: (props: Parameters<typeof actual.EntityPicker>[0]) => {
       inputRenderCount += 1;
-      const { Input: ActualInput } = actual;
-      return <ActualInput {...props} />;
+      return <actual.EntityPicker {...props} />;
     }
   };
 });
+
+vi.mock("../../../hooks/useFilterLookups", () => ({
+  useFilterLookups: () => ({
+    clients: { options: [], loading: false, search: vi.fn() },
+    providers: { options: [], loading: false, search: vi.fn() },
+    services: { options: [], loading: false }
+  })
+}));
 
 const useBookingListMock = vi.fn();
 
