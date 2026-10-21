@@ -46,6 +46,9 @@ import {
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 
+// A popup on a phone keeps a margin all round and never taller than the screen; its content scrolls inside.
+const FIT_PHONE_PAPER = { borderRadius: "24px", p: 1, m: 2, width: "calc(100% - 32px)", maxHeight: "calc(100dvh - 32px)" } as const;
+
 const ACTIVE_STATUSES = [
   "accepted",
   "en_route",
@@ -557,7 +560,7 @@ const ClientHome = () => {
         container={() => document.body}
         open={Boolean(completionPrompt)}
         onClose={confirmCompletion.isPending ? undefined : closeCompletionPrompt}
-        PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
+        PaperProps={{ sx: FIT_PHONE_PAPER }}
         maxWidth="xs"
         fullWidth
       >
@@ -630,7 +633,7 @@ const ClientHome = () => {
         container={() => document.body}
         open={Boolean(cancelPrompt)}
         onClose={cancelBookingMutation.isPending ? undefined : closeCancelPrompt}
-        PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
+        PaperProps={{ sx: FIT_PHONE_PAPER }}
         maxWidth="xs"
         fullWidth
       >
