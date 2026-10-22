@@ -5,9 +5,11 @@ import { AppLayout } from "../../../shared/components/AppLayout";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
 import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { ConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { useToast } from "../../../shared/components/ToastProvider";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import { useAuth } from "../../../shared/hooks/useAuth";
-import { useBookingList } from "../../../shared/hooks/useBookings";
+import { useBookingList, useCancelBookingMutation } from "../../../shared/hooks/useBookings";
 import { useNow } from "../../../shared/hooks/useNow";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
 import { prefetchBooking } from "../../../shared/libs/query";
@@ -27,6 +29,8 @@ import {
 
 const OPEN_PAGE_SIZE = 50;
 const EARLIER_STEP = 10;
+/** Needs you shows this many; the rest sit behind one button so Coming up and Earlier are never pushed off the page. */
+const NEEDS_YOU_PREVIEW = 3;
 
 const linkButtonClass =
   "inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2";
@@ -106,6 +110,10 @@ const BookingsPage = () => {
   const now = useNow(60_000);
   const [earlierOpen, setEarlierOpen] = useState(false);
   const [earlierLimit, setEarlierLimit] = useState(EARLIER_STEP);
+  const [needsYouExpanded, setNeedsYouExpanded] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<Booking | null>(null);
+  const cancelMutation = useCancelBookingMutation("detail");
+  const toast = useToast();
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
 
   const enabled = { enabled: Boolean(user?.id) };
@@ -141,6 +149,23 @@ const BookingsPage = () => {
     setFeedbackPrompt({ bookingId: booking.id, providerName: booking.provider?.fullName || "the provider" });
   const ratable = new Set(needsYou.filter((item) => item.kind === "rate").map((item) => item.booking.id));
 
+  const visibleNeedsYou = needsYouExpanded ? needsYou : needsYou.slice(0, NEEDS_YOU_PREVIEW);
+  const hiddenNeedsYou = needsYou.length - visibleNeedsYou.length;
+  const whenOf = (booking: Booking): string => {
+    const day = agendaDay(booking, timezone);
+    return day.soon ? "" : `${day.weekday} ${day.day} ${day.month}, ${day.time}`;
+  };
+  const removeUnpaid = async () => {
+    if (!removeTarget) return;
+    try {
+      await cancelMutation.mutateAsync({ bookingId: removeTarget.id, reason: "Cancelled by client" });
+      toast.showToast({ title: "Request removed", description: "You were not charged for it.", variant: "success" });
+      setRemoveTarget(null);
+    } catch (error) {
+      toast.showToast({ title: "Could not remove the request", description: error instanceof Error ? error.message : "Try again shortly.", variant: "error" });
+    }
+  };
+
   const loading = openQuery.isLoading || earlierQuery.isLoading;
   const nothingAtAll = !loading && !openQuery.isError && !earlierQuery.isError && openBookings.length === 0 && earlierBookings.length === 0;
 
@@ -175,24 +200,54 @@ const BookingsPage = () => {
 
             {needsYou.length > 0 && (
               <section aria-label="Needs you" className="space-y-3">
-                <SectionTitle>Needs you</SectionTitle>
+                <SectionTitle count={needsYou.length}>Needs you</SectionTitle>
                 <ul className="space-y-2">
-                  {needsYou.map((item) => (
-                    <li
-                      key={`${item.kind}-${item.booking.id}`}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
-                    >
-                      <p className="text-sm font-medium text-amber-950">{item.message}</p>
-                      <button
-                        type="button"
-                        onClick={() => (item.kind === "rate" ? rate(item.booking) : openBooking(item.booking))}
-                        className="min-h-[44px] shrink-0 rounded-lg bg-white px-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                  {visibleNeedsYou.map((item) => {
+                    const when = whenOf(item.booking);
+                    return (
+                      <li
+                        key={`${item.kind}-${item.booking.id}`}
+                        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
                       >
-                        {item.action}
-                      </button>
-                    </li>
-                  ))}
+                        <div className="min-w-0 flex-1 basis-48">
+                          <p className="text-sm font-medium text-amber-950">{item.message}</p>
+                          <p className="mt-0.5 text-xs text-amber-900/80">
+                            {item.booking.service?.name || "Service request"}
+                            {when ? ` · ${when}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {item.kind === "pay" && (
+                            <button
+                              type="button"
+                              onClick={() => setRemoveTarget(item.booking)}
+                              className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-amber-900 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                            >
+                              Remove
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => (item.kind === "rate" ? rate(item.booking) : openBooking(item.booking))}
+                            className="min-h-[44px] rounded-lg bg-white px-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                          >
+                            {item.action}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
+                {needsYou.length > NEEDS_YOU_PREVIEW && (
+                  <button
+                    type="button"
+                    aria-expanded={needsYouExpanded}
+                    onClick={() => setNeedsYouExpanded((open) => !open)}
+                    className="min-h-[44px] text-sm font-semibold text-tiba-blue hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                  >
+                    {needsYouExpanded ? "Show fewer" : `Show all ${needsYou.length} (${hiddenNeedsYou} more)`}
+                  </button>
+                )}
               </section>
             )}
 
@@ -258,6 +313,17 @@ const BookingsPage = () => {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        title="Remove this request?"
+        description="You have not paid for it, so nothing is charged. You can book again whenever you like."
+        confirmLabel="Remove request"
+        cancelLabel="Keep it"
+        loading={cancelMutation.isPending}
+        onConfirm={() => void removeUnpaid()}
+        onClose={() => !cancelMutation.isPending && setRemoveTarget(null)}
+      />
 
       <BookingFeedbackDialog
         open={Boolean(feedbackPrompt)}
