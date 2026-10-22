@@ -256,7 +256,6 @@ export const ServiceListPanel = ({ kind = "home_based" }: { kind?: ManagedKind }
       price: (service.base_price_cents / 100).toLocaleString(undefined, { style: "currency", currency: "KES" }),
       duration: `${service.default_estimate_minutes} min`,
       emergency: service.is_emergency_capable ? "Yes" : "No",
-      remote: service.remote_capable ? "Yes" : "No",
       activeStatus: service.active ? "Active" : "Inactive",
       categoryName: service.category?.name ?? "Unassigned"
     }));
@@ -271,7 +270,6 @@ export const ServiceListPanel = ({ kind = "home_based" }: { kind?: ManagedKind }
     { field: "price", headerName: "Base price", minWidth: 140 },
     { field: "duration", headerName: "Duration", minWidth: 130 },
     { field: "emergency", headerName: "Emergency", minWidth: 120 },
-    { field: "remote", headerName: "Remote", minWidth: 110 },
     { field: "activeStatus", headerName: "Status", minWidth: 120 },
     {
       field: "actions",
