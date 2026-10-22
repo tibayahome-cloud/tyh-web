@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type ListState = Record<string, unknown>;
 
 const state = vi.hoisted(() => ({
+  cancel: vi.fn(),
   open: {} as Record<string, unknown>,
   earlier: {} as Record<string, unknown>,
   calls: [] as Array<Record<string, unknown>>
@@ -15,8 +16,10 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
   useBookingList: (params: { statuses?: string[] }) => {
     state.calls.push(params as Record<string, unknown>);
     return params.statuses?.includes("scheduled") ? state.open : state.earlier;
-  }
+  },
+  useCancelBookingMutation: () => ({ mutateAsync: state.cancel, isPending: false })
 }));
+vi.mock("../../../../shared/components/ToastProvider", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock("../../../../shared/hooks/useTelemedicine", () => ({
   useTelemedicinePolicy: () => ({ data: { defaultTimezone: "Africa/Nairobi", joinWindowBeforeMinutes: 10 } })
 }));
@@ -72,6 +75,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   state.calls = [];
+  state.cancel.mockReset();
+  state.cancel.mockResolvedValue({});
   state.open = list([]);
   state.earlier = list([]);
 });
@@ -218,5 +223,60 @@ describe("client My bookings agenda", () => {
 
     expect(screen.getByLabelText("Loading your bookings")).toBeInTheDocument();
     expect(screen.queryByText("No bookings yet")).not.toBeInTheDocument();
+  });
+});
+
+describe("Needs you", () => {
+  const unpaid = (id: string, name = "Video consultation") =>
+    make({ id, status: "telemedicine_payment_pending", scheduledAt: at(600), provider: null, service: { name } });
+
+  it("shows the first three and keeps the rest behind one button, so the sections below stay in view", () => {
+    state.open = list([unpaid("a"), unpaid("b"), unpaid("c"), unpaid("d"), unpaid("e")]);
+    renderPage();
+
+    const needs = within(screen.getByRole("region", { name: "Needs you" }));
+    expect(needs.getAllByText("Pay to confirm your consultation")).toHaveLength(3);
+    expect(screen.getByRole("heading", { name: /Needs you/ })).toHaveTextContent("(5)");
+    expect(screen.getByRole("region", { name: "Earlier" })).toBeInTheDocument();
+
+    fireEvent.click(needs.getByRole("button", { name: /Show all 5/ }));
+    expect(needs.getAllByText("Pay to confirm your consultation")).toHaveLength(5);
+
+    fireEvent.click(needs.getByRole("button", { name: "Show fewer" }));
+    expect(needs.getAllByText("Pay to confirm your consultation")).toHaveLength(3);
+  });
+
+  it("offers no expander when there are three or fewer", () => {
+    state.open = list([unpaid("a"), unpaid("b")]);
+    renderPage();
+
+    expect(screen.queryByRole("button", { name: /Show all/ })).not.toBeInTheDocument();
+  });
+
+  it("says which service and when each row is about, so identical messages can be told apart", () => {
+    state.open = list([unpaid("a", "Online Paediatrician Consultation")]);
+    renderPage();
+
+    expect(within(screen.getByRole("region", { name: "Needs you" })).getByText(/Online Paediatrician Consultation · /)).toBeInTheDocument();
+  });
+
+  it("removes an unpaid request from the list after a confirmation, without opening it", async () => {
+    state.open = list([unpaid("a")]);
+    renderPage();
+
+    fireEvent.click(within(screen.getByRole("region", { name: "Needs you" })).getByRole("button", { name: "Remove" }));
+    expect(await screen.findByText("Remove this request?")).toBeInTheDocument();
+    expect(state.cancel).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove request" }));
+    await vi.waitFor(() => expect(state.cancel).toHaveBeenCalledWith({ bookingId: "a", reason: "Cancelled by client" }));
+    expect(screen.queryByText("booking page")).not.toBeInTheDocument();
+  });
+
+  it("offers Remove only for unpaid requests", () => {
+    state.open = list([make({ id: "n", status: "telemedicine_unattended", provider: null })]);
+    renderPage();
+
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });
 });
