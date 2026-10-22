@@ -553,17 +553,17 @@ const ProviderDetailPage = () => {
     },
   });
 
+  // Only what the provider's own facility actively offers can be assigned; the API refuses anything else.
   const servicesQuery = useQuery({
-    queryKey: ["admin", "services", "options"],
+    queryKey: ["admin", "provider", userId, "available-services"],
+    enabled: Boolean(userId),
     queryFn: async () => {
-      const response = await api.get<Envelope<ServiceOption[]>>("/services", {
-        params: buildFieldParams(svcCard),
-      });
-      return response.data.data.map((svc) => ({
-        id: svc.id,
-        name: svc.name,
-        key: svc.key,
-      }));
+      const response = await api.get<Envelope<Array<{ active?: boolean; service?: { id: string; name: string; key: string; active?: boolean } | null }>>>(
+        `/providers/${userId}/available-services`
+      );
+      return response.data.data
+        .filter((offering) => offering.active !== false && offering.service && offering.service.active !== false)
+        .map((offering) => ({ id: offering.service!.id, name: offering.service!.name, key: offering.service!.key }));
     },
   });
 
@@ -784,7 +784,14 @@ const ProviderDetailPage = () => {
   }, [providerQuery.data, detailForm]);
 
   const provider = providerQuery.data;
-  const allServices = servicesQuery.data ?? [];
+  const offeredServices = servicesQuery.data ?? [];
+  // A service the provider already has but the facility no longer offers stays listed so it can be unticked.
+  const allServices: Array<ServiceOption & { notOffered?: boolean }> = [
+    ...offeredServices,
+    ...(provider?.services ?? [])
+      .filter((svc) => !offeredServices.some((offered) => offered.id === svc.serviceId))
+      .map((svc) => ({ id: svc.serviceId, name: svc.name ?? "Service", key: svc.key ?? "", notOffered: true })),
+  ];
   const activity = activityQuery.data;
   const auditEntries = activity?.audit ?? [];
   const requestEntries = activity?.requests ?? [];
@@ -1218,7 +1225,17 @@ const ProviderDetailPage = () => {
 
   return (
     <div className="space-y-5 pb-8">
-      <Link to="/admin/providers" className="inline-flex items-center text-sm font-medium text-tiba-blue hover:underline">
+      <Link
+        to="/admin/providers/directory"
+        onClick={(event) => {
+          // Return to wherever the admin came from (a facility, the directory, the queue); fall back to the directory.
+          if ((window.history.state as { idx?: number } | null)?.idx) {
+            event.preventDefault();
+            navigate(-1);
+          }
+        }}
+        className="inline-flex min-h-[44px] items-center text-sm font-medium text-tiba-blue hover:underline"
+      >
         Back to providers
       </Link>
 
@@ -1517,7 +1534,9 @@ const ProviderDetailPage = () => {
         {servicesQuery.isLoading ? (
           <Loading />
         ) : allServices.length === 0 ? (
-          <p className="text-sm text-slate-600">No services available in the catalog.</p>
+          <p className="text-sm text-slate-600">
+            This provider&apos;s facility does not offer any services yet. Add them under the facility&apos;s Services first, then assign them here.
+          </p>
         ) : (
           <div className="space-y-4">
             <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-200">
@@ -1528,11 +1547,12 @@ const ProviderDetailPage = () => {
                     <li key={service.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                       <div>
                         <p className="font-medium text-slate-900">{service.name}</p>
-                        <p className="text-xs uppercase tracking-wide text-slate-400">{service.key}</p>
+                        {service.notOffered && <p className="text-xs text-amber-700">No longer offered by this facility. Untick to remove it.</p>}
                       </div>
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        className="h-5 w-5 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                        aria-label={service.name}
                         checked={checked}
                         onChange={(event) => {
                           setSelectedServiceIds((prev) =>
