@@ -184,13 +184,36 @@ describe("facility Services tab: home-based care and telemedicine apart", () => 
     expect(input).toMatchObject({ priceCents: 450000, deliveryMode: "remote" });
   });
 
-  it("keeps the delivery mode choice for a home-based care service", async () => {
+  it("offers no delivery mode for a home-based care service: it is always in person", async () => {
     const user = await openServices();
     const row = (await screen.findByText("Nurse Visit at Home")).closest("article") as HTMLElement;
     await user.click(within(row).getByRole("button", { name: "Edit" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Delivery mode")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Delivery mode")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Emergency capable")).toBeInTheDocument();
+  });
+
+  it("lists only home-based care to add, with no remote badge and no delivery mode", async () => {
+    const { api } = await import("../../../../../shared/libs/api");
+    vi.mocked(api.get).mockImplementation(async (url: string) => ({
+      data: {
+        data: url === "/services"
+          ? [
+              { id: "c1", key: "wound-care", name: "Wound dressing", base_price_cents: 150000, default_estimate_minutes: 30, active: true, remote_capable: false },
+              { id: "c2", key: "old-video", name: "Leftover video service", base_price_cents: 150000, default_estimate_minutes: 30, active: true, remote_capable: true }
+            ]
+          : []
+      }
+    }) as never);
+    const user = await openServices();
+    await user.click(await screen.findByRole("button", { name: "Add home-based care services" }));
+    const dialog = await screen.findByRole("dialog");
+
+    await user.click(await within(dialog).findByText("Wound dressing"));
+    expect(within(dialog).queryByText("Leftover video service")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Remote capable")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Delivery mode")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Normal service")).toBeInTheDocument();
   });
 
   it("starts the add dialog on the kind of service being viewed", async () => {
