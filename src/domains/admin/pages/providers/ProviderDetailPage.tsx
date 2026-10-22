@@ -1225,7 +1225,17 @@ const ProviderDetailPage = () => {
 
   return (
     <div className="space-y-5 pb-8">
-      <Link to="/admin/providers" className="inline-flex items-center text-sm font-medium text-tiba-blue hover:underline">
+      <Link
+        to="/admin/providers/directory"
+        onClick={(event) => {
+          // Return to wherever the admin came from (a facility, the directory, the queue); fall back to the directory.
+          if ((window.history.state as { idx?: number } | null)?.idx) {
+            event.preventDefault();
+            navigate(-1);
+          }
+        }}
+        className="inline-flex min-h-[44px] items-center text-sm font-medium text-tiba-blue hover:underline"
+      >
         Back to providers
       </Link>
 

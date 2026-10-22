@@ -311,3 +311,11 @@ describe("assigning services to a provider", () => {
     expect(await screen.findByText(/does not offer any services yet/)).toBeInTheDocument();
   });
 });
+
+describe("back link", () => {
+  it("goes to the provider directory, which exists, not to a bare /admin/providers", async () => {
+    renderPage();
+    const link = await screen.findByRole("link", { name: "Back to providers" });
+    expect(link).toHaveAttribute("href", "/admin/providers/directory");
+  });
+});
