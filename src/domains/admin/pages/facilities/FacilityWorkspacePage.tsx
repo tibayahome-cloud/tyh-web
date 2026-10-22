@@ -833,7 +833,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     [telemedicineCatalogServices]
   );
   const availableNormalCatalogServices = useMemo(
-    () => availableCatalogServices.filter((service) => !telemedicineServiceIds.has(service.id)),
+    () => availableCatalogServices.filter((service) => !telemedicineServiceIds.has(service.id) && !service.remote_capable),
     [availableCatalogServices, telemedicineServiceIds]
   );
   const availableTelemedicineCatalogServices = useMemo(() => {
@@ -861,11 +861,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
   const activeServiceCount = facilityServices.filter((service) => service.active).length;
 
   const editingTelemedicineService = Boolean(editingService && telemedicineServiceIds.has(editingService.serviceId));
-
-  const selectedCatalogServiceIsRemoteCapable = useMemo(() => {
-    const selected = (catalogQuery.data ?? []).find((service) => service.id === serviceForm.serviceId);
-    return Boolean(selected?.remote_capable);
-  }, [catalogQuery.data, serviceForm.serviceId]);
 
   const invalidateWorkspace = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId] });
@@ -1699,27 +1694,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                 </label>
                 )}
               </div>
-              {editingTelemedicineService ? (
+              {editingTelemedicineService && (
                 <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   Delivery: remote only. Telemedicine services are always delivered by video.
                 </p>
-              ) : (
-              <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
-                <span>Delivery mode</span>
-                <select
-                  value={serviceForm.deliveryMode}
-                  onChange={(event) => updateServiceForm("deliveryMode", event.target.value as ServiceFormState["deliveryMode"])}
-                  disabled={!selectedCatalogServiceIsRemoteCapable}
-                  className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20 disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="in_person">In-person only</option>
-                  <option value="remote" disabled={!selectedCatalogServiceIsRemoteCapable}>Remote only</option>
-                  <option value="both" disabled={!selectedCatalogServiceIsRemoteCapable}>In-person and remote</option>
-                </select>
-                {!selectedCatalogServiceIsRemoteCapable && (
-                  <span className="text-xs text-slate-500">This service isn&apos;t enabled for remote delivery in the global catalog.</span>
-                )}
-              </label>
               )}
             </>
           ) : (
@@ -1766,7 +1744,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                         className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
                       />
                       <span>{service.name}</span>
-                      {service.remote_capable && !assigned && <span className="ml-auto text-xs font-medium text-tiba-blue">Remote capable</span>}
                       {assigned && <span className="ml-auto text-xs font-semibold text-green-700">Already assigned</span>}
                     </label>
                   );
@@ -1846,14 +1823,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                           Active
                         </label>
                       </div>
-                      <label className="mt-3 flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
-                        <span>Delivery mode</span>
-                        <select value={row.deliveryMode} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, deliveryMode: event.target.value as BulkServiceRow["deliveryMode"] } : item))} disabled={!row.remoteCapable} className="h-[46px] rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-50 disabled:text-slate-400">
-                          <option value="in_person">In-person only</option>
-                          <option value="remote">Remote only</option>
-                          <option value="both">In-person and remote</option>
-                        </select>
-                      </label>
+                      {row.isTelemedicine && <p className="mt-3 text-xs text-slate-500">Delivered by video.</p>}
                     </div>
                   ))}
                 </div>
