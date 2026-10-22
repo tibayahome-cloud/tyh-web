@@ -1,282 +1,272 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import classNames from "classnames";
-import { motion, AnimatePresence } from "framer-motion";
-import { prefetchBooking } from "../../../shared/libs/query";
+import { Link, useNavigate } from "react-router-dom";
 
-import { Card } from "../../../shared/components/Card";
-import { Loading } from "../../../shared/components/Loading";
+import { AppLayout } from "../../../shared/components/AppLayout";
+import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
+import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
+import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { WidgetError } from "../../../shared/components/WidgetError";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useBookingList } from "../../../shared/hooks/useBookings";
-import { getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
-import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
-import { Button } from "../../../shared/components/Button";
+import { useNow } from "../../../shared/hooks/useNow";
+import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { prefetchBooking } from "../../../shared/libs/query";
 import type { Booking } from "../../../shared/schemas/booking";
-import { ClientPageHeader } from "../components/ClientPageHeader";
-import { AppLayout } from "../../../shared/components/AppLayout";
+import { AgendaBookingRow } from "../../../shared/components/AgendaBookingRow";
+import { agendaDay } from "../../../shared/utils/agendaDates";
 import {
-    Calendar as CalendarIcon,
-    Clock as ClockIcon,
-    MapPin,
-    ChevronRight,
-    Star
-} from "lucide-react";
+  EARLIER_BOOKING_STATUSES,
+  OPEN_BOOKING_STATUSES,
+  needsYouForOpenBooking,
+  needsYouForRating,
+  pickNextConsultation,
+  sortComingUp,
+  sortEarlier,
+  type NeedsYouItem
+} from "../utils/bookingGroups";
 
-type TabKey = "all" | "pending" | "active" | "completed" | "cancelled";
+const OPEN_PAGE_SIZE = 50;
+const EARLIER_STEP = 10;
 
-const TABS: { key: TabKey; label: string; statuses: string[] }[] = [
-    {
-        key: "all",
-        label: "All",
-        statuses: []
-    },
-    {
-        key: "pending",
-        label: "Pending",
-        statuses: ["requested", "broadcasting", "scheduled"]
-    },
-    {
-        key: "active",
-        label: "Active",
-        statuses: ["accepted", "en_route", "nearby", "arrived", "in_service", "completed_by_provider"]
-    },
-    {
-        key: "completed",
-        label: "Completed",
-        statuses: ["client_completed", "client_confirmed", "fully_completed", "paid"]
-    },
-    {
-        key: "cancelled",
-        label: "Cancelled",
-        statuses: ["cancelled_by_client", "cancelled_by_admin", "expired_no_accept"]
-    }
-];
+const linkButtonClass =
+  "inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue focus-visible:ring-offset-2";
 
-const formatDate = (iso?: string | null) => {
-    if (!iso) return "";
-    const date = new Date(iso);
-    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+type AgendaListProps = {
+  bookings: Booking[];
+  timezone: string | undefined;
+  showYear?: boolean;
+  onOpen: (booking: Booking) => void;
+  /** Returns a Rate handler for a booking that can still be rated, otherwise undefined. */
+  rateFor?: (booking: Booking) => (() => void) | undefined;
 };
 
-const formatTime = (iso?: string | null) => {
-    if (!iso) return "";
-    const date = new Date(iso);
-    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-};
-
-const BookingCardSkeleton = () => (
-    <div className="flex w-full animate-pulse flex-col gap-2 rounded-lg bg-white p-2.5 ring-1 ring-slate-100">
-        <div className="flex items-start justify-between">
-            <div className="space-y-1.5">
-                <div className="h-3 w-24 rounded bg-slate-100" />
-                <div className="h-2.5 w-32 rounded bg-slate-50" />
-            </div>
-            <div className="h-4 w-14 rounded-full bg-slate-100" />
-        </div>
-        <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-50">
-            <div className="h-5 w-5 rounded-lg bg-slate-100" />
-            <div className="h-2.5 w-20 rounded bg-slate-50" />
-        </div>
-    </div>
+// Rows in time order with the date shown once per day, so the left rail reads as one entry per day.
+const AgendaList = ({ bookings, timezone, showYear, onOpen, rateFor }: AgendaListProps) => (
+  <ul>
+    {bookings.map((booking, index) => {
+      const day = agendaDay(booking, timezone);
+      const previous = index > 0 ? agendaDay(bookings[index - 1], timezone) : null;
+      return (
+        <AgendaBookingRow
+          key={booking.id}
+          booking={booking}
+          party={booking.provider}
+          day={day}
+          showDate={!previous || previous.key !== day.key}
+          showYear={showYear}
+          onOpen={() => onOpen(booking)}
+          onRate={rateFor?.(booking)}
+          onPrefetch={() => prefetchBooking(booking.id)}
+        />
+      );
+    })}
+  </ul>
 );
 
-const BookingCard = ({
-    booking,
-    onClick,
-    onRate
-}: {
-    booking: Booking;
-    onClick: () => void;
-    onRate?: () => void
-}) => {
-    const theme = getBookingStatusTheme(booking.status);
-    const showRateButton = onRate && !booking.feedback?.length && (booking.status === "fully_completed" || booking.status === "paid" || booking.status === "client_completed");
+const SectionTitle = ({ children, count }: { children: React.ReactNode; count?: number }) => (
+  <h2 className="text-base font-semibold text-slate-900">
+    {children}
+    {count !== undefined && <span className="ml-1.5 font-normal text-slate-600">({count})</span>}
+  </h2>
+);
 
-    return (
-        <motion.article
-            layout
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            onClick={onClick}
-            onMouseEnter={() => prefetchBooking(booking.id)}
-            className="group flex w-full flex-col gap-2 rounded-lg bg-white p-2.5 text-left ring-1 ring-slate-100 transition-all hover:ring-slate-200 cursor-pointer"
-        >
-            <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-bold text-slate-900 truncate group-hover:text-brand-600 transition-colors">
-                        {booking.service?.name || "Service Request"}
-                    </h3>
-                    <div className="flex items-center gap-0.5 mt-0.5 text-slate-400">
-                        <MapPin size={8} />
-                        <p className="text-[9px] truncate">
-                            {booking.addressText || "Location not specified"}
-                        </p>
-                    </div>
-                </div>
-                <span className={classNames(
-                    "shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold",
-                    theme.className
-                )}>
-                    {theme.label}
-                </span>
-            </div>
+const AgendaSkeleton = () => (
+  <div className="space-y-6" aria-busy="true" aria-label="Loading your bookings">
+    <div className="h-36 animate-pulse rounded-2xl bg-slate-100" />
+    {[1, 2, 3].map((row) => (
+      <div key={row} className="grid animate-pulse grid-cols-[3.75rem_1fr] gap-4">
+        <div className="mx-auto h-14 w-10 rounded-lg bg-slate-100" />
+        <div className="space-y-2">
+          <div className="h-5 w-28 rounded-full bg-slate-100" />
+          <div className="h-5 w-48 rounded bg-slate-100" />
+          <div className="h-4 w-36 rounded bg-slate-50" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
-            <div className="flex items-center gap-2 text-[9px] text-slate-500">
-                <div className="flex items-center gap-0.5">
-                    <CalendarIcon size={10} className="text-slate-400" />
-                    <span>{formatDate(booking.scheduledAt || booking.createdAt)}</span>
-                </div>
-                <div className="flex items-center gap-0.5">
-                    <ClockIcon size={10} className="text-slate-400" />
-                    <span>{formatTime(booking.scheduledAt || booking.createdAt)}</span>
-                </div>
-            </div>
+const BookActions = () => (
+  <div className="mt-4 flex flex-wrap justify-center gap-2">
+    <Link to="/app/telemedicine" className={`${linkButtonClass} bg-tiba-blue text-white hover:bg-blue-800`}>
+      Book a consultation
+    </Link>
+    <Link to="/app/services" className={`${linkButtonClass} border-2 border-slate-200 text-slate-700 hover:border-tiba-blue hover:text-tiba-blue`}>
+      Book a home visit
+    </Link>
+  </div>
+);
 
-            <div className="flex items-center justify-between pt-1.5 border-t border-slate-50">
-                {booking.provider ? (
-                    <div className="flex items-center gap-1.5">
-                        {booking.provider.avatarUrl ? (
-                            <img
-                                src={booking.provider.avatarUrl}
-                                alt={booking.provider.fullName}
-                                className="h-5 w-5 rounded-lg object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-brand-100 text-brand-600 text-[8px] font-bold">
-                                {booking.provider.fullName?.charAt(0) || "P"}
-                            </div>
-                        )}
-                        <span className="text-[10px] font-medium text-slate-700 truncate">{booking.provider.fullName}</span>
-                    </div>
-                ) : (
-                    <span className="text-[9px] text-slate-400 italic">Finding provider...</span>
-                )}
-                {showRateButton ? (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onRate?.();
-                        }}
-                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-amber-50 text-amber-600 text-[8px] font-bold hover:bg-amber-100 transition-colors shrink-0"
-                    >
-                        <Star size={8} />
-                        Rate
-                    </button>
-                ) : (
-                    <ChevronRight size={12} className="text-slate-300 group-hover:text-brand-600 transition-colors flex-shrink-0" />
-                )}
-            </div>
-        </motion.article>
-    );
-};
-
+// My bookings, sorted by what the client needs to do rather than by system status: the next consultation with
+// its Join button, anything waiting on them, what is coming up, and everything earlier tucked behind one button.
 const BookingsPage = () => {
-    const navigate = useNavigate();
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<TabKey>("all");
-    const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const policyQuery = useTelemedicinePolicy();
+  const now = useNow(60_000);
+  const [earlierOpen, setEarlierOpen] = useState(false);
+  const [earlierLimit, setEarlierLimit] = useState(EARLIER_STEP);
+  const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
 
-    const activeTabConfig = TABS.find((t) => t.key === activeTab)!;
+  const enabled = { enabled: Boolean(user?.id) };
+  const openQuery = useBookingList(
+    { clientId: user?.id ?? undefined, statuses: [...OPEN_BOOKING_STATUSES], pageSize: OPEN_PAGE_SIZE, preset: "card" },
+    enabled
+  );
+  // Fetched even while the list is closed: a recent visit with no rating is asked about under "Needs you".
+  const earlierQuery = useBookingList(
+    { clientId: user?.id ?? undefined, statuses: [...EARLIER_BOOKING_STATUSES], pageSize: earlierLimit, preset: "card" },
+    enabled
+  );
 
-    const { data, isLoading } = useBookingList(
-        {
-            clientId: user?.id ?? undefined,
-            statuses: activeTabConfig.statuses.length > 0 ? activeTabConfig.statuses : undefined,
-            pageSize: 50,
-            preset: "card"
-        },
-        { enabled: Boolean(user?.id) }
-    );
+  const timezone = policyQuery.data?.defaultTimezone;
+  const openBookings = useMemo(() => sortComingUp((openQuery.data as { bookings?: Booking[] } | undefined)?.bookings ?? []), [openQuery.data]);
+  const earlierBookings = useMemo(() => sortEarlier((earlierQuery.data as { bookings?: Booking[] } | undefined)?.bookings ?? []), [earlierQuery.data]);
+  const earlierTotal = (earlierQuery.data as { meta?: { page?: { total?: number } } } | undefined)?.meta?.page?.total ?? earlierBookings.length;
 
-    const bookings = useMemo(() => {
-        const result = data as { bookings?: Booking[] } | undefined;
-        return result?.bookings ?? [];
-    }, [data]);
+  const next = useMemo(() => pickNextConsultation(openBookings, now), [openBookings, now]);
+  const needsYou = useMemo<NeedsYouItem[]>(() => {
+    const open = openBookings.map(needsYouForOpenBooking).filter((item): item is NeedsYouItem => item !== null);
+    const rate = earlierBookings.map((booking) => needsYouForRating(booking, now)).filter((item): item is NeedsYouItem => item !== null);
+    return [...open, ...rate];
+  }, [openBookings, earlierBookings, now]);
+  // A booking already shown under "Needs you" or as the featured consultation is not repeated in the list.
+  const comingUp = useMemo(() => {
+    const shown = new Set<string>([...needsYou.filter((item) => item.kind !== "rate").map((item) => item.booking.id), ...(next ? [next.id] : [])]);
+    return openBookings.filter((booking) => !shown.has(booking.id));
+  }, [openBookings, needsYou, next]);
 
-    if (isLoading) {
-        return (
-            <AppLayout fullWidth showHeader={false} disablePadding>
-                <div className="flex flex-col gap-3 pb-20">
-                    <div className="px-4 sm:px-6 pt-4">
-                        <h1 className="text-xl font-bold text-slate-900">My Bookings</h1>
-                    </div>
-                    <div className="grid gap-2 px-4 sm:px-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {[1, 2, 3, 4, 5, 6].map((i) => <BookingCardSkeleton key={i} />)}
-                    </div>
+  const openBooking = (booking: Booking) => navigate(`/app/bookings/${booking.id}`);
+  const rate = (booking: Booking) =>
+    setFeedbackPrompt({ bookingId: booking.id, providerName: booking.provider?.fullName || "the provider" });
+  const ratable = new Set(needsYou.filter((item) => item.kind === "rate").map((item) => item.booking.id));
+
+  const loading = openQuery.isLoading || earlierQuery.isLoading;
+  const nothingAtAll = !loading && !openQuery.isError && !earlierQuery.isError && openBookings.length === 0 && earlierBookings.length === 0;
+
+  return (
+    <AppLayout fullWidth showHeader={false} disablePadding>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pb-24 pt-4 sm:px-6">
+        <h1 className="text-xl font-bold text-slate-900">My bookings</h1>
+
+        {loading ? (
+          <AgendaSkeleton />
+        ) : nothingAtAll ? (
+          <div className="rounded-2xl bg-white px-6 py-12 text-center ring-1 ring-slate-100">
+            <h2 className="text-base font-bold text-slate-900">No bookings yet</h2>
+            <p className="mx-auto mt-1 max-w-xs text-sm text-slate-600">When you book a consultation or a home visit, it appears here.</p>
+            <BookActions />
+          </div>
+        ) : (
+          <>
+            {openQuery.isError && <WidgetError what="your upcoming bookings" onRetry={() => void openQuery.refetch()} />}
+
+            {next && (
+              <NextConsultationCard
+                booking={next}
+                withName={next.provider?.fullName}
+                joinTo={`/app/bookings/${next.id}?join=1`}
+                detailsTo={`/app/bookings/${next.id}`}
+                joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+              />
+            )}
+
+            <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
+
+            {needsYou.length > 0 && (
+              <section aria-label="Needs you" className="space-y-3">
+                <SectionTitle>Needs you</SectionTitle>
+                <ul className="space-y-2">
+                  {needsYou.map((item) => (
+                    <li
+                      key={`${item.kind}-${item.booking.id}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+                    >
+                      <p className="text-sm font-medium text-amber-950">{item.message}</p>
+                      <button
+                        type="button"
+                        onClick={() => (item.kind === "rate" ? rate(item.booking) : openBooking(item.booking))}
+                        className="min-h-[44px] shrink-0 rounded-lg bg-white px-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                      >
+                        {item.action}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {!openQuery.isError && (
+              <section aria-label="Coming up" className="space-y-1">
+                <SectionTitle count={comingUp.length > 0 ? comingUp.length : undefined}>Coming up</SectionTitle>
+                {comingUp.length > 0 ? (
+                  <AgendaList bookings={comingUp} timezone={timezone} onOpen={openBooking} />
+                ) : (
+                  <div className="py-4 text-sm text-slate-600">
+                    {next || needsYou.some((item) => item.kind !== "rate")
+                      ? "Nothing else is coming up."
+                      : "Nothing is coming up."}
+                    <BookActions />
+                  </div>
+                )}
+              </section>
+            )}
+
+            <section aria-label="Earlier" className="space-y-1">
+              <h2 className="text-base font-semibold text-slate-900">
+                <button
+                  type="button"
+                  aria-expanded={earlierOpen}
+                  aria-controls="earlier-bookings"
+                  onClick={() => setEarlierOpen((open) => !open)}
+                  className="-mx-2 flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-left hover:text-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                >
+                  Earlier
+                  <span className="font-normal text-slate-600">({earlierTotal})</span>
+                  <span className="text-sm font-semibold text-tiba-blue">{earlierOpen ? "Hide" : "Show"}</span>
+                </button>
+              </h2>
+              {earlierOpen && (
+                <div id="earlier-bookings">
+                  {earlierQuery.isError ? (
+                    <WidgetError what="your earlier bookings" onRetry={() => void earlierQuery.refetch()} />
+                  ) : earlierBookings.length === 0 ? (
+                    <p className="py-4 text-sm text-slate-600">Finished and cancelled bookings appear here.</p>
+                  ) : (
+                    <>
+                      <AgendaList
+                        bookings={earlierBookings}
+                        timezone={timezone}
+                        showYear
+                        onOpen={openBooking}
+                        rateFor={(booking) => (ratable.has(booking.id) ? () => rate(booking) : undefined)}
+                      />
+                      {earlierBookings.length < earlierTotal && (
+                        <button
+                          type="button"
+                          onClick={() => setEarlierLimit((limit) => limit + EARLIER_STEP)}
+                          className="mt-2 min-h-[44px] rounded-xl border-2 border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:border-tiba-blue hover:text-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                        >
+                          Show more
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
-            </AppLayout>
-        );
-    }
+              )}
+            </section>
+          </>
+        )}
+      </div>
 
-    return (
-        <AppLayout fullWidth showHeader={false} disablePadding>
-            <div className="flex flex-col gap-3 pb-20">
-                <div className="px-4 sm:px-6 pt-4">
-                    <h1 className="text-xl font-bold text-slate-900">My Bookings</h1>
-                </div>
-
-                <div className="flex flex-col gap-3 px-4 sm:px-6">
-                    {/* Tabs */}
-                    <div className="flex gap-1 p-0.5 rounded-lg bg-slate-100 w-full overflow-x-auto no-scrollbar">
-                        {TABS.map((tab) => (
-                            <button
-                                key={tab.key}
-                                type="button"
-                                onClick={() => setActiveTab(tab.key)}
-                                className={classNames(
-                                    "flex-1 min-w-[60px] rounded-lg py-1.5 text-[10px] font-bold transition-all",
-                                    activeTab === tab.key
-                                        ? "bg-white text-brand-600 shadow-sm"
-                                        : "text-slate-500 hover:text-slate-700"
-                                )}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Bookings List */}
-                    {bookings.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-lg ring-1 ring-slate-100">
-                            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50 text-slate-300">
-                                <CalendarIcon size={18} />
-                            </div>
-                            <h3 className="text-xs font-bold text-slate-900">No records found</h3>
-                            <p className="mt-1 text-[11px] text-slate-500 max-w-[180px]">
-                                {activeTab === "all"
-                                    ? "Your history will appear here."
-                                    : `No ${activeTabConfig.label.toLowerCase()} bookings.`}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                            <AnimatePresence mode="popLayout">
-                                {bookings.map((booking: Booking) => (
-                                    <BookingCard
-                                        key={booking.id}
-                                        booking={booking}
-                                        onClick={() => navigate(`/app/bookings/${booking.id}`)}
-                                        onRate={() => setFeedbackPrompt({
-                                            bookingId: booking.id,
-                                            providerName: booking.provider?.fullName || "the provider"
-                                        })}
-                                    />
-                                ))}
-                            </AnimatePresence>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <BookingFeedbackDialog
-                open={Boolean(feedbackPrompt)}
-                bookingId={feedbackPrompt?.bookingId || null}
-                targetName={feedbackPrompt?.providerName || ""}
-                onClose={() => setFeedbackPrompt(null)}
-            />
-        </AppLayout>
-    );
+      <BookingFeedbackDialog
+        open={Boolean(feedbackPrompt)}
+        bookingId={feedbackPrompt?.bookingId || null}
+        targetName={feedbackPrompt?.providerName || ""}
+        onClose={() => setFeedbackPrompt(null)}
+      />
+    </AppLayout>
+  );
 };
 
 export default BookingsPage;

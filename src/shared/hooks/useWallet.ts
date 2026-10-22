@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   approveWithdrawal,
@@ -67,7 +67,7 @@ export const useAdminWithdrawals = (
   return useQuery<WithdrawalListResult>({
     queryKey: walletKeys.adminList(normalized),
     queryFn: () => fetchAdminWithdrawals(params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled: options?.enabled ?? true
   });
 };

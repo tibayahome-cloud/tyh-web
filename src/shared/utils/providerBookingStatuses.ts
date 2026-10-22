@@ -12,3 +12,16 @@ export const PROVIDER_CANCELLED_STATUSES = [
   "expired_no_accept",
   "reassigned"
 ] as const;
+
+// "Active" for a provider also covers a booked video consultation that has not happened yet; leaving
+// "scheduled" out meant the default Bookings view was empty for a provider who only does consultations.
+export const PROVIDER_ACTIVE_STATUSES = [
+  "scheduled",
+  "accepted",
+  "en_route",
+  "nearby",
+  "arrived",
+  "in_service",
+  "completed_by_provider",
+  "client_completed"
+] as const;

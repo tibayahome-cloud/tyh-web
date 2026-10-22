@@ -15,6 +15,7 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { api } from "../../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin, svcCard } from "../../../../shared/libs/fieldInclude";
+import { AMBULANCE_CATEGORY, categoriesOfKind, selectableCategories, type ManagedKind } from "../../utils/serviceCategories";
 
 type ServiceCategory = {
   id: string;
@@ -80,12 +81,14 @@ const useCategoriesQuery = () =>
     }
   });
 
-const useServicesQuery = (filters: { category: string; active: string }) =>
+const useServicesQuery = (filters: { category: string; active: string }, kind: ManagedKind) =>
   useQuery({
-    queryKey: ["admin", "services", filters],
+    queryKey: ["admin", "services", kind, filters],
     queryFn: async () => {
       const params: Record<string, string | boolean> = {
-        ...buildFieldParams(svcCard)
+        ...buildFieldParams(svcCard),
+        // Only this kind of care: the other kinds are managed in their own place.
+        "filter[care_type]": kind
       };
       if (filters.category && filters.category !== "all") {
         params["filter[category_id]"] = filters.category;
@@ -98,7 +101,7 @@ const useServicesQuery = (filters: { category: string; active: string }) =>
     }
   });
 
-export const ServiceListPanel = () => {
+export const ServiceListPanel = ({ kind = "home_based" }: { kind?: ManagedKind }) => {
   const [filters, setFilters] = useState({ category: "all", active: "active" });
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
@@ -106,8 +109,9 @@ export const ServiceListPanel = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  const { data: categories } = useCategoriesQuery();
-  const { data: services, isFetching } = useServicesQuery(filters);
+  const { data: allCategories } = useCategoriesQuery();
+  const categories = useMemo(() => categoriesOfKind(allCategories, kind), [allCategories, kind]);
+  const { data: services, isFetching } = useServicesQuery(filters, kind);
 
   const {
     control,
@@ -160,6 +164,9 @@ export const ServiceListPanel = () => {
       const payload = {
         ...rest,
         key: editing?.key ?? slugifyKey(values.name),
+        // Telemedicine services are managed in the Telemedicine tab, so a service made here is never remote.
+        remote_capable: false,
+        ...(kind === "ambulance" ? { tags: [AMBULANCE_CATEGORY.key] } : {}),
         base_price_cents: Math.round(base_price * 100),
         description: values.description || null
       };
@@ -195,16 +202,16 @@ export const ServiceListPanel = () => {
       return service;
     },
     onMutate: async (service) => {
-      await queryClient.cancelQueries({ queryKey: ["admin", "services", filters] });
-      const previous = queryClient.getQueryData<Service[]>(["admin", "services", filters]);
-      queryClient.setQueryData<Service[]>(["admin", "services", filters], (old) =>
+      await queryClient.cancelQueries({ queryKey: ["admin", "services", kind, filters] });
+      const previous = queryClient.getQueryData<Service[]>(["admin", "services", kind, filters]);
+      queryClient.setQueryData<Service[]>(["admin", "services", kind, filters], (old) =>
         (old ?? []).filter((item) => item.id !== service.id)
       );
       return { previous };
     },
     onError: (error: unknown, _service, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(["admin", "services", filters], context.previous);
+        queryClient.setQueryData(["admin", "services", kind, filters], context.previous);
       }
       toast.showToast({
         title: "Unable to delete service",
@@ -381,7 +388,7 @@ export const ServiceListPanel = () => {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 >
                   <option value="">Select category</option>
-                  {categories?.map((category) => (
+                  {selectableCategories(categories, field.value as string).map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
                     </option>
@@ -453,21 +460,6 @@ export const ServiceListPanel = () => {
                     onChange={(event) => field.onChange(event.target.checked)}
                   />
                   Active service
-                </label>
-              )}
-            />
-            <FormField
-              control={control}
-              name="remote_capable"
-              render={({ field }) => (
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                    checked={Boolean(field.value)}
-                    onChange={(event) => field.onChange(event.target.checked)}
-                  />
-                  Remote (telemedicine) capable
                 </label>
               )}
             />

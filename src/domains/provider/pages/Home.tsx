@@ -4,13 +4,23 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import classNames from "classnames";
 import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
+import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
+import { LiveStatusCard, type LiveFix } from "../../../shared/components/LiveStatusCard";
+import { useProviderLiveStatus } from "../../../shared/hooks/useLiveStatus";
+import type { LiveBlocker } from "../../../shared/libs/liveStatus";
+import { WidgetError } from "../../../shared/components/WidgetError";
+import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
+import { ProviderFacilityAffiliation } from "../components/ProviderFacilityAffiliation";
 
 import { Card } from "../../../shared/components/Card";
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { useLocationAccess } from "../../../shared/hooks/useLocationAccess";
 import { providerFinancialsAreVisible, useProviderProfile } from "../hooks/useProviderProfile";
@@ -27,16 +37,11 @@ import { PerformanceStats } from "../components/PerformanceStats";
 import { useUpdateProviderStatus } from "../hooks/useProviderProfile";
 
 import {
-  Power,
   Activity,
   Rocket,
   MessageCircle,
   ArrowRight,
-  Clock,
-  Calendar,
-  ExternalLink,
-  CreditCard,
-  Settings
+  Calendar
 } from "lucide-react";
 
 import type { Booking } from "../../../shared/schemas/booking";
@@ -105,6 +110,24 @@ const formatTimestamp = (iso?: string | null) => {
   });
 };
 
+// The time the appointment happens, not when the provider accepted it. A remote consultation is anchored
+// to the facility's timezone, so it is formatted there rather than in the provider's own.
+const formatAppointmentTime = (booking: Booking) => {
+  if (booking.scheduledAt) {
+    return booking.isTelemedicine
+      ? formatTelemedicineDateTime(booking.scheduledAt)
+      : formatTimestamp(booking.scheduledAt);
+  }
+  return formatTimestamp(booking.acceptedAt);
+};
+
+// A provider can set their own hours; every other blocker (verification, specialties, telemedicine on) is
+// set by their facility, so they are told that instead of being sent somewhere they cannot act.
+const resolveProviderLiveFix = (blocker: LiveBlocker): LiveFix =>
+  blocker.fix === "provider_availability"
+    ? { label: "Set your hours", to: "/pro/availability" }
+    : { hint: "Your facility admin sets this up." };
+
 const ProviderHome = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -113,6 +136,8 @@ const ProviderHome = () => {
   const { data: profile, isLoading: loadingProfile } = useProviderProfile(user?.id);
   const { queue: broadcastQueue, dismiss: dismissBroadcast } = useBroadcastQueueContext();
   const updateStatusMutation = useUpdateProviderStatus(user?.id);
+  const { openBookingChat } = useOpenBookingChat("/pro/inbox");
+  const providerLive = useProviderLiveStatus(user?.id);
   const acceptBookingMutation = useAcceptBookingMutation("detail");
   const location = useLocation();
   const isOnHomePage = location.pathname === "/pro/home" || location.pathname === "/pro";
@@ -170,7 +195,7 @@ const ProviderHome = () => {
     }
   }, [activeBooking]);
 
-  const { data: upcomingList, isFetching: upcomingFetching } = useBookingList(
+  const { data: upcomingList, isFetching: upcomingFetching, isError: upcomingError, refetch: refetchUpcoming } = useBookingList(
     {
       statuses: [...PROVIDER_UPCOMING_STATUSES],
       providerId: user?.id ?? undefined,
@@ -178,9 +203,14 @@ const ProviderHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] }, isFetching: boolean };
+  ) as {
+    data?: { bookings?: Booking[]; meta?: { page?: { total?: number } } };
+    isFetching: boolean;
+    isError?: boolean;
+    refetch: () => unknown;
+  };
 
-  const { data: historyList, isFetching: historyFetching } = useBookingList(
+  const { data: historyList, isFetching: historyFetching, isError: historyError, refetch: refetchHistory } = useBookingList(
     {
       statuses: [...HISTORY_STATUSES],
       providerId: user?.id ?? undefined,
@@ -188,7 +218,7 @@ const ProviderHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] }, isFetching: boolean };
+  ) as { data?: { bookings?: Booking[] }, isFetching: boolean, isError?: boolean, refetch: () => unknown };
 
   const socket = useSocket();
   const locationAccess = useLocationAccess();
@@ -203,8 +233,8 @@ const ProviderHome = () => {
     updateStatusMutation.mutate(next, {
       onSuccess: () => {
         toast.showToast({
-          title: next ? "System Online" : "System Offline",
-          description: next ? "You are now visible for nearby bookings." : "Standby mode activated.",
+          title: next ? "You are online" : "You are offline",
+          description: next ? "Clients can now request you." : "You will not receive new requests.",
           variant: "success"
         });
       }
@@ -218,7 +248,7 @@ const ProviderHome = () => {
         dismissBroadcast(bookingId);
         toast.showToast({
           title: "Booking Accepted",
-          description: `Booking #${booking.id.slice(0, 6)} is now active.`,
+          description: "Your booking is now active.",
           variant: "success"
         });
         navigate(`/pro/bookings/${booking.id}`);
@@ -246,16 +276,25 @@ const ProviderHome = () => {
     return activeBooking ? items.filter((b) => b.id !== activeBooking.id) : items;
   }, [upcomingList?.bookings, activeBooking]);
 
+  // The list is one page of three, so its length is not the total. Use the server's count, less the active booking
+  // when that one was filtered out of the page.
+  const upcomingListed = upcomingList?.bookings ?? [];
+  const upcomingTotal = Math.max(
+    upcomingBookings.length,
+    (upcomingList?.meta?.page?.total ?? upcomingListed.length) - (upcomingListed.length - upcomingBookings.length)
+  );
+
+  const policyQuery = useTelemedicinePolicy();
+  const nextConsultation = upcomingBookings.find(
+    (b) => b.isTelemedicine && b.status === "scheduled" && !hasConsultationEnded(b.scheduledAt, b.estimateDurationMinutes)
+  );
+
   const historyBookings = historyList?.bookings ?? [];
   const financialsVisible = providerFinancialsAreVisible(profile);
 
   if (loadingProfile) return <Loading fullHeight />;
 
-  const dispatchChat = (bookingId: string) => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("chat:open", { detail: { bookingId, role: "provider" } }));
-    }
-  };
+  const dispatchChat = (bookingId: string) => void openBookingChat(bookingId);
 
   return (
     <>
@@ -272,19 +311,71 @@ const ProviderHome = () => {
             lock them out of their own dashboard until they filled them in. */}
         <ProviderSetupCard />
 
+        {/* Shown only while clients cannot book this provider, so a working provider sees no extra card. */}
+        {providerLive.data && !providerLive.data.live && (
+          <LiveStatusCard
+            title="Clients cannot book you yet"
+            subject="provider"
+            status={providerLive.data}
+            isLoading={false}
+            isError={false}
+            onRetry={() => void providerLive.refetch()}
+            resolveFix={resolveProviderLiveFix}
+          />
+        )}
+
         <NeedsYourResponse bookingPath={(id) => `/pro/bookings/${id}`} />
 
-        {/* Intelligence Layer */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {financialsVisible && (
-          <div className="lg:col-span-4">
-            <RevenueSnapshot financialsVisible={financialsVisible} />
-          </div>
-          )}
-          <div className={financialsVisible ? "lg:col-span-8" : "lg:col-span-12"}>
-            <PerformanceStats />
-          </div>
-        </div>
+        {pendingInvites.length > 0 && (
+          <section aria-labelledby="new-requests-heading" className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
+              <h2 id="new-requests-heading" className="text-sm font-bold text-slate-900">
+                New requests ({pendingInvites.length})
+              </h2>
+            </div>
+            <ul className="mt-3 grid gap-3 md:grid-cols-2">
+              {pendingInvites.map((offer) => (
+                <li key={offer.booking.id} className="flex flex-col gap-3 rounded-xl bg-white p-3 ring-1 ring-amber-100">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{offer.booking.service?.name}</p>
+                    <p className="text-sm text-slate-600">
+                      {offer.distanceM ? `${(offer.distanceM / 1000).toFixed(1)} km away` : "Distance not known"}
+                      {" · "}
+                      received {formatRelativeTime(offer.receivedAt)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="min-h-[44px] flex-1 text-sm font-semibold"
+                      onClick={() => handleAcceptInvite(offer.booking.id)}
+                      loading={acceptBookingMutation.isPending}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-[44px] text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+                      onClick={() => dismissBroadcast(offer.booking.id)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {nextConsultation && (
+          <NextConsultationCard
+            booking={nextConsultation}
+            withName={nextConsultation.client?.fullName}
+            joinTo={`/pro/telemedicine?join=${nextConsultation.id}`}
+            detailsTo={`/pro/bookings/${nextConsultation.id}`}
+            joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+          />
+        )}
 
         {/* Live Operations */}
         <div className={classNames(
@@ -297,7 +388,7 @@ const ProviderHome = () => {
                 className="overflow-hidden border-none shadow-lg ring-1 ring-black/5 p-4"
                 title="Active Booking"
                 description={activeBooking.service?.name}
-                badge={<span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">Live</span>}
+                badge={<span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-800">Live</span>}
               >
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -305,14 +396,14 @@ const ProviderHome = () => {
                       {activeBooking.client?.fullName?.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Client</p>
+                      <p className="text-xs text-slate-600">Client</p>
                       <p className="text-sm font-semibold text-slate-900">{activeBooking.client?.fullName}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="primary"
-                      className="h-9 rounded-lg px-4 text-xs"
+                      className="min-h-[44px] rounded-lg px-4 text-sm"
                       onClick={() => handleSetIsTracking(true)}
                     >
                       <Activity className="mr-1.5 h-3.5 w-3.5" />
@@ -320,10 +411,11 @@ const ProviderHome = () => {
                     </Button>
                     <Button
                       variant="secondary"
-                      className="h-9 w-9 rounded-lg p-0"
+                      className="min-h-[44px] min-w-[44px] rounded-lg p-0"
+                      aria-label="Open chat with the client"
                       onClick={() => dispatchChat(activeBooking.id)}
                     >
-                      <MessageCircle className="h-4 w-4" />
+                      <MessageCircle className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </div>
                 </div>
@@ -341,8 +433,8 @@ const ProviderHome = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-slate-300 shadow-md mb-4">
                   <Rocket className="h-6 w-6" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900">No Active Booking</h2>
-                <p className="mt-1 text-[11px] text-slate-500">Awaiting requests...</p>
+                <h2 className="text-sm font-bold text-slate-900">Nothing in progress right now</h2>
+                <p className="mt-1 text-sm text-slate-600">New requests appear at the top of this page as they arrive.</p>
               </div>
             )}
           </div>
@@ -350,125 +442,43 @@ const ProviderHome = () => {
           <div className={classNames(
             activeBooking ? "space-y-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
           )}>
-            <div className="bg-slate-900 p-4 rounded-xl shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className={classNames(
-                    "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors",
-                    profile?.is_available ? "bg-emerald-500/10 border-emerald-500 text-emerald-500" : "bg-slate-500/10 border-slate-500 text-slate-500"
-                  )}>
-                    <Power className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Status</h3>
-                    <p className={classNames(
-                      "text-[10px] font-bold",
-                      profile?.is_available ? "text-emerald-400" : "text-slate-400"
-                    )}>
-                      {profile?.is_available ? "Online" : "Offline"}
-                    </p>
-                  </div>
+            <section aria-labelledby="availability-heading" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 id="availability-heading" className="text-sm font-bold text-slate-900">Availability</h3>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {profile?.is_available
+                      ? "You are online. Clients can request you."
+                      : "You are offline. Turn this on to receive requests."}
+                  </p>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(profile?.is_available)}
+                  aria-labelledby="availability-heading"
                   onClick={toggleStatus}
                   disabled={updateStatusMutation.isPending}
                   className={classNames(
-                    "relative h-5 w-10 rounded-full transition-colors focus:outline-none",
-                    profile?.is_available ? "bg-emerald-500" : "bg-slate-700"
+                    "relative h-8 w-14 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50 focus-visible:ring-offset-2 disabled:opacity-60",
+                    profile?.is_available ? "bg-emerald-600" : "bg-slate-400"
                   )}
                 >
-                  <div className={classNames(
-                    "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow",
-                    profile?.is_available ? "left-5" : "left-0.5"
-                  )} />
+                  <span
+                    aria-hidden="true"
+                    className={classNames(
+                      "absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform",
+                      profile?.is_available ? "left-7" : "left-1"
+                    )}
+                  />
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                {profile?.is_available
-                  ? "Visible for bookings"
-                  : "Activate to receive invitations"}
-              </p>
-            </div>
+            </section>
 
-            <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-tiba-blue text-white">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wide">Quick Links</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Inbox", icon: <MessageCircle className="h-3.5 w-3.5" />, to: "/pro/inbox", color: "bg-blue-50 text-blue-600" },
-                  { label: "Bookings", icon: <Calendar className="h-3.5 w-3.5" />, to: "/pro/bookings", color: "bg-emerald-50 text-emerald-600" },
-                  { label: "Payments", icon: <CreditCard className="h-3.5 w-3.5" />, to: "/pro/payments", color: "bg-amber-50 text-amber-600" },
-                  { label: "Settings", icon: <Settings className="h-3.5 w-3.5" />, to: "/pro/settings", color: "bg-slate-100 text-slate-600" }
-                ].filter((link) => financialsVisible || link.label !== "Payments").map((link) => (
-                  <button
-                    key={link.label}
-                    onClick={() => navigate(link.to)}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 transition-all hover:bg-slate-100"
-                  >
-                    <div className={classNames("flex h-6 w-6 items-center justify-center rounded-md", link.color)}>
-                      {link.icon}
-                    </div>
-                    <span className="text-[11px] font-semibold text-slate-700">{link.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ProviderFacilityAffiliation facility={profile?.facility} />
 
             <ClientHealthAlertsCard />
 
-            {pendingInvites.length > 0 && (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white">
-                    <Activity className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900">Live Broadcasts</h3>
-                    <p className="text-[10px] text-amber-600 font-bold">Respond now</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {pendingInvites.map((offer) => (
-                    <article
-                      key={offer.booking.id}
-                      className="flex flex-col gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-100"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{offer.booking.service?.name}</p>
-                          <p className="text-[11px] text-slate-500">
-                            {offer.distanceM ? `${(offer.distanceM / 1000).toFixed(1)} km` : "—"} • {offer.radiusM}m radius
-                          </p>
-                        </div>
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-amber-500 animate-pulse">
-                          <Clock className="h-3 w-3" />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          className="flex-1 h-8 rounded-lg text-[11px] font-bold"
-                          onClick={() => handleAcceptInvite(offer.booking.id)}
-                          loading={acceptBookingMutation.isPending}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="h-8 rounded-lg text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                          onClick={() => dismissBroadcast(offer.booking.id)}
-                        >
-                          Dismiss
-                        </Button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
           </div>
         </div>
 
@@ -476,43 +486,47 @@ const ProviderHome = () => {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Upcoming</h3>
-              <span className="text-[10px] text-slate-400">{upcomingBookings.length} scheduled</span>
+              <h3 className="text-sm font-semibold text-slate-900">Upcoming</h3>
+              <span className="text-xs text-slate-600">{upcomingTotal} upcoming</span>
             </div>
-            {upcomingFetching && !upcomingBookings.length ? (
+            {upcomingError && !upcomingList ? (
+              <WidgetError what="your upcoming bookings" onRetry={() => void refetchUpcoming()} />
+            ) : upcomingFetching && !upcomingBookings.length ? (
               <Loading />
             ) : upcomingBookings.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Calendar className="h-6 w-6 text-slate-300 mb-2" />
-                <p className="text-xs font-semibold text-slate-500">No upcoming bookings</p>
+                <Calendar className="mb-2 h-6 w-6 text-slate-400" aria-hidden="true" />
+                <p className="text-sm font-semibold text-slate-600">No upcoming bookings</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {upcomingBookings.map((booking) => {
                   const theme = getBookingStatusTheme(booking.status);
                   return (
-                    <article
-                      key={booking.id}
-                      onClick={() => navigate(`/pro/bookings/${booking.id}`)}
-                      className="group flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-brand-600 ring-1 ring-slate-100">
-                          <Activity className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{booking.service?.name}</p>
-                          <p className="text-[11px] text-slate-500">
-                            {booking.client?.fullName} • {formatTimestamp(booking.acceptedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={classNames("rounded-full px-2 py-0.5 text-[10px] font-bold", theme.className)}>
-                          {theme.label}
+                    <article key={booking.id} className="rounded-lg bg-slate-50 transition-colors hover:bg-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/pro/bookings/${booking.id}`)}
+                        className="group flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-600 ring-1 ring-slate-200">
+                            <Activity className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{booking.service?.name}</span>
+                            <span className="block text-xs text-slate-600">
+                              {booking.client?.fullName} • {formatAppointmentTime(booking)}
+                            </span>
+                          </span>
                         </span>
-                        <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
-                      </div>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className={classNames("rounded-full px-2 py-0.5 text-xs font-semibold", theme.className)}>
+                            {theme.label}
+                          </span>
+                          <ArrowRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
+                        </span>
+                      </button>
                     </article>
                   );
                 })}
@@ -522,42 +536,62 @@ const ProviderHome = () => {
 
           <div className="bg-white p-4 rounded-xl ring-1 ring-slate-100">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">History</h3>
-              <button onClick={() => navigate('/pro/bookings')} className="text-[10px] text-tiba-blue font-bold">View All</button>
+              <h3 className="text-sm font-semibold text-slate-900">History</h3>
+              <button
+                type="button"
+                onClick={() => navigate("/pro/bookings")}
+                className="min-h-[44px] px-2 text-sm font-semibold text-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
+              >
+                View all
+              </button>
             </div>
-            {historyFetching && !historyBookings.length ? (
+            {historyError && !historyList ? (
+              <WidgetError what="your history" onRetry={() => void refetchHistory()} />
+            ) : historyFetching && !historyBookings.length ? (
               <Loading />
             ) : historyBookings.length > 0 ? (
               <div className="space-y-1">
                 {historyBookings.slice(0, 5).map((booking) => {
                   const theme = getBookingStatusTheme(booking.status);
                   return (
-                    <div
+                    <button
                       key={booking.id}
+                      type="button"
                       onClick={() => navigate(`/pro/bookings/${booking.id}`)}
-                      className="group flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                      className="group flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg p-2 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate group-hover:text-brand-600">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-slate-900 group-hover:text-brand-600">
                           {booking.service?.name}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
+                        </span>
+                        <span className="block text-xs text-slate-600">
                           {formatRelativeTime(booking.clientConfirmedAt ?? booking.paidAt ?? booking.serviceCompletedAt)}
-                        </p>
-                      </div>
-                      <span className={classNames("text-[10px] font-bold shrink-0", theme.className.replace(/bg-[\w-]+|ring-[\w-]+/g, ""))}>
+                        </span>
+                      </span>
+                      <span className={classNames("shrink-0 text-xs font-semibold", theme.className.replace(/bg-[\w-]+|ring-[\w-]+/g, ""))}>
                         {theme.label}
                       </span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Activity className="h-5 w-5 text-slate-300 mb-2" />
-                <p className="text-xs text-slate-400">No history yet</p>
+                <Activity className="mb-2 h-5 w-5 text-slate-400" aria-hidden="true" />
+                <p className="text-sm text-slate-600">No history yet</p>
               </div>
             )}
+          </div>
+        </div>
+        {/* What the provider has earned and how they are doing: useful, but not what they open the app to do. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          {financialsVisible && (
+            <div className="lg:col-span-4">
+              <RevenueSnapshot financialsVisible={financialsVisible} />
+            </div>
+          )}
+          <div className={financialsVisible ? "lg:col-span-8" : "lg:col-span-12"}>
+            <PerformanceStats />
           </div>
         </div>
       </div>

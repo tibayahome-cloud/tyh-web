@@ -28,10 +28,16 @@ describe("mapTelemedicinePolicy", () => {
       supportedCountryCodes: ["KE"],
       defaultTimezone: "Africa/Nairobi",
       joinWindowBeforeMinutes: 10,
+      noShowGraceMinutes: 10,
       cancellationCutoffMinutes: 10,
       remindersEnabled: false,
       reminderWindowsMinutes: [1440, 15]
     });
+  });
+
+  it("reads the no-show grace the server publishes, and defaults to 10 for an older server", () => {
+    expect(mapTelemedicinePolicy({ ...REAL_POLICY_RESPONSE, no_show_grace_minutes: 15 })?.noShowGraceMinutes).toBe(15);
+    expect(mapTelemedicinePolicy({})?.noShowGraceMinutes).toBe(10);
   });
 
   it("falls back to the join window for the cancellation cutoff if the nested field is absent", () => {

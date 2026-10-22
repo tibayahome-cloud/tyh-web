@@ -76,7 +76,7 @@ export const BookingNotesPanel = ({
         error
     } = useQuery({
         queryKey: ["bookingNotes", bookingId],
-        queryFn: () => fetchBookingNotes(bookingId),
+        queryFn: async () => (await fetchBookingNotes(bookingId)).data,
         staleTime: 30000
     });
 

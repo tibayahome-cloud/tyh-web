@@ -19,8 +19,10 @@ import PauseIcon from "@mui/icons-material/PauseOutlined";
 import FastForwardIcon from "@mui/icons-material/FastForwardOutlined";
 
 import { Button } from "../../../shared/components/Button";
-import type { Booking } from "../../../shared/schemas/booking";
+import type { Booking, BookingMarkAction } from "../../../shared/schemas/booking";
 import { useMarkBookingMutation } from "../../../shared/hooks/useBookings";
+import { PaymentRequestPanel } from "../../../shared/components/PaymentRequestPanel";
+import { PlaceLabel } from "../../../shared/components/PlaceLabel";
 
 type ImmersiveProviderBookingViewProps = {
   booking: Booking;
@@ -93,10 +95,8 @@ const WORKFLOW: WorkflowStep[] = [
   {
     status: "completed_by_provider",
     label: "Completed",
-    description: "Awaiting client confirmation and payment.",
+    description: "Ask the client to pay. They approve the payment on their phone.",
     icon: <DoneAllIcon />,
-    action: "client_confirmed",
-    actionLabel: "Request Payment (STK Push)",
     color: "text-slate-600",
     bgColor: "bg-slate-50 border-slate-100"
   }
@@ -150,7 +150,7 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
     (action: string) => {
       markBooking.mutate({
         bookingId: booking.id,
-        action: action as "en_route" | "nearby" | "arrived" | "start_service" | "complete" | "client_confirmed"
+        action: action as BookingMarkAction
       });
     },
     [booking.id, markBooking]
@@ -476,8 +476,8 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
                 {booking.addressText || "Client's Location"}
               </p>
               {booking.lat && booking.lng && !booking.addressText && (
-                <p className="text-xs text-white/30 mt-0.5 font-mono">
-                  {booking.lat.toFixed(4)}, {booking.lng.toFixed(4)}
+                <p className="text-xs text-white/60 mt-0.5">
+                  Near <PlaceLabel lat={booking.lat} lng={booking.lng} />
                 </p>
               )}
             </div>
@@ -555,9 +555,7 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
         {showDetails && (
           <div className="rounded-3xl bg-white/10 p-5 border border-white/10 space-y-3">
             {[
-              { label: "Booking ID", value: booking.id?.slice(0, 8).toUpperCase() },
               { label: "Service", value: booking.service?.name },
-              { label: "Emergency", value: booking.emergency ? "Yes" : "No" },
               { label: "Scheduled", value: booking.scheduledAt ? new Date(booking.scheduledAt).toLocaleString() : "ASAP" },
             ].filter(d => d.value).map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">
@@ -571,7 +569,9 @@ export const ImmersiveProviderBookingView = ({ booking, onClose, onOpenChat }: I
 
       {/* Fixed action bar at bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe-bottom" style={{ background: "linear-gradient(to top, #0f172a 70%, transparent)" }}>
-        {currentStep?.action ? (
+        {booking.status === "completed_by_provider" ? (
+          <PaymentRequestPanel bookingId={booking.id} clientName={clientName} tone="dark" />
+        ) : currentStep?.action ? (
           <Button
             onClick={() => handleAction(currentStep.action!)}
             loading={markBooking.isPending}

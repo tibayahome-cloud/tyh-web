@@ -216,7 +216,7 @@ describe("facility administrator access", () => {
     it.each([
       [429, /Too many requests/],
       [500, /something went wrong on our side/i],
-      [403, /Only a super admin/]
+      [403, /Contact support/]
     ])("explains a %s and lets the person try again", async (status, expected) => {
       const user = userEvent.setup();
       resendMock.mockRejectedValueOnce(httpError(status));
@@ -469,7 +469,7 @@ describe("facility administrator access", () => {
       fetchAccessMock.mockRejectedValue(httpError(403, "Forbidden"));
       renderCard();
 
-      expect(await screen.findByRole("alert")).toHaveTextContent(/Only a super admin can/);
+      expect(await screen.findByRole("alert")).toHaveTextContent(/Contact support/);
       expect(screen.queryByRole("button", { name: "Invite administrator" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Assign existing account" })).not.toBeInTheDocument();
     });

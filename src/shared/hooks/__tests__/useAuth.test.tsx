@@ -1,7 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../useAuth";
 
@@ -84,7 +84,7 @@ describe("useAuth", () => {
 
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useAuth(), { wrapper });
-    let loginResult;
+    let loginResult: Awaited<ReturnType<ReturnType<typeof useAuth>["loginClientProvider"]>> | undefined;
 
     await act(async () => {
       loginResult = await result.current.loginClientProvider({
@@ -95,7 +95,7 @@ describe("useAuth", () => {
     });
 
     expect(loginResult?.status).toBe("authenticated");
-    expect(loginResult?.user?.fullName).toBe("Jane Client");
+    expect(loginResult && "user" in loginResult ? loginResult.user?.fullName : undefined).toBe("Jane Client");
 
     expect(mockPost).toHaveBeenCalledWith("/auth/login", {
       emailOrPhone: "jane@example.com",

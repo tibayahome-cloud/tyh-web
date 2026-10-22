@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AxiosError } from "axios";
+import { AxiosError, AxiosHeaders } from "axios";
 
 import { classifyApiError, getApiError } from "../errors";
 
@@ -8,7 +8,7 @@ const axiosErrorWithStatus = (status: number, message: string) =>
     status,
     statusText: "",
     headers: {},
-    config: {},
+    config: { headers: new AxiosHeaders() },
     data: { error: { message } }
   });
 
@@ -18,7 +18,7 @@ describe("getApiError", () => {
       status: 400,
       statusText: "Bad Request",
       headers: {},
-      config: {},
+      config: { headers: new AxiosHeaders() },
       data: { error: { message: "Phone belongs to an existing user" } }
     });
 
@@ -71,7 +71,7 @@ describe("friendlyApiMessage and getApiError for transport and bare statuses", (
     const { friendlyApiMessage } = await import("../errors");
     for (const status of [400, 401, 403, 404, 409, 422, 429, 500, 502, 503]) {
       const error = new AxiosError(`Request failed with status code ${status}`, "ERR_BAD_REQUEST", undefined, undefined, {
-        status, statusText: "", headers: {}, config: {}, data: ""
+        status, statusText: "", headers: {}, config: { headers: new AxiosHeaders() }, data: ""
       } as never);
       expect(friendlyApiMessage(error)).not.toMatch(/status code/);
       expect(getApiError(error)).not.toMatch(/status code/);
@@ -86,7 +86,7 @@ describe("friendlyApiMessage and getApiError for transport and bare statuses", (
   it("appends the first field-level reason to a general validation message", async () => {
     const { friendlyApiMessage } = await import("../errors");
     const error = new AxiosError("x", "ERR_BAD_REQUEST", undefined, undefined, {
-      status: 400, statusText: "", headers: {}, config: {},
+      status: 400, statusText: "", headers: {}, config: { headers: new AxiosHeaders() },
       data: { error: { message: "Validation failed.", details: { phone: ["Enter a valid phone number."] } } }
     } as never);
     expect(friendlyApiMessage(error)).toBe("Validation failed. Enter a valid phone number.");

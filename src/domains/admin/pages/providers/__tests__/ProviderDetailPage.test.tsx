@@ -64,8 +64,11 @@ const renderPage = () =>
     </MemoryRouter>
   );
 
+let offered: unknown[] = [];
+
 beforeEach(() => {
   denied = [];
+  offered = [];
   applicationStatus = "approved";
   vi.clearAllMocks();
   vi.mocked(fetchFacilityBookings).mockResolvedValue({ bookings: [], meta: null, counts: null, raw: {} } as never);
@@ -78,7 +81,7 @@ beforeEach(() => {
     if (url === "/provider-applications")
       return { data: { data: [{ id: "app1", status: applicationStatus, progress_percent: 50, items: [] }] } };
     if (url === "/users/u1/activity") return { data: { data: { audit: [{ id: "e1", action: "UPDATE", resource_type: "provider_availability", at: "2026-10-13T08:00:00Z", reason: "provider availability replaced" }], requests: [] } } };
-    if (url === "/services") return { data: { data: [] } };
+    if (url === "/providers/u1/available-services") return { data: { data: offered } };
     return { data: { data: [] } };
   });
 });
@@ -276,5 +279,43 @@ describe("provider bookings", () => {
     );
     expect(screen.getByText("Bookings for Dr Gitobu")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("assigning services to a provider", () => {
+  const offering = (id: string, name: string, active = true) => ({ id: `o-${id}`, active, service: { id, name, key: id, active: true } });
+
+  it("lists only what the provider's facility offers, and saves the ticked ones", async () => {
+    offered = [offering("sv1", "ECG at home"), offering("sv2", "Wound dressing"), offering("sv3", "Old offer", false)];
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Services and specialties" }));
+    await user.click(screen.getByRole("button", { name: "Manage services" }));
+
+    expect(await screen.findByRole("checkbox", { name: "ECG at home" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Old offer" })).not.toBeInTheDocument();
+    expect(api.get).not.toHaveBeenCalledWith("/services", expect.anything());
+
+    await user.click(screen.getByRole("checkbox", { name: "Wound dressing" }));
+    await user.click(screen.getAllByRole("button", { name: "Save" })[0]);
+    await user.click(await screen.findByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith("/providers/u1/services", ["sv2"]));
+  });
+
+  it("says what to do when the facility offers nothing yet", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Services and specialties" }));
+    await user.click(screen.getByRole("button", { name: "Manage services" }));
+
+    expect(await screen.findByText(/does not offer any services yet/)).toBeInTheDocument();
+  });
+});
+
+describe("back link", () => {
+  it("goes to the provider directory, which exists, not to a bare /admin/providers", async () => {
+    renderPage();
+    const link = await screen.findByRole("link", { name: "Back to providers" });
+    expect(link).toHaveAttribute("href", "/admin/providers/directory");
   });
 });

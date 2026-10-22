@@ -5,7 +5,6 @@ import { Plus } from "lucide-react";
 import { Card } from "../../../../shared/components/Card";
 import { Button } from "../../../../shared/components/Button";
 import { Loading } from "../../../../shared/components/Loading";
-import { Input } from "../../../../shared/components/Input";
 import ApiErrorBanner from "../../../../shared/components/ApiErrorBanner";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import { useBookingList, useCancelBookingMutation } from "../../../../shared/hooks/useBookings";
@@ -18,6 +17,26 @@ import ConfirmDialog from "../../../../shared/components/ConfirmDialog";
 import { AdminCreateBookingDialog } from "../../components/AdminCreateBookingDialog";
 import CancelBookingDialog from "../../components/CancelBookingDialog";
 import type { BookingDispute } from "../../../../shared/schemas/booking";
+import { EntityPicker, type PickedEntity } from "../../components/EntityPicker";
+import { useFilterLookups } from "../../hooks/useFilterLookups";
+
+type QueueFilters = {
+  client: PickedEntity | null;
+  provider: PickedEntity | null;
+  service: PickedEntity | null;
+  from: string;
+  to: string;
+};
+
+const EMPTY_FILTERS: QueueFilters = { client: null, provider: null, service: null, from: "", to: "" };
+
+const toDateInput = (date: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Nairobi" }).format(date);
+
+const formatFilterDate = (value: string) =>
+  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${value}T00:00:00Z`)
+  );
 
 const ACTIVE_STATUSES = [
   "requested",
@@ -74,13 +93,7 @@ const AdminBookingQueuePage = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const isMobileFilters = useMediaQuery("(max-width: 640px)");
-  const [appliedFilters, setAppliedFilters] = useState({
-    clientId: "",
-    providerId: "",
-    serviceId: "",
-    from: "",
-    to: ""
-  });
+  const [appliedFilters, setAppliedFilters] = useState<QueueFilters>(EMPTY_FILTERS);
   const [draftFilters, setDraftFilters] = useState(appliedFilters);
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -95,14 +108,15 @@ const AdminBookingQueuePage = () => {
 
   const bookingQuery = useBookingList(
     {
-      statuses: tab.statuses as string[],
+      statuses: [...tab.statuses],
       pageSize: 50,
       preset: "card",
-      clientId: appliedFilters.clientId || undefined,
-      providerId: appliedFilters.providerId || undefined,
-      serviceId: appliedFilters.serviceId || undefined,
-      from: appliedFilters.from || undefined,
-      to: appliedFilters.to || undefined
+      clientId: appliedFilters.client?.id,
+      providerId: appliedFilters.provider?.id,
+      serviceId: appliedFilters.service?.id,
+      // Whole days in Nairobi time, so "until 21 Oct" includes everything booked on the 21st.
+      from: appliedFilters.from ? `${appliedFilters.from}T00:00:00+03:00` : undefined,
+      to: appliedFilters.to ? `${appliedFilters.to}T23:59:59+03:00` : undefined
     },
     { enabled: true, refetchInterval: 30_000 }
   );
@@ -180,12 +194,17 @@ const AdminBookingQueuePage = () => {
       if (!filterMenuRef.current) {
         return;
       }
-      if (!filterMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Element;
+      // The name suggestions open in a popper outside the menu; choosing one is not a click away.
+      if (target.closest?.(".MuiAutocomplete-popper")) {
+        return;
+      }
+      if (!filterMenuRef.current.contains(target)) {
         setFiltersOpen(false);
       }
     };
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !document.querySelector(".MuiAutocomplete-popper")) {
         setFiltersOpen(false);
       }
     };
@@ -208,72 +227,95 @@ const AdminBookingQueuePage = () => {
   };
 
   const clearFilters = () => {
-    const cleared = { clientId: "", providerId: "", serviceId: "", from: "", to: "" };
-    setDraftFilters(cleared);
-    setAppliedFilters(cleared);
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
     setFiltersOpen(false);
   };
 
   const activeFilterChips = useMemo(() => {
     const chips: string[] = [];
-    if (appliedFilters.clientId) {
-      chips.push(`Client: ${appliedFilters.clientId}`);
-    }
-    if (appliedFilters.providerId) {
-      chips.push(`Provider: ${appliedFilters.providerId}`);
-    }
-    if (appliedFilters.serviceId) {
-      chips.push(`Service: ${appliedFilters.serviceId}`);
-    }
-    if (appliedFilters.from) {
-      chips.push(`From ${appliedFilters.from}`);
-    }
-    if (appliedFilters.to) {
-      chips.push(`To ${appliedFilters.to}`);
-    }
+    if (appliedFilters.client) chips.push(`Client: ${appliedFilters.client.label}`);
+    if (appliedFilters.provider) chips.push(`Provider: ${appliedFilters.provider.label}`);
+    if (appliedFilters.service) chips.push(`Service: ${appliedFilters.service.label}`);
+    if (appliedFilters.from) chips.push(`Booked from ${formatFilterDate(appliedFilters.from)}`);
+    if (appliedFilters.to) chips.push(`Booked until ${formatFilterDate(appliedFilters.to)}`);
     return chips;
   }, [appliedFilters]);
 
+  const filterLookups = useFilterLookups(filtersOpen);
+  const setRange = (days: number) => {
+    const end = new Date();
+    const start = new Date(end.getTime() - (days - 1) * 86_400_000);
+    setDraftFilters((prev) => ({ ...prev, from: toDateInput(start), to: toDateInput(end) }));
+  };
+
   const filterPanel = (
     <div className="space-y-4 text-left">
-      <Input
-        label="Client ID"
-        placeholder="client_user_id"
-        value={draftFilters.clientId}
-        onChange={(event) => setDraftFilters((prev) => ({ ...prev, clientId: event.target.value }))}
+      <EntityPicker
+        label="Client"
+        placeholder="Search by name or phone"
+        value={draftFilters.client}
+        options={filterLookups.clients.options}
+        loading={filterLookups.clients.loading}
+        onSearch={filterLookups.clients.search}
+        onChange={(client) => setDraftFilters((prev) => ({ ...prev, client }))}
       />
-      <Input
-        label="Provider ID"
-        placeholder="provider_user_id"
-        value={draftFilters.providerId}
-        onChange={(event) => setDraftFilters((prev) => ({ ...prev, providerId: event.target.value }))}
+      <EntityPicker
+        label="Provider"
+        placeholder="Search by name or phone"
+        value={draftFilters.provider}
+        options={filterLookups.providers.options}
+        loading={filterLookups.providers.loading}
+        onSearch={filterLookups.providers.search}
+        onChange={(provider) => setDraftFilters((prev) => ({ ...prev, provider }))}
       />
-      <Input
-        label="Service ID"
-        placeholder="service_id"
-        value={draftFilters.serviceId}
-        onChange={(event) => setDraftFilters((prev) => ({ ...prev, serviceId: event.target.value }))}
+      <EntityPicker
+        label="Service"
+        placeholder="Choose a service"
+        value={draftFilters.service}
+        options={filterLookups.services.options}
+        loading={filterLookups.services.loading}
+        onChange={(service) => setDraftFilters((prev) => ({ ...prev, service }))}
       />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          <span>From</span>
-          <input
-            type="date"
-            value={draftFilters.from}
-            onChange={(event) => setDraftFilters((prev) => ({ ...prev, from: event.target.value }))}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          <span>To</span>
-          <input
-            type="date"
-            value={draftFilters.to}
-            onChange={(event) => setDraftFilters((prev) => ({ ...prev, to: event.target.value }))}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
-          />
-        </label>
-      </div>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-slate-700">Booked between</legend>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "Today", days: 1 },
+            { label: "Last 7 days", days: 7 },
+            { label: "Last 30 days", days: 30 }
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => setRange(preset.days)}
+              className="min-h-[44px] rounded-full border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>From</span>
+            <input
+              type="date"
+              value={draftFilters.from}
+              onChange={(event) => setDraftFilters((prev) => ({ ...prev, from: event.target.value }))}
+              className="min-h-[44px] rounded-lg border border-slate-300 px-3 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            <span>Until</span>
+            <input
+              type="date"
+              value={draftFilters.to}
+              onChange={(event) => setDraftFilters((prev) => ({ ...prev, to: event.target.value }))}
+              className="min-h-[44px] rounded-lg border border-slate-300 px-3 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+            />
+          </label>
+        </div>
+      </fieldset>
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button type="button" variant="ghost" onClick={clearFilters}>
           Clear
@@ -334,7 +376,7 @@ const AdminBookingQueuePage = () => {
                   </div>
                 </>
               ) : (
-                <div className="absolute left-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl md:left-auto md:right-0">
+                <div className="absolute left-0 top-full z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
                   {filterPanel}
                 </div>
               ))}
@@ -397,7 +439,7 @@ const AdminBookingQueuePage = () => {
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
                         {booking.status.replace(/_/g, " ")}
                       </span>
-                      {booking.meta?.escalation_at && (
+                      {Boolean(booking.meta?.escalation_at) && (
                         <p className="text-xs font-semibold text-rose-600">Escalation pending</p>
                       )}
                       {tab.key === "disputes" &&

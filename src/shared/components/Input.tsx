@@ -1,32 +1,45 @@
 import clsx from "classnames";
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
+
+import { withoutOverriddenColours } from "../utils/overrideClasses";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   label?: string;
   hint?: string;
+  /** Decorative icon at the start of the field. */
+  icon?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, error, label, hint, id, ...rest }, ref) => {
+  ({ className, error, label, hint, icon, id, ...rest }, ref) => {
     const inputId = id ?? rest.name;
     return (
       <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700" htmlFor={inputId}>
         {label && <span>{label}</span>}
-        <input
-          id={inputId}
-          ref={ref}
-          className={clsx(
-            "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition-all",
-            "focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20",
-            "placeholder:text-slate-400",
-            error && "border-red-400 focus:border-red-400 focus:ring-red-400/20",
-            className
+        <span className="relative block">
+          {icon && (
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center" aria-hidden>
+              {icon}
+            </span>
           )}
-          aria-invalid={Boolean(error)}
-          {...rest}
-        />
+          <input
+            id={inputId}
+            ref={ref}
+            className={clsx(
+              "w-full rounded-xl px-4 py-3 text-base shadow-sm transition-all",
+              withoutOverriddenColours("border border-slate-200 bg-white text-slate-900", clsx(className, error && "border-red-400")),
+              "focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20",
+              "placeholder:text-slate-400",
+              icon && "pl-10",
+              error && "border-red-400 focus:border-red-400 focus:ring-red-400/20",
+              className
+            )}
+            aria-invalid={Boolean(error)}
+            {...rest}
+          />
+        </span>
         {hint && !error && <span className="text-xs text-slate-500">{hint}</span>}
         {error && <span className="text-xs text-red-500">{error}</span>}
       </label>

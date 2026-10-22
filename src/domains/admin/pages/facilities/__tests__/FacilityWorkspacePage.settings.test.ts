@@ -30,7 +30,7 @@ const facilityFactory = (overrides: Partial<Facility> = {}): Facility => ({
   services: [],
   admins: [],
   ...overrides
-});
+} as Facility);
 
 describe("facility operations settings", () => {
   it("maps existing phone numbers and fills missing weekdays", () => {

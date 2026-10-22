@@ -130,7 +130,7 @@ const AdminSelfCareAlertsPage = () => {
     createThread
       .mutateAsync({
         scope: "admin",
-        title: `Self-care alert ${alert.id.slice(0, 6)}`,
+        title: "Self-care alert",
         participants: [
           { userId: user.id, roleHint: "admin" },
           { userId: targetId, roleHint: target }
@@ -142,11 +142,7 @@ const AdminSelfCareAlertsPage = () => {
           description: "We opened a conversation in your inbox.",
           variant: "info"
         });
-        if (thread?.bookingId) {
-          window.dispatchEvent(new CustomEvent("chat:open", { detail: { bookingId: thread.bookingId } }));
-        } else {
-          navigate("/admin/conversations");
-        }
+        navigate(thread?.id ? `/admin/conversations/${thread.id}` : "/admin/conversations");
       })
       .catch((error) => {
         showToast({
@@ -250,7 +246,7 @@ const AdminSelfCareAlertsPage = () => {
                       <p className="text-xs text-slate-400">Provider: {alert.provider.fullName}</p>
                     )}
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${riskTone[alert.riskLevel] ?? riskTone.moderate}`}>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${riskTone[alert.riskLevel ?? "moderate"] ?? riskTone.moderate}`}>
                     {alert.riskLevel}
                   </span>
                 </div>

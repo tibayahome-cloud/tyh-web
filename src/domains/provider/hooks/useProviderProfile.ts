@@ -19,6 +19,8 @@ type ProviderProfile = {
   facility?: {
     id: string;
     name?: string | null;
+    facility_type?: string | null;
+    county?: string | null;
     provider_financials_visible?: boolean | null;
   } | null;
   telemedicine_subcategory_assignments?: Array<{

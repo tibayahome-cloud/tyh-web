@@ -67,7 +67,7 @@ export const describeRecoveryError = (error: unknown): string => {
       : "We could not reach the server. Check your connection and try again.";
   }
   if (category === "forbidden") {
-    return "Only a super admin can do this.";
+    return "Contact support to do this.";
   }
   return message;
 };

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  acknowledgeAttentionItem,
   acceptReschedule,
   acceptRebookingOffer,
   declineReschedule,
@@ -41,6 +42,18 @@ export const useAnswerAttention = () => {
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists(), exact: false }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: ["telemedicine", "reschedules", item.bookingId] }).catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(item.bookingId) }).catch(() => undefined);
+    }
+  });
+};
+
+// Opening a heads-up that needs no answer. The list is refreshed so the marker goes as soon as the server
+// has recorded it; if recording fails the item simply stays, which is the honest outcome.
+export const useAcknowledgeAttention = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (item: AttentionItem) => acknowledgeAttentionItem(item.id),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: attentionKey }).catch(() => undefined);
     }
   });
 };

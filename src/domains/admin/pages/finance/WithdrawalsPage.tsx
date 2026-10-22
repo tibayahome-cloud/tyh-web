@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { Button } from "../../../../shared/components/Button";
 import { Card } from "../../../../shared/components/Card";
@@ -85,7 +85,7 @@ const WithdrawalsPage = () => {
           size: PAGE_SIZE,
           status: statusFilter === "all" ? undefined : statusFilter
         }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled: canReadGlobalLedger || Boolean(facilityId)
   });
 
@@ -222,7 +222,7 @@ const WithdrawalsPage = () => {
                 </div>
               </>
             ) : (
-              <div className="absolute left-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl md:left-auto md:right-0">
+              <div className="absolute left-0 top-full z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
                 {filterPanel}
               </div>
             ))}

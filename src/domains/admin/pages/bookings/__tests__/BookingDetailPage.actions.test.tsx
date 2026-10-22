@@ -10,6 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let booking: Record<string, unknown>;
 
+vi.mock("../../../../../shared/hooks/useOpenBookingChat", () => ({
+  useOpenBookingChat: () => ({ openBookingChat: vi.fn(), openingBookingId: null })
+}));
 vi.mock("../../../../../shared/hooks/useBookings", () => ({
   useBookingDetail: () => ({ data: booking, isLoading: false, refetch: vi.fn() }),
   useBookingEvents: () => ({ data: [], isLoading: false }),
@@ -51,6 +54,23 @@ const renderPage = () =>
 
 beforeEach(() => {
   booking = { ...base, status: "telemedicine_paid_pending_assignment" };
+});
+
+describe("telemedicine booking that is not paid yet", () => {
+  it("offers no provider actions and says it is waiting for payment", () => {
+    booking = { ...base, status: "telemedicine_payment_pending", paidAt: null, provider: { id: "p1", fullName: "Dr Denis Gitobu" } };
+    renderPage();
+    expect(screen.queryByRole("button", { name: /Assign provider|Reassign provider/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for the client to pay.")).toBeInTheDocument();
+  });
+
+  it("is titled by service and client, with a plain status, never the raw id or status code", () => {
+    booking = { ...base, status: "telemedicine_payment_pending", paidAt: null };
+    renderPage();
+    expect(screen.getByRole("heading", { name: "First Medical Consultation for Micubu James" })).toBeInTheDocument();
+    expect(screen.getByText("Awaiting Payment")).toBeInTheDocument();
+    expect(screen.queryByText(/b1|telemedicine_payment_pending/)).not.toBeInTheDocument();
+  });
 });
 
 describe("telemedicine booking actions", () => {

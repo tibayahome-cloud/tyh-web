@@ -232,6 +232,7 @@ export const TelemedicinePolicySchema = z.object({
   supportedCountryCodes: z.array(z.string()),
   defaultTimezone: z.string(),
   joinWindowBeforeMinutes: z.number(),
+  noShowGraceMinutes: z.number(),
   cancellationCutoffMinutes: z.number(),
   remindersEnabled: z.boolean(),
   reminderWindowsMinutes: z.array(z.number())
@@ -256,6 +257,7 @@ export const mapTelemedicinePolicy = (payload: unknown): TelemedicinePolicy | nu
     supportedCountryCodes: countryCodes,
     defaultTimezone: coerceString(raw.default_timezone) ?? "Africa/Nairobi",
     joinWindowBeforeMinutes: coerceNumber(raw.join_window_before_minutes) ?? 0,
+    noShowGraceMinutes: coerceNumber(raw.no_show_grace_minutes) ?? 10,
     cancellationCutoffMinutes:
       coerceNumber(cancellationRaw.client_cutoff_minutes_before_scheduled_at) ?? coerceNumber(raw.join_window_before_minutes) ?? 0,
     remindersEnabled: coerceBoolean(remindersRaw.enabled) ?? false,
@@ -285,7 +287,7 @@ export const TECHNICAL_ISSUE_CATEGORY_LABEL: Record<TechnicalIssueCategory, stri
   audio: "Audio",
   video: "Video",
   browser: "Browser",
-  jitsi: "Jitsi / call platform",
+  jitsi: "The call system",
   other: "Other"
 };
 

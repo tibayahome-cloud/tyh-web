@@ -121,8 +121,8 @@ describe("describeRecoveryError", () => {
     expect(server).not.toMatch(/psycopg/);
   });
 
-  it("says only a super admin can do this for a 403", () => {
-    expect(describeRecoveryError(httpError(403, "Super admin privileges required"))).toBe("Only a super admin can do this.");
+  it("tells a refused person to contact support for a 403", () => {
+    expect(describeRecoveryError(httpError(403, "Super admin privileges required"))).toBe("Contact support to do this.");
   });
 
   it("shows the API's own guidance for a rejected request", () => {

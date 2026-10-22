@@ -39,6 +39,9 @@ import { defaultServiceKind, splitServicesByKind, type ServiceKind } from "../..
 import { FacilityBookingsPanel } from "../../components/FacilityBookingsPanel";
 import { FacilityProvidersManager } from "./FacilityProvidersPage";
 import { FacilitySetupChecklist as FacilitySetupChecklistCard } from "../../components/FacilitySetupChecklist";
+import { LiveStatusCard, type LiveFix } from "../../../../shared/components/LiveStatusCard";
+import { useFacilityLiveStatus } from "../../../../shared/hooks/useLiveStatus";
+import type { LiveBlocker } from "../../../../shared/libs/liveStatus";
 import { facilitySetupChecklist } from "../../../../shared/utils/telemedicineReadiness";
 import { FacilityProfileCard } from "../../components/FacilityProfileCard";
 import { FacilityAdministratorsSection } from "../../components/FacilityAdministratorsSection";
@@ -629,6 +632,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     { id: "finance", label: "Finance", available: canManageFinance }
   ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
+  const liveStatusQuery = useFacilityLiveStatus(facilityId, canReadFacilities);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [financialsVisible, setFinancialsVisible] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -868,6 +872,24 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "services"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "bookings"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities"] });
+    queryClient.invalidateQueries({ queryKey: ["live-status"] });
+  };
+
+  // Where each blocker is fixed in this workspace. Anything not fixable here says who can fix it.
+  const resolveLiveFix = (blocker: LiveBlocker): LiveFix => {
+    switch (blocker.fix) {
+      case "facility_services":
+        return { label: "Open services", onClick: () => setActiveTab("services") };
+      case "facility_providers":
+      case "provider_availability":
+        return { label: "Open providers", onClick: () => setActiveTab("providers") };
+      case "facility_status":
+        return { hint: "A platform admin activates a facility." };
+      case "facility_location":
+        return { hint: isSuperAdmin ? "Set the country in the facility profile below." : "Ask a platform admin to set it." };
+      default:
+        return { hint: "Check the facility settings." };
+    }
   };
 
   const visibilityMutation = useMutation({
@@ -886,7 +908,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       updateFacility(String(facilityId), {
         phones: form.phones.map((phone) => ({
           phone: phone.phone.trim(),
-          label: phone.label.trim() || null,
+          label: phone.label?.trim() || null,
           isPrimary: phone.isPrimary
         })),
         operatingHours: form.operatingHours
@@ -1220,6 +1242,17 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       >
       {activeTab === "overview" && (
         <div className="space-y-6">
+      {canReadFacilities && facilityId && (
+        <LiveStatusCard
+          title="Live for telemedicine"
+          subject="facility"
+          status={liveStatusQuery.data}
+          isLoading={liveStatusQuery.isLoading}
+          isError={liveStatusQuery.isError}
+          onRetry={() => void liveStatusQuery.refetch()}
+          resolveFix={resolveLiveFix}
+        />
+      )}
       {setupChecklist && (
         <FacilitySetupChecklistCard steps={setupChecklist.steps} firstMissing={setupChecklist.firstMissing} onOpenTab={setActiveTab} />
       )}
@@ -1312,7 +1345,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       <Modal
         open={settingsModalOpen}
         title="Edit facility operations settings"
-        description="Manage facility contact numbers and operating hours. Facility identity, email, and location are managed by a super admin."
+        description="Manage facility contact numbers and operating hours. To change the facility name, email or location, contact support."
         onClose={() => setSettingsModalOpen(false)}
         maxWidth="lg"
       >

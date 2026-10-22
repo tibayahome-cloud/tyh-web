@@ -18,6 +18,7 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { getApiError } from "../../../shared/utils/errors";
 import { fetchFacilities } from "../../../shared/libs/facilities";
 import { useRbac } from "../../../shared/hooks/useRbac";
+import { PlaceLabel } from "../../../shared/components/PlaceLabel";
 
 type AdminCreateBookingDialogProps = {
   open: boolean;
@@ -188,14 +189,11 @@ export const AdminCreateBookingDialog = ({
     },
   });
 
-  const handleLocationSelect = (location: { lat: number; lng: number; address?: string }) => {
+  const handleLocationSelect = (location: { lat: number; lng: number }) => {
     setValue("lat", location.lat);
     setValue("lng", location.lng);
-    if (location.address) {
-      setValue("addressText", location.address);
-    }
-    setShowMap(false);
   };
+  const handleAddressResolved = (address: string) => setValue("addressText", address);
 
   const handleUserSelect = (user: UserSearchResult) => {
     setSelectedUser(user);
@@ -224,8 +222,9 @@ export const AdminCreateBookingDialog = ({
             <p className="text-sm text-slate-600">Tap to set client location</p>
             <div className="h-80 rounded-xl overflow-hidden border">
               <LocationPickerMap
-                onLocationSelect={handleLocationSelect}
-                initialLocation={hasLocation ? { lat, lng } : undefined}
+                value={hasLocation ? { lat, lng } : null}
+                onChange={handleLocationSelect}
+                onAddressChange={handleAddressResolved}
               />
             </div>
             <Button variant="outline" onClick={() => setShowMap(false)} className="w-full">
@@ -411,7 +410,7 @@ export const AdminCreateBookingDialog = ({
               </button>
               {hasLocation && (
                 <p className="text-xs text-slate-500 mt-1">
-                  GPS: {lat?.toFixed(4)}, {lng?.toFixed(4)}
+                  Location: <PlaceLabel lat={lat} lng={lng} />
                 </p>
               )}
             </div>

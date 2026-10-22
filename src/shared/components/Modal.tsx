@@ -4,6 +4,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import type { PropsWithChildren } from "react";
+import { X } from "lucide-react";
 
 interface ModalProps {
   open: boolean;
@@ -48,16 +49,28 @@ export const Modal = ({
         }
       }}
     >
-      {(title || description) && (
-        <DialogTitle sx={{ pb: description ? 0 : 1, pt: useFullScreen ? 2 : 3 }}>
+      {/* Always a visible way out: a full-screen popup on a phone has no backdrop to tap. */}
+      <DialogTitle
+        component="div"
+        sx={{ pb: description ? 0 : 1, pt: useFullScreen ? 1.5 : 2, pr: 1, display: "flex", alignItems: "flex-start", gap: 1, position: "sticky", top: 0, zIndex: 1, backgroundColor: "rgba(255,255,255,0.97)" }}
+      >
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 8 }}>
           {title && <span style={{ display: "block", fontWeight: 600, fontSize: useFullScreen ? "1.1rem" : undefined }}>{title}</span>}
           {description && (
             <span style={{ display: "block", color: "#475569", fontSize: "0.85rem", marginTop: "0.25rem" }}>
               {description}
             </span>
           )}
-        </DialogTitle>
-      )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{ width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9999, border: "none", background: "transparent", cursor: "pointer", color: "#334155" }}
+        >
+          <X size={22} aria-hidden="true" />
+        </button>
+      </DialogTitle>
       <DialogContent
         dividers
         sx={{
@@ -65,7 +78,8 @@ export const Modal = ({
           borderColor: "rgba(148,163,184,0.35)",
           mt: title || description ? 1 : 0,
           backgroundColor: "#fffdfc",
-          p: useFullScreen ? 2 : 3
+          p: useFullScreen ? 2 : 3,
+          pb: useFullScreen ? "max(16px, env(safe-area-inset-bottom))" : 3
         }}
       >
         {children}

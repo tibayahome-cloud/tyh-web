@@ -15,6 +15,8 @@ type LocationPickerMapProps = {
   height?: number;
   className?: string;
   disabled?: boolean;
+  /** The facility screens search inside the map; the booking flow has its own search above it. */
+  showSearch?: boolean;
 };
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: -1.286389, lng: 36.817223 };
@@ -59,7 +61,8 @@ export const LocationPickerMap = ({
   onAddressChange,
   height = 260,
   className,
-  disabled = false
+  disabled = false,
+  showSearch = true
 }: LocationPickerMapProps) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useJsApiLoader({
@@ -136,7 +139,7 @@ export const LocationPickerMap = ({
     >
       {isLoaded ? (
         <>
-          {!disabled && (
+          {!disabled && showSearch && (
             <div className="absolute left-3 right-3 top-3 z-10 sm:left-4 sm:right-auto sm:w-[min(440px,calc(100%-2rem))]">
               <Autocomplete
                 onLoad={(autocomplete) => { autocompleteRef.current = autocomplete; }}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PhoneOff, X } from "lucide-react";
 
 import { Button } from "./Button";
@@ -6,9 +6,12 @@ import { Loading } from "./Loading";
 import { useAuth } from "../hooks/useAuth";
 import { useConfirmSessionJoinMutation, useEndSessionMutation, useJoinSessionMutation } from "../hooks/useTelemedicine";
 import type { TelemedicineSessionJoin } from "../schemas/telemedicine";
+import { friendlyJoinError, isInAppBrowser, waitingMessage } from "../utils/callJoin";
+import { PreCallCheck } from "./PreCallCheck";
 
 interface JitsiMeetExternalAPIInstance {
   dispose: () => void;
+  getNumberOfParticipants?: () => number;
   addEventListener: (event: string, listener: (...args: unknown[]) => void) => void;
 }
 
@@ -67,11 +70,18 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<JitsiMeetExternalAPIInstance | null>(null);
   const hasLeftRef = useRef(false);
+  // "check" is the camera and microphone step; the call itself only starts once the person taps Join.
+  const [stage, setStage] = useState<"check" | "call">("check");
   const [loading, setLoading] = useState(true);
+  // True while nobody else is in the room, so the screen can say who we are waiting for.
+  const [alone, setAlone] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [endError, setEndError] = useState<string | null>(null);
   const [joinDetails, setJoinDetails] = useState<TelemedicineSessionJoin | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  // Ending a consultation ends it for the client too, so it takes a second tap.
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const inAppBrowser = useMemo(() => isInAppBrowser(typeof navigator === "undefined" ? "" : navigator.userAgent), []);
   // Bumping this re-runs the join effect below, so "Reconnect" can retry a failed connection
   // attempt (token fetch or Jitsi script load) without the caller having to unmount and remount
   // this whole panel.
@@ -97,6 +107,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
   };
 
   useEffect(() => {
+    if (stage !== "call") return;
     let cancelled = false;
     hasLeftRef.current = false;
 
@@ -116,7 +127,9 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
           width: "100%",
           height: "100%",
           userInfo: { displayName: user?.fullName ?? "Participant" },
-          configOverwrite: { prejoinPageEnabled: false },
+          // Without disableDeepLinking a phone browser can show "open in the app / download the app"
+          // instead of the call. The room and token belong to this site, so the app could not open it.
+          configOverwrite: { prejoinPageEnabled: false, disableDeepLinking: true },
           interfaceConfigOverwrite: {
             APP_NAME: "Tiba Ya Home",
             NATIVE_APP_NAME: "Tiba Ya Home",
@@ -131,16 +144,20 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
         // This is the real attendance signal: a token was issued above, but that only proves
         // authorization, not that the browser actually reached the room (blocked WebRTC, the
         // Jitsi deployment being down, etc. can all fail silently after the token is minted).
+        const refreshAlone = () => setAlone((api.getNumberOfParticipants?.() ?? 1) <= 1);
         const handleJoined = () => {
           confirmJoinMutation.mutate(bookingId);
+          refreshAlone();
         };
+        api.addEventListener("participantJoined", refreshAlone);
+        api.addEventListener("participantLeft", refreshAlone);
         api.addEventListener("readyToClose", leaveLocalCall);
         api.addEventListener("videoConferenceLeft", leaveLocalCall);
         api.addEventListener("videoConferenceJoined", handleJoined);
         setLoading(false);
       } catch (err) {
         if (!cancelled) {
-          setConnectionError(err instanceof Error ? err.message : "Unable to join the call.");
+          setConnectionError(friendlyJoinError(err));
           setLoading(false);
         }
       }
@@ -157,7 +174,37 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
     // join/end mutations are stable identities from react-query and re-running on every render
     // would tear down and rejoin the call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId, connectionAttempt]);
+  }, [bookingId, connectionAttempt, stage]);
+
+  // Keep the phone awake while the call is up; a screen that dims mid-consultation drops the video. Not
+  // every browser has this, and refusing it is harmless, so every failure is ignored.
+  useEffect(() => {
+    if (stage !== "call" || loading || connectionError) return;
+    type Sentinel = { release: () => Promise<void> };
+    let sentinel: Sentinel | null = null;
+    let cancelled = false;
+    const request = () => {
+      const wakeLock = (navigator as unknown as { wakeLock?: { request: (type: "screen") => Promise<Sentinel> } }).wakeLock;
+      wakeLock
+        ?.request("screen")
+        .then((lock) => {
+          if (cancelled) void lock.release().catch(() => undefined);
+          else sentinel = lock;
+        })
+        .catch(() => undefined);
+    };
+    // The lock is released whenever the page is hidden, so take it again on return.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") request();
+    };
+    request();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      void sentinel?.release().catch(() => undefined);
+    };
+  }, [stage, loading, connectionError]);
 
   const handleManualLeave = () => {
     leaveLocalCall();
@@ -184,28 +231,65 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
           {canEndConsultation && (
             <button
               type="button"
-              onClick={handleEndConsultation}
+              onClick={() => setConfirmingEnd(true)}
               disabled={isEndingSession}
-              title="End consultation for both participants"
-              className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+              title="End the consultation for both participants"
+              className="flex min-h-[44px] items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <PhoneOff size={14} />
+              <PhoneOff size={16} />
               {isEndingSession ? "Ending..." : "End consultation"}
             </button>
           )}
           <button
             type="button"
             onClick={handleManualLeave}
-            title="Leave this call screen"
-            className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
+            title="Leave the call screen. The consultation carries on and you can rejoin."
+            className="flex min-h-[44px] items-center gap-1 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
           >
-            <X size={14} />
-            Leave
+            <X size={16} />
+            Leave call
           </button>
         </div>
       </div>
+      {inAppBrowser && (
+        <div role="status" className="bg-amber-100 px-4 py-2 text-sm font-medium text-amber-950">
+          If the camera or microphone does not work, open this page in Chrome or Safari instead of from inside another app.
+        </div>
+      )}
+      {confirmingEnd && !isEndingSession && (
+        <div role="alertdialog" aria-label="End the consultation" className="flex flex-wrap items-center justify-between gap-2 bg-red-950 px-4 py-3 text-sm text-red-50">
+          <span>End the consultation for everyone? The client will be taken out of the call too.</span>
+          <span className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingEnd(false);
+                void handleEndConsultation();
+              }}
+              className="min-h-[44px] rounded-lg bg-red-600 px-3 py-2 font-semibold hover:bg-red-500"
+            >
+              End for everyone
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingEnd(false)}
+              className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2 font-semibold hover:bg-white/20"
+            >
+              Keep going
+            </button>
+          </span>
+        </div>
+      )}
       {endError && <div className="bg-red-950 px-4 py-2 text-sm font-medium text-red-100">{endError}</div>}
-      {loading && (
+      {stage === "check" && (
+        <PreCallCheck inAppBrowser={inAppBrowser} onJoin={() => setStage("call")} onCancel={onLeave} />
+      )}
+      {stage === "call" && alone && !loading && !connectionError && (
+        <div role="status" className="bg-sky-900 px-4 py-2 text-center text-sm font-medium text-sky-50">
+          {waitingMessage(joinDetails?.role)}
+        </div>
+      )}
+      {stage === "call" && loading && (
         <div className="flex flex-1 items-center justify-center text-white">
           <Loading label="Connecting to your consultation…" />
         </div>
@@ -226,7 +310,7 @@ export const TelemedicineCallPanel = ({ bookingId, onLeave }: TelemedicineCallPa
       <div
         ref={containerRef}
         className="min-h-0 flex-1 overflow-hidden"
-        style={{ display: loading || connectionError ? "none" : "block" }}
+        style={{ display: stage !== "call" || loading || connectionError ? "none" : "block" }}
       />
     </div>
   );

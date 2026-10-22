@@ -64,7 +64,7 @@ describe("FacilityOverviewPage", () => {
     renderPage();
 
     await waitFor(() => expect(fetchFacilityOverviewMock).toHaveBeenCalledWith("facility-1"));
-    expect(screen.queryByText(/not linked to exactly one facility/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not linked to a facility yet/i)).not.toBeInTheDocument();
   });
 
   it("renders the overview once both queries resolve", async () => {
@@ -74,7 +74,7 @@ describe("FacilityOverviewPage", () => {
     renderPage();
 
     expect(await screen.findByText("Karen Hospital")).toBeInTheDocument();
-    expect(screen.queryByText(/not linked to exactly one facility/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not linked to a facility yet/i)).not.toBeInTheDocument();
   });
 
   it("still shows the linkage message when the account genuinely has no single facility", async () => {
@@ -82,7 +82,7 @@ describe("FacilityOverviewPage", () => {
 
     renderPage();
 
-    expect(await screen.findByText(/not linked to exactly one facility/i)).toBeInTheDocument();
+    expect(await screen.findByText(/not linked to a facility yet/i)).toBeInTheDocument();
     expect(fetchFacilityOverviewMock).not.toHaveBeenCalled();
   });
 });

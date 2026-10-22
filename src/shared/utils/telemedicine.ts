@@ -230,3 +230,17 @@ export const facilityLocalToUtcIso = (wallClock: string, timeZone: string): stri
   const result = new Date(secondPass);
   return Number.isNaN(result.getTime()) ? null : result.toISOString();
 };
+
+// True once a consultation's call window has closed, so a "next consultation" card does not keep showing one that
+// is over. Matches the end of isWithinJoinWindow.
+export const hasConsultationEnded = (
+  scheduledAt: string | null,
+  estimateDurationMinutes: number | null,
+  now = Date.now()
+): boolean => {
+  if (!scheduledAt) return false;
+  const start = new Date(scheduledAt).getTime();
+  if (Number.isNaN(start)) return false;
+  const durationMs = (estimateDurationMinutes ?? DEFAULT_DURATION_MINUTES) * 60_000;
+  return now > start + durationMs + JOIN_WINDOW_AFTER_MINUTES * 60_000;
+};

@@ -90,6 +90,27 @@ export const fetchRescheduleRequests = async (bookingId: string): Promise<Resche
   return rows.map(mapReschedule);
 };
 
+export type RescheduleSlots = { slots: Array<{ startAt: string; endAt: string }>; timezone: string | null };
+
+/** Times that could be offered for this consultation, limited to what its assigned provider can actually take. */
+export const fetchRescheduleSlots = async (
+  bookingId: string,
+  startDate: string,
+  endDate: string
+): Promise<RescheduleSlots> => {
+  const response = await api.get(`/telemedicine/bookings/${bookingId}/reschedule-slots`, {
+    params: { start_date: startDate, end_date: endDate }
+  });
+  const rows = Array.isArray(response.data?.data) ? (response.data.data as Array<Record<string, unknown>>) : [];
+  const meta = (response.data?.meta ?? {}) as Record<string, unknown>;
+  return {
+    slots: rows
+      .filter((row) => typeof row.start_at === "string" && typeof row.end_at === "string")
+      .map((row) => ({ startAt: String(row.start_at), endAt: String(row.end_at) })),
+    timezone: typeof meta.timezone === "string" && meta.timezone ? meta.timezone : null
+  };
+};
+
 export const proposeReschedule = async (
   bookingId: string,
   proposedStartAt: string,
@@ -117,7 +138,9 @@ export const declineReschedule = (requestId: string, note?: string) => respond(r
 // What is waiting on the signed-in person
 // ---------------------------------------------------------------------------
 
-export type AttentionKind = "reschedule_request" | "rebooking_offer";
+// `time_confirmed` is a heads-up with nothing to answer: a consultation of the provider's now has a new
+// confirmed time. It stays listed until it is opened.
+export type AttentionKind = "reschedule_request" | "rebooking_offer" | "time_confirmed";
 
 export type AttentionItem = {
   kind: AttentionKind;
@@ -133,13 +156,16 @@ export type AttentionItem = {
   serviceName: string;
   // The other participant, or the facility for a replacement-time offer.
   fromName: string | null;
+  // True for a heads-up that is dismissed by opening it rather than answered.
+  acknowledgeable: boolean;
 };
 
 const text = (value: unknown): string | null => (typeof value === "string" && value ? value : null);
 
 export const mapAttentionItem = (value: unknown): AttentionItem | null => {
   const raw = (value ?? {}) as Record<string, unknown>;
-  const kind = raw.kind === "reschedule_request" || raw.kind === "rebooking_offer" ? raw.kind : null;
+  const kind =
+    raw.kind === "reschedule_request" || raw.kind === "rebooking_offer" || raw.kind === "time_confirmed" ? raw.kind : null;
   const id = text(raw.id);
   const bookingId = text(raw.booking_id);
   if (!kind || !id || !bookingId) return null;
@@ -154,7 +180,8 @@ export const mapAttentionItem = (value: unknown): AttentionItem | null => {
     currentStartAt: text(raw.current_start_at),
     role: raw.role === "provider" ? "provider" : "client",
     serviceName: text(raw.service_name) ?? "Consultation",
-    fromName: text(raw.from_name)
+    fromName: text(raw.from_name),
+    acknowledgeable: raw.acknowledgeable === true
   };
 };
 
@@ -162,6 +189,10 @@ export const fetchTelemedicineAttention = async (): Promise<AttentionItem[]> => 
   const response = await api.get("/telemedicine/attention");
   const items = (response.data?.data?.items ?? []) as unknown[];
   return items.map(mapAttentionItem).filter((item): item is AttentionItem => item !== null);
+};
+
+export const acknowledgeAttentionItem = async (itemId: string): Promise<void> => {
+  await api.post(`/telemedicine/attention/${itemId}/acknowledge`, {});
 };
 
 export const acceptRebookingOffer = async (bookingId: string): Promise<void> => {
@@ -257,7 +288,11 @@ export type ReviewCategory =
   | "cancellation_payment_review"
   | "no_show"
   | "technical_issue"
-  | "reschedule_escalation";
+  | "reschedule_escalation"
+  | "provider_earnings_complaint";
+
+/** One decision the operator may choose for an item, with what it does, supplied by the server. */
+export type ReviewOutcome = { key: string; label: string; effect: string };
 
 export type ReviewItem = {
   category: ReviewCategory;
@@ -269,6 +304,13 @@ export type ReviewItem = {
   paymentId: string | null;
   openedAt: string | null;
   summary: string | null;
+  clientName: string | null;
+  providerName: string | null;
+  serviceName: string | null;
+  outcomes: ReviewOutcome[];
+  /** What a full refund would send back, when the item has a payment that can be refunded. */
+  refundableAmountCents: number | null;
+  refundableCurrency: string | null;
 };
 
 const mapReviewItem = (raw: Record<string, any>): ReviewItem => ({
@@ -280,7 +322,13 @@ const mapReviewItem = (raw: Record<string, any>): ReviewItem => ({
   scheduledAt: raw.scheduled_at ?? null,
   paymentId: raw.payment_id ?? null,
   openedAt: raw.opened_at ?? null,
-  summary: raw.summary ?? null
+  summary: raw.summary ?? null,
+  clientName: raw.client_name ?? null,
+  providerName: raw.provider_name ?? null,
+  serviceName: raw.service_name ?? null,
+  outcomes: Array.isArray(raw.outcomes) ? raw.outcomes : [],
+  refundableAmountCents: typeof raw.refundable_amount_cents === "number" ? raw.refundable_amount_cents : null,
+  refundableCurrency: raw.refundable_currency ?? null
 });
 
 export const fetchReviewQueue = async (categories?: ReviewCategory[]): Promise<ReviewItem[]> => {
@@ -291,22 +339,31 @@ export const fetchReviewQueue = async (categories?: ReviewCategory[]): Promise<R
   return rows.map(mapReviewItem);
 };
 
+export type ReviewResolution = {
+  outcome: string;
+  refund: { requested: boolean; payment_id: string | null; amount_cents: number | null; currency: string | null; already_requested: boolean };
+};
+
 /**
- * Close one review item. A reason is required by the backend, so it is required here rather
- * than sent empty and rejected -- the caller finds out at the form, not after a round trip.
+ * Close one review item with an outcome chosen from the item's own list. A reason is required by the backend, so it is
+ * required here rather than sent empty and rejected. A refund must carry the amount the screen showed: the server
+ * refuses if the payment is no longer that amount.
  */
 export const resolveReviewItem = async (
   category: ReviewCategory,
   itemId: string,
-  reason: string,
-  outcome?: string
-) => {
-  if (!reason.trim()) {
+  input: { reason: string; outcome: string; refundAmountCents?: number | null }
+): Promise<ReviewResolution> => {
+  if (!input.reason.trim()) {
     throw new Error("A reason is required to resolve a review item");
   }
+  if (!input.outcome) {
+    throw new Error("Choose what to do");
+  }
   const response = await api.post(`/admin/payments/reviews/${category}/${itemId}/resolve`, {
-    reason,
-    outcome: outcome ?? ""
+    reason: input.reason,
+    outcome: input.outcome,
+    refund_amount_cents: input.refundAmountCents ?? undefined
   });
   return response.data?.data;
 };

@@ -61,7 +61,7 @@ export const TechnicalIssueDialog = ({ open, bookingId, onClose, onReported }: T
       onConfirm={handleSubmit}
       loading={reportMutation.isPending}
       title="Report a technical issue"
-      description="Let admin.ops know about a problem with this consultation. This is a review flag -- it doesn't request a refund by itself."
+      description="Tell us about a problem with this consultation and our team will look into it. Reporting a problem does not request a refund by itself."
       confirmLabel="Report issue"
       confirmVariant="secondary"
     >

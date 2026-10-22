@@ -1,18 +1,19 @@
-import { Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { useProviderEarningsSummary } from "../../../shared/hooks/useWallet";
+import { Wallet } from "lucide-react";
 import { useMemo } from "react";
 
-const formatPrice = (amountCents?: number, currency = "KES") => {
-    const value = typeof amountCents === "number" ? amountCents / 100 : 0;
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value);
-};
+import { KpiCard } from "../../../shared/components/KpiCard";
+import { WidgetError } from "../../../shared/components/WidgetError";
+import { useProviderEarningsSummary } from "../../../shared/hooks/useWallet";
+
+const formatPrice = (amountCents: number, currency = "KES") =>
+    new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amountCents / 100);
 
 type RevenueSnapshotProps = {
     financialsVisible?: boolean;
 };
 
 export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotProps) => {
-    const { data: earnings, isLoading } = useProviderEarningsSummary({ enabled: financialsVisible });
+    const { data: earnings, isLoading, isError, refetch } = useProviderEarningsSummary({ enabled: financialsVisible });
 
     const metrics = useMemo(() => {
         if (!earnings) return null;
@@ -28,50 +29,34 @@ export const RevenueSnapshot = ({ financialsVisible = true }: RevenueSnapshotPro
     if (!financialsVisible) return null;
 
     if (isLoading) {
-        return (
-            <div className="h-[180px] animate-pulse rounded-[32px] bg-white/40 backdrop-blur-md ring-1 ring-black/5" />
-        );
+        return <div className="h-[180px] animate-pulse rounded-xl bg-slate-100" aria-hidden />;
+    }
+
+    // A failed request is not an empty wallet. Showing KES 0.00 here told a provider they had nothing to withdraw.
+    if (isError || !metrics) {
+        return <WidgetError what="your earnings" onRetry={() => void refetch()} />;
     }
 
     return (
-        <div className="group relative overflow-hidden rounded-[40px] border border-white/80 bg-white/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 transition-all hover:bg-white/60">
-            <div className="relative flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-200">
-                        <Wallet className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Available to withdraw</p>
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                            {formatPrice(metrics?.balance, metrics?.currency)}
-                        </h2>
-                    </div>
+        <KpiCard
+            label="Available to withdraw"
+            value={formatPrice(metrics.balance, metrics.currency)}
+            caption="In your wallet now"
+            icon={<Wallet className="h-5 w-5" />}
+            action={{ label: "Withdraw", to: "/pro/payments" }}
+        >
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                    <dt className="text-slate-600">Pending earnings</dt>
+                    <dd className="font-semibold text-slate-900">{formatPrice(metrics.pending, metrics.currency)}</dd>
+                    <dd className="text-xs text-slate-600">Not available yet</dd>
                 </div>
-
-                <p className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">Wallet summary</p>
-            </div>
-
-            <div className="mt-8 grid grid-cols-2 gap-4 border-t border-slate-100 pt-6">
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                        <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Paid out</span>
-                    </div>
-                    <p className="mt-1 text-sm font-bold text-slate-900">
-                        {formatPrice(metrics?.paidOut, metrics?.currency)}
-                    </p>
+                <div>
+                    <dt className="text-slate-600">Paid out</dt>
+                    <dd className="font-semibold text-slate-900">{formatPrice(metrics.paidOut, metrics.currency)}</dd>
+                    <dd className="text-xs text-slate-600">So far</dd>
                 </div>
-
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                        <ArrowDownRight className="h-4 w-4 text-amber-500" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Pending earnings</span>
-                    </div>
-                    <p className="mt-1 text-sm font-bold text-slate-900">
-                        {formatPrice(metrics?.pending, metrics?.currency)}
-                    </p>
-                </div>
-            </div>
-        </div>
+            </dl>
+        </KpiCard>
     );
 };

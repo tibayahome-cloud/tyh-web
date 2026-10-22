@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import classNames from "classnames";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,8 +17,6 @@ import {
   Heart,
   Baby,
   Activity as VitalsIcon,
-  Search,
-  Crosshair,
   Phone,
   RefreshCw
 } from "lucide-react";
@@ -35,10 +33,11 @@ import { api } from "../../../shared/libs/api";
 import { discoverFacilities } from "../../../shared/libs/facilities";
 import { buildFieldParams, svcCard } from "../../../shared/libs/fieldInclude";
 import type { BookingRequestMode, FacilityDiscoveryItem } from "../../../shared/schemas/facility";
-import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
+import { PlacePicker } from "./PlacePicker";
+import { CareTypeBadge, toCareType } from "../../../shared/components/CareTypeBadge";
 import { loadRecentLocations, saveRecentLocation, type StoredLocation } from "../../../shared/utils/recentLocations";
 import { Stepper } from "../../../shared/components/Stepper";
-import { formatDecimalLocation } from "../../../shared/utils/location";
+import { isCoordinateText, UNNAMED_PLACE, type Place } from "../../../shared/utils/geocoding";
 import { SlideToBook } from "../../../shared/components/SlideToBook";
 
 type BookingRequestDialogProps = {
@@ -56,9 +55,10 @@ type ServiceOption = {
   default_estimate_minutes: number;
   is_emergency_capable: boolean;
   active?: boolean;
+  care_type?: "telemedicine" | "home_based" | "ambulance";
 };
 
-type LocationSource = "none" | "map" | "current" | "saved" | "manual";
+type LocationSource = "none" | "map" | "current" | "saved" | "search";
 
 export const BOOKING_STEP_INDEX = {
   service: 0,
@@ -94,9 +94,6 @@ export const BOOKING_STEPS = [
 /** Returns the first booking step for the caller's entry point. */
 export const getInitialBookingStep = (serviceId?: string | null): number =>
   serviceId ? BOOKING_STEP_INDEX.location : BOOKING_STEP_INDEX.service;
-
-const coordinateRegex =
-  /^\s*(-?\d+(?:\.\d+)?)\s*(?:,|\s)\s*(-?\d+(?:\.\d+)?)/;
 
 const bookingRequestSchema = z.object({
   serviceId: z.string().min(1, "Select a service to continue"),
@@ -147,7 +144,9 @@ const useServiceOptions = (enabled: boolean) =>
           // Match the client Services browser: only offer services a facility can actually
           // deliver right now, not every globally active catalog definition.
           "filter[active]": "true",
-          "filter[has_active_offering]": "true"
+          "filter[has_active_offering]": "true",
+          // The same services as the Services page: care that comes to you, never a video consultation.
+          "filter[care_type]": "home_based,ambulance"
         }
       });
       return response.data.data.filter((service) => service.active ?? true);
@@ -212,7 +211,6 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     resolver: zodResolver(bookingRequestSchema),
     defaultValues: DEFAULT_VALUES
   });
-  const [geoLoading, setGeoLoading] = useState(false);
   const [recentLocations, setRecentLocations] = useState<StoredLocation[]>([]);
   const [, setLocationSource] = useState<LocationSource>("none");
 
@@ -224,6 +222,14 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
   const houseNumberField = watch("houseNumber");
   const apartmentField = watch("apartment");
   const mapLocation = useMemo(() => toLatLng(latField, lngField), [latField, lngField]);
+  // The place as a name. A coordinate pair is never kept as the name, whatever an older booking or recent held.
+  const place = useMemo<Place | null>(
+    () =>
+      mapLocation
+        ? { name: addressField && !isCoordinateText(addressField) ? addressField : UNNAMED_PLACE, coords: mapLocation }
+        : null,
+    [mapLocation, addressField]
+  );
   const selectedService = useMemo(
     () => (services ?? []).find((service) => service.id === selectedServiceId),
     [services, selectedServiceId]
@@ -267,19 +273,14 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     if (apartmentField?.trim()) {
       summaryParts.push(`Unit ${apartmentField.trim()}`);
     }
-    if (addressField?.trim()) {
+    if (addressField?.trim() && !isCoordinateText(addressField) && !summaryParts.includes(addressField.trim())) {
       summaryParts.push(addressField.trim());
     }
     if (summaryParts.length) {
       return summaryParts.join(" • ");
     }
-    if (mapLocation) {
-      return formatDecimalLocation(mapLocation.lat, mapLocation.lng);
-    }
     return "Add detailed directions for your provider";
-  }, [homeAddressField, houseNumberField, apartmentField, addressField, mapLocation]);
-  const defaultLocationAppliedRef = useRef(false);
-  const lastParsedAddressRef = useRef<string | null>(null);
+  }, [homeAddressField, houseNumberField, apartmentField, addressField]);
 
   useEffect(() => {
     if (open) {
@@ -293,7 +294,6 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       setCurrentStep(getInitialBookingStep(serviceId));
       setRecentLocations(loadRecentLocations());
       setSubmitError(null);
-      defaultLocationAppliedRef.current = false;
     }
   }, [open, reset, serviceId]);
 
@@ -308,144 +308,27 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
     setSelectedFacilityId(null);
   }, [selectedServiceId, mapLocation?.lat, mapLocation?.lng]);
 
-  const applyLocation = useCallback(
-    (coords: { lat: number; lng: number }, source: LocationSource) => {
-      setValue("lat", coords.lat.toFixed(6), { shouldDirty: true, shouldTouch: true });
-      setValue("lng", coords.lng.toFixed(6), { shouldDirty: true, shouldTouch: true });
+  const applyPlace = useCallback(
+    (chosen: Place, source: LocationSource) => {
+      const previousName = getValues("addressText");
+      setValue("lat", chosen.coords.lat.toFixed(6), { shouldDirty: true, shouldTouch: true });
+      setValue("lng", chosen.coords.lng.toFixed(6), { shouldDirty: true, shouldTouch: true });
+      setValue("addressText", chosen.name, { shouldDirty: true, shouldTouch: true });
+      // The street line starts as the place's name; once the person has typed their own, it is left alone.
+      const street = getValues("homeAddress");
+      if (!street?.trim() || street === previousName) {
+        setValue("homeAddress", chosen.name === UNNAMED_PLACE ? "" : chosen.name, { shouldDirty: true, shouldTouch: true });
+      }
       setLocationSource(source);
-      const currentAddress = getValues("addressText");
-
-      // Update address text if it's empty OR if it currently looks like a coordinate pair
-      // This prevents "mismatches" where the text shows old coordinates while the map shows new ones
-      const shouldUpdateAddress = !currentAddress || !currentAddress.trim() || coordinateRegex.test(currentAddress);
-
-      if (shouldUpdateAddress) {
-        setValue("addressText", `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`, {
-          shouldDirty: true,
-          shouldTouch: true
-        });
-      }
-    },
-    [getValues, setValue]
-  );
-
-  const handleMapSelect = (coords: { lat: number; lng: number }) => applyLocation(coords, "map");
-
-  const handleAddressResolved = useCallback(
-    (address: string) => {
-      // Update home address field with resolved address
-      const currentHomeAddress = getValues("homeAddress");
-      if (!currentHomeAddress || !currentHomeAddress.trim()) {
-        setValue("homeAddress", address, { shouldDirty: true, shouldTouch: true });
-      }
     },
     [getValues, setValue]
   );
 
   const handleApplyRecent = (entry: StoredLocation) =>
-    applyLocation(
-      {
-        lat: entry.lat,
-        lng: entry.lng
-      },
+    applyPlace(
+      { name: isCoordinateText(entry.label) || entry.label.startsWith("Lat ") ? UNNAMED_PLACE : entry.label, coords: { lat: entry.lat, lng: entry.lng } },
       "saved"
     );
-
-  const handleUseCurrentLocation = () => {
-    if (geoLoading) {
-      return;
-    }
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      showToast({
-        title: "Location unsupported",
-        description: "Your device does not expose geolocation. Drop a pin on the map instead.",
-        variant: "error"
-      });
-      return;
-    }
-    setGeoLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = {
-          lat: Number(position.coords.latitude.toFixed(6)),
-          lng: Number(position.coords.longitude.toFixed(6))
-        };
-        applyLocation(coords, "current");
-        setGeoLoading(false);
-        showToast({
-          title: "Location captured",
-          description: "We are using your live location for this booking.",
-          variant: "success"
-        });
-      },
-      (error) => {
-        setGeoLoading(false);
-        const message = error.message || "We could not read your location. Allow permissions and try again.";
-        setSubmitError(message);
-        showToast({
-          title: "Location unavailable",
-          description: message,
-          variant: "error"
-        });
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  };
-
-  useEffect(() => {
-    if (!open || defaultLocationAppliedRef.current || mapLocation) {
-      return;
-    }
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      return;
-    }
-    defaultLocationAppliedRef.current = true;
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        applyLocation(
-          {
-            lat: Number(position.coords.latitude.toFixed(6)),
-            lng: Number(position.coords.longitude.toFixed(6))
-          },
-          "current"
-        );
-      },
-      () => {
-        defaultLocationAppliedRef.current = false;
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000
-      }
-    );
-  }, [applyLocation, mapLocation, open]);
-
-  useEffect(() => {
-    if (!addressField || addressField === lastParsedAddressRef.current) {
-      return;
-    }
-    const match = addressField.match(coordinateRegex);
-    if (!match) {
-      lastParsedAddressRef.current = null;
-      return;
-    }
-    const [, latRaw, lngRaw] = match;
-    const latParsed = Number(latRaw);
-    const lngParsed = Number(lngRaw);
-    if (Number.isNaN(latParsed) || Number.isNaN(lngParsed)) {
-      return;
-    }
-    const latString = latParsed.toFixed(6);
-    const lngString = lngParsed.toFixed(6);
-    if (getValues("lat") === latString && getValues("lng") === lngString) {
-      lastParsedAddressRef.current = addressField;
-      return;
-    }
-    setValue("lat", latString, { shouldDirty: true, shouldTouch: true });
-    setValue("lng", lngString, { shouldDirty: true, shouldTouch: true });
-    setLocationSource("manual");
-    lastParsedAddressRef.current = addressField;
-  }, [addressField, getValues, setValue]);
 
   const closeAndReset = () => {
     reset(DEFAULT_VALUES);
@@ -573,7 +456,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
       });
       const locationHistoryLabel =
         locationSummaryLabel === "Add detailed directions for your provider"
-          ? `Pin at ${formatDecimalLocation(lat, lng)}`
+          ? UNNAMED_PLACE
           : locationSummaryLabel;
       setRecentLocations(saveRecentLocation({ lat, lng, addressText: locationHistoryLabel }));
       showToast({
@@ -763,14 +646,12 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                               service.name.toLowerCase().includes("heart") ? <Heart size={16} /> : <Activity size={16} />}
                         </div>
                         <h3 className="text-sm font-bold text-slate-900 leading-tight">{service.name}</h3>
-                        <p className="mt-0.5 text-[10px] text-slate-500 line-clamp-1">
-                          {service.description ?? "Professional healthcare"}
-                        </p>
+                        <CareTypeBadge careType={toCareType(service.care_type)} className="mt-1 self-start" />
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-xs font-bold text-tiba-blue">
-                            From {formatCurrency(service.base_price_cents)}
+                            {service.base_price_cents > 0 ? `KES ${Math.round(service.base_price_cents / 100).toLocaleString("en-US")}` : "Quote on request"}
                           </span>
-                          <span className="text-[10px] text-slate-400">{service.default_estimate_minutes} min</span>
+                          <span className="text-xs text-slate-600">{service.default_estimate_minutes} min</span>
                         </div>
                       </button>
                     ))}
@@ -787,35 +668,7 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-4"
                 >
-                  <div className="relative overflow-hidden rounded-xl border border-neutral-100 shadow-md">
-                    <LocationPickerMap
-                      value={mapLocation ?? undefined}
-                      onChange={handleMapSelect}
-                      onAddressChange={handleAddressResolved}
-                    />
-
-                    <div className="absolute top-4 left-4 right-4 z-10 flex gap-2">
-                      <div className="flex-1 rounded-lg bg-white/90 p-1 shadow-2xl backdrop-blur-md ring-1 ring-black/5">
-                        <div className="flex items-center px-3">
-                          <Search className="h-4 w-4 text-neutral-400" />
-                          <input
-                            type="text"
-                            className="w-full border-none bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-0"
-                            placeholder="Find your location..."
-                            {...control.register("addressText")}
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label="Use current location"
-                        onClick={handleUseCurrentLocation}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-tiba-blue text-white shadow-lg active:scale-95 transition-transform"
-                      >
-                        {geoLoading ? <Loading /> : <Crosshair className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
+                  <PlacePicker value={place} onChange={(chosen, source) => applyPlace(chosen, source)} />
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
@@ -862,7 +715,6 @@ export const BookingRequestDialog = ({ open, onClose, serviceId, onCreated }: Bo
                             </div>
                             <div>
                               <p className="type-caption font-bold text-neutral-900">{loc.label}</p>
-                              <p className="type-overline text-neutral-400 lowercase">{loc.lat.toFixed(2)}, {loc.lng.toFixed(2)}</p>
                             </div>
                           </button>
                         ))}

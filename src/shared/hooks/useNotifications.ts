@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   fetchNotificationEventPreferences,
@@ -104,7 +104,7 @@ export const useNotifications = ({
   const query = useQuery({
     queryKey: notificationKeys.list({ page, pageSize, unreadOnly }),
     queryFn: () => fetchNotifications({ page, pageSize, unreadOnly }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled
   });
 

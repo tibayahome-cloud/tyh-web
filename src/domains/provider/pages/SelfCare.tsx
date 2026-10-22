@@ -188,7 +188,7 @@ const ProviderSelfCarePage = () => {
     createThread
       .mutateAsync({
         scope: "provider_support",
-        title: `Self-care alert ${alert.id.slice(0, 6)}`,
+        title: "Self-care alert",
         participants: [
           { userId: user.id, roleHint: "provider" },
           { userId: alert.clientUserId, roleHint: "client" }
@@ -232,8 +232,8 @@ const ProviderSelfCarePage = () => {
               <span className="text-xs uppercase text-slate-500">{entry.mood ?? "mood unknown"}</span>
             </div>
             <p className="text-xs text-slate-500">Logged by {formatLoggerName(entry)}</p>
-            {(entry.symptoms ?? []).length > 0 && (
-              <p className="mt-1 text-sm text-slate-600">Symptoms: {(entry.symptoms ?? []).join(", ")}</p>
+            {entry.symptoms.length > 0 && (
+              <p className="mt-1 text-sm text-slate-600">Symptoms: {entry.symptoms.map((symptom) => symptom.label).join(", ")}</p>
             )}
             {entry.vitals && (entry.vitals.bpSystolic || entry.vitals.bpDiastolic) && (
               <p className="mt-1 text-xs text-slate-500">
