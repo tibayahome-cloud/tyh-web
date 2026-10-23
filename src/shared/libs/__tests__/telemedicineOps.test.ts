@@ -12,7 +12,9 @@ vi.mock("../api", () => ({
 }));
 
 import {
+  acknowledgeAttentionItem,
   fetchPaymentReport,
+  mapAttentionItem,
   fetchProviderPreference,
   fetchReviewQueue,
   proposeReschedule,
@@ -114,8 +116,25 @@ describe("review queue", () => {
   it("refuses to resolve without a reason, before the round trip", async () => {
     // The backend requires it. Failing here means the operator finds out at the form rather
     // than after a request that was always going to be rejected.
-    await expect(resolveReviewItem("payment_review", "d1", "   ")).rejects.toThrow("reason is required");
+    await expect(resolveReviewItem("payment_review", "d1", { reason: "   ", outcome: "no_action" })).rejects.toThrow("reason is required");
     expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("refuses to resolve without a chosen outcome, before the round trip", async () => {
+    await expect(resolveReviewItem("payment_review", "d1", { reason: "ok", outcome: "" })).rejects.toThrow("Choose what to do");
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("sends the outcome and, for a refund, the amount the screen showed", async () => {
+    mockPost.mockResolvedValueOnce({ data: { data: { outcome: "refund_full" } } });
+
+    await resolveReviewItem("payment_review", "d1", { reason: "client asked", outcome: "refund_full", refundAmountCents: 150000 });
+
+    expect(mockPost).toHaveBeenCalledWith("/admin/payments/reviews/payment_review/d1/resolve", {
+      reason: "client asked",
+      outcome: "refund_full",
+      refund_amount_cents: 150000
+    });
   });
 
   it("passes categories as a comma separated filter", async () => {
@@ -125,5 +144,26 @@ describe("review queue", () => {
 
     const params = mockGet.mock.calls[0][1].params as Record<string, unknown>;
     expect(params["filter[category]"]).toBe("payment_review,no_show");
+  });
+});
+
+describe("attention items", () => {
+  const raw = { id: "i1", booking_id: "b1", proposed_start_at: "2026-10-20T09:00:00Z", role: "provider", service_name: "Consultation" };
+
+  it("reads a confirmed new time as an item that can be dismissed", () => {
+    const item = mapAttentionItem({ ...raw, kind: "time_confirmed", acknowledgeable: true });
+    expect(item?.kind).toBe("time_confirmed");
+    expect(item?.acknowledgeable).toBe(true);
+  });
+
+  it("does not treat a proposal as dismissible, and ignores a kind it does not know", () => {
+    expect(mapAttentionItem({ ...raw, kind: "reschedule_request" })?.acknowledgeable).toBe(false);
+    expect(mapAttentionItem({ ...raw, kind: "something_new" })).toBeNull();
+  });
+
+  it("tells the server which item was opened", async () => {
+    mockPost.mockResolvedValue({ data: {} });
+    await acknowledgeAttentionItem("i1");
+    expect(mockPost).toHaveBeenCalledWith("/telemedicine/attention/i1/acknowledge", {});
   });
 });

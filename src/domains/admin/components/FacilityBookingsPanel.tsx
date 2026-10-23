@@ -55,7 +55,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
         </div>
         <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{statusLabel(booking.status)}</span>
-          {booking.isTelemedicine && <span className="rounded-full bg-tiba-blue/10 px-2.5 py-1 text-tiba-blue">Video consultation</span>}
+          {booking.isTelemedicine && <span className="rounded-full bg-tiba-blue/10 px-2.5 py-1 text-tiba-blue">Telemedicine</span>}
           <span className={`rounded-full px-2.5 py-1 ${booking.paidAt ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
             {booking.paidAt ? "Paid" : "Not paid"}
           </span>
@@ -74,7 +74,7 @@ const BookingRow = ({ booking, onAssign, showProvider = true }: { booking: Booki
         </div>
         {booking.isTelemedicine && booking.telemedicineSession && (
           <div>
-            <dt className="text-xs font-semibold text-slate-500">Video session</dt>
+            <dt className="text-xs font-semibold text-slate-500">Call session</dt>
             <dd className="mt-0.5 text-slate-800">{statusLabel(booking.telemedicineSession.status)}</dd>
           </div>
         )}

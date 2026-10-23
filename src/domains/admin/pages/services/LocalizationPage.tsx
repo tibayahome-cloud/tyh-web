@@ -204,7 +204,7 @@ export const ServiceLocalizationPanel = () => {
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!mutation.isLoading) {
+          if (!mutation.isPending) {
             setModalOpen(false);
             setEditing(null);
           }

@@ -91,7 +91,14 @@ export const FacilitySchema = z.object({
   phones: z.array(FacilityPhoneSchema),
   operatingHours: z.array(FacilityOperatingHourSchema),
   services: z.array(FacilityServiceSchema),
-  admins: z.array(FacilityAdminSchema)
+  admins: z.array(FacilityAdminSchema),
+  // Only on the platform admin's facility list: counts for the row, so it need not load each facility's
+  // services and administrators. Absent (null) from an API that does not send them.
+  activeServiceCount: z.number().int().nullable().optional(),
+  adminSummary: z
+    .object({ active: z.number().int(), pendingSetup: z.number().int(), suspended: z.number().int() })
+    .nullable()
+    .optional()
 });
 
 export type Facility = z.infer<typeof FacilitySchema>;
@@ -105,6 +112,18 @@ export type FacilityOverview = {
     providersAvailable: number;
     providersPendingVerification: number;
     activeServices: number;
+    // Open work split by what it is, and what needs a person to act. Null from an API that does not
+    // send them yet: "nothing needs attention" must never be inferred from a missing answer.
+    inProgressBookings: number | null;
+    upcomingBookings: number | null;
+    needsAttention: {
+      unassignedConsultations: number;
+      unattendedConsultations: number;
+      paymentReview: number;
+      awaitingResponse: number;
+      total: number;
+    } | null;
+    asOf: string | null;
   };
   readiness: {
     locationReady: boolean;
@@ -254,11 +273,23 @@ export const mapFacilityAdmin = (payload: unknown): FacilityAdmin | null => {
   };
 };
 
+const mapAdminSummary = (value: unknown): Facility["adminSummary"] => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  return {
+    active: coerceNumber(raw.active) ?? 0,
+    pendingSetup: coerceNumber(raw.pending_setup ?? raw.pendingSetup) ?? 0,
+    suspended: coerceNumber(raw.suspended) ?? 0
+  };
+};
+
 export const mapFacility = (payload: unknown): Facility | null => {
   const raw = toResourceRecord(payload);
   const id = coerceId(raw.id);
   const facilityType = coerceString(raw.facility_type ?? raw.facilityType);
   const status = coerceString(raw.status);
+  const operatingHoursRaw: unknown = raw.operating_hours ?? raw.operatingHours;
+  const operatingHoursSource: unknown[] = Array.isArray(operatingHoursRaw) ? operatingHoursRaw : [];
   if (!id || !isFacilityType(facilityType) || !isFacilityStatus(status)) {
     return null;
   }
@@ -283,7 +314,7 @@ export const mapFacility = (payload: unknown): Facility | null => {
     phones: (Array.isArray(raw.phones) ? raw.phones : [])
       .map((phone) => mapFacilityPhone(phone))
       .filter((phone): phone is FacilityPhone => Boolean(phone)),
-    operatingHours: (Array.isArray(raw.operating_hours ?? raw.operatingHours) ? raw.operating_hours ?? raw.operatingHours : [])
+    operatingHours: operatingHoursSource
       .map((hour) => mapFacilityOperatingHour(hour))
       .filter((hour): hour is FacilityOperatingHour => Boolean(hour)),
     services: (Array.isArray(raw.services) ? raw.services : [])
@@ -291,7 +322,9 @@ export const mapFacility = (payload: unknown): Facility | null => {
       .filter((service): service is FacilityService => Boolean(service)),
     admins: (Array.isArray(raw.admins) ? raw.admins : [])
       .map((admin) => mapFacilityAdmin(admin))
-      .filter((admin): admin is FacilityAdmin => Boolean(admin))
+      .filter((admin): admin is FacilityAdmin => Boolean(admin)),
+    activeServiceCount: coerceNumber(raw.active_service_count ?? raw.activeServiceCount),
+    adminSummary: mapAdminSummary(raw.admin_summary ?? raw.adminSummary)
   };
 };
 
@@ -314,6 +347,7 @@ export const mapFacilityDiscoveryItem = (payload: unknown): FacilityDiscoveryIte
   if (!id || !isFacilityType(facilityType) || !svcRaw || !facilityServiceId || !serviceId) {
     return null;
   }
+  const deliveryModeRaw = coerceString(svcRaw.delivery_mode ?? svcRaw.deliveryMode);
   const service: FacilityService = {
     id: facilityServiceId,
     facilityId: id,
@@ -322,6 +356,7 @@ export const mapFacilityDiscoveryItem = (payload: unknown): FacilityDiscoveryIte
     currency: coerceString(svcRaw.currency) ?? "KES",
     estimateDurationMinutes: coerceNumber(svcRaw.estimate_duration_minutes ?? svcRaw.estimateDurationMinutes),
     active: true,
+    deliveryMode: isDeliveryMode(deliveryModeRaw) ? deliveryModeRaw : "in_person",
     isEmergencyCapable: toBoolean(svcRaw.is_emergency_capable ?? svcRaw.isEmergencyCapable),
     service: mapFacilityServiceSummary(svcRaw.service ?? { ...svcRaw, id: serviceId })
   };

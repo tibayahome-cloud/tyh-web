@@ -260,7 +260,7 @@ const MonitoringPage = () => {
                       Distance to destination: {(booking.distanceToDestinationM / 1000).toFixed(2)} km
                     </p>
                   )}
-                  {booking.meta?.escalation_at && (
+                  {Boolean(booking.meta?.escalation_at) && (
                     <p className="mt-1 text-xs font-semibold text-rose-600">Escalation pending</p>
                   )}
                 </button>

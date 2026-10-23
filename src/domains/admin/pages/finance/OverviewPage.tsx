@@ -107,6 +107,11 @@ const FinanceOverviewPage = () => {
           <Link to="/admin/finance/withdrawals" className={linkButtonClasses("secondary")}>
             Withdrawals
           </Link>
+          {canReadGlobalLedger && (
+            <Link to="/admin/finance/stranded-wallets" className={linkButtonClasses("ghost")}>
+              Deleted accounts
+            </Link>
+          )}
         </div>
       </div>
 

@@ -67,12 +67,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Reporting only for now. `vite build` strips types without checking them, and a plain
-      # `tsc --noEmit` was unusable until the tsconfig overlap below was fixed, so errors have
-      # accumulated unseen. Failing this job today would block every pull request; it exists to
-      # make the count visible so it can be driven down, and should be made blocking at zero.
+      # Blocking: `vite build` strips types without checking them, so this is the only place a type
+      # error is caught before it reaches users.
       - name: Typecheck
-        continue-on-error: true
         run: npm run typecheck
 
   build:

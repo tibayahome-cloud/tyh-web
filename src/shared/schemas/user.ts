@@ -51,7 +51,7 @@ export const mapUserResource = (payload: unknown): AuthUser | null => {
         phone: coerceString(raw.phone),
         phoneVerifiedAt: coerceString(raw.phone_verified_at) || coerceString(raw.phoneVerifiedAt) || null,
         countryCode: coerceString(raw.country_code) || coerceString(raw.countryCode),
-        roles: roles.filter(Boolean),
+        roles: roles.filter((role): role is string => Boolean(role)),
         permissions: Array.isArray(raw.permissions) ? raw.permissions.filter((permission): permission is string => typeof permission === "string") : [],
         meta,
         status: coerceString(raw.status) || undefined

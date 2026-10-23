@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { PROVIDER_CANCELLED_STATUSES, PROVIDER_UPCOMING_STATUSES } from "../providerBookingStatuses";
+import {
+  PROVIDER_ACTIVE_STATUSES,
+  PROVIDER_CANCELLED_STATUSES,
+  PROVIDER_UPCOMING_STATUSES
+} from "../providerBookingStatuses";
 
 describe("provider booking status lists", () => {
   it("count a booked video consultation as upcoming", () => {
@@ -9,5 +13,9 @@ describe("provider booking status lists", () => {
 
   it("count a consultation cancelled after payment as cancelled", () => {
     expect(PROVIDER_CANCELLED_STATUSES).toContain("telemedicine_cancelled_payment_review");
+  });
+
+  it("count a booked video consultation as active, so the default Bookings view is not empty for it", () => {
+    expect(PROVIDER_ACTIVE_STATUSES).toContain("scheduled");
   });
 });

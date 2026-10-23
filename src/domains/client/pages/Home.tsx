@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../../shared/components/Button";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useOpenBookingChat } from "../../../shared/hooks/useOpenBookingChat";
 import { useBookingList, useConfirmBookingMutation, useCancelBookingMutation } from "../../../shared/hooks/useBookings";
 import { BookingFeedbackDialog } from "../../../shared/components/BookingFeedbackDialog";
 import { AppLayout } from "../../../shared/components/AppLayout";
@@ -17,7 +18,6 @@ import { BookingRequestDialog } from "../components/BookingRequestDialog";
 import { BookingSearchStatus } from "../components/BookingSearchStatus";
 import { PaymentReviewNotice } from "../components/PaymentReviewNotice";
 import { findBookingUnderPaymentReview } from "../utils/paymentReview";
-import { AIRecommendationsCard } from "../components/AIRecommendationsCard";
 import { ClientPageHeader } from "../components/ClientPageHeader";
 import { useToast } from "../../../shared/components/ToastProvider";
 import { useSocket } from "../../../shared/hooks/useSocket";
@@ -27,17 +27,13 @@ import { LocationPermissionBanner } from "../../../shared/components/LocationPer
 import { formatBookingStatus, getBookingStatusTheme } from "../../../shared/utils/bookingStatus";
 import type { Booking } from "../../../shared/schemas/booking";
 import ImmersiveBookingView from "../components/ImmersiveBookingView";
-import { useWalletAccount } from "../../../shared/hooks/useWallet";
-import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
-import { HomeCarePaymentActions } from "../components/HomeCarePaymentActions";
-import { formatMsisdn } from "../utils/payerPhone";
-import { useSelfCareCheckins } from "../../../shared/hooks/useSelfCare";
+import { NextConsultationCard } from "../../../shared/components/NextConsultationCard";
+import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
+import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
+import { WidgetError } from "../../../shared/components/WidgetError";
+import { PaymentRequestNotice } from "../components/PaymentRequestNotice";
 import {
-  Plus,
   ArrowRight,
-  Activity,
-  Heart,
-  Zap,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -49,6 +45,10 @@ import {
   Video
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
+import { useHasAmbulanceService } from "../hooks/useHasAmbulanceService";
+
+// A popup on a phone keeps a margin all round and never taller than the screen; its content scrolls inside.
+const FIT_PHONE_PAPER = { borderRadius: "24px", p: 1, m: 2, width: "calc(100% - 32px)", maxHeight: "calc(100dvh - 32px)" } as const;
 
 const ACTIVE_STATUSES = [
   "accepted",
@@ -87,6 +87,7 @@ const HISTORY_STATUSES = [
 
 const ClientHome = () => {
   const { user } = useAuth();
+  const { openBookingChat } = useOpenBookingChat("/app/inbox");
   const navigate = useNavigate();
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [bookingServiceId, setBookingServiceId] = useState<string | null>(null);
@@ -94,12 +95,17 @@ const ClientHome = () => {
   const socket = useSocket();
   const locationAccess = useLocationAccess();
   const confirmCompletion = useConfirmBookingMutation("detail");
+  const hasAmbulance = useHasAmbulanceService();
   const cancelBookingMutation = useCancelBookingMutation("detail");
   const [completionPrompt, setCompletionPrompt] = useState<Booking | null>(null);
+  // The booking whose confirm-and-pay prompt the client put away. It is not opened again by itself; a reminder on the
+  // page brings it back. Without this the prompt could not be closed, and reopened on every refresh.
+  const [dismissedCompletionId, setDismissedCompletionId] = useState<string | null>(null);
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ bookingId: string; providerName: string } | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [completionError, setCompletionError] = useState<string | null>(null);
   const [showMpesaManual, setShowMpesaManual] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -110,12 +116,6 @@ const ClientHome = () => {
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
   // The number the M-Pesa request went to, kept so the follow-up step can say where to look.
-  const [chargedTo, setChargedTo] = useState<string | null>(null);
-  const [paymentFailed, setPaymentFailed] = useState(false);
-
-  const walletQuery = useWalletAccount({ enabled: Boolean(user?.id) });
-  const checkinsQuery = useSelfCareCheckins(user?.id, { limit: 1 });
-  const latestCheckin = checkinsQuery.data?.[0];
 
   const { data: activeList } = useBookingList(
     {
@@ -164,8 +164,15 @@ const ClientHome = () => {
   const upcomingQuery = useBookingList(
     upcomingParams,
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] }, isLoading: boolean };
+  ) as { data?: { bookings?: Booking[] }, isLoading: boolean, isError?: boolean, refetch: () => unknown };
   const upcomingList = upcomingQuery.data;
+  const policyQuery = useTelemedicinePolicy();
+  // The soonest booked video consultation that has not finished: it gets its own card with a Join button, and is
+  // not repeated in the list under it.
+  const nextConsultation = (upcomingList?.bookings ?? []).find(
+    (b) => b.isTelemedicine && b.status === "scheduled" && !hasConsultationEnded(b.scheduledAt, b.estimateDurationMinutes)
+  );
+  const otherUpcoming = (upcomingList?.bookings ?? []).filter((b) => b.id !== nextConsultation?.id);
 
   // A payment that arrived for an appointment that could not be honoured. Surfaced above
   // everything else because the client has paid and, without this, has no way of knowing
@@ -177,13 +184,13 @@ const ClientHome = () => {
     ...(upcomingList?.bookings ?? [])
   ]);
   useEffect(() => {
-    if (activeBooking?.status === "completed_by_provider") {
+    if (activeBooking?.status === "completed_by_provider" && activeBooking.id !== dismissedCompletionId) {
       setCompletionPrompt(activeBooking);
       setCompletionError(null);
     }
-  }, [activeBooking]);
+  }, [activeBooking, dismissedCompletionId]);
 
-  const { data: historyList } = useBookingList(
+  const historyQuery = useBookingList(
     {
       statuses: HISTORY_STATUSES,
       clientId: user?.id ?? undefined,
@@ -191,24 +198,20 @@ const ClientHome = () => {
       preset: "card"
     },
     { enabled: Boolean(user?.id) }
-  ) as { data?: { bookings?: Booking[] } };
+  ) as { data?: { bookings?: Booking[] }, isError?: boolean, refetch: () => unknown };
+  const historyList = historyQuery.data;
 
 
 
-  const walletBalance = walletQuery.data ? `${walletQuery.data.currency} ${(walletQuery.data.balanceCents / 100).toLocaleString()}` : "—";
+  // "—" while loading, and a plain "unavailable" if the request failed, so a failure never looks like a balance.
+  // A finished visit with no rating yet. Asked for here, not left inside a collapsed "Recent activity".
+  const ratingDue = (historyList?.bookings ?? []).find(
+    (b) => (b.status === "fully_completed" || b.status === "paid" || b.status === "client_completed") && !b.feedback?.length
+  );
 
 
 
-  useEffect(() => {
-    // Only access window height on client
-    if (typeof window !== "undefined") {
-      const handler = () => {
-        // viewport height logic removed
-      };
-      window.addEventListener("resize", handler);
-      return () => window.removeEventListener("resize", handler);
-    }
-  }, []);
+
 
   const openBookingDialog = (serviceId?: string) => {
     setBookingServiceId(serviceId ?? null);
@@ -220,50 +223,23 @@ const ClientHome = () => {
     setBookingServiceId(null);
     toast.showToast({
       title: "Booking requested",
-      description: `We are matching you with a nearby provider (ref ${bookingId.slice(0, 6)}…).`,
+      description: "We are matching you with a nearby provider.",
       variant: "info"
     });
   };
 
   const closeCompletionPrompt = () => {
+    setDismissedCompletionId(completionPrompt?.id ?? null);
+    setCompletionPrompt(null);
     setCompletionError(null);
     setShowMpesaManual(false);
-    setPaymentFailed(false);
-    setChargedTo(null);
+    setReporting(false);
   };
 
   const closeCancelPrompt = () => {
     setCancelPrompt(null);
     setCancelReason("");
     setCancelError(null);
-  };
-
-  // `phone` arrives validated and normalised from the payment form; a different number is used for
-  // this request only and is never saved to the client's profile.
-  const handleConfirmCompletion = async (phone: string) => {
-    if (!completionPrompt) return;
-
-    setCompletionError(null);
-    setPaymentFailed(false);
-
-    try {
-      await confirmCompletion.mutateAsync({
-        bookingId: completionPrompt.id,
-        decision: "confirm",
-        phone
-      });
-      toast.showToast({
-        title: "Payment requested",
-        description: `Check ${formatMsisdn(phone)} to approve the M-Pesa payment.`,
-        variant: "success"
-      });
-      setChargedTo(formatMsisdn(phone));
-      setShowMpesaManual(true);
-      setCompletionError(null);
-    } catch (error) {
-      setPaymentFailed(true);
-      setCompletionError(error instanceof Error ? error.message : "Unable to confirm completion. Try again.");
-    }
   };
 
   const handleDeclineCompletion = async () => {
@@ -282,8 +258,8 @@ const ClientHome = () => {
         reason: declineReason.trim()
       });
       toast.showToast({
-        title: "Thanks for the feedback",
-        description: "Support has been notified about the issue.",
+        title: "Problem reported",
+        description: "Support has been told and will look into it.",
         variant: "info"
       });
       closeCompletionPrompt();
@@ -334,7 +310,7 @@ const ClientHome = () => {
         const label = formatBookingStatus(statusRaw);
         toast.showToast({
           title: label,
-          description: `Booking${bookingId ? ` #${bookingId.slice(0, 6)}` : ""} updated.`,
+          description: "Your booking was updated.",
           variant: statusRaw === "accepted" ? "success" : "info"
         });
         if (
@@ -342,7 +318,12 @@ const ClientHome = () => {
           bookingId &&
           (!activeBooking || bookingId === activeBooking.id)
         ) {
-          setCompletionPrompt({ bookingId });
+          // The booking list is refreshed by the live-update service, and the effect on `activeBooking` opens
+          // the prompt from it. Only a booking already loaded can be shown now; a bare id is not a booking.
+          if (activeBooking) {
+            setDismissedCompletionId(null);
+            setCompletionPrompt(activeBooking);
+          }
           setDeclineReason("");
           setCompletionError(null);
         }
@@ -361,7 +342,7 @@ const ClientHome = () => {
         <ImmersiveBookingView
           booking={activeBooking}
           onClose={() => setIsTracking(false)}
-          onOpenChat={() => navigate("/app/inbox")}
+          onOpenChat={() => void openBookingChat(activeBooking.id)}
         />
       )}
 
@@ -374,35 +355,40 @@ const ClientHome = () => {
           className="pb-0 sm:pb-0 lg:pb-0"
         />
 
-        <div className="px-4 empty:hidden">
+        <div className="flex flex-col gap-3 px-4 empty:hidden">
           <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
+          {activeBooking?.status === "completed_by_provider" && !completionPrompt && (
+            <section aria-label="Payment for your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                Your visit{activeBooking.provider?.fullName ? ` with ${activeBooking.provider.fullName}` : ""} is complete. See your payment request.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setDismissedCompletionId(null);
+                  setCompletionPrompt(activeBooking);
+                }}
+              >
+                View payment
+              </Button>
+            </section>
+          )}
+          {ratingDue && (
+            <section aria-label="Rate your visit" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                How was your visit{ratingDue.provider?.fullName ? ` with ${ratingDue.provider.fullName}` : ""}?
+              </p>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setFeedbackPrompt({ bookingId: ratingDue.id, providerName: ratingDue.provider?.fullName || "the provider" })
+                }
+              >
+                Rate your visit
+              </Button>
+            </section>
+          )}
         </div>
-
-        {/* HEALTH PULSE CHIPS */}
-        <section className="px-4 -mt-2 overflow-x-auto no-scrollbar">
-          <div className="flex gap-2 min-w-max">
-            {latestCheckin?.vitals ? (
-              <>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-bold">
-                  <Heart className="w-3 h-3" />
-                  {latestCheckin.vitals.pulseRate || "--"} bpm
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full text-[11px] font-bold">
-                  <Activity className="w-3 h-3" />
-                  {latestCheckin.vitals.bpSystolic}/{latestCheckin.vitals.bpDiastolic}
-                </div>
-              </>
-            ) : (
-              <div onClick={() => navigate("/app/selfcare/checkin")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[11px] font-bold cursor-pointer">
-                <Plus className="w-3 h-3" />
-                Log Vitals
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-[11px] font-bold">
-              {walletBalance}
-            </div>
-          </div>
-        </section>
 
         <div className="flex flex-col gap-4 px-4 sm:px-6">
           {underReview && (
@@ -436,7 +422,7 @@ const ClientHome = () => {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>
-                      <p className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Live</p>
+                      <p className="text-xs font-semibold text-emerald-300">Live</p>
                     </div>
                     <h2 className="mt-1 text-base font-bold text-white">
                       {activeBooking.provider?.fullName?.split(" ")[0] || "Provider"} · {formatBookingStatus(activeBooking.status)}
@@ -448,6 +434,42 @@ const ClientHome = () => {
             ) : null}
           </section>
 
+          {/* The first question a client has is "when is my next appointment?", so it comes before the
+              ways to book a new one. */}
+          {nextConsultation && (
+            <NextConsultationCard
+              booking={nextConsultation}
+              withName={nextConsultation.provider?.fullName}
+              joinTo={`/app/bookings/${nextConsultation.id}?join=1`}
+              detailsTo={`/app/bookings/${nextConsultation.id}`}
+              joinWindowBeforeMinutes={policyQuery.data?.joinWindowBeforeMinutes}
+            />
+          )}
+
+          {(!nextConsultation || otherUpcoming.length > 0 || upcomingQuery.isError) && (
+          <section aria-labelledby="upcoming-heading" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 id="upcoming-heading" className="text-base font-semibold text-slate-900">Your next appointments</h2>
+              <button type="button" onClick={() => navigate("/app/bookings")} className="min-h-[44px] px-2 text-sm font-semibold text-tiba-blue">
+                View all
+              </button>
+            </div>
+            <div className="space-y-2">
+              {upcomingQuery.isError && !upcomingList ? (
+                <WidgetError what="your upcoming appointments" onRetry={() => void upcomingQuery.refetch()} />
+              ) : otherUpcoming.length > 0 ? (
+                otherUpcoming.slice(0, 3).map((b) => (
+                  <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-6 text-center">
+                  <p className="text-sm text-slate-600">No upcoming care scheduled</p>
+                </div>
+              )}
+            </div>
+          </section>
+          )}
+
           <section aria-label="Choose your care" className="border-y border-slate-200 py-4">
             <h2 className="mb-3 text-base font-semibold text-slate-900">How would you like to receive care?</h2>
             <div className="grid gap-3 md:grid-cols-2">
@@ -456,7 +478,7 @@ const ClientHome = () => {
                 <Video className="h-6 w-6 shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-base font-semibold">Talk to a Doctor Online</span>
-                  <span className="mt-1 block text-sm text-white/90">A video consultation. No home visit needed.</span>
+                  <span className="mt-1 block text-sm text-white/90">A consultation by call or video. No home visit needed.</span>
                 </span>
                 <ArrowRight className="h-5 w-5 shrink-0" />
               </button>
@@ -469,18 +491,21 @@ const ClientHome = () => {
                   </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <button type="button" onClick={() => openBookingDialog()}
-                    className="flex min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                  <button type="button" onClick={() => navigate("/app/services")}
+                    className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
                     <House className="h-5 w-5 shrink-0 text-tiba-gold" />
-                    <span className="min-w-0 flex-1 text-sm font-semibold">Book Home Care</span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold">Book home care</span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
                   </button>
-                  <button type="button" onClick={() => openBookingDialog()}
-                    className="flex min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
-                    <Ambulance className="h-5 w-5 shrink-0 text-tiba-gold" />
-                    <span className="min-w-0 flex-1 text-sm font-semibold">Request an Ambulance</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
-                  </button>
+                  {/* Only when the catalogue has an ambulance service: a button that opens a list with none in it only confuses. */}
+                  {hasAmbulance && (
+                    <button type="button" onClick={() => navigate("/app/services?group=ambulance")}
+                      className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
+                      <Ambulance className="h-5 w-5 shrink-0 text-tiba-gold" />
+                      <span className="min-w-0 flex-1 text-sm font-semibold">Request an ambulance</span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -493,38 +518,28 @@ const ClientHome = () => {
           />
 
           {/* MAIN CONTENT GRID */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            {/* UPCOMING BOOKINGS */}
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Upcoming</h3>
-                <button onClick={() => navigate("/app/bookings")} className="text-xs font-bold text-tiba-blue">
-                  View All
-                </button>
-              </div>
-              <div className="space-y-2">
-                {upcomingList?.bookings && upcomingList.bookings.length > 0 ? (
-                  upcomingList.bookings.slice(0, 3).map((b) => (
-                    <BookingCompactCard key={b.id} booking={b} onClick={() => navigate(`/app/bookings/${b.id}`)} />
-                  ))
-                ) : (
-                  <div className="py-8 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
-                    <p className="text-sm text-slate-400">No upcoming care scheduled</p>
-                  </div>
-                )}
-              </div>
-
+          <div className="grid gap-4">
+            <div className="space-y-3">
               {/* RECENT ACTIVITY - Collapsed by default */}
               <button
+                type="button"
                 onClick={() => setActivityExpanded(!activityExpanded)}
-                className="w-full flex items-center justify-between py-2 group"
+                aria-expanded={activityExpanded}
+                aria-controls="recent-activity"
+                className="group flex min-h-[44px] w-full items-center justify-between py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
               >
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Recent Activity</h3>
-                {activityExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                <h3 className="text-sm font-semibold text-slate-800">Recent activity</h3>
+                {activityExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                )}
               </button>
               {activityExpanded && (
-                <div className="space-y-2">
-                  {historyList?.bookings && historyList.bookings.length > 0 ? (
+                <div id="recent-activity" className="space-y-2">
+                  {historyQuery.isError && !historyList ? (
+                    <WidgetError what="your past activity" onRetry={() => void historyQuery.refetch()} />
+                  ) : historyList?.bookings && historyList.bookings.length > 0 ? (
                     historyList.bookings.map((b) => (
                       <BookingCompactCard
                         key={b.id}
@@ -534,46 +549,12 @@ const ClientHome = () => {
                       />
                     ))
                   ) : (
-                    <p className="text-center py-6 text-xs text-slate-400">No past activity</p>
+                    <p className="py-6 text-center text-sm text-slate-600">No past activity</p>
                   )}
                 </div>
               )}
             </div>
 
-            {/* SIDEBAR: QUICK ACTIONS */}
-            <aside className="space-y-3">
-              <div
-                onClick={() => navigate("/app/selfcare")}
-                className="flex items-center gap-3 p-4 rounded-xl bg-white ring-1 ring-slate-100 cursor-pointer hover:ring-slate-200 transition-all"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                  <Activity size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-400">Health Pulse</p>
-                  <p className="text-sm font-bold text-slate-900">
-                    {latestCheckin?.vitals?.bpSystolic ? `${latestCheckin.vitals.bpSystolic}/${latestCheckin.vitals.bpDiastolic}` : "Normal"}
-                  </p>
-                </div>
-                <ChevronRight size={16} className="text-slate-300" />
-              </div>
-
-              <div
-                onClick={() => navigate("/app/selfcare/checkin")}
-                className="flex items-center gap-3 p-4 rounded-xl bg-slate-900 text-white cursor-pointer hover:bg-slate-800 transition-all"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-tiba-gold">
-                  <Zap size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-400">Daily</p>
-                  <p className="text-sm font-bold">Check-in</p>
-                </div>
-                <ChevronRight size={16} className="text-slate-600" />
-              </div>
-
-              <AIRecommendationsCard />
-            </aside>
           </div>
         </div>
       </div>
@@ -584,62 +565,70 @@ const ClientHome = () => {
         container={() => document.body}
         open={Boolean(completionPrompt)}
         onClose={confirmCompletion.isPending ? undefined : closeCompletionPrompt}
-        PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
+        PaperProps={{ sx: FIT_PHONE_PAPER }}
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle className="text-xl font-bold text-slate-900">Confirm Service</DialogTitle>
+        <DialogTitle className="flex items-start justify-between gap-3 text-xl font-bold text-slate-900">
+          Payment for your visit
+          <button
+            type="button"
+            onClick={closeCompletionPrompt}
+            disabled={confirmCompletion.isPending}
+            aria-label="Close"
+            className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue disabled:opacity-50"
+          >
+            <span aria-hidden="true" className="text-2xl leading-none">&times;</span>
+          </button>
+        </DialogTitle>
         <DialogContent>
-          <p className="text-sm text-slate-500 leading-relaxed">
-            Your provider marked the booking as complete. Please confirm if everything was handled to your satisfaction.
-          </p>
-          <div className="mt-6 space-y-4">
-            <label className="block">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason for decline (Optional)</span>
+          {completionPrompt && (
+            <PaymentRequestNotice
+              bookingId={completionPrompt.id}
+              providerName={completionPrompt.provider?.fullName ?? null}
+              showManual={showMpesaManual}
+              onToggleManual={() => setShowMpesaManual((value) => !value)}
+            />
+          )}
+          {reporting && (
+            <label className="mt-5 block">
+              <span className="text-sm font-medium text-slate-800">What went wrong?</span>
               <textarea
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none"
                 rows={3}
                 value={declineReason}
                 onChange={(event) => setDeclineReason(event.target.value)}
-                placeholder="Tell us what went wrong..."
+                placeholder="For example, the visit did not happen or was not finished"
                 disabled={confirmCompletion.isPending}
               />
             </label>
-          </div>
-          {completionError && <p className="mt-3 text-xs font-semibold text-rose-500 px-1">{completionError}</p>}
+          )}
+          {completionError && <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{completionError}</p>}
         </DialogContent>
         <DialogActions className="p-4 flex-col">
-          <div className="w-full">
-            {showMpesaManual ? (
-              <div className="space-y-4">
-                <p className="text-xs font-medium text-slate-500 text-center animate-pulse" role="status">
-                  {chargedTo
-                    ? `We sent the payment request to ${chargedTo}. If it does not appear, pay manually:`
-                    : "Waiting for the M-Pesa request. If it does not appear, pay manually:"}
-                </p>
-                <MpesaPaymentInstructions
-                  amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
-                  accountNumber={completionPrompt?.id.slice(0, 8).toUpperCase() ?? activeBooking?.id.slice(0, 8).toUpperCase() ?? "BOOKING"}
-                />
-                <Button
-                  variant="ghost"
-                  className="w-full text-xs font-bold text-slate-400"
-                  onClick={() => setShowMpesaManual(false)}
-                >
-                  Back to confirmation
-                </Button>
-              </div>
+          <div className="w-full space-y-2">
+            {reporting ? (
+              <Button
+                className="min-h-[44px] w-full"
+                variant="secondary"
+                loading={confirmCompletion.isPending}
+                onClick={handleDeclineCompletion}
+              >
+                Send report
+              </Button>
             ) : (
-              <HomeCarePaymentActions
-                savedPhone={user?.phone}
-                amountCents={completionPrompt?.priceCents ?? activeBooking?.priceCents ?? 0}
-                isPending={confirmCompletion.isPending}
-                failed={paymentFailed}
-                resetKey={completionPrompt?.id ?? null}
-                onConfirm={handleConfirmCompletion}
-                onDecline={handleDeclineCompletion}
-              />
+              <Button className="min-h-[44px] w-full" variant="secondary" onClick={() => setReporting(true)}>
+                Report a problem
+              </Button>
             )}
+            <Button
+              variant="ghost"
+              className="min-h-[44px] w-full text-sm font-semibold text-slate-700"
+              onClick={closeCompletionPrompt}
+              disabled={confirmCompletion.isPending}
+            >
+              Not now
+            </Button>
           </div>
         </DialogActions>
       </Dialog>
@@ -649,7 +638,7 @@ const ClientHome = () => {
         container={() => document.body}
         open={Boolean(cancelPrompt)}
         onClose={cancelBookingMutation.isPending ? undefined : closeCancelPrompt}
-        PaperProps={{ sx: { borderRadius: "24px", p: 1 } }}
+        PaperProps={{ sx: FIT_PHONE_PAPER }}
         maxWidth="xs"
         fullWidth
       >
@@ -660,7 +649,7 @@ const ClientHome = () => {
           </p>
           <div className="mt-6">
             <label className="block">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Reason (Optional)</span>
+              <span className="text-sm font-medium text-slate-700">Reason (optional)</span>
               <textarea
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none transition-all"
                 rows={3}
@@ -729,49 +718,40 @@ const BookingCompactCard = ({
       : "—";
 
   return (
-    <div
-      onClick={onClick}
-      className="group flex items-center justify-between gap-3 p-3 rounded-xl bg-white ring-1 ring-slate-100 transition-all hover:ring-slate-200 cursor-pointer"
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-          {booking.isTelemedicine ? <Video size={16} /> : <Calendar size={16} />}
-        </div>
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-slate-900 truncate">
-            {booking.service?.name || "Booking"}
-          </h4>
-          <div className="flex items-center gap-1.5">
-            <span className={classNames("text-[11px] font-bold", theme.className.replace(/bg-\w+-\d+/, ""))}>
+    <div className="group flex items-center gap-2 rounded-xl bg-white ring-1 ring-slate-200 transition-all hover:ring-slate-300 focus-within:ring-2 focus-within:ring-tiba-blue/50">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-3 text-left focus:outline-none"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 transition-colors group-hover:bg-brand-50 group-hover:text-brand-600">
+          {booking.isTelemedicine ? <Video size={16} aria-hidden="true" /> : <Calendar size={16} aria-hidden="true" />}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-slate-900">{booking.service?.name || "Booking"}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5 text-xs">
+            <span className={classNames("font-semibold", theme.className.replace(/bg-\w+-\d+/, ""))}>
               {formatBookingStatus(booking.status)}
             </span>
-            <span className="text-slate-300 text-[10px]">•</span>
-            <p className="text-[11px] text-slate-400">{when}</p>
-          </div>
-        </div>
-      </div>
+            <span className="text-slate-500" aria-hidden="true">•</span>
+            <span className="text-slate-600">{when}</span>
+          </span>
+        </span>
+      </button>
       {showRateButton ? (
         <button
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-[10px] font-bold hover:bg-amber-100 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRate?.();
-          }}
+          type="button"
+          className="mr-3 flex min-h-[44px] items-center gap-1 rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
+          onClick={() => onRate?.()}
         >
-          <StarIcon size={12} />
+          <StarIcon size={12} aria-hidden="true" />
           Rate
         </button>
       ) : (
-        <ChevronRight size={16} className="text-slate-300 group-hover:text-brand-600 transition-colors" />
+        <ChevronRight size={16} className="mr-3 text-slate-500 transition-colors group-hover:text-brand-600" aria-hidden="true" />
       )}
     </div>
   );
 };
-
-
-
-
-
-
 
 export default ClientHome;

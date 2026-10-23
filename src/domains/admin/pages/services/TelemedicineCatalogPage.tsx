@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "../../../../shared/components/Button";
-import { Card } from "../../../../shared/components/Card";
 import { Input } from "../../../../shared/components/Input";
 import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
@@ -53,8 +52,8 @@ const slugify = (value: string, fallback: string) => {
   return key || `${fallback}-${Date.now()}`;
 };
 
-const nextDisplayOrder = (items: Array<{ displayOrder: number }>) =>
-  items.reduce((highest, item) => Math.max(highest, item.displayOrder), -1) + 1;
+const nextDisplayOrder = (items: Array<{ displayOrder?: number }>) =>
+  items.reduce((highest, item) => Math.max(highest, item.displayOrder ?? 0), -1) + 1;
 
 const editorExamples: Record<EditorKind, { name: string; description: string }> = {
   category: {
@@ -72,10 +71,19 @@ const editorExamples: Record<EditorKind, { name: string; description: string }> 
 };
 
 const statusClass: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700",
-  suspended: "bg-amber-50 text-amber-700",
-  archived: "bg-slate-100 text-slate-600"
+  active: "bg-emerald-50 text-emerald-800",
+  suspended: "bg-amber-50 text-amber-800",
+  archived: "bg-slate-100 text-slate-700"
 };
+const statusLabel: Record<string, string> = { active: "Active", suspended: "Suspended", archived: "Archived" };
+
+const StatusPill = ({ status }: { status: string }) => (
+  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusClass[status] ?? statusClass.archived}`}>
+    {statusLabel[status] ?? status}
+  </span>
+);
+
+const formatKes = (cents: number) => `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
 
 const TelemedicineCatalogPage = () => {
   const toast = useToast();
@@ -85,6 +93,8 @@ const TelemedicineCatalogPage = () => {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [editorCategoryId, setEditorCategoryId] = useState("");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [search, setSearch] = useState("");
+  const [mobileView, setMobileView] = useState<"areas" | "detail">("areas");
 
   const categoriesQuery = useQuery({
     queryKey: ["admin", "telemedicine", "categories"],
@@ -188,7 +198,7 @@ const TelemedicineCatalogPage = () => {
           ? nextDisplayOrder(categories)
           : kind === "subcategory"
             ? nextDisplayOrder(subcategories)
-            : nextDisplayOrder(services)
+            : services.length
       );
     }
     setForm(next);
@@ -208,74 +218,153 @@ const TelemedicineCatalogPage = () => {
   const editorCategories = categories.filter((category) => category.status === "active");
   const editorCategory = categories.find((category) => category.id === editorCategoryId);
   const editorTitle = editor ? `${editor.item ? "Edit" : "Add"} telemedicine ${editor.kind}` : "";
-  const selectedServiceCount = useMemo(() => services.length, [services]);
+
+  const query = search.trim().toLowerCase();
+  const shownCategories = query ? categories.filter((category) => category.name.toLowerCase().includes(query)) : categories;
+  const shownServices = query ? services.filter((service) => service.name.toLowerCase().includes(query)) : services;
+  const duplicateNames = useMemo(() => {
+    const seen = new Map<string, number>();
+    subcategories.forEach((item) => seen.set(item.name.trim().toLowerCase(), (seen.get(item.name.trim().toLowerCase()) ?? 0) + 1));
+    return seen;
+  }, [subcategories]);
+
+  const pickCategory = (id: string) => {
+    setSelectedCategoryId(id);
+    setSelectedSubcategoryId("");
+    setMobileView("detail");
+  };
 
   return (
-    <div className="space-y-6">
-      <Card title="Telemedicine catalog" description="Build the catalog in order: consultation area → specialty → bookable service. Providers are assigned to specialties; clients only see active services." badge={`${categories.length} areas`}>
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Select an area, then a specialty. Services are always created under the selected specialty. Changes here affect future discovery and assignment; existing appointments retain their selected service details.
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Telemedicine catalogue</h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Pick an area, then a specialty, then manage its services. Providers are assigned to specialties; clients only see active services.
+          </p>
         </div>
-      </Card>
+        <label className="block sm:w-64">
+          <span className="sr-only">Search the catalogue</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search areas and services"
+            className="min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/30"
+          />
+        </label>
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.85fr_1fr_1.25fr]">
-        <Card title="Consultation areas" padding="none">
-          <div className="flex justify-end px-6 pt-6"><Button size="sm" onClick={() => openEditor("category")}>Add area</Button></div>
-          <div className="space-y-2 px-6 pb-6 pt-4">
-            {categories.map((category) => (
-              <div key={category.id} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 ${selectedCategoryId === category.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <button type="button" onClick={() => { setSelectedCategoryId(category.id); setSelectedSubcategoryId(""); }} className="min-w-0 flex-1 py-1 text-left">
-                  <span className="block font-semibold text-slate-900">{category.name}</span>
-                </button>
-                <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[category.status] ?? statusClass.archived}`}>{category.status}</span>
-                <Button size="sm" variant="outline" onClick={() => openEditor("category", category)}>Edit</Button>
-              </div>
-            ))}
-            {!categoriesQuery.isFetching && !categories.length && <p className="py-6 text-sm text-slate-500">No consultation areas configured.</p>}
+      <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <section aria-label="Consultation areas" className={`${mobileView === "detail" ? "hidden" : ""} rounded-2xl border border-slate-200 bg-white lg:block`}>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <h3 className="text-sm font-semibold text-slate-900">Areas <span className="font-normal text-slate-500">({categories.length})</span></h3>
+            <Button size="sm" onClick={() => openEditor("category")}>Add area</Button>
           </div>
-        </Card>
-
-        <Card title="Specialties" subtitle={selectedCategory?.name ?? "Select an area first"} padding="none">
-          <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateSubcategory} onClick={() => openEditor("subcategory")}>Add specialty</Button></div>
-          <div className="space-y-2 px-6 pb-6 pt-4">
-            {subcategories.map((subcategory) => (
-              <div key={subcategory.id} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 ${selectedSubcategoryId === subcategory.id ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white"}`}>
-                <button type="button" onClick={() => setSelectedSubcategoryId(subcategory.id)} className="min-w-0 flex-1 py-1 text-left">
-                  <span className="block font-semibold text-slate-900">{subcategory.name}</span>
+          <ul className="divide-y divide-slate-100">
+            {shownCategories.map((category) => (
+              <li key={category.id} className={`flex items-center gap-1 ${selectedCategoryId === category.id ? "bg-sky-50" : ""}`}>
+                <button
+                  type="button"
+                  aria-current={selectedCategoryId === category.id ? "true" : undefined}
+                  onClick={() => pickCategory(category.id)}
+                  className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 px-4 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-tiba-blue"
+                >
+                  <span className="min-w-0 truncate text-sm font-medium text-slate-900">{category.name}</span>
+                  {category.status !== "active" && <StatusPill status={category.status} />}
                 </button>
-                <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[subcategory.status] ?? statusClass.archived}`}>{subcategory.status}</span>
-                <Button size="sm" variant="outline" onClick={() => openEditor("subcategory", subcategory)}>Edit</Button>
-              </div>
+                <button
+                  type="button"
+                  aria-label={`Edit ${category.name}`}
+                  onClick={() => openEditor("category", category)}
+                  className="mr-2 min-h-[44px] rounded-lg px-3 text-sm font-medium text-tiba-blue hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                >
+                  Edit
+                </button>
+              </li>
             ))}
-            {selectedCategoryId && !subcategoriesQuery.isFetching && !subcategories.length && <p className="py-6 text-sm text-slate-500">No specialties configured for this area.</p>}
-          </div>
-        </Card>
+          </ul>
+          {!categoriesQuery.isFetching && !shownCategories.length && (
+            <p className="px-4 py-8 text-center text-sm text-slate-500">{query ? "No area matches your search." : "No consultation areas yet. Add the first one."}</p>
+          )}
+        </section>
 
-        <Card title="Consultation services" subtitle={selectedSubcategory ? `${selectedCategory?.name ?? ""} → ${selectedSubcategory.name}` : "Select a specialty first"} badge={`${selectedServiceCount} services`} padding="none">
-          <div className="mx-6 mt-6 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
-            {selectedSubcategory ? (
-              <>
-                <p className="font-semibold">Services under {selectedSubcategory.name}</p>
-                <p className="mt-1 text-primary-700">New services created here will automatically belong to this specialty.</p>
-              </>
-            ) : (
-              <p>Select a specialty in the middle panel to view or add its services.</p>
+        <section aria-label="Specialties and services" className={`${mobileView === "areas" ? "hidden" : ""} min-w-0 space-y-4 lg:block`}>
+          <button
+            type="button"
+            onClick={() => setMobileView("areas")}
+            className="inline-flex min-h-[44px] items-center gap-1 text-sm font-medium text-tiba-blue lg:hidden"
+          >
+            <span aria-hidden="true">←</span> All areas
+          </button>
+
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold text-slate-900">{selectedCategory?.name ?? "Select an area"}</h3>
+                <p className="text-xs text-slate-500">{subcategories.length} {subcategories.length === 1 ? "specialty" : "specialties"}</p>
+              </div>
+              <Button size="sm" disabled={!canCreateSubcategory} onClick={() => openEditor("subcategory")}>Add specialty</Button>
+            </div>
+            <div role="tablist" aria-label="Specialties" className="flex flex-wrap gap-2 p-4">
+              {subcategories.map((subcategory) => {
+                const active = selectedSubcategoryId === subcategory.id;
+                const duplicate = (duplicateNames.get(subcategory.name.trim().toLowerCase()) ?? 0) > 1;
+                return (
+                  <button
+                    key={subcategory.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setSelectedSubcategoryId(subcategory.id)}
+                    className={`min-h-[44px] rounded-full border px-4 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue ${active ? "border-tiba-blue bg-tiba-blue text-white" : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"}`}
+                  >
+                    {subcategory.name}
+                    {duplicate && <span className="ml-2 text-xs opacity-80">(duplicate name)</span>}
+                    {subcategory.status !== "active" && <span className="ml-2 text-xs opacity-80">({statusLabel[subcategory.status] ?? subcategory.status})</span>}
+                  </button>
+                );
+              })}
+              {selectedCategoryId && !subcategoriesQuery.isFetching && !subcategories.length && (
+                <p className="py-2 text-sm text-slate-500">No specialties in this area yet. Add one to start listing services.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold text-slate-900">{selectedSubcategory ? `${selectedSubcategory.name} services` : "Services"}</h3>
+                <p className="text-xs text-slate-500">
+                  {selectedSubcategory ? `${services.length} ${services.length === 1 ? "service" : "services"} · new services are added under ${selectedSubcategory.name}` : "Choose a specialty to see its services."}
+                </p>
+              </div>
+              <Button size="sm" disabled={!canCreateService} onClick={() => openEditor("service")}>Add service</Button>
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {shownServices.map((service) => (
+                <li key={service.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                  <div className="min-w-0 flex-1 basis-56">
+                    <p className="text-sm font-medium text-slate-900">{service.name}</p>
+                    <p className="text-sm text-slate-600">{formatKes(service.basePriceCents)} · {service.defaultEstimateMinutes} min{service.isEmergencyCapable ? " · Emergency capable" : ""}</p>
+                  </div>
+                  <StatusPill status={service.status} />
+                  <button
+                    type="button"
+                    aria-label={`Edit ${service.name}`}
+                    onClick={() => openEditor("service", service)}
+                    className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-tiba-blue hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
+                  >
+                    Edit
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {selectedSubcategoryId && !servicesQuery.isFetching && !shownServices.length && (
+              <p className="px-4 py-8 text-center text-sm text-slate-500">{query ? "No service matches your search." : "No services in this specialty yet. Add the first one."}</p>
             )}
           </div>
-          <div className="flex justify-end px-6 pt-6"><Button size="sm" disabled={!canCreateService} onClick={() => openEditor("service")}>Add service</Button></div>
-          <div className="space-y-3 px-6 pb-6 pt-4">
-            {services.map((service) => (
-              <div key={service.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><h3 className="font-semibold text-slate-900">{service.name}</h3><p className="text-xs text-slate-500">{service.currency} {(service.basePriceCents / 100).toLocaleString()} · {service.defaultEstimateMinutes} min</p></div>
-                  <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${statusClass[service.status] ?? statusClass.archived}`}>{service.status}</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500"><span>{service.isEmergencyCapable ? "Emergency capable" : "Routine consultation"}</span><Button size="sm" variant="outline" onClick={() => openEditor("service", service)}>Edit</Button></div>
-              </div>
-            ))}
-            {selectedSubcategoryId && !servicesQuery.isFetching && !services.length && <p className="py-6 text-sm text-slate-500">No services configured for this specialty.</p>}
-          </div>
-        </Card>
+        </section>
       </div>
 
       <Modal open={Boolean(editor)} onClose={() => !mutation.isPending && setEditor(null)} title={editorTitle}>
@@ -288,10 +377,10 @@ const TelemedicineCatalogPage = () => {
             </select>}
             <span className="text-xs text-slate-500">This specialty will be listed under the selected consultation area.</span>
           </label>}
-          {editor.kind === "service" && selectedSubcategory && <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+          {editor.kind === "service" && selectedSubcategory && <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
             <p className="font-semibold">Creating service under</p>
             <p className="mt-1">{selectedCategory?.name ?? "Consultation area"} <span aria-hidden="true">→</span> {selectedSubcategory.name}</p>
-            <p className="mt-1 text-xs text-primary-700">This parent relationship is saved automatically when you create the service.</p>
+            <p className="mt-1 text-xs text-sky-800">This parent relationship is saved automatically when you create the service.</p>
           </div>}
           <Input label="Name" value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder={editorExamples[editor.kind].name} required />
           <Input label="Description" value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder={editorExamples[editor.kind].description} />

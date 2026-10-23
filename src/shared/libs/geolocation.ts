@@ -120,7 +120,7 @@ export const watchPosition = async (
 
   watchId = navigator.geolocation.watchPosition(
     (position) => onPosition(toGeoPosition(position)),
-    (error) => onError?.(error),
+    (error) => onError?.(new Error(error.message)),
     {
       enableHighAccuracy: highAccuracy,
       timeout: 15000,

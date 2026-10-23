@@ -11,6 +11,8 @@ import { FormField } from "../../../shared/components/FormField";
 import { Button } from "../../../shared/components/Button";
 import { LocationPickerMap } from "../../../shared/components/LocationPickerMap";
 import { currentLegalDocumentPayload } from "../../../shared/constants/legal";
+import { bookingReference } from "../../../shared/utils/bookingReference";
+import { PlaceLabel } from "../../../shared/components/PlaceLabel";
 
 type GuestBookingDialogProps = {
   open: boolean;
@@ -92,14 +94,11 @@ export const GuestBookingDialog = ({
     },
   });
 
-  const handleLocationSelect = (location: { lat: number; lng: number; address?: string }) => {
+  const handleLocationSelect = (location: { lat: number; lng: number }) => {
     setValue("lat", location.lat);
     setValue("lng", location.lng);
-    if (location.address) {
-      setValue("addressText", location.address);
-    }
-    setStep("form");
   };
+  const handleAddressResolved = (address: string) => setValue("addressText", address);
 
   const onSubmit = handleSubmit((values) => {
     createGuestBooking.mutate(values);
@@ -142,7 +141,7 @@ export const GuestBookingDialog = ({
               </p>
               {bookingId && (
                 <p className="text-sm text-slate-500">
-                  Booking ID: <span className="font-mono">{bookingId.slice(0, 8)}</span>
+                  Booking ID: <span className="font-mono">{bookingReference(bookingId)}</span>
                 </p>
               )}
               <Button onClick={handleClose} className="mt-6">
@@ -158,8 +157,9 @@ export const GuestBookingDialog = ({
               </p>
               <div className="h-80 rounded-xl overflow-hidden border border-slate-200">
                 <LocationPickerMap
-                  onLocationSelect={handleLocationSelect}
-                  initialLocation={hasLocation ? { lat, lng } : undefined}
+                  value={hasLocation ? { lat, lng } : null}
+                  onChange={handleLocationSelect}
+                  onAddressChange={handleAddressResolved}
                 />
               </div>
               <Button variant="outline" onClick={() => setStep("form")} className="w-full">
@@ -227,7 +227,7 @@ export const GuestBookingDialog = ({
                 </button>
                 {hasLocation && (
                   <p className="text-xs text-slate-500 mt-1">
-                    Location: {lat.toFixed(4)}, {lng.toFixed(4)}
+                    Location: <PlaceLabel lat={lat} lng={lng} />
                   </p>
                 )}
               </div>

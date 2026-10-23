@@ -38,7 +38,7 @@ test.describe("facility-local calendar in a real browser", () => {
   test.use({ timezoneId: NAIROBI });
 
   test("a device in Nairobi resolves a late-evening slot to the next local day", async ({ page }) => {
-    const result = await page.evaluate(`${CALENDAR}
+    const result = await page.evaluate<Record<string, string>>(`${CALENDAR}
       ({
         deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         // 21:30Z is 00:30 the next day in Nairobi.
@@ -65,7 +65,7 @@ test.describe("facility-local calendar in a real browser", () => {
   });
 
   test("renders the facility's clock, not the browser's", async ({ page }) => {
-    const times = await page.evaluate(`
+    const times = await page.evaluate<Record<string, string>>(`
       const fmt = (tz) => new Intl.DateTimeFormat("en-GB", {
         hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz
       }).format(new Date("2026-09-01T06:00:00Z"));
@@ -82,7 +82,7 @@ test.describe("a device outside the facility's zone", () => {
   test.use({ timezoneId: "America/Los_Angeles" });
 
   test("the facility's calendar does not follow the device", async ({ page }) => {
-    const result = await page.evaluate(`${CALENDAR}
+    const result = await page.evaluate<Record<string, string>>(`${CALENDAR}
       ({
         deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         facilityDate: facilityLocalDate("2026-09-01T21:30:00Z", "${NAIROBI}"),
@@ -101,7 +101,7 @@ test.describe("a DST-observing facility", () => {
   test.use({ timezoneId: NAIROBI });
 
   test("offsets shift across a transition", async ({ page }) => {
-    const offsets = await page.evaluate(`
+    const offsets = await page.evaluate<Record<string, string>>(`
       const fmt = (iso) => new Intl.DateTimeFormat("en-GB", {
         hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/New_York"
       }).format(new Date(iso));

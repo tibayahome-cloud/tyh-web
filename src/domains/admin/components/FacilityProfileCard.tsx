@@ -167,7 +167,7 @@ export const FacilityProfileCard = ({ facility, onEditContactAndHours, onSaved }
   return (
     <Card
       title="Facility profile"
-      subtitle="Identity, location, commercial terms and status. Only a super admin can change these."
+      subtitle="Identity, location, commercial terms and status. Contact support to change these."
       badge={badge}
     >
       {!editing ? (

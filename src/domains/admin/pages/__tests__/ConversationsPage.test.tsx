@@ -45,14 +45,14 @@ const thread = (overrides: Partial<Thread> = {}): Thread => ({
       userId: "admin-1",
       roleHint: "admin",
       muted: false,
-      user: { id: "admin-1", fullName: "Admin User", avatarUrl: null, email: null, phone: null, countryCode: null, roles: [], permissions: [] }
+      user: { id: "admin-1", fullName: "Admin User", avatarUrl: null, email: null, phone: null, countryCode: null, phoneVerifiedAt: null, roles: [], permissions: [] }
     },
     {
       id: "participant-2",
       userId: "client-1",
       roleHint: "client",
       muted: false,
-      user: { id: "client-1", fullName: "Jane Wanjiru", avatarUrl: null, email: "jane@example.test", phone: "+254712345678", countryCode: "KE", roles: [], permissions: [] }
+      user: { id: "client-1", fullName: "Jane Wanjiru", avatarUrl: null, email: "jane@example.test", phone: "+254712345678", countryCode: "KE", phoneVerifiedAt: null, roles: [], permissions: [] }
     }
   ],
   messages: [],
@@ -71,7 +71,7 @@ describe("filterThreadsBySearch", () => {
           userId: "provider-1",
           roleHint: "provider",
           muted: false,
-          user: { id: "provider-1", fullName: "Dr. Kevin Mwangi", avatarUrl: null, email: "kevin@example.test", phone: null, countryCode: null, roles: [], permissions: [] }
+          user: { id: "provider-1", fullName: "Dr. Kevin Mwangi", avatarUrl: null, email: "kevin@example.test", phone: null, countryCode: null, phoneVerifiedAt: null, roles: [], permissions: [] }
         }
       ]
     })
@@ -136,7 +136,7 @@ describe("ConversationsPage", () => {
                     userId: "provider-1",
                     roleHint: "provider",
                     muted: false,
-                    user: { id: "provider-1", fullName: "Dr. Kevin Mwangi", avatarUrl: null, email: "kevin@example.test", phone: null, countryCode: null, roles: [], permissions: [] }
+                    user: { id: "provider-1", fullName: "Dr. Kevin Mwangi", avatarUrl: null, email: "kevin@example.test", phone: null, countryCode: null, phoneVerifiedAt: null, roles: [], permissions: [] }
                   }
                 ]
               })

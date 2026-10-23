@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AxiosError } from "axios";
+import { AxiosError, AxiosHeaders } from "axios";
 
 import { TechnicalIssueDialog } from "../TechnicalIssueDialog";
 
@@ -48,7 +48,7 @@ describe("TechnicalIssueDialog", () => {
         status: 400,
         statusText: "",
         headers: {},
-        config: {},
+        config: { headers: new AxiosHeaders() },
         data: { error: { message: "Reporting window has passed for this appointment" } }
       })
     );
@@ -80,6 +80,6 @@ describe("TechnicalIssueDialog", () => {
 
   it("never claims a refund or resolution in its copy", () => {
     render(<TechnicalIssueDialog open bookingId="booking-1" onClose={vi.fn()} />);
-    expect(screen.getByText(/doesn't request a refund/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not request a refund/i)).toBeInTheDocument();
   });
 });

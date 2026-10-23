@@ -14,13 +14,15 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { api } from "../../../../shared/libs/api";
 import { buildFieldParams, serviceCategoryAdmin } from "../../../../shared/libs/fieldInclude";
+import {
+  AMBULANCE_CATEGORY,
+  categoriesOfKind,
+  categoryDescription,
+  type AdminServiceCategory,
+  type ManagedKind
+} from "../../utils/serviceCategories";
 
-type ServiceCategory = {
-  id: string;
-  key: string;
-  name: string;
-  description?: string | null;
-};
+type ServiceCategory = AdminServiceCategory;
 
 type Envelope<T> = {
   data: T;
@@ -53,7 +55,7 @@ const useCategoriesQuery = () =>
     }
   });
 
-export const ServiceCatalogPanel = () => {
+export const ServiceCatalogPanel = ({ kind = "home_based" }: { kind?: ManagedKind }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data, isFetching } = useCategoriesQuery();
@@ -168,14 +170,27 @@ export const ServiceCatalogPanel = () => {
     setPendingDelete(category);
   };
 
+  const createAmbulanceCategory = useMutation({
+    mutationFn: async () => {
+      await api.post("/service-categories", { ...AMBULANCE_CATEGORY, description: "Ambulance transport and emergency services" });
+    },
+    onSuccess: () => {
+      toast.showToast({ title: "Ambulance category created", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["admin", "service-categories"] }).catch(() => undefined);
+    },
+    onError: (error: unknown) =>
+      toast.showToast({ title: "Unable to create the category", description: error instanceof Error ? error.message : "Try again.", variant: "error" })
+  });
+
   const rows = useMemo(
     () =>
-      (data ?? []).map((category) => ({
+      categoriesOfKind(data, kind).map((category) => ({
         ...category,
-        description: category.description || "—"
+        description: categoryDescription(category)
       })),
-    [data]
+    [data, kind]
   );
+  const ambulanceMissing = kind === "ambulance" && !(data ?? []).some((category) => category.key === AMBULANCE_CATEGORY.key);
 
   const onSubmit = handleSubmit((values) => mutation.mutate(values));
 
@@ -186,7 +201,16 @@ export const ServiceCatalogPanel = () => {
         description="Organize services into manageable groups. Categories help providers navigate available offerings."
       >
         <div className="flex justify-end">
-          <Button onClick={openCreate}>Create category</Button>
+          {kind === "ambulance" ? (
+            // Ambulance is one category on its own; its services belong in it, so there is nothing else to create.
+            ambulanceMissing && (
+              <Button onClick={() => createAmbulanceCategory.mutate()} loading={createAmbulanceCategory.isPending}>
+                Create the Ambulance category
+              </Button>
+            )
+          ) : (
+            <Button onClick={openCreate}>Create category</Button>
+          )}
         </div>
       </Card>
 
@@ -200,28 +224,32 @@ export const ServiceCatalogPanel = () => {
             {
               field: "actions",
               headerName: "",
-              minWidth: 160,
+              minWidth: 200,
               sortable: false,
-              renderCell: (params) => (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => openEdit(params.row)}>
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => confirmDelete(params.row)}>
-                    Delete
-                  </Button>
-                </div>
-              )
+              renderCell: (params) =>
+                params.row.is_system ? (
+                  // The category that holds video consultations: changing it here could break live services.
+                  <span className="text-sm text-slate-600">Managed in Telemedicine</span>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => openEdit(params.row)}>
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => confirmDelete(params.row)}>
+                      Delete
+                    </Button>
+                  </div>
+                )
             }
           ]}
-          loading={isFetching || mutation.isLoading || deleteMutation.isLoading}
+          loading={isFetching || mutation.isPending || deleteMutation.isPending}
         />
       </Card>
 
       <Modal
         open={modalOpen}
         onClose={() => {
-          if (!mutation.isLoading) {
+          if (!mutation.isPending) {
             setModalOpen(false);
             setEditing(null);
           }
@@ -270,10 +298,10 @@ export const ServiceCatalogPanel = () => {
         description="This category will be hidden for all users. Delete only if services are already reassigned."
         confirmLabel="Delete"
         confirmVariant="secondary"
-        loading={deleteMutation.isLoading}
+        loading={deleteMutation.isPending}
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
         onClose={() => {
-          if (!deleteMutation.isLoading) {
+          if (!deleteMutation.isPending) {
             setPendingDelete(null);
           }
         }}

@@ -71,7 +71,8 @@ export const svcCard: FieldPreset = {
     "default_estimate_minutes",
     "is_emergency_capable",
     "active",
-    "remote_capable"
+    "remote_capable",
+    "care_type"
   ],
   includes: {
     category: {
@@ -148,7 +149,8 @@ export const providerProfile: FieldPreset = {
   ],
   includes: {
     facility: {
-      fields: ["id", "name", "provider_financials_visible"]
+      // type and county only label the provider's affiliation on their dashboard.
+      fields: ["id", "name", "facility_type", "county", "provider_financials_visible"]
     },
     user: {
       // status is needed to show whether the provider's account is active; without it the UI
@@ -325,7 +327,7 @@ export const providerApplicationAdmin: FieldPreset = {
 
 export const serviceCategoryAdmin: FieldPreset = {
   resource: "service_categories",
-  fields: ["id", "key", "name", "description"],
+  fields: ["id", "key", "name", "description", "is_system", "care_type"],
   includes: {}
 };
 

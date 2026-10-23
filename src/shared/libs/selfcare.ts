@@ -170,7 +170,7 @@ export const fetchSelfCareAlerts = async (filters: SelfCareAlertFilters = {}): P
     params.client_id = normalized.clientId;
   }
   const response = await api.get("/selfcare/alerts", { params });
-  const entries = Array.isArray(response.data?.data) ? response.data.data : [];
+  const entries: unknown[] = Array.isArray(response.data?.data) ? response.data.data : [];
   return entries
     .map((entry) => mapSelfCareAlert(entry))
     .filter((entry): entry is SelfCareAlert => Boolean(entry));

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GridColDef } from "@mui/x-data-grid";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -253,7 +253,7 @@ const useUserListQuery = (status: string, search: string, page: number, pageSize
         },
       };
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
 const MetricCard = ({ label, primary, secondary }: { label: string; primary: string; secondary?: string }) => (
@@ -521,7 +521,7 @@ const UserManagementPage = () => {
         <select
           value={draftStatusFilter}
           onChange={(event) => setDraftStatusFilter(event.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/40"
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -599,7 +599,7 @@ const UserManagementPage = () => {
                   </div>
                 </>
               ) : (
-                <div className="absolute left-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl md:left-auto md:right-0">
+                <div className="absolute left-0 top-full z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
                   {filterPanel}
                 </div>
               ))}

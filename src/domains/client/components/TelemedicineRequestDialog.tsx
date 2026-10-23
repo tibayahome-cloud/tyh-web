@@ -51,6 +51,7 @@ import {
   groupSlotsByFacilityLocalDate,
   TELEMEDICINE_DEFAULT_TIMEZONE
 } from "../../../shared/utils/telemedicine";
+import { bookingReference } from "../../../shared/utils/bookingReference";
 
 type TelemedicineRequestDialogProps = {
   open: boolean;
@@ -858,7 +859,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             {submitError && <ApiErrorBanner category={submitError.category} message={submitError.message} />}
             {!slotsQuery.isLoading && !slotsQuery.isError && (slotsQuery.data?.slots ?? []).length === 0 && (
               <p className="text-sm text-slate-500">
-                No open appointments in the next {WEEK_LENGTH} days at this facility.
+                No open appointments in the next {WEEK_LENGTH} days at this facility. Try another facility, or check
+                back later.
               </p>
             )}
             {!slotsQuery.isLoading && !slotsQuery.isError && slotsForActiveDate.length === 0 &&
@@ -959,7 +961,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                     <p className="text-sm text-slate-600">Waiting for M-Pesa confirmation...</p>
                     <MpesaPaymentInstructions
                       amountCents={selectedFacility.priceCents}
-                      accountNumber={hold?.bookingId?.slice(0, 8).toUpperCase() ?? "TELEMED"}
+                      accountNumber={(hold?.bookingId ? bookingReference(hold.bookingId) : "TELEMED")}
                     />
                   </div>
                 )}

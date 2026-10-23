@@ -10,7 +10,7 @@ import {
 } from "react";
 import classNames from "classnames";
 
-export type ToastVariant = "info" | "success" | "error";
+export type ToastVariant = "info" | "success" | "warning" | "error";
 
 export type ToastOptions = {
   title?: string;
@@ -118,6 +118,7 @@ type ToastCardProps = {
 const variantClasses: Record<ToastVariant, string> = {
   info: "border-primary-100 bg-white text-slate-800",
   success: "border-emerald-100 bg-emerald-50 text-emerald-900",
+  warning: "border-amber-200 bg-amber-50 text-amber-950",
   error: "border-rose-100 bg-rose-50 text-rose-900"
 };
 

@@ -14,6 +14,7 @@ import {
   usePayBookingMutation
 } from "../../../../shared/hooks/useBookings";
 import { useTelemedicineReschedules } from "../../../../shared/hooks/useTelemedicine";
+import { useOpenBookingChat } from "../../../../shared/hooks/useOpenBookingChat";
 import { Card } from "../../../../shared/components/Card";
 import { Loading } from "../../../../shared/components/Loading";
 import { Button } from "../../../../shared/components/Button";
@@ -22,6 +23,7 @@ import ReassignBookingModal from "../../components/ReassignBookingModal";
 import TelemedicineReassignModal from "../../components/TelemedicineReassignModal";
 import CancelBookingDialog from "../../components/CancelBookingDialog";
 import { formatTelemedicineDateTime } from "../../../../shared/utils/telemedicine";
+import { formatBookingStatus, getBookingStatusTheme, getSessionStatusTheme } from "../../../../shared/utils/bookingStatus";
 
 // Final states: nothing can be cancelled or assigned from here.
 const CLOSED_STATUSES = [
@@ -31,6 +33,9 @@ const CLOSED_STATUSES = [
   "fully_completed",
   "disputed"
 ];
+
+// A telemedicine request is only worth a provider's time once the client has paid.
+const UNPAID_TELEMEDICINE_STATUSES = ["telemedicine_payment_pending"];
 
 const STK_PUSH_ELIGIBLE_STATUSES = ["client_completed", "completed_by_provider"];
 
@@ -47,11 +52,8 @@ const AdminBookingDetailPage = () => {
   const [stkModalOpen, setStkModalOpen] = useState(false);
   const [stkPhone, setStkPhone] = useState("");
   const [stkPhoneError, setStkPhoneError] = useState("");
-  const dispatchChat = (id: string) => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("chat:open", { detail: { bookingId: id } }));
-    }
-  };
+  const { openBookingChat } = useOpenBookingChat("/admin/conversations");
+  const dispatchChat = (id: string) => void openBookingChat(id);
 
   const booking = detailQuery.data;
   const events = eventsQuery.data ?? [];
@@ -61,8 +63,10 @@ const AdminBookingDetailPage = () => {
     if (userId && userId === booking?.provider?.id) return "Provider";
     return "Participant";
   };
+  const isUnpaidTelemedicine = Boolean(booking?.isTelemedicine && UNPAID_TELEMEDICINE_STATUSES.includes(booking.status));
   const canReassignTelemedicine = Boolean(
     booking?.isTelemedicine &&
+      !isUnpaidTelemedicine &&
       booking.provider &&
       !booking.telemedicineSession?.providerJoinedAt &&
       !booking.telemedicineSession?.clientJoinedAt &&
@@ -149,9 +153,16 @@ const AdminBookingDetailPage = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Booking {booking.id}</h1>
-          <p className="text-sm text-slate-500">
-            {booking.client?.fullName ?? "Client"} · {booking.service?.name ?? "Service"} · {booking.status}
+          <h1 className="text-xl font-semibold text-slate-900">
+            {booking.service?.name ?? "Booking"} for {booking.client?.fullName ?? "the client"}
+          </h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <span
+              className={classNames("rounded-full px-3 py-1 text-sm font-medium", getBookingStatusTheme(booking.status).className)}
+            >
+              {formatBookingStatus(booking.status)}
+            </span>
+            <span>{booking.isTelemedicine ? "Telemedicine" : "Home based"}</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -160,9 +171,7 @@ const AdminBookingDetailPage = () => {
               Reassign provider
             </Button>
           )}
-          {canAssignTelemedicine && (
-            <Button onClick={() => setReassignOpen(true)}>Assign provider</Button>
-          )}
+          {canAssignTelemedicine && <Button onClick={() => setReassignOpen(true)}>Assign provider</Button>}
           {canReassignTelemedicine && (
             <Button variant="secondary" onClick={() => setReassignOpen(true)}>
               Reassign provider
@@ -185,6 +194,13 @@ const AdminBookingDetailPage = () => {
         </div>
       </div>
 
+      {isUnpaidTelemedicine && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+          <p className="font-semibold">Waiting for the client to pay.</p>
+          <p className="mt-1">A provider can be assigned once the payment goes through.</p>
+        </div>
+      )}
+
       {booking.status === "telemedicine_cancelled_payment_review" && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
           <p className="font-semibold">This booking was cancelled after payment.</p>
@@ -196,22 +212,22 @@ const AdminBookingDetailPage = () => {
       )}
 
       {booking.isTelemedicine ? (
-        <Card title="Video consultation" description="Remote appointment details and session state">
+        <Card title="Telemedicine consultation" description="Remote appointment details and session state">
           <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Appointment</p>
+              <p className="text-sm text-slate-600">Appointment</p>
               <p className="mt-1 font-medium">{formatTelemedicineDateTime(booking.scheduledAt)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Provider</p>
+              <p className="text-sm text-slate-600">Provider</p>
               <p className="mt-1 font-medium">{booking.provider?.fullName ?? "Unassigned"}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Session</p>
-              <p className="mt-1 font-medium">{booking.telemedicineSession?.status ?? "Not started"}</p>
+              <p className="text-sm text-slate-600">Session</p>
+              <p className="mt-1 font-medium">{booking.telemedicineSession?.status ? getSessionStatusTheme(booking.telemedicineSession.status).label : "Not started"}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration</p>
+              <p className="text-sm text-slate-600">Duration</p>
               <p className="mt-1 font-medium">
                 {booking.estimateDurationMinutes ? `${booking.estimateDurationMinutes} minutes` : "Not provided"}
               </p>
@@ -240,7 +256,7 @@ const AdminBookingDetailPage = () => {
                     <p className="font-semibold text-slate-900">
                       {participantLabel(request.requestedByUserId)} proposal
                     </p>
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold uppercase text-slate-600">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium capitalize text-slate-700">
                       {request.status.replace(/_/g, " ")}
                     </span>
                   </div>
@@ -279,10 +295,10 @@ const AdminBookingDetailPage = () => {
                     <p className="font-semibold text-slate-900">{event.action.replace(/_/g, " ")}</p>
                     <p className="text-xs text-slate-400">{event.at ? new Date(event.at).toLocaleString() : ""}</p>
                   </div>
-                  {event.payload?.reason && (
+                  {Boolean(event.payload?.reason) && (
                     <p className="text-xs text-slate-500">Reason: {String(event.payload.reason)}</p>
                   )}
-                  {event.payload?.note && (
+                  {Boolean(event.payload?.note) && (
                     <p className="text-xs text-slate-500">Note: {String(event.payload.note)}</p>
                   )}
                 </li>

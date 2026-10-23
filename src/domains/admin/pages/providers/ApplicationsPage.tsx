@@ -676,7 +676,7 @@ const ProviderApplicationsPage = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="absolute left-0 z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl md:left-auto md:right-0">
+                    <div className="absolute left-0 top-full z-[60] mt-2 w-80 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
                       {filterPanel}
                     </div>
                   ))}
@@ -775,7 +775,7 @@ const ProviderApplicationsPage = () => {
                                   type="button"
                                   variant="ghost"
                                   className="px-3 py-1 text-xs text-rose-600"
-                                  disabled={reviewMutation.isLoading}
+                                  disabled={reviewMutation.isPending}
                                   onClick={() => setConfirmState({ action: "rejected", id: card.id })}
                                 >
                                   Reject
@@ -784,7 +784,7 @@ const ProviderApplicationsPage = () => {
                                   type="button"
                                   variant="ghost"
                                   className="px-3 py-1 text-xs text-emerald-600"
-                                  disabled={reviewMutation.isLoading}
+                                  disabled={reviewMutation.isPending}
                                   onClick={() => setConfirmState({ action: "approved", id: card.id })}
                                 >
                                   Approve
@@ -840,7 +840,7 @@ const ProviderApplicationsPage = () => {
                   size="sm"
                   variant="ghost"
                   onClick={openAddRequirement}
-                  disabled={availableRequirements.length === 0 || addRequirementMutation.isLoading}
+                  disabled={availableRequirements.length === 0 || addRequirementMutation.isPending}
                 >
                   Add requirement
                 </Button>
@@ -893,7 +893,7 @@ const ProviderApplicationsPage = () => {
                               size="sm"
                               variant="ghost"
                               onClick={() => openResubmission(item)}
-                              disabled={requestResubmissionMutation.isLoading}
+                              disabled={requestResubmissionMutation.isPending}
                             >
                               Request resubmission
                             </Button>
@@ -913,13 +913,13 @@ const ProviderApplicationsPage = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
                 variant="secondary"
-                disabled={reviewMutation.isLoading}
+                disabled={reviewMutation.isPending}
                 onClick={() => detail?.id && setConfirmState({ action: "rejected", id: detail.id })}
               >
                 Reject
               </Button>
               <Button
-                disabled={reviewMutation.isLoading}
+                disabled={reviewMutation.isPending}
                 onClick={() => detail?.id && setConfirmState({ action: "approved", id: detail.id })}
               >
                 Approve
@@ -950,13 +950,13 @@ const ProviderApplicationsPage = () => {
               ))}
             </select>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeAddRequirement} disabled={addRequirementMutation.isLoading}>
+              <Button variant="secondary" onClick={closeAddRequirement} disabled={addRequirementMutation.isPending}>
                 Cancel
               </Button>
               <Button
                 onClick={() => selectedRequirementId && addRequirementMutation.mutate(selectedRequirementId)}
                 disabled={!selectedRequirementId}
-                loading={addRequirementMutation.isLoading}
+                loading={addRequirementMutation.isPending}
               >
                 Add
               </Button>
@@ -989,7 +989,7 @@ const ProviderApplicationsPage = () => {
               <Button
                 variant="secondary"
                 onClick={closeResubmission}
-                disabled={requestResubmissionMutation.isLoading}
+                disabled={requestResubmissionMutation.isPending}
               >
                 Cancel
               </Button>
@@ -999,7 +999,7 @@ const ProviderApplicationsPage = () => {
                     note: resubmissionNote.trim() ? resubmissionNote.trim() : undefined
                   })
                 }
-                loading={requestResubmissionMutation.isLoading}
+                loading={requestResubmissionMutation.isPending}
               >
                 Send request
               </Button>
@@ -1020,10 +1020,10 @@ const ProviderApplicationsPage = () => {
         }
         confirmLabel={confirmState?.action === "approved" ? "Approve" : "Reject"}
         confirmVariant={confirmState?.action === "approved" ? "primary" : "secondary"}
-        loading={reviewMutation.isLoading}
+        loading={reviewMutation.isPending}
         onConfirm={() => confirmState && handleReview(confirmState.action, confirmState.id)}
         onClose={() => {
-          if (!reviewMutation.isLoading) {
+          if (!reviewMutation.isPending) {
             setConfirmState(null);
           }
         }}

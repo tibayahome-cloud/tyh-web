@@ -10,7 +10,8 @@ const ops = vi.hoisted(() => ({
   acceptReschedule: vi.fn(),
   declineReschedule: vi.fn(),
   acceptRebookingOffer: vi.fn(),
-  declineRebookingOffer: vi.fn()
+  declineRebookingOffer: vi.fn(),
+  acknowledgeAttentionItem: vi.fn()
 }));
 vi.mock("../../libs/telemedicineOps", async (importOriginal) => ({ ...(await importOriginal<typeof import("../../libs/telemedicineOps")>()), ...ops }));
 
@@ -25,6 +26,12 @@ const offer = {
   kind: "rebooking_offer" as const, id: "o1", bookingId: "b2", proposedStartAt: "2026-10-17T09:00:00Z", expiresAt: "2026-10-16T09:00:00Z",
   reason: null, createdAt: "2026-10-15T11:00:00Z", currentStartAt: null, role: "client" as const,
   serviceName: "Counselling", fromName: "Psychare"
+};
+
+const confirmed = {
+  kind: "time_confirmed" as const, id: "t1", bookingId: "b3", proposedStartAt: "2026-10-20T09:00:00Z", expiresAt: null,
+  reason: null, createdAt: "2026-10-19T10:00:00Z", currentStartAt: "2026-10-20T09:00:00Z", role: "provider" as const,
+  serviceName: "Follow-up Consultation", fromName: "Sample Client", acknowledgeable: true
 };
 
 const renderCard = () =>
@@ -43,6 +50,7 @@ beforeEach(() => {
   ops.declineReschedule.mockResolvedValue({});
   ops.acceptRebookingOffer.mockResolvedValue(undefined);
   ops.declineRebookingOffer.mockResolvedValue(undefined);
+  ops.acknowledgeAttentionItem.mockResolvedValue(undefined);
 });
 
 describe("NeedsYourResponse", () => {
@@ -103,5 +111,38 @@ describe("NeedsYourResponse", () => {
     await user.click(within(card).getByRole("button", { name: "Accept new time" }));
     expect(await within(card).findByRole("alert")).toHaveTextContent("The provider is not free at the proposed time");
     expect(screen.getByText(/proposed a new time/)).toBeInTheDocument();
+  });
+
+  describe("a confirmed new time", () => {
+    it("is shown as an update with nothing to answer, and is dismissed by 'Got it'", async () => {
+      ops.fetchTelemedicineAttention.mockResolvedValue([confirmed]);
+      const user = userEvent.setup();
+      renderCard();
+
+      const section = await screen.findByRole("region", { name: /Updates/ });
+      expect(within(section).getByText("Follow-up Consultation with Sample Client has a new confirmed time")).toBeInTheDocument();
+      expect(within(section).getByText("New time")).toBeInTheDocument();
+      expect(within(section).getByText(/There is nothing you need to do/)).toBeInTheDocument();
+      expect(within(section).queryByRole("button", { name: "Accept new time" })).not.toBeInTheDocument();
+      expect(within(section).queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
+
+      await user.click(within(section).getByRole("button", { name: "Got it" }));
+      await waitFor(() => expect(ops.acknowledgeAttentionItem).toHaveBeenCalledWith("t1"));
+    });
+
+    it("is also dismissed by opening the booking", async () => {
+      ops.fetchTelemedicineAttention.mockResolvedValue([confirmed]);
+      const user = userEvent.setup();
+      renderCard();
+
+      await user.click(await screen.findByRole("link", { name: "View booking" }));
+      await waitFor(() => expect(ops.acknowledgeAttentionItem).toHaveBeenCalledWith("t1"));
+    });
+
+    it("still says 'Needs your response' when a proposal is waiting alongside it", async () => {
+      ops.fetchTelemedicineAttention.mockResolvedValue([reschedule, confirmed]);
+      renderCard();
+      expect(await screen.findByRole("region", { name: /Needs your response \(2\)/ })).toBeInTheDocument();
+    });
   });
 });

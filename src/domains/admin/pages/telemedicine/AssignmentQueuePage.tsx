@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ClipboardList, Flag, RefreshCw, Video } from "lucide-react";
 
 import { Card } from "../../../../shared/components/Card";
@@ -9,6 +9,7 @@ import { ApiErrorBanner } from "../../../../shared/components/ApiErrorBanner";
 import { StickyFilterBar } from "../../../../shared/components/StickyFilterBar";
 import { TechnicalIssueReviewList } from "../../../../shared/components/TechnicalIssueReviewList";
 import { useToast } from "../../../../shared/components/ToastProvider";
+import { TimeSlotPicker } from "../../../../shared/components/TimeSlotPicker";
 import {
   useAssignProviderMutation,
   useAssignmentQueue,
@@ -18,12 +19,13 @@ import {
 } from "../../../../shared/hooks/useTelemedicine";
 import { useBookingList } from "../../../../shared/hooks/useBookings";
 import {
-  facilityLocalToUtcIso,
   formatTelemedicineDateTime,
   splitTelemedicineBookings
 } from "../../../../shared/utils/telemedicine";
 import { getBookingStatusTheme, getSessionStatusTheme } from "../../../../shared/utils/bookingStatus";
 import { PreferenceSummary } from "../../components/PreferenceSummary";
+import { useNow } from "../../../../shared/hooks/useNow";
+import { groupAssignmentQueue, requestUrgency, type Urgency } from "../../utils/assignmentQueueGroups";
 import { classifyApiError, type ClassifiedApiError } from "../../../../shared/utils/errors";
 import type { Booking } from "../../../../shared/schemas/booking";
 import type { TelemedicineAssignmentBooking } from "../../../../shared/schemas/telemedicine";
@@ -76,25 +78,17 @@ const AssignProviderAction = ({ booking }: { booking: TelemedicineAssignmentBook
   );
 };
 
-const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+const OfferNewTimeAction = ({ booking }: { booking: TelemedicineAssignmentBooking }) => {
   const toast = useToast();
-  const [proposedStartAt, setProposedStartAt] = useState("");
+  const [proposedStartAt, setProposedStartAt] = useState<string | null>(null);
   const [offerError, setOfferError] = useState<ClassifiedApiError | null>(null);
   const proposeMutation = useProposeRebookingMutation();
 
   const handleOffer = async () => {
-    if (!proposedStartAt || !timezone) return;
+    if (!proposedStartAt) return;
     setOfferError(null);
-    // datetime-local carries no zone. Resolving it against the browser's would be right only
-    // for an operator who happens to be in the facility's timezone, and silently wrong -- with
-    // no error to notice -- for one who is not. The zone comes from the telemedicine policy.
-    const isoWithZone = facilityLocalToUtcIso(proposedStartAt, timezone);
-    if (!isoWithZone) {
-      setOfferError({ category: "bad_request", message: "That is not a valid date and time." });
-      return;
-    }
     try {
-      await proposeMutation.mutateAsync({ bookingId: booking.id, proposedStartAt: isoWithZone });
+      await proposeMutation.mutateAsync({ bookingId: booking.id, proposedStartAt });
       toast.showToast({ title: "New time offered to the client", variant: "success" });
     } catch (error) {
       setOfferError(classifyApiError(error, "Unable to offer that time."));
@@ -102,31 +96,22 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
   };
 
   return (
-    <div className="flex flex-col items-stretch gap-2 sm:items-end">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="datetime-local"
-          value={proposedStartAt}
-          onChange={(event) => setProposedStartAt(event.target.value)}
-          aria-label={`Choose a replacement time for ${booking.serviceName ?? "consultation"} with ${booking.clientFullName ?? "client"}`}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
-        />
-        <Button
-          size="sm"
-          // Held back until the policy resolves rather than falling back to the browser's zone:
-          // a guessed timezone books a real appointment at the wrong hour.
-          disabled={!proposedStartAt || !timezone}
-          loading={proposeMutation.isPending}
-          onClick={handleOffer}
-        >
-          Offer new time
-        </Button>
-      </div>
-      <p className="text-[11px] text-slate-500 sm:text-right">
-        {timezone
-          ? `Times are in the facility's timezone (${timezone}). The client is asked to accept, and is not charged again.`
-          : "Loading the facility's timezone…"}
-      </p>
+    <div className="flex w-full flex-col items-stretch gap-3 sm:max-w-md">
+      <TimeSlotPicker
+        bookingId={booking.id}
+        value={proposedStartAt}
+        onChange={setProposedStartAt}
+        label={`New time for ${booking.clientFullName ?? "the client"}`}
+      />
+      <p className="text-sm text-slate-600">The client is asked to accept, and is not charged again.</p>
+      <Button
+        className="self-start"
+        disabled={!proposedStartAt}
+        loading={proposeMutation.isPending}
+        onClick={handleOffer}
+      >
+        Offer this time
+      </Button>
       {offerError && <ApiErrorBanner category={offerError.category} message={offerError.message} />}
     </div>
   );
@@ -135,14 +120,28 @@ const OfferNewTimeAction = ({ booking, timezone }: { booking: TelemedicineAssign
 // The descriptive half of an assignment-queue row, shared by the desktop grid layout and the
 // mobile stack so each booking (and its PreferenceSummary fetch) mounts exactly once -- CSS
 // reflows this between a table-like two-column row and a stacked card, no duplicate DOM tree.
-const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => (
+const URGENCY_CLASSES: Record<Urgency["tone"], string> = {
+  overdue: "bg-rose-100 text-rose-900",
+  soon: "bg-amber-100 text-amber-900",
+  later: "bg-slate-100 text-slate-700"
+};
+
+const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+  const now = useNow(30_000);
+  // How pressing it is, in words, on requests the admin has to act on. A request waiting on the client is not urgent.
+  const urgency = booking.recoveryState === "awaiting_client" ? null : requestUrgency(booking, now);
+  return (
   <div className="min-w-0">
-    <p className="font-semibold text-slate-900">{booking.serviceName ?? "Consultation"}</p>
-    <p className="text-xs text-slate-400">{booking.id}</p>
-    <p className="text-sm text-slate-700">{booking.clientFullName ?? booking.clientUserId}</p>
-    <p className="text-xs text-slate-500">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
+    {urgency && (
+      <p role="status" className={`mb-1.5 inline-flex rounded-full px-2.5 py-0.5 text-sm font-semibold ${URGENCY_CLASSES[urgency.tone]}`}>
+        {urgency.label}
+      </p>
+    )}
+    <p className="text-base font-semibold text-slate-900">{booking.serviceName ?? "Consultation"}</p>
+    <p className="text-sm text-slate-700">{booking.clientFullName ?? "Client"}</p>
+    <p className="text-sm text-slate-600">{formatTelemedicineDateTime(booking.scheduledAt, timezone)}</p>
     {booking.recoveryState !== "assignable" && (
-      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
         {booking.recoveryState === "awaiting_client"
           ? "A replacement time has been offered. Waiting for the client to accept."
           : "This appointment's slot was released before a provider was assigned. Offer the client another time, or refund the payment from the review queue."}
@@ -151,30 +150,31 @@ const AssignmentRowDetails = ({ booking, timezone }: { booking: TelemedicineAssi
     <PreferenceSummary bookingId={booking.id} />
     <Link
       to={`/admin/bookings/${booking.id}`}
-      className="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:underline"
+      className="mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue"
     >
       View consultation details
     </Link>
   </div>
-);
+  );
+};
 
 // One action per row, chosen by the backend rather than guessed here. A booking whose slot
 // lapsed used to render an Assign button the API would always reject -- the operator saw a
 // provider they could pick and an error every time they picked one.
-const AssignmentRowAction = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => {
+const AssignmentRowAction = ({ booking }: { booking: TelemedicineAssignmentBooking }) => {
   if (booking.recoveryState === "assignable") return <AssignProviderAction booking={booking} />;
-  if (booking.recoveryState === "needs_rebooking") return <OfferNewTimeAction booking={booking} timezone={timezone} />;
+  if (booking.recoveryState === "needs_rebooking") return <OfferNewTimeAction booking={booking} />;
   if (booking.recoveryState === "awaiting_client") {
-    return <span className="text-xs font-semibold text-slate-500">Awaiting client</span>;
+    return <span className="text-sm font-semibold text-slate-600">Awaiting client</span>;
   }
   return null;
 };
 
 const AssignmentQueueRow = ({ booking, timezone }: { booking: TelemedicineAssignmentBooking; timezone: string | undefined }) => (
-  <div className="grid grid-cols-1 gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-x-6">
+  <div className="grid grid-cols-1 gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] md:items-start md:gap-x-6">
     <AssignmentRowDetails booking={booking} timezone={timezone} />
     <div className="flex md:justify-end">
-      <AssignmentRowAction booking={booking} timezone={timezone} />
+      <AssignmentRowAction booking={booking} />
     </div>
   </div>
 );
@@ -270,13 +270,13 @@ const SummaryStat = ({
     // every poll tick would be noise, not information.
     <div
       role="group"
-      className={`rounded-xl border px-3 py-2 ${toneClass}`}
+      className={`rounded-xl border px-4 py-3 ${toneClass}`}
       aria-label={`${value} ${label}`}
     >
-      <p aria-hidden="true" className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
+      <p aria-hidden="true" className="text-sm font-medium">
         {label}
       </p>
-      <p aria-hidden="true" className="text-xl font-bold tabular-nums">
+      <p aria-hidden="true" className="text-2xl font-bold tabular-nums">
         {value}
       </p>
     </div>
@@ -292,10 +292,16 @@ const AssignmentQueuePage = () => {
     { isTelemedicine: true, pageSize: 100, preset: "card" },
     { refetchInterval: 60_000 }
   );
-  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>("queue");
+  // A link from the facility overview can open straight onto a tab (?tab=review).
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>(
+    WORKSPACE_TABS.some((tab) => tab.key === requestedTab) ? (requestedTab as WorkspaceTabKey) : "queue"
+  );
   const [consultationFilter, setConsultationFilter] = useState<ConsultationFilterKey>("upcoming");
 
   const bookings = queueQuery.data ?? [];
+  const queueGroups = groupAssignmentQueue(bookings);
   const consultations = (consultationsQuery.data?.bookings ?? []).filter((booking) => booking.isTelemedicine);
   const { upcoming: notYetHistoricalConsultations, history: consultationHistory } = splitTelemedicineBookings(consultations);
   const activeConsultations = notYetHistoricalConsultations.filter(isConsultationInSession);
@@ -454,16 +460,32 @@ const AssignmentQueuePage = () => {
             ) : bookings.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">No consultations waiting for assignment.</p>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {/* Column header only where there's room for the action column to read as a
-                    column; the mobile stack below md doesn't need one repeated per row. */}
-                <div className="hidden bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:gap-x-6">
-                  <span>Consultation</span>
-                  <span className="text-right">Action</span>
-                </div>
-                {bookings.map((booking) => (
-                  <AssignmentQueueRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
-                ))}
+              <div className="space-y-6 p-4 sm:p-6">
+                {([
+                  { key: "assign", title: "Assign a provider", note: "Soonest appointment first", items: queueGroups.assign, quiet: false },
+                  { key: "rebook", title: "Offer a new time", note: "Offer the client another time", items: queueGroups.rebook, quiet: false },
+                  { key: "waiting", title: "Waiting for the client", note: "A replacement time was offered. Nothing to do yet", items: queueGroups.waiting, quiet: true }
+                ] as const)
+                  .filter((group) => group.items.length > 0)
+                  .map((group) => (
+                    <section key={group.key} aria-label={group.title} className="space-y-2">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <h2 className={group.quiet ? "text-base font-semibold text-slate-700" : "text-lg font-bold text-slate-900"}>
+                          {group.title} <span className="font-normal text-slate-600">({group.items.length})</span>
+                        </h2>
+                        <p className="text-sm text-slate-600">{group.note}</p>
+                      </div>
+                      <div
+                        className={`divide-y divide-slate-100 rounded-2xl border ${
+                          group.quiet ? "border-slate-100 bg-slate-50" : "border-slate-200 bg-white shadow-sm"
+                        }`}
+                      >
+                        {group.items.map((booking) => (
+                          <AssignmentQueueRow key={booking.id} booking={booking} timezone={policyQuery.data?.defaultTimezone} />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
               </div>
             )}
           </Card>

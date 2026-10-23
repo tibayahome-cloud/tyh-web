@@ -39,6 +39,9 @@ import { defaultServiceKind, splitServicesByKind, type ServiceKind } from "../..
 import { FacilityBookingsPanel } from "../../components/FacilityBookingsPanel";
 import { FacilityProvidersManager } from "./FacilityProvidersPage";
 import { FacilitySetupChecklist as FacilitySetupChecklistCard } from "../../components/FacilitySetupChecklist";
+import { LiveStatusCard, type LiveFix } from "../../../../shared/components/LiveStatusCard";
+import { useFacilityLiveStatus } from "../../../../shared/hooks/useLiveStatus";
+import type { LiveBlocker } from "../../../../shared/libs/liveStatus";
 import { facilitySetupChecklist } from "../../../../shared/utils/telemedicineReadiness";
 import { FacilityProfileCard } from "../../components/FacilityProfileCard";
 import { FacilityAdministratorsSection } from "../../components/FacilityAdministratorsSection";
@@ -629,6 +632,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     { id: "finance", label: "Finance", available: canManageFinance }
   ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
+  const liveStatusQuery = useFacilityLiveStatus(facilityId, canReadFacilities);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [financialsVisible, setFinancialsVisible] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -829,7 +833,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     [telemedicineCatalogServices]
   );
   const availableNormalCatalogServices = useMemo(
-    () => availableCatalogServices.filter((service) => !telemedicineServiceIds.has(service.id)),
+    () => availableCatalogServices.filter((service) => !telemedicineServiceIds.has(service.id) && !service.remote_capable),
     [availableCatalogServices, telemedicineServiceIds]
   );
   const availableTelemedicineCatalogServices = useMemo(() => {
@@ -858,16 +862,29 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
 
   const editingTelemedicineService = Boolean(editingService && telemedicineServiceIds.has(editingService.serviceId));
 
-  const selectedCatalogServiceIsRemoteCapable = useMemo(() => {
-    const selected = (catalogQuery.data ?? []).find((service) => service.id === serviceForm.serviceId);
-    return Boolean(selected?.remote_capable);
-  }, [catalogQuery.data, serviceForm.serviceId]);
-
   const invalidateWorkspace = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "services"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities", facilityId, "bookings"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "facilities"] });
+    queryClient.invalidateQueries({ queryKey: ["live-status"] });
+  };
+
+  // Where each blocker is fixed in this workspace. Anything not fixable here says who can fix it.
+  const resolveLiveFix = (blocker: LiveBlocker): LiveFix => {
+    switch (blocker.fix) {
+      case "facility_services":
+        return { label: "Open services", onClick: () => setActiveTab("services") };
+      case "facility_providers":
+      case "provider_availability":
+        return { label: "Open providers", onClick: () => setActiveTab("providers") };
+      case "facility_status":
+        return { hint: "A platform admin activates a facility." };
+      case "facility_location":
+        return { hint: isSuperAdmin ? "Set the country in the facility profile below." : "Ask a platform admin to set it." };
+      default:
+        return { hint: "Check the facility settings." };
+    }
   };
 
   const visibilityMutation = useMutation({
@@ -886,7 +903,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       updateFacility(String(facilityId), {
         phones: form.phones.map((phone) => ({
           phone: phone.phone.trim(),
-          label: phone.label.trim() || null,
+          label: phone.label?.trim() || null,
           isPrimary: phone.isPrimary
         })),
         operatingHours: form.operatingHours
@@ -1220,6 +1237,17 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       >
       {activeTab === "overview" && (
         <div className="space-y-6">
+      {canReadFacilities && facilityId && (
+        <LiveStatusCard
+          title="Live for telemedicine"
+          subject="facility"
+          status={liveStatusQuery.data}
+          isLoading={liveStatusQuery.isLoading}
+          isError={liveStatusQuery.isError}
+          onRetry={() => void liveStatusQuery.refetch()}
+          resolveFix={resolveLiveFix}
+        />
+      )}
       {setupChecklist && (
         <FacilitySetupChecklistCard steps={setupChecklist.steps} firstMissing={setupChecklist.firstMissing} onOpenTab={setActiveTab} />
       )}
@@ -1312,7 +1340,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       <Modal
         open={settingsModalOpen}
         title="Edit facility operations settings"
-        description="Manage facility contact numbers and operating hours. Facility identity, email, and location are managed by a super admin."
+        description="Manage facility contact numbers and operating hours. To change the facility name, email or location, contact support."
         onClose={() => setSettingsModalOpen(false)}
         maxWidth="lg"
       >
@@ -1666,27 +1694,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                 </label>
                 )}
               </div>
-              {editingTelemedicineService ? (
+              {editingTelemedicineService && (
                 <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   Delivery: remote only. Telemedicine services are always delivered by video.
                 </p>
-              ) : (
-              <label className="flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
-                <span>Delivery mode</span>
-                <select
-                  value={serviceForm.deliveryMode}
-                  onChange={(event) => updateServiceForm("deliveryMode", event.target.value as ServiceFormState["deliveryMode"])}
-                  disabled={!selectedCatalogServiceIsRemoteCapable}
-                  className="h-[50px] rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 shadow-sm focus:border-tiba-blue focus:outline-none focus:ring-2 focus:ring-tiba-blue/20 disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="in_person">In-person only</option>
-                  <option value="remote" disabled={!selectedCatalogServiceIsRemoteCapable}>Remote only</option>
-                  <option value="both" disabled={!selectedCatalogServiceIsRemoteCapable}>In-person and remote</option>
-                </select>
-                {!selectedCatalogServiceIsRemoteCapable && (
-                  <span className="text-xs text-slate-500">This service isn&apos;t enabled for remote delivery in the global catalog.</span>
-                )}
-              </label>
               )}
             </>
           ) : (
@@ -1733,7 +1744,6 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                         className="h-4 w-4 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
                       />
                       <span>{service.name}</span>
-                      {service.remote_capable && !assigned && <span className="ml-auto text-xs font-medium text-tiba-blue">Remote capable</span>}
                       {assigned && <span className="ml-auto text-xs font-semibold text-green-700">Already assigned</span>}
                     </label>
                   );
@@ -1813,14 +1823,7 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
                           Active
                         </label>
                       </div>
-                      <label className="mt-3 flex w-full flex-col gap-1 text-sm font-medium text-slate-700">
-                        <span>Delivery mode</span>
-                        <select value={row.deliveryMode} onChange={(event) => setBulkServiceRows((rows) => rows.map((item) => item.serviceId === row.serviceId ? { ...item, deliveryMode: event.target.value as BulkServiceRow["deliveryMode"] } : item))} disabled={!row.remoteCapable} className="h-[46px] rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-50 disabled:text-slate-400">
-                          <option value="in_person">In-person only</option>
-                          <option value="remote">Remote only</option>
-                          <option value="both">In-person and remote</option>
-                        </select>
-                      </label>
+                      {row.isTelemedicine && <p className="mt-3 text-xs text-slate-500">Delivered by video.</p>}
                     </div>
                   ))}
                 </div>

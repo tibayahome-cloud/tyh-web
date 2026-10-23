@@ -129,7 +129,7 @@ export const mapFacilityProfileError = (
   error: unknown
 ): { field: FacilityProfileField | null; message: string } => {
   if (isAxiosError(error) && error.response?.status === 403) {
-    return { field: null, message: "Only a super admin can edit the facility profile." };
+    return { field: null, message: "Contact support to change the facility profile." };
   }
   const message = getApiError(error, "We could not save the facility. Try again.");
   const hint = FIELD_HINTS.find(([pattern]) => pattern.test(message));
