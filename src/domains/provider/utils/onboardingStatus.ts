@@ -33,6 +33,8 @@ export type OnboardingSummary = {
   documentsDueOn: string | null;
   documentsDaysLeft: number | null;
   documentsInOrder: boolean;
+  /** Already verified, so they keep taking bookings while documents are checked. */
+  providerVerified: boolean;
 };
 
 // An item the provider has supplied, whether or not a reviewer has looked at it yet.
@@ -70,7 +72,8 @@ export const mapOnboardingSummary = (raw: Record<string, unknown>): OnboardingSu
     documentsDueOn: typeof raw.documents_due_on === "string" ? raw.documents_due_on : null,
     documentsDaysLeft: typeof raw.documents_days_left === "number" ? raw.documents_days_left : null,
     // An older server sends nothing here; that means nothing is owed.
-    documentsInOrder: raw.documents_in_order !== false
+    documentsInOrder: raw.documents_in_order !== false,
+    providerVerified: raw.provider_verified === true || raw.status === "verified" || raw.status === "set_up_by_facility"
   };
 };
 
@@ -92,7 +95,7 @@ export type StatusCopy = {
 
 /** What to tell the provider, in plain words, for each status. */
 export const describeOnboarding = (summary: OnboardingSummary): StatusCopy => {
-  const { status, requiredDone, requiredTotal, nextItem, reviewerNote } = summary;
+  const { status, nextItem, reviewerNote } = summary;
   // A provider already working who still owes documents is told so first, ahead of "you are verified".
   if ((status === "verified" || status === "set_up_by_facility") && !summary.documentsInOrder && summary.documentsDaysLeft !== null && summary.documentsDaysLeft >= 0) {
     return {
@@ -114,7 +117,7 @@ export const describeOnboarding = (summary: OnboardingSummary): StatusCopy => {
       return summary.readyToSubmit
         ? { title: "Ready to send", message: "Everything is uploaded. Send it for review.", tone: "info" }
         : {
-            title: `Documents needed (${requiredDone} of ${requiredTotal})`,
+            title: "Documents needed",
             message: `${nextItem ? `Next: ${nextItem.label}.` : "Upload the documents below."}${
               summary.documentsDaysLeft !== null && summary.documentsDaysLeft >= 0
                 ? ` Due ${describeDaysLeft(summary.documentsDaysLeft)}; you can keep working until then.`

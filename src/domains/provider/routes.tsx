@@ -9,8 +9,8 @@ import { lazyWithRetry } from "../../shared/utils/lazyWithRetry";
 const ProviderHome = lazyWithRetry(() => import("./pages/Home"));
 const ProviderBookings = lazyWithRetry(() => import("./pages/Bookings"));
 const ProviderTelemedicine = lazyWithRetry(() => import("./pages/Telemedicine"));
-const ProviderOnboarding = lazyWithRetry(() => import("./pages/Onboarding"));
 const ProviderServices = lazyWithRetry(() => import("./pages/Services"));
+const ProviderDocuments = lazyWithRetry(() => import("./pages/Documents"));
 const ProviderAvailability = lazyWithRetry(() => import("./pages/Availability"));
 const ProviderPayments = lazyWithRetry(() => import("./pages/Payments"));
 const ProviderInbox = lazyWithRetry(() => import("./pages/Inbox"));
@@ -42,13 +42,15 @@ const buildRoutes = (): RouteObject[] => [
         )
       },
       {
-        path: "onboarding",
+        path: "documents",
         element: (
           <Suspense fallback={<Loading fullHeight />}>
-            <ProviderOnboarding />
+            <ProviderDocuments />
           </Suspense>
         )
       },
+      // The verification page and the documents page were the same list in two places. Old links land on the one page.
+      { path: "onboarding", element: <Navigate to="/pro/documents" replace /> },
       {
         path: "bookings",
         element: (

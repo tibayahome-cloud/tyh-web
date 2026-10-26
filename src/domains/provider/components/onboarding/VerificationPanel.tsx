@@ -1,73 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Loading } from "../../../shared/components/Loading";
-import { Button } from "../../../shared/components/Button";
-import { useToast } from "../../../shared/components/ToastProvider";
-import { useAuth } from "../../../shared/hooks/useAuth";
-import { useSocket } from "../../../shared/hooks/useSocket";
-import { api } from "../../../shared/libs/api";
-import { buildFieldParams, provApp } from "../../../shared/libs/fieldInclude";
-import { getApiError } from "../../../shared/utils/errors";
-import { useProviderProfile } from "../hooks/useProviderProfile";
-import { onboardingStatusKey, useOnboardingStatus } from "../hooks/useOnboardingStatus";
-import { OnboardingChecklist, type ChecklistItem } from "../components/onboarding/OnboardingChecklist";
-import { OnboardingStatusCard } from "../components/onboarding/OnboardingStatusCard";
-import { DocumentPreviewModal } from "../components/onboarding/DocumentPreviewModal";
+import { Loading } from "../../../../shared/components/Loading";
+import { Button } from "../../../../shared/components/Button";
+import { useToast } from "../../../../shared/components/ToastProvider";
+import { useAuth } from "../../../../shared/hooks/useAuth";
+import { useSocket } from "../../../../shared/hooks/useSocket";
+import { api } from "../../../../shared/libs/api";
+import { getApiError } from "../../../../shared/utils/errors";
+import { onboardingStatusKey, useOnboardingStatus } from "../../hooks/useOnboardingStatus";
+import { OnboardingChecklist, type ChecklistItem } from "./OnboardingChecklist";
+import { OnboardingStatusCard } from "./OnboardingStatusCard";
+import { OnboardingTimeline } from "./OnboardingTimeline";
+import { SendForReviewDialog } from "./SendForReviewDialog";
+import { DocumentPreviewModal } from "./DocumentPreviewModal";
+import { applicationKey, useMyApplication } from "../../hooks/useMyApplication";
 
-type ApplicationItem = {
-  id: string;
-  status: string;
-  value_text?: string | null;
-  file_url?: string | null;
-  download_url?: string | null;
-  comment?: string | null;
-  expires_on?: string | null;
-  requirement_type?: {
-    id: string;
-    key?: string;
-    label: string;
-    input_type: "file" | "image" | "text";
-    display_order?: number | null;
-    required_for_verification?: boolean;
-    has_expiry?: boolean;
-  };
-};
-
-type Application = { id: string; status: string; items?: ApplicationItem[] };
-
-const applicationKey = ["provider", "application"] as const;
-
-const useApplicationQuery = () =>
-  useQuery({
-    queryKey: applicationKey,
-    queryFn: async () => {
-      try {
-        const response = await api.get<{ data: Application }>("/provider-applications/me", { params: buildFieldParams(provApp) });
-        return response.data.data;
-      } catch (error) {
-        if (isAxiosError(error) && error.response?.status === 404) return null;
-        throw error;
-      }
-    },
-    refetchOnWindowFocus: false
-  });
-
-const OnboardingPage = () => {
+export const VerificationPanel = () => {
   const { user } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
   const socket = useSocket();
   const statusQuery = useOnboardingStatus();
-  const applicationQuery = useApplicationQuery();
-  const { data: profile } = useProviderProfile(user?.id);
+  const applicationQuery = useMyApplication();
   const application = applicationQuery.data ?? null;
 
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ source: string; title: string } | null>(null);
-  const [dailyLimit, setDailyLimit] = useState<string>("");
-  const [canEmergency, setCanEmergency] = useState<boolean | null>(null);
+  const [confirmingSend, setConfirmingSend] = useState(false);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: applicationKey }).catch(() => undefined);
@@ -159,16 +119,18 @@ const OnboardingPage = () => {
     onSettled: () => setBusyItemId(null)
   });
 
-  const saveLimits = useMutation({
-    mutationFn: async (payload: { daily_request_limit: number; can_emergency: boolean }) => {
-      if (!user?.id) throw new Error("Not signed in");
-      await api.patch(`/providers/${user.id}`, payload);
+  const remove = useMutation({
+    mutationFn: async (itemId: string) => {
+      if (!application) throw new Error("No application yet");
+      await api.delete(`/provider-applications/${application.id}/items/${itemId}/document`);
     },
+    onMutate: (itemId) => setBusyItemId(itemId),
     onSuccess: () => {
-      toast.showToast({ title: "Saved", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["provider", "profile", user?.id] }).catch(() => undefined);
+      toast.showToast({ title: "Removed", variant: "success" });
+      refresh();
     },
-    onError: fail("Could not save")
+    onError: fail("Could not remove it"),
+    onSettled: () => setBusyItemId(null)
   });
 
   const items: ChecklistItem[] = useMemo(() => {
@@ -186,6 +148,7 @@ const OnboardingPage = () => {
         required: Boolean(item.requirement_type?.required_for_verification),
         hasExpiry: Boolean(item.requirement_type?.has_expiry),
         expiresOn: item.expires_on ?? null,
+        editableAfterSend: Boolean(item.requirement_type?.editable_after_submission),
         reviewerNote: noteByLabel.get(item.requirement_type?.label ?? "") ?? (item.status === "rejected" ? item.comment ?? null : null)
       }));
   }, [application?.items, statusQuery.data?.items]);
@@ -194,7 +157,7 @@ const OnboardingPage = () => {
 
   if (statusQuery.isError || !statusQuery.data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
+      <div>
         <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
           <p className="font-semibold">We could not load your verification.</p>
           <Button type="button" className="mt-3 min-h-[44px]" variant="secondary" onClick={() => statusQuery.refetch()}>
@@ -208,8 +171,11 @@ const OnboardingPage = () => {
   const summary = statusQuery.data;
   // A provider set up by their facility has nothing to upload, unless documents are now owed.
   const showChecklist = items.length > 0 && (summary.status !== "set_up_by_facility" || !summary.documentsInOrder);
-  const limitValue = dailyLimit !== "" ? dailyLimit : String(profile?.daily_request_limit ?? 0);
-  const emergencyValue = canEmergency ?? profile?.can_emergency ?? false;
+
+  const goToDocuments = () => {
+    const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById("your-documents")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  };
 
   const view = (itemId: string) => {
     const item = application?.items?.find((entry) => entry.id === itemId);
@@ -218,23 +184,19 @@ const OnboardingPage = () => {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-16 pt-6 sm:px-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Your verification</h1>
-        <p className="text-sm text-slate-700">We check your documents once, so clients can trust who they book.</p>
-      </div>
-
+    <div className="flex flex-col gap-6">
       <OnboardingStatusCard
         summary={summary}
         starting={start.isPending}
         submitting={submit.isPending}
         onStart={() => start.mutate()}
-        onSubmit={() => submit.mutate()}
+        onSubmit={() => setConfirmingSend(true)}
         checklistShown={showChecklist}
+        onGoToDocuments={goToDocuments}
       />
 
       {showChecklist && (
-        <section aria-label="Your documents" className="space-y-3">
+        <section id="your-documents" aria-label="Your documents" className="scroll-mt-4 space-y-3">
           <h2 className="text-base font-semibold text-slate-900">Your documents</h2>
           <OnboardingChecklist
             items={items}
@@ -242,48 +204,27 @@ const OnboardingPage = () => {
             onUpload={(itemId, file, expiresOn) => upload.mutate({ itemId, file, expiresOn })}
             onSaveText={(itemId, text) => saveText.mutate({ itemId, text })}
             onView={view}
+            onRemove={(itemId) => remove.mutate(itemId)}
+            sentForReview={summary.status === "in_review"}
           />
         </section>
       )}
 
-      <section aria-label="Work settings" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-slate-900">How much work you can take</h2>
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveLimits.mutate({ daily_request_limit: Math.max(0, Number(limitValue) || 0), can_emergency: Boolean(emergencyValue) });
-          }}
-        >
-          <label className="block">
-            <span className="text-sm font-medium text-slate-800">Most requests you can take in a day</span>
-            <input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              value={limitValue}
-              onChange={(event) => setDailyLimit(event.target.value)}
-              className="mt-2 h-11 w-full max-w-[160px] rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-            />
-          </label>
-          <label className="flex min-h-[44px] items-start gap-3">
-            <input
-              type="checkbox"
-              checked={Boolean(emergencyValue)}
-              onChange={(event) => setCanEmergency(event.target.checked)}
-              className="mt-1 h-5 w-5 rounded border-slate-400"
-            />
-            <span className="text-sm text-slate-800">I can respond to urgent requests near me</span>
-          </label>
-          <Button type="submit" className="min-h-[44px]" loading={saveLimits.isPending}>
-            Save
-          </Button>
-        </form>
-      </section>
+      {["not_started", "documents_needed", "in_review", "needs_changes"].includes(summary.status) && (
+        <OnboardingTimeline summary={summary} defaultOpen={["in_review", "needs_changes"].includes(summary.status)} />
+      )}
+
+      <SendForReviewDialog
+        open={confirmingSend}
+        items={items}
+        submitting={submit.isPending}
+        onConfirm={() => submit.mutate(undefined, { onSettled: () => setConfirmingSend(false) })}
+        onClose={() => setConfirmingSend(false)}
+      />
 
       <DocumentPreviewModal source={viewing?.source ?? null} title={viewing?.title ?? "Document"} onClose={() => setViewing(null)} />
     </div>
   );
 };
 
-export default OnboardingPage;
+export default VerificationPanel;

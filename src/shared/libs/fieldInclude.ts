@@ -114,7 +114,7 @@ export const provApp: FieldPreset = {
       fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "expires_on"],
       children: {
         requirement_type: {
-          fields: ["id", "key", "label", "input_type", "display_order", "required_for_verification", "has_expiry"]
+          fields: ["id", "key", "label", "input_type", "display_order", "required_for_verification", "has_expiry", "editable_after_submission"]
         }
       }
     },
@@ -318,7 +318,7 @@ export const providerApplicationAdmin: FieldPreset = {
       fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "requirement_type_id"],
       children: {
         requirement_type: {
-          fields: ["id", "key", "label", "input_type"]
+          fields: ["id", "key", "label", "input_type", "required_for_verification"]
         }
       }
     }
