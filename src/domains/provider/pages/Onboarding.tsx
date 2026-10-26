@@ -160,6 +160,20 @@ const OnboardingPage = () => {
     onSettled: () => setBusyItemId(null)
   });
 
+  const remove = useMutation({
+    mutationFn: async (itemId: string) => {
+      if (!application) throw new Error("No application yet");
+      await api.delete(`/provider-applications/${application.id}/items/${itemId}/document`);
+    },
+    onMutate: (itemId) => setBusyItemId(itemId),
+    onSuccess: () => {
+      toast.showToast({ title: "Removed", variant: "success" });
+      refresh();
+    },
+    onError: fail("Could not remove it"),
+    onSettled: () => setBusyItemId(null)
+  });
+
   const saveLimits = useMutation({
     mutationFn: async (payload: { daily_request_limit: number; can_emergency: boolean }) => {
       if (!user?.id) throw new Error("Not signed in");
@@ -245,6 +259,8 @@ const OnboardingPage = () => {
             onUpload={(itemId, file, expiresOn) => upload.mutate({ itemId, file, expiresOn })}
             onSaveText={(itemId, text) => saveText.mutate({ itemId, text })}
             onView={view}
+            onRemove={(itemId) => remove.mutate(itemId)}
+            sentForReview={summary.status === "in_review"}
           />
         </section>
       )}

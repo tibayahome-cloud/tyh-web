@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ status: {} as Record<string, unknown>, application: null as unknown, post: vi.fn(), put: vi.fn() }));
+const state = vi.hoisted(() => ({ status: {} as Record<string, unknown>, application: null as unknown, post: vi.fn(), put: vi.fn(), del: vi.fn() }));
 
 vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "p1" } }) }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
@@ -26,6 +26,7 @@ vi.mock("../../../../shared/libs/api", () => ({
     }),
     post: (...args: unknown[]) => state.post(...args),
     put: (...args: unknown[]) => state.put(...args),
+    delete: (...args: unknown[]) => state.del(...args),
     patch: vi.fn()
   }
 }));
@@ -77,6 +78,8 @@ beforeEach(() => {
   state.post.mockResolvedValue({});
   state.put.mockReset();
   state.put.mockResolvedValue({});
+  state.del.mockReset();
+  state.del.mockResolvedValue({});
 });
 
 describe("onboarding status", () => {
@@ -115,14 +118,17 @@ describe("onboarding status", () => {
     const group = screen.getByRole("region", { name: "Other documents" });
     expect(within(group).getByText("1 left")).toBeInTheDocument();
     const list = within(group).getByRole("list", { name: "Documents in Other documents" });
-    expect(within(list).getByText("Sent, waiting for review")).toBeInTheDocument();
+    expect(within(list).getByText("Uploaded")).toBeInTheDocument();
+    expect(screen.queryByText("Sent, waiting for review")).not.toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Add Practising licence" })).toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Replace National ID" })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/\b(missing|pending|rejected)\b/);
 
     fireEvent.click(within(list).getByRole("button", { name: "Add Practising licence" }));
-    expect(within(list).getByText("Choose a file")).toBeInTheDocument();
-    expect(within(list).getByText("Take a photo")).toBeInTheDocument();
+    expect(within(list).queryByRole("menuitem", { name: "Take a photo" })).not.toBeInTheDocument();
+    fireEvent.click(within(list).getByRole("button", { name: "Upload" }));
+    expect(within(list).getByRole("menuitem", { name: "Choose a file" })).toBeInTheDocument();
+    expect(within(list).getByRole("menuitem", { name: "Take a photo" })).toBeInTheDocument();
   });
 
   it("needs changes: shows the reviewer's note on the document that was sent back", async () => {
@@ -166,7 +172,7 @@ describe("onboarding status", () => {
     await renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
-    const input = screen.getByText("Choose a file").closest("label")!.querySelector("input[type=file]") as HTMLInputElement;
+    const input = screen.getByTestId("file-input") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["x"], "id.pdf", { type: "application/pdf" })] } });
 
     await vi.waitFor(() => expect(state.post).toHaveBeenCalledWith("/provider-applications/a1/items/1/upload", expect.any(FormData), expect.anything()));
@@ -178,7 +184,7 @@ describe("onboarding status", () => {
     await renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
-    const camera = screen.getByText("Take a photo").closest("label")!.querySelector("input[type=file]");
+    const camera = screen.getByTestId("camera-input");
     expect(camera).toHaveAttribute("capture", "environment");
     expect(camera).toHaveAttribute("accept", "image/*");
   });
@@ -241,12 +247,12 @@ describe("documents owed by a provider who was already working", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add Practising licence" }));
 
-    const file = screen.getByText("Choose a file").closest("label")!.querySelector("input[type=file]") as HTMLInputElement;
-    expect(file).toBeDisabled();
+    const file = screen.getByTestId("file-input") as HTMLInputElement;
+    expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
     expect(screen.getByText("Enter the date first, then choose the file.")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Expiry date"), { target: { value: "2027-03-31" } });
-    expect(file).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Upload" })).not.toBeDisabled();
     fireEvent.change(file, { target: { files: [new File(["x"], "licence.pdf", { type: "application/pdf" })] } });
 
     await vi.waitFor(() => expect(state.post).toHaveBeenCalled());
@@ -281,5 +287,37 @@ describe("documents owed by a provider who was already working", () => {
     await vi.waitFor(() =>
       expect(state.put).toHaveBeenCalledWith("/provider-applications/a1/items/1", { value_text: "A123456789B", status: "pending" })
     );
+  });
+});
+
+describe("taking a document back", () => {
+  it("offers Replace and Remove once something is uploaded, and removes it after a confirmation", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 1, items_total: 1 });
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [appItem("1", "Practising licence", "pending", { file_url: "/x", download_url: "/x" })]
+    };
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Other documents/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Replace Practising licence" }));
+    expect(screen.getByRole("button", { name: "Replace" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument();
+    expect(screen.getByText(/Uploaded, not sent yet/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await vi.waitFor(() => expect(state.del).toHaveBeenCalledWith("/provider-applications/a1/items/1/document"));
+  });
+
+  it("calls it waiting for review only once the application has been sent", async () => {
+    state.status = summary({ status: "in_review", items_done: 1, items_total: 1 });
+    state.application = { id: "a1", status: "submitted", items: [appItem("1", "National ID", "pending")] };
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Other documents/ }));
+    expect(screen.getByText("Waiting for review")).toBeInTheDocument();
+    expect(screen.queryByText("Uploaded")).not.toBeInTheDocument();
   });
 });

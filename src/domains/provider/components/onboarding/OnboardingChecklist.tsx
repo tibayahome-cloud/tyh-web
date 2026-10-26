@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Camera, Check, ChevronDown, Eye, FileText, Stethoscope, Upload, User, Wallet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Check, ChevronDown, Eye, FileText, Stethoscope, Trash2, Upload, User, Wallet } from "lucide-react";
 
 import { Button } from "../../../../shared/components/Button";
+import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { groupChecklistItems, itemsLeft, type DocumentGroupId } from "../../utils/onboardingGroups";
 import { itemStatusLabel } from "../../utils/onboardingStatus";
 
@@ -28,6 +29,9 @@ type Props = {
   onUpload: (itemId: string, file: File, expiresOn?: string) => void;
   onSaveText: (itemId: string, text: string) => void;
   onView: (itemId: string) => void;
+  onRemove: (itemId: string) => void;
+  /** True once the application has gone to a reviewer; until then an uploaded document has not been sent. */
+  sentForReview?: boolean;
 };
 
 const PILL: Record<string, string> = {
@@ -35,6 +39,12 @@ const PILL: Record<string, string> = {
   submitted: "bg-sky-100 text-sky-900",
   verified: "bg-emerald-100 text-emerald-900",
   rejected: "bg-rose-100 text-rose-900"
+};
+
+/** What a document's state is called to the provider. Uploading is not sending: that is a separate step. */
+const statusText = (status: string, sentForReview: boolean): string => {
+  if (status === "pending" || status === "submitted") return sentForReview ? "Waiting for review" : "Uploaded";
+  return itemStatusLabel(status);
 };
 
 const GROUP_ICONS: Record<DocumentGroupId, React.ReactNode> = {
@@ -54,9 +64,80 @@ const DEFAULT_HINT = { placeholder: "Type your answer", inputMode: "text" as con
 const outlineButton =
   "inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-tiba-blue";
 
+const removeButton =
+  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-rose-800 hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400";
+
 const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50";
 
-const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem; busy: boolean } & Omit<Props, "items" | "busyItemId">) => {
+/** One Upload button; choosing it offers a file or the camera, the way a document upload works in Google apps. */
+const UploadMenu = ({ label, busy, disabled, onPick }: { label: string; busy: boolean; disabled: boolean; onPick: (file: File) => void }) => {
+  const [open, setOpen] = useState(false);
+  const wrapper = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (wrapper.current && !wrapper.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const picked = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) onPick(file);
+    event.target.value = "";
+  };
+
+  const choose = (input: React.RefObject<HTMLInputElement>) => {
+    setOpen(false);
+    input.current?.click();
+  };
+
+  const menuItem = "flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-base text-slate-900 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
+
+  return (
+    <div ref={wrapper} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={busy || disabled}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
+      >
+        <Upload aria-hidden="true" size={16} />
+        {busy ? "Uploading…" : label}
+        <ChevronDown aria-hidden="true" size={14} />
+      </button>
+      {open && (
+        <div role="menu" aria-label={label} className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          <button type="button" role="menuitem" autoFocus onClick={() => choose(fileInput)} className={menuItem}>
+            <FileText aria-hidden="true" size={18} className="text-slate-600" />
+            Choose a file
+          </button>
+          <button type="button" role="menuitem" onClick={() => choose(cameraInput)} className={menuItem}>
+            <Camera aria-hidden="true" size={18} className="text-slate-600" />
+            Take a photo
+          </button>
+        </div>
+      )}
+      <input ref={fileInput} type="file" accept="image/*,.pdf,.doc,.docx" tabIndex={-1} aria-hidden="true" className="sr-only" onChange={picked} data-testid="file-input" />
+      <input ref={cameraInput} type="file" accept="image/*" capture="environment" tabIndex={-1} aria-hidden="true" className="sr-only" onChange={picked} data-testid="camera-input" />
+    </div>
+  );
+};
+
+const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview = false }: { item: ChecklistItem; busy: boolean } & Omit<Props, "items" | "busyItemId" | "onUpload"> & { onUpload: Props["onUpload"] }) => {
   const approved = item.status === "verified";
   const sent = item.status === "pending" || item.status === "submitted";
   const [open, setOpen] = useState(item.status === "rejected");
@@ -67,11 +148,8 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
   const needsDate = item.hasExpiry && !expiresOn;
   const panelId = `doc-${item.id}`;
 
-  const pick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) onUpload(item.id, file, item.hasExpiry ? expiresOn : undefined);
-    event.target.value = "";
-  };
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const hasContent = item.status !== "missing";
 
   const actionLabel = approved ? "View" : item.status === "missing" ? "Add" : "Replace";
 
@@ -92,7 +170,7 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
         <div className="flex items-center gap-2">
           {item.status !== "missing" && (
             <span className={`rounded-full px-3 py-1 text-sm font-medium ${PILL[item.status] ?? "bg-slate-100 text-slate-800"}`}>
-              {itemStatusLabel(item.status)}
+              {statusText(item.status, sentForReview)}
             </span>
           )}
           <button
@@ -152,6 +230,12 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
               <Button type="button" className="min-h-[44px]" loading={busy} disabled={!text.trim()} onClick={() => onSaveText(item.id, text.trim())}>
                 Save answer
               </Button>
+              {hasContent && (
+                <button type="button" onClick={() => setConfirmingRemove(true)} className={removeButton}>
+                  <Trash2 aria-hidden="true" size={16} />
+                  Remove
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -161,19 +245,34 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
                   View
                 </button>
               )}
-              <label className={outlineButton}>
-                <Upload aria-hidden="true" size={16} />
-                {busy ? "Uploading…" : item.hasFile ? "Replace file" : "Choose a file"}
-                <input type="file" accept="image/*,.pdf,.doc,.docx" className="sr-only" disabled={busy || needsDate} onChange={pick} />
-              </label>
-              <label className={outlineButton}>
-                <Camera aria-hidden="true" size={16} />
-                Take a photo
-                <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={busy || needsDate} onChange={pick} />
-              </label>
+              <UploadMenu
+                label={item.hasFile ? "Replace" : "Upload"}
+                busy={busy}
+                disabled={needsDate}
+                onPick={(file) => onUpload(item.id, file, item.hasExpiry ? expiresOn : undefined)}
+              />
+              {hasContent && (
+                <button type="button" onClick={() => setConfirmingRemove(true)} className={removeButton}>
+                  <Trash2 aria-hidden="true" size={16} />
+                  Remove
+                </button>
+              )}
             </div>
           )}
-          {sent && <p className="text-sm text-slate-700">We have this. Replace it only if it was wrong.</p>}
+          {sent && !sentForReview && <p className="text-sm text-slate-700">Uploaded, not sent yet. You send everything together when the required documents are in.</p>}
+          <ConfirmDialog
+            open={confirmingRemove}
+            title={`Remove ${item.label}?`}
+            description="This clears what you added here so you can start again. Nothing has been lost from your other documents."
+            confirmLabel="Remove"
+            cancelLabel="Keep it"
+            confirmVariant="secondary"
+            onConfirm={() => {
+              setConfirmingRemove(false);
+              onRemove(item.id);
+            }}
+            onClose={() => setConfirmingRemove(false)}
+          />
         </div>
       )}
     </li>
@@ -184,7 +283,7 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
  * Documents in a few groups, the way a setup checklist reads: each group says how many required ones are left, opens
  * to its rows, and each row has one action. The first group with something left starts open.
  */
-export const OnboardingChecklist = ({ items, busyItemId, onUpload, onSaveText, onView }: Props) => {
+export const OnboardingChecklist = ({ items, busyItemId, onUpload, onSaveText, onView, onRemove, sentForReview }: Props) => {
   const groups = groupChecklistItems(items);
   const firstOpen = groups.find((entry) => itemsLeft(entry.items) > 0)?.group.id ?? null;
   const [opened, setOpened] = useState<Record<string, boolean>>({});
@@ -220,7 +319,7 @@ export const OnboardingChecklist = ({ items, busyItemId, onUpload, onSaveText, o
             {open && (
               <ul id={regionId} aria-label={`Documents in ${group.title}`} className="space-y-2 px-4 pb-4">
                 {groupItems.map((item) => (
-                  <Row key={item.id} item={item} busy={busyItemId === item.id} onUpload={onUpload} onSaveText={onSaveText} onView={onView} />
+                  <Row key={item.id} item={item} busy={busyItemId === item.id} onUpload={onUpload} onSaveText={onSaveText} onView={onView} onRemove={onRemove} sentForReview={sentForReview} />
                 ))}
               </ul>
             )}
