@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Loading } from "../../../shared/components/Loading";
 import { Button } from "../../../shared/components/Button";
@@ -8,7 +7,6 @@ import { useToast } from "../../../shared/components/ToastProvider";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import { api } from "../../../shared/libs/api";
-import { buildFieldParams, provApp } from "../../../shared/libs/fieldInclude";
 import { getApiError } from "../../../shared/utils/errors";
 import { onboardingStatusKey, useOnboardingStatus } from "../hooks/useOnboardingStatus";
 import { OnboardingChecklist, type ChecklistItem } from "../components/onboarding/OnboardingChecklist";
@@ -16,45 +14,7 @@ import { OnboardingStatusCard } from "../components/onboarding/OnboardingStatusC
 import { OnboardingTimeline } from "../components/onboarding/OnboardingTimeline";
 import { SendForReviewDialog } from "../components/onboarding/SendForReviewDialog";
 import { DocumentPreviewModal } from "../components/onboarding/DocumentPreviewModal";
-
-type ApplicationItem = {
-  id: string;
-  status: string;
-  value_text?: string | null;
-  file_url?: string | null;
-  download_url?: string | null;
-  comment?: string | null;
-  expires_on?: string | null;
-  requirement_type?: {
-    id: string;
-    key?: string;
-    label: string;
-    input_type: "file" | "image" | "text";
-    display_order?: number | null;
-    required_for_verification?: boolean;
-    has_expiry?: boolean;
-    editable_after_submission?: boolean;
-  };
-};
-
-type Application = { id: string; status: string; items?: ApplicationItem[] };
-
-const applicationKey = ["provider", "application"] as const;
-
-const useApplicationQuery = () =>
-  useQuery({
-    queryKey: applicationKey,
-    queryFn: async () => {
-      try {
-        const response = await api.get<{ data: Application }>("/provider-applications/me", { params: buildFieldParams(provApp) });
-        return response.data.data;
-      } catch (error) {
-        if (isAxiosError(error) && error.response?.status === 404) return null;
-        throw error;
-      }
-    },
-    refetchOnWindowFocus: false
-  });
+import { applicationKey, useMyApplication } from "../hooks/useMyApplication";
 
 const OnboardingPage = () => {
   const { user } = useAuth();
@@ -62,7 +22,7 @@ const OnboardingPage = () => {
   const queryClient = useQueryClient();
   const socket = useSocket();
   const statusQuery = useOnboardingStatus();
-  const applicationQuery = useApplicationQuery();
+  const applicationQuery = useMyApplication();
   const application = applicationQuery.data ?? null;
 
   const [busyItemId, setBusyItemId] = useState<string | null>(null);

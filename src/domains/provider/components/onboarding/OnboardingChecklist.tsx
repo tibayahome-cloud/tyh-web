@@ -5,7 +5,7 @@ import { Button } from "../../../../shared/components/Button";
 import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { groupChecklistItems, itemsLeft, type DocumentGroupId } from "../../utils/onboardingGroups";
 import { DOCUMENT_ACCEPT, DOCUMENT_HINT, PHOTO_ACCEPT, documentFileProblem } from "../../utils/documentFiles";
-import { itemStatusLabel } from "../../utils/onboardingStatus";
+import { documentStatusLabel } from "../../utils/documentDisplay";
 import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 export type ChecklistItem = {
@@ -43,12 +43,6 @@ const PILL: Record<string, string> = {
   submitted: "bg-sky-100 text-sky-900",
   verified: "bg-emerald-100 text-emerald-900",
   rejected: "bg-rose-100 text-rose-900"
-};
-
-/** What a document's state is called to the provider. Uploading is not sending: that is a separate step. */
-const statusText = (status: string, sentForReview: boolean): string => {
-  if (status === "pending" || status === "submitted") return sentForReview ? "Waiting for review" : "Uploaded";
-  return itemStatusLabel(status);
 };
 
 const GROUP_ICONS: Record<DocumentGroupId, React.ReactNode> = {
@@ -214,7 +208,7 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
         <div className="flex items-center gap-2">
           {item.status !== "missing" && (
             <span className={`rounded-full px-3 py-1 text-sm font-medium ${PILL[item.status] ?? "bg-slate-100 text-slate-800"}`}>
-              {statusText(item.status, sentForReview)}
+              {documentStatusLabel(item.status, sentForReview)}
             </span>
           )}
           {locked ? (

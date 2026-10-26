@@ -11,6 +11,7 @@ const ProviderBookings = lazyWithRetry(() => import("./pages/Bookings"));
 const ProviderTelemedicine = lazyWithRetry(() => import("./pages/Telemedicine"));
 const ProviderOnboarding = lazyWithRetry(() => import("./pages/Onboarding"));
 const ProviderServices = lazyWithRetry(() => import("./pages/Services"));
+const ProviderDocuments = lazyWithRetry(() => import("./pages/Documents"));
 const ProviderAvailability = lazyWithRetry(() => import("./pages/Availability"));
 const ProviderPayments = lazyWithRetry(() => import("./pages/Payments"));
 const ProviderInbox = lazyWithRetry(() => import("./pages/Inbox"));
@@ -38,6 +39,14 @@ const buildRoutes = (): RouteObject[] => [
         element: (
           <Suspense fallback={<Loading fullHeight />}>
             <ProviderSelfCare />
+          </Suspense>
+        )
+      },
+      {
+        path: "documents",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <ProviderDocuments />
           </Suspense>
         )
       },
