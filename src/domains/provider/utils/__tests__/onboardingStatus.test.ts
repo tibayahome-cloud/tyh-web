@@ -11,6 +11,11 @@ const summary = (overrides: Partial<OnboardingSummary> = {}): OnboardingSummary 
   reviewerNote: null,
   readyToSubmit: false,
   verifiedAt: null,
+  requiredTotal: 0,
+  requiredDone: 0,
+  documentsDueOn: null,
+  documentsDaysLeft: null,
+  documentsInOrder: true,
   ...overrides
 });
 
@@ -22,7 +27,7 @@ describe("describeOnboarding: one plain status for every kind of provider", () =
   });
 
   it("documents needed, with how many and which is next", () => {
-    expect(describeOnboarding(summary({ status: "documents_needed", itemsDone: 1, itemsTotal: 3, nextItem: item("Practising licence") }))).toEqual({
+    expect(describeOnboarding(summary({ status: "documents_needed", itemsDone: 1, itemsTotal: 3, requiredDone: 1, requiredTotal: 3, nextItem: item("Practising licence") }))).toEqual({
       title: "Documents needed (1 of 3)",
       message: "Next: Practising licence.",
       tone: "warning"
@@ -74,5 +79,36 @@ describe("itemStatusLabel", () => {
     expect(itemStatusLabel("missing")).toBe("Needed");
     expect(itemStatusLabel("verified")).toBe("Approved");
     expect(itemStatusLabel("under_review_x")).toBe("In progress");
+  });
+});
+
+describe("documents owed by a provider who was already working", () => {
+  it("leads with what is owed and the days left, ahead of 'you are verified'", () => {
+    const copy = describeOnboarding(
+      summary({ status: "verified", documentsInOrder: false, documentsDaysLeft: 12, requiredTotal: 4, nextItem: item("National ID") })
+    );
+    expect(copy.title).toBe("Add your documents to keep taking bookings");
+    expect(copy.message).toBe("Upload the required documents in 12 days. Next: National ID. You can keep working until then.");
+    expect(copy.tone).toBe("warning");
+  });
+
+  it("is quiet when nothing is owed, and an older server that sends nothing means nothing is owed", () => {
+    expect(describeOnboarding(summary({ status: "verified" })).title).toBe("You are verified");
+    expect(mapOnboardingSummary({ status: "verified" }).documentsInOrder).toBe(true);
+  });
+
+  it("counts required documents against the server's total and never shows more done than total", () => {
+    const mapped = mapOnboardingSummary({
+      status: "documents_needed",
+      required_total: 2,
+      items: [
+        { label: "A", status: "verified", required: true },
+        { label: "B", status: "pending", required: true },
+        { label: "C", status: "pending", required: true },
+        { label: "D", status: "missing", required: false }
+      ]
+    });
+    expect(mapped.requiredTotal).toBe(2);
+    expect(mapped.requiredDone).toBe(2);
   });
 });

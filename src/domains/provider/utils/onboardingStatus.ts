@@ -12,6 +12,9 @@ export type OnboardingItem = {
   input_type: string;
   status: string;
   reviewer_note: string | null;
+  required?: boolean;
+  has_expiry?: boolean;
+  expires_on?: string | null;
 };
 
 export type OnboardingSummary = {
@@ -23,21 +26,61 @@ export type OnboardingSummary = {
   reviewerNote: string | null;
   readyToSubmit: boolean;
   verifiedAt: string | null;
+  /** How many documents are required, and how many of those are provided. Falls back to all items if none are marked. */
+  requiredTotal: number;
+  requiredDone: number;
+  /** Set for providers who were working before documents became mandatory: the day their required ones are due. */
+  documentsDueOn: string | null;
+  documentsDaysLeft: number | null;
+  documentsInOrder: boolean;
 };
+
+// An item the provider has supplied, whether or not a reviewer has looked at it yet.
+const PROVIDED = new Set(["pending", "submitted", "verified"]);
 
 const STATUSES: OnboardingStatus[] = ["not_started", "documents_needed", "in_review", "needs_changes", "verified", "set_up_by_facility"];
 
 /** Reads the server's onboarding status. An unknown value is treated as not started rather than guessed at. */
-export const mapOnboardingSummary = (raw: Record<string, unknown>): OnboardingSummary => ({
-  status: STATUSES.includes(raw.status as OnboardingStatus) ? (raw.status as OnboardingStatus) : "not_started",
-  itemsDone: typeof raw.items_done === "number" ? raw.items_done : 0,
-  itemsTotal: typeof raw.items_total === "number" ? raw.items_total : 0,
-  items: Array.isArray(raw.items) ? (raw.items as OnboardingItem[]) : [],
-  nextItem: (raw.next_item as OnboardingItem | null) ?? null,
-  reviewerNote: typeof raw.reviewer_note === "string" ? raw.reviewer_note : null,
-  readyToSubmit: raw.ready_to_submit === true,
-  verifiedAt: typeof raw.verified_at === "string" ? raw.verified_at : null
-});
+export const mapOnboardingSummary = (raw: Record<string, unknown>): OnboardingSummary => {
+  const items = Array.isArray(raw.items) ? (raw.items as OnboardingItem[]) : [];
+  const required = items.filter((item) => item.required);
+  const counted = required.length > 0 ? required : items;
+  const requiredTotal =
+    typeof raw.required_total === "number" && raw.required_total > 0
+      ? raw.required_total
+      : items.length > 0
+        ? counted.length
+        : typeof raw.items_total === "number"
+          ? raw.items_total
+          : 0;
+  return {
+    status: STATUSES.includes(raw.status as OnboardingStatus) ? (raw.status as OnboardingStatus) : "not_started",
+    itemsDone: typeof raw.items_done === "number" ? raw.items_done : 0,
+    itemsTotal: typeof raw.items_total === "number" ? raw.items_total : 0,
+    items,
+    nextItem: (raw.next_item as OnboardingItem | null) ?? null,
+    reviewerNote: typeof raw.reviewer_note === "string" ? raw.reviewer_note : null,
+    readyToSubmit: raw.ready_to_submit === true,
+    verifiedAt: typeof raw.verified_at === "string" ? raw.verified_at : null,
+    requiredTotal,
+    requiredDone: Math.min(
+      requiredTotal,
+      items.length > 0 ? counted.filter((item) => PROVIDED.has(item.status)).length : typeof raw.items_done === "number" ? raw.items_done : 0
+    ),
+    documentsDueOn: typeof raw.documents_due_on === "string" ? raw.documents_due_on : null,
+    documentsDaysLeft: typeof raw.documents_days_left === "number" ? raw.documents_days_left : null,
+    // An older server sends nothing here; that means nothing is owed.
+    documentsInOrder: raw.documents_in_order !== false
+  };
+};
+
+/** "in 12 days", "tomorrow", "today", or "was due 3 days ago". */
+export const describeDaysLeft = (days: number): string => {
+  if (days < 0) return `was due ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`;
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  return `in ${days} days`;
+};
 
 export type StatusTone = "neutral" | "info" | "warning" | "success";
 
@@ -49,7 +92,17 @@ export type StatusCopy = {
 
 /** What to tell the provider, in plain words, for each status. */
 export const describeOnboarding = (summary: OnboardingSummary): StatusCopy => {
-  const { status, itemsDone, itemsTotal, nextItem, reviewerNote } = summary;
+  const { status, requiredDone, requiredTotal, nextItem, reviewerNote } = summary;
+  // A provider already working who still owes documents is told so first, ahead of "you are verified".
+  if ((status === "verified" || status === "set_up_by_facility") && !summary.documentsInOrder && summary.documentsDaysLeft !== null && summary.documentsDaysLeft >= 0) {
+    return {
+      title: "Add your documents to keep taking bookings",
+      message: `Upload the required documents ${describeDaysLeft(summary.documentsDaysLeft)}${
+        nextItem ? `. Next: ${nextItem.label}` : ""
+      }. You can keep working until then.`,
+      tone: "warning"
+    };
+  }
   switch (status) {
     case "not_started":
       return {
@@ -61,8 +114,12 @@ export const describeOnboarding = (summary: OnboardingSummary): StatusCopy => {
       return summary.readyToSubmit
         ? { title: "Ready to send", message: "Everything is uploaded. Send it for review.", tone: "info" }
         : {
-            title: `Documents needed (${itemsDone} of ${itemsTotal})`,
-            message: nextItem ? `Next: ${nextItem.label}.` : "Upload the documents below.",
+            title: `Documents needed (${requiredDone} of ${requiredTotal})`,
+            message: `${nextItem ? `Next: ${nextItem.label}.` : "Upload the documents below."}${
+              summary.documentsDaysLeft !== null && summary.documentsDaysLeft >= 0
+                ? ` Due ${describeDaysLeft(summary.documentsDaysLeft)}; you can keep working until then.`
+                : ""
+            }`,
             tone: "warning"
           };
     case "in_review":

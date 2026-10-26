@@ -48,14 +48,14 @@ const summary = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
-const appItem = (id: string, label: string, status: string, extra: Record<string, unknown> = {}) => ({
+const appItem = (id: string, label: string, status: string, extra: Record<string, unknown> = {}, type: Record<string, unknown> = {}) => ({
   id,
   status,
   file_url: null,
   download_url: null,
   value_text: null,
   comment: null,
-  requirement_type: { id: `r-${id}`, label, input_type: "file", display_order: Number(id.replace(/\D/g, "")) || 0 },
+  requirement_type: { id: `r-${id}`, label, input_type: "file", display_order: Number(id.replace(/\D/g, "")) || 0, ...type },
   ...extra
 });
 
@@ -86,7 +86,7 @@ describe("onboarding status", () => {
     const card = screen.getByRole("region", { name: "Verification status" });
     expect(within(card).getByText("Not started")).toBeInTheDocument();
     fireEvent.click(within(card).getByRole("button", { name: "Start verification" }));
-    await vi.waitFor(() => expect(state.post).toHaveBeenCalledWith("/provider-applications", {}));
+    await vi.waitFor(() => expect(state.post).toHaveBeenCalledWith("/provider-applications/me/open", {}));
   });
 
   it("verified with no application: says verified, offers no start and no upload", async () => {
@@ -174,5 +174,70 @@ describe("onboarding status", () => {
     const camera = screen.getByText("Take a photo").closest("label")!.querySelector("input[type=file]");
     expect(camera).toHaveAttribute("capture", "environment");
     expect(camera).toHaveAttribute("accept", "image/*");
+  });
+});
+
+describe("documents owed by a provider who was already working", () => {
+  const owing = (overrides: Record<string, unknown> = {}) =>
+    summary({
+      status: "set_up_by_facility",
+      documents_in_order: false,
+      documents_due_on: "2026-12-25",
+      documents_days_left: 12,
+      required_total: 4,
+      ...overrides
+    });
+
+  it("says what is owed and by when, and offers to add the documents", async () => {
+    state.status = owing();
+    await renderPage();
+
+    const card = screen.getByRole("region", { name: "Verification status" });
+    expect(within(card).getByText("Add your documents to keep taking bookings")).toBeInTheDocument();
+    expect(within(card).getByText(/in 12 days/)).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "Add your documents" }));
+    await vi.waitFor(() => expect(state.post).toHaveBeenCalledWith("/provider-applications/me/open", {}));
+  });
+
+  it("shows required documents first and marks the rest optional", async () => {
+    state.status = owing({
+      items: [{ requirement_key: "national-id", label: "National ID", input_type: "file", status: "missing", reviewer_note: null, required: true }]
+    });
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [
+        appItem("1", "National ID", "missing", {}, { required_for_verification: true }),
+        appItem("2", "Curriculum vitae", "missing")
+      ]
+    };
+    await renderPage();
+
+    expect(screen.getByText("Required to be verified")).toBeInTheDocument();
+    expect(screen.getByText("Also helpful")).toBeInTheDocument();
+    expect(screen.getByText("Optional")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add your documents" })).not.toBeInTheDocument();
+  });
+
+  it("asks for the expiry date before a dated document can be uploaded, then sends it with the file", async () => {
+    state.status = owing();
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [appItem("1", "Practising licence", "missing", {}, { required_for_verification: true, has_expiry: true })]
+    };
+    await renderPage();
+
+    const file = screen.getByText("Choose a file").closest("label")!.querySelector("input[type=file]") as HTMLInputElement;
+    expect(file).toBeDisabled();
+    expect(screen.getByText("Enter the date first, then choose the file.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Expiry date"), { target: { value: "2027-03-31" } });
+    expect(file).not.toBeDisabled();
+    fireEvent.change(file, { target: { files: [new File(["x"], "licence.pdf", { type: "application/pdf" })] } });
+
+    await vi.waitFor(() => expect(state.post).toHaveBeenCalled());
+    const form = state.post.mock.calls[0][1] as FormData;
+    expect(form.get("expires_on")).toBe("2027-03-31");
   });
 });
