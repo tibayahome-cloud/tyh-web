@@ -14,6 +14,7 @@ import { useProviderProfile } from "../hooks/useProviderProfile";
 import { onboardingStatusKey, useOnboardingStatus } from "../hooks/useOnboardingStatus";
 import { OnboardingChecklist, type ChecklistItem } from "../components/onboarding/OnboardingChecklist";
 import { OnboardingStatusCard } from "../components/onboarding/OnboardingStatusCard";
+import { OnboardingTimeline } from "../components/onboarding/OnboardingTimeline";
 import { DocumentPreviewModal } from "../components/onboarding/DocumentPreviewModal";
 
 type ApplicationItem = {
@@ -232,6 +233,8 @@ const OnboardingPage = () => {
         onSubmit={() => submit.mutate()}
         checklistShown={showChecklist}
       />
+
+      {["not_started", "documents_needed", "in_review", "needs_changes"].includes(summary.status) && <OnboardingTimeline summary={summary} />}
 
       {showChecklist && (
         <section aria-label="Your documents" className="space-y-3">

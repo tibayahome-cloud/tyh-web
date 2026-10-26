@@ -55,7 +55,7 @@ const appItem = (id: string, label: string, status: string, extra: Record<string
   download_url: null,
   value_text: null,
   comment: null,
-  requirement_type: { id: `r-${id}`, label, input_type: "file", display_order: Number(id.replace(/\D/g, "")) || 0, ...type },
+  requirement_type: { id: `r-${id}`, label, input_type: "file", display_order: Number(id.replace(/\D/g, "")) || 0, required_for_verification: true, ...type },
   ...extra
 });
 
@@ -112,12 +112,17 @@ describe("onboarding status", () => {
 
     expect(screen.getByText("Documents needed (1 of 2)")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Documents provided" })).toHaveAttribute("aria-valuenow", "1");
-    const list = screen.getByRole("list", { name: "Documents" });
+    const group = screen.getByRole("region", { name: "Other documents" });
+    expect(within(group).getByText("1 left")).toBeInTheDocument();
+    const list = within(group).getByRole("list", { name: "Documents in Other documents" });
     expect(within(list).getByText("Sent, waiting for review")).toBeInTheDocument();
-    expect(within(list).getByText("Needed")).toBeInTheDocument();
-    expect(within(list).getAllByText("Choose a file")).toHaveLength(2);
-    expect(within(list).getAllByText("Take a photo")).toHaveLength(2);
+    expect(within(list).getByRole("button", { name: "Add Practising licence" })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "Replace National ID" })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/\b(missing|pending|rejected)\b/);
+
+    fireEvent.click(within(list).getByRole("button", { name: "Add Practising licence" }));
+    expect(within(list).getByText("Choose a file")).toBeInTheDocument();
+    expect(within(list).getByText("Take a photo")).toBeInTheDocument();
   });
 
   it("needs changes: shows the reviewer's note on the document that was sent back", async () => {
@@ -160,6 +165,7 @@ describe("onboarding status", () => {
     state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
     await renderPage();
 
+    fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
     const input = screen.getByText("Choose a file").closest("label")!.querySelector("input[type=file]") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["x"], "id.pdf", { type: "application/pdf" })] } });
 
@@ -171,6 +177,7 @@ describe("onboarding status", () => {
     state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
     await renderPage();
 
+    fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
     const camera = screen.getByText("Take a photo").closest("label")!.querySelector("input[type=file]");
     expect(camera).toHaveAttribute("capture", "environment");
     expect(camera).toHaveAttribute("accept", "image/*");
@@ -199,23 +206,27 @@ describe("documents owed by a provider who was already working", () => {
     await vi.waitFor(() => expect(state.post).toHaveBeenCalledWith("/provider-applications/me/open", {}));
   });
 
-  it("shows required documents first and marks the rest optional", async () => {
-    state.status = owing({
-      items: [{ requirement_key: "national-id", label: "National ID", input_type: "file", status: "missing", reviewer_note: null, required: true }]
-    });
+  it("groups documents, says how many required ones are left, and marks optional ones", async () => {
+    state.status = owing();
     state.application = {
       id: "a1",
       status: "draft",
       items: [
-        appItem("1", "National ID", "missing", {}, { required_for_verification: true }),
-        appItem("2", "Curriculum vitae", "missing")
+        appItem("1", "National ID or passport", "missing", {}, { key: "national-id" }),
+        appItem("2", "Curriculum vitae", "missing", {}, { key: "cv", required_for_verification: false })
       ]
     };
     await renderPage();
 
-    expect(screen.getByText("Required to be verified")).toBeInTheDocument();
-    expect(screen.getByText("Also helpful")).toBeInTheDocument();
-    expect(screen.getByText("Optional")).toBeInTheDocument();
+    const identity = screen.getByRole("region", { name: "Your identity" });
+    expect(within(identity).getByText("1 left")).toBeInTheDocument();
+    expect(within(identity).getByRole("button", { name: "Add National ID or passport" })).toBeInTheDocument();
+
+    const professional = screen.getByRole("region", { name: "Your professional standing" });
+    expect(within(professional).getByText("Done")).toBeInTheDocument();
+    expect(within(professional).queryByRole("button", { name: "Add Curriculum vitae" })).not.toBeInTheDocument();
+    fireEvent.click(within(professional).getByRole("button", { name: /Your professional standing/ }));
+    expect(within(professional).getByText("Optional")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add your documents" })).not.toBeInTheDocument();
   });
 
@@ -227,6 +238,8 @@ describe("documents owed by a provider who was already working", () => {
       items: [appItem("1", "Practising licence", "missing", {}, { required_for_verification: true, has_expiry: true })]
     };
     await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Practising licence" }));
 
     const file = screen.getByText("Choose a file").closest("label")!.querySelector("input[type=file]") as HTMLInputElement;
     expect(file).toBeDisabled();
@@ -247,17 +260,15 @@ describe("documents owed by a provider who was already working", () => {
       id: "a1",
       status: "draft",
       items: [
-        {
-          ...appItem("1", "KRA PIN number", "missing"),
-          requirement_type: { id: "r1", key: "kra-pin", label: "KRA PIN number", input_type: "text", display_order: 1 }
-        },
-        {
-          ...appItem("2", "M-Pesa number for payouts", "missing"),
-          requirement_type: { id: "r2", key: "payout-details", label: "M-Pesa number for payouts", input_type: "text", display_order: 2 }
-        }
+        appItem("1", "KRA PIN number", "missing", {}, { key: "kra-pin", input_type: "text", required_for_verification: true }),
+        appItem("2", "M-Pesa number for payouts", "missing", {}, { key: "payout-details", input_type: "text", required_for_verification: true })
       ]
     };
     await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add KRA PIN number" }));
+    fireEvent.click(screen.getByRole("button", { name: /Payments and agreements/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add M-Pesa number for payouts" }));
 
     const kra = screen.getByLabelText("KRA PIN number") as HTMLInputElement;
     expect(kra.tagName).toBe("INPUT");
