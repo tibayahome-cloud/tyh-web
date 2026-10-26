@@ -6,6 +6,8 @@ import { itemStatusLabel } from "../../utils/onboardingStatus";
 
 export type ChecklistItem = {
   id: string;
+  /** The requirement's key, used to pick the right hint for typed answers. */
+  requirementKey?: string | null;
   label: string;
   inputType: "file" | "image" | "text";
   status: string;
@@ -35,6 +37,13 @@ const PILL: Record<string, string> = {
   rejected: "bg-rose-100 text-rose-900"
 };
 
+// Typed answers with a known shape get a one-line box and an example, not a blank text area.
+const TYPED_HINTS: Record<string, { placeholder: string; inputMode: "text" | "tel"; maxLength: number }> = {
+  "kra-pin": { placeholder: "A123456789B", inputMode: "text", maxLength: 11 },
+  "payout-details": { placeholder: "0712 345 678", inputMode: "tel", maxLength: 16 }
+};
+const DEFAULT_HINT = { placeholder: "Type your answer", inputMode: "text" as const, maxLength: 200 };
+
 const outlineButton =
   "inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-tiba-blue";
 
@@ -42,6 +51,7 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
   const [text, setText] = useState(item.valueText ?? "");
   const [expiresOn, setExpiresOn] = useState(item.expiresOn ?? "");
   const isText = item.inputType === "text";
+  const hint = TYPED_HINTS[item.requirementKey ?? ""] ?? DEFAULT_HINT;
   const approved = item.status === "verified";
   const needsDate = item.hasExpiry && !expiresOn;
 
@@ -90,13 +100,16 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
         <div className="space-y-2">
           <label className="block">
             <span className="sr-only">{item.label}</span>
-            <textarea
+            <input
+              type="text"
               value={text}
               onChange={(event) => setText(event.target.value)}
-              rows={3}
               disabled={approved || busy}
-              placeholder="Type your answer"
-              className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40 disabled:bg-slate-50"
+              placeholder={hint.placeholder}
+              inputMode={hint.inputMode}
+              maxLength={hint.maxLength}
+              autoComplete="off"
+              className="h-11 w-full max-w-sm rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40 disabled:bg-slate-50"
             />
           </label>
           {!approved && (
