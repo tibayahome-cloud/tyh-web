@@ -12,6 +12,8 @@ type Props = {
   onSubmit: () => void;
   /** Whether the document list is already on the page below. */
   checklistShown?: boolean;
+  /** Takes the provider to the document list. */
+  onGoToDocuments?: () => void;
 };
 
 const TONES: Record<StatusTone, { box: string; icon: React.ReactNode }> = {
@@ -22,7 +24,7 @@ const TONES: Record<StatusTone, { box: string; icon: React.ReactNode }> = {
 };
 
 /** The one status at the top of the page, in words, with the one thing to do next. */
-export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, onSubmit, checklistShown = false }: Props) => {
+export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, onSubmit, checklistShown = false, onGoToDocuments }: Props) => {
   const copy = describeOnboarding(summary);
   const tone = TONES[copy.tone];
   const owesDocuments = !summary.documentsInOrder && summary.documentsDaysLeft !== null;
@@ -63,6 +65,11 @@ export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, o
             {summary.status === "documents_needed" && summary.readyToSubmit && (
               <Button type="button" className="min-h-[44px]" loading={submitting} onClick={onSubmit}>
                 Send for review
+              </Button>
+            )}
+            {checklistShown && summary.nextItem && onGoToDocuments && ["documents_needed", "needs_changes"].includes(summary.status) && !summary.readyToSubmit && (
+              <Button type="button" className="min-h-[44px]" onClick={onGoToDocuments}>
+                Go to {summary.nextItem.label}
               </Button>
             )}
             {owesDocuments && !checklistShown && (

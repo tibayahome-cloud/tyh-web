@@ -172,6 +172,11 @@ const OnboardingPage = () => {
   // A provider set up by their facility has nothing to upload, unless documents are now owed.
   const showChecklist = items.length > 0 && (summary.status !== "set_up_by_facility" || !summary.documentsInOrder);
 
+  const goToDocuments = () => {
+    const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById("your-documents")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  };
+
   const view = (itemId: string) => {
     const item = application?.items?.find((entry) => entry.id === itemId);
     const source = item?.download_url ?? item?.file_url;
@@ -192,12 +197,11 @@ const OnboardingPage = () => {
         onStart={() => start.mutate()}
         onSubmit={() => setConfirmingSend(true)}
         checklistShown={showChecklist}
+        onGoToDocuments={goToDocuments}
       />
 
-      {["not_started", "documents_needed", "in_review", "needs_changes"].includes(summary.status) && <OnboardingTimeline summary={summary} />}
-
       {showChecklist && (
-        <section aria-label="Your documents" className="space-y-3">
+        <section id="your-documents" aria-label="Your documents" className="scroll-mt-4 space-y-3">
           <h2 className="text-base font-semibold text-slate-900">Your documents</h2>
           <OnboardingChecklist
             items={items}
@@ -209,6 +213,10 @@ const OnboardingPage = () => {
             sentForReview={summary.status === "in_review"}
           />
         </section>
+      )}
+
+      {["not_started", "documents_needed", "in_review", "needs_changes"].includes(summary.status) && (
+        <OnboardingTimeline summary={summary} defaultOpen={["in_review", "needs_changes"].includes(summary.status)} />
       )}
 
       <SendForReviewDialog

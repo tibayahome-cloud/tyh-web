@@ -2,12 +2,11 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, FileText, ScrollText } from "lucide-react";
 
-import { Loading } from "../../../shared/components/Loading";
+import { Skeleton } from "../../../shared/components/Skeleton";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { DocumentPreviewModal } from "../components/onboarding/DocumentPreviewModal";
 import { useMyApplication, type ApplicationItem } from "../hooks/useMyApplication";
-import { useOnboardingStatus } from "../hooks/useOnboardingStatus";
 import { describeExpiry, documentStatusLabel, formatDocumentDate, legalDocumentTitle } from "../utils/documentDisplay";
 
 const PILL: Record<string, string> = {
@@ -28,11 +27,11 @@ const sourceOf = (item: ApplicationItem) => item.download_url ?? item.file_url ?
 const DocumentsPage = () => {
   const { user } = useAuth();
   const applicationQuery = useMyApplication();
-  const statusQuery = useOnboardingStatus();
   const [viewing, setViewing] = useState<{ source: string; title: string } | null>(null);
 
   const legal = user?.legalConsent?.documents ?? [];
-  const sentForReview = statusQuery.data?.status === "in_review";
+  // Read from the application itself, so a failed second request cannot leave a document in review labelled "Uploaded".
+  const sentForReview = applicationQuery.data?.status === "submitted";
 
   const { uploaded, needed } = useMemo(() => {
     const items = [...(applicationQuery.data?.items ?? [])].sort(
@@ -97,7 +96,11 @@ const DocumentsPage = () => {
         </div>
 
         {applicationQuery.isPending ? (
-          <Loading />
+          <div aria-busy="true" aria-label="Loading your documents" className="space-y-2">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} height="3.5rem" rounded="md" />
+            ))}
+          </div>
         ) : applicationQuery.isError ? (
           <WidgetError what="your documents" onRetry={() => void applicationQuery.refetch()} />
         ) : uploaded.length === 0 && needed.length === 0 ? (

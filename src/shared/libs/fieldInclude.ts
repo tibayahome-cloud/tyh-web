@@ -318,7 +318,7 @@ export const providerApplicationAdmin: FieldPreset = {
       fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "requirement_type_id"],
       children: {
         requirement_type: {
-          fields: ["id", "key", "label", "input_type"]
+          fields: ["id", "key", "label", "input_type", "required_for_verification"]
         }
       }
     }

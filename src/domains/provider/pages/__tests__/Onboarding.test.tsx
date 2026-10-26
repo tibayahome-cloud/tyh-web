@@ -475,3 +475,90 @@ describe("after the application is sent", () => {
     expect(screen.queryByText(/Most requests you can take/)).not.toBeInTheDocument();
   });
 });
+
+describe("the flow reads in the right order", () => {
+  it("puts the documents before the process steps and folds the steps while there is work to do", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 0, items_total: 1 });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    await renderPage();
+
+    const documents = screen.getByRole("region", { name: "Your documents" });
+    const process = screen.getByRole("region", { name: "Where you are" });
+    expect(documents.compareDocumentPosition(process) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(process).getByText("You are at: Add your documents")).toBeInTheDocument();
+    expect(within(process).queryByText("We check them")).not.toBeInTheDocument();
+
+    fireEvent.click(within(process).getByRole("button", { name: /How the process works/ }));
+    expect(within(process).getByText("We check them")).toBeInTheDocument();
+  });
+
+  it("keeps the steps open once the application is with a reviewer", async () => {
+    state.status = summary({ status: "in_review", items_done: 1, items_total: 1 });
+    state.application = { id: "a1", status: "submitted", items: [appItem("1", "National ID", "pending")] };
+    await renderPage();
+
+    const process = screen.getByRole("region", { name: "Where you are" });
+    expect(within(process).getByText("We check them")).toBeInTheDocument();
+  });
+
+  it("offers a button that takes you to the next document", async () => {
+    state.status = summary({
+      status: "documents_needed",
+      items_done: 0,
+      items_total: 1,
+      next_item: { requirement_key: "national-id", label: "National ID", input_type: "file", status: "missing", reviewer_note: null }
+    });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Go to National ID" }));
+    expect(scroll).toHaveBeenCalled();
+  });
+
+  it("tells a provider who is already verified that they keep working, and words the last step to match", async () => {
+    state.status = summary({
+      status: "documents_needed",
+      items_done: 0,
+      items_total: 1,
+      provider_verified: true,
+      documents_in_order: false,
+      documents_days_left: 20
+    });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    await renderPage();
+
+    const process = screen.getByRole("region", { name: "Where you are" });
+    fireEvent.click(within(process).getByRole("button", { name: /How the process works/ }));
+    expect(within(process).getByText("Your documents are confirmed")).toBeInTheDocument();
+    expect(within(process).queryByText("You are verified")).not.toBeInTheDocument();
+  });
+
+  it("makes you send again after something was handed back", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 1, items_total: 1, ready_to_submit: true });
+    state.application = { id: "a1", status: "under_review", items: [appItem("1", "National ID", "pending")] };
+    await renderPage();
+
+    expect(screen.getByRole("button", { name: "Send for review" })).toBeInTheDocument();
+    expect(state.post).not.toHaveBeenCalled();
+  });
+
+  it("moves between upload options with the arrow keys", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 0, items_total: 1 });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    const first = screen.getByRole("menuitem", { name: "Choose a file" });
+    const second = screen.getByRole("menuitem", { name: "Take a photo" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(second, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(second);
+  });
+});

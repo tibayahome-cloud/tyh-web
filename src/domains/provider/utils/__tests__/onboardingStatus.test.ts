@@ -16,6 +16,7 @@ const summary = (overrides: Partial<OnboardingSummary> = {}): OnboardingSummary 
   documentsDueOn: null,
   documentsDaysLeft: null,
   documentsInOrder: true,
+  providerVerified: false,
   ...overrides
 });
 

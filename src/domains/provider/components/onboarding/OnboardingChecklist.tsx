@@ -132,6 +132,19 @@ const UploadMenu = ({
     cameraInput.current?.click();
   };
 
+  const onMenuKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const move = (to: number) => {
+      event.preventDefault();
+      items[(to + items.length) % items.length]?.focus();
+    };
+    if (event.key === "ArrowDown") move(index + 1);
+    else if (event.key === "ArrowUp") move(index - 1);
+    else if (event.key === "Home") move(0);
+    else if (event.key === "End") move(items.length - 1);
+  };
+
   const menuItem = "flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-base text-slate-900 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
 
   return (
@@ -149,7 +162,7 @@ const UploadMenu = ({
         <ChevronDown aria-hidden="true" size={14} />
       </button>
       {open && (
-        <div role="menu" aria-label={label} className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        <div role="menu" aria-label={label} onKeyDown={onMenuKey} className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           <button type="button" role="menuitem" autoFocus onClick={() => choose(fileInput)} className={menuItem}>
             <FileText aria-hidden="true" size={18} className="text-slate-600" />
             Choose a file

@@ -33,6 +33,8 @@ export type OnboardingSummary = {
   documentsDueOn: string | null;
   documentsDaysLeft: number | null;
   documentsInOrder: boolean;
+  /** Already verified, so they keep taking bookings while documents are checked. */
+  providerVerified: boolean;
 };
 
 // An item the provider has supplied, whether or not a reviewer has looked at it yet.
@@ -70,7 +72,8 @@ export const mapOnboardingSummary = (raw: Record<string, unknown>): OnboardingSu
     documentsDueOn: typeof raw.documents_due_on === "string" ? raw.documents_due_on : null,
     documentsDaysLeft: typeof raw.documents_days_left === "number" ? raw.documents_days_left : null,
     // An older server sends nothing here; that means nothing is owed.
-    documentsInOrder: raw.documents_in_order !== false
+    documentsInOrder: raw.documents_in_order !== false,
+    providerVerified: raw.provider_verified === true || raw.status === "verified" || raw.status === "set_up_by_facility"
   };
 };
 
