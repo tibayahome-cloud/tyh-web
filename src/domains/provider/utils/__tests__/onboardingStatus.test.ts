@@ -27,9 +27,9 @@ describe("describeOnboarding: one plain status for every kind of provider", () =
     expect(describeOnboarding(summary())).toMatchObject({ title: "Not started", tone: "neutral" });
   });
 
-  it("documents needed, with how many and which is next", () => {
+  it("documents needed, with which is next (the count is shown beside the progress, not repeated here)", () => {
     expect(describeOnboarding(summary({ status: "documents_needed", itemsDone: 1, itemsTotal: 3, requiredDone: 1, requiredTotal: 3, nextItem: item("Practising licence") }))).toEqual({
-      title: "Documents needed (1 of 3)",
+      title: "Documents needed",
       message: "Next: Practising licence.",
       tone: "warning"
     });

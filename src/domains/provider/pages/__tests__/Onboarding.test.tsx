@@ -113,7 +113,9 @@ describe("onboarding status", () => {
     state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "pending"), appItem("2", "Practising licence", "missing")] };
     await renderPage();
 
-    expect(screen.getByText("Documents needed (1 of 2)")).toBeInTheDocument();
+    expect(screen.getByText("Documents needed")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("required documents sent")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Documents provided" })).toHaveAttribute("aria-valuenow", "1");
     const group = screen.getByRole("region", { name: "Other documents" });
     expect(within(group).getByText("1 left")).toBeInTheDocument();

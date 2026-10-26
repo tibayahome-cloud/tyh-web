@@ -47,7 +47,8 @@ describe("DocumentsDueCard", () => {
     renderCard();
 
     expect(screen.getByRole("heading", { name: "Add your documents in 20 days" })).toBeInTheDocument();
-    expect(screen.getByText(/1 of 4 required documents are in/)).toBeInTheDocument();
+    expect(screen.getByText("1 of 4 required documents sent")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Required documents sent" })).toHaveAttribute("aria-valuenow", "1");
     expect(screen.getByRole("link", { name: "Add documents" })).toHaveAttribute("href", "/pro/onboarding");
   });
 
