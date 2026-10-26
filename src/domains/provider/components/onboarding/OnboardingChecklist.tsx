@@ -5,7 +5,7 @@ import { Button } from "../../../../shared/components/Button";
 import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { groupChecklistItems, itemsLeft, type DocumentGroupId } from "../../utils/onboardingGroups";
 import { DOCUMENT_ACCEPT, DOCUMENT_HINT, PHOTO_ACCEPT, documentFileProblem } from "../../utils/documentFiles";
-import { documentStatusLabel } from "../../utils/documentDisplay";
+import { describeExpiry, documentStatusLabel } from "../../utils/documentDisplay";
 import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 export type ChecklistItem = {
@@ -64,6 +64,8 @@ const outlineButton =
 
 const removeButton =
   "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-rose-800 hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400";
+
+const EXPIRY_TONE = { ok: "text-slate-700", soon: "font-medium text-amber-800", expired: "font-medium text-rose-800" } as const;
 
 const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50";
 
@@ -198,9 +200,14 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
   const locked = sentForReview && !item.editableAfterSend;
 
   const actionLabel = approved && !item.editableAfterSend ? "View" : item.status === "missing" ? "Add" : "Replace";
+  // What is holding verification up stands out; optional documents stay quiet.
+  const needsAttention = item.required && item.status === "missing";
+  const sentBack = item.status === "rejected";
+  const expiry = describeExpiry(item.expiresOn);
+  const rowTone = needsAttention ? "border-amber-300 bg-amber-50" : sentBack ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white";
 
   return (
-    <li className="rounded-xl border border-slate-200 bg-white">
+    <li className={`rounded-xl border ${rowTone}`}>
       <div className="flex min-h-[56px] flex-wrap items-center justify-between gap-2 px-4 py-2">
         <div className="flex min-w-0 items-center gap-3">
           {approved ? (
@@ -214,7 +221,9 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
             <h4 className="min-w-0 text-base font-medium text-slate-900">
               {item.label}
               {!item.required && <span className="ml-2 text-sm font-normal text-slate-600">Optional</span>}
+              {needsAttention && <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-950">Required</span>}
             </h4>
+            {expiry && <p className={`text-sm ${EXPIRY_TONE[expiry.tone]}`}>{expiry.text}</p>}
             {isText && item.valueText && !open && <p className="text-sm text-slate-700">{item.valueText}</p>}
           </div>
         </div>
@@ -242,7 +251,11 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
               aria-controls={panelId}
               aria-label={`${actionLabel} ${item.label}`}
               onClick={() => (approved && item.hasFile && !item.editableAfterSend ? onView(item.id) : setOpen((value) => !value))}
-              className={`min-h-[44px] rounded-lg px-3 text-base font-semibold text-tiba-blue hover:bg-sky-50 ${focusRing}`}
+              className={
+                needsAttention
+                  ? `min-h-[44px] rounded-lg bg-tiba-blue px-5 text-base font-semibold text-white hover:opacity-90 ${focusRing}`
+                  : `min-h-[44px] rounded-lg px-3 text-base font-semibold text-tiba-blue hover:bg-sky-50 ${focusRing}`
+              }
             >
               {actionLabel}
             </button>
@@ -383,9 +396,11 @@ export const OnboardingChecklist = ({ items, busyItemId, onUpload, onSaveText, o
                 <span className="block text-sm text-slate-700">{group.description}</span>
               </span>
               <span
-                className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${left > 0 ? "bg-slate-100 text-slate-800" : "bg-emerald-100 text-emerald-900"}`}
+                className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${
+                  left > 0 ? "bg-amber-100 text-amber-900" : groupItems.some((item) => item.required) ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-800"
+                }`}
               >
-                {left > 0 ? `${left} left` : "Done"}
+                {left > 0 ? `${left} left` : groupItems.some((item) => item.required) ? "Done" : "Optional"}
               </span>
               <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-tiba-blue transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
             </button>

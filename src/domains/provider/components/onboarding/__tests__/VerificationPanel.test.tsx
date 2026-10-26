@@ -10,11 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ status: {} as Record<string, unknown>, application: null as unknown, post: vi.fn(), put: vi.fn(), del: vi.fn() }));
 
-vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "p1" } }) }));
-vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
-vi.mock("../../../../shared/components/ToastProvider", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
-vi.mock("../../hooks/useProviderProfile", () => ({ useProviderProfile: () => ({ data: { daily_request_limit: 5, can_emergency: false } }) }));
-vi.mock("../../../../shared/libs/api", () => ({
+vi.mock("../../../../../shared/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "p1" } }) }));
+vi.mock("../../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
+vi.mock("../../../../../shared/components/ToastProvider", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+vi.mock("../../../hooks/useProviderProfile", () => ({ useProviderProfile: () => ({ data: { daily_request_limit: 5, can_emergency: false } }) }));
+vi.mock("../../../../../shared/libs/api", () => ({
   api: {
     get: vi.fn(async (url: string) => {
       if (url === "/provider-applications/me/status") return { data: { data: state.status } };
@@ -35,7 +35,7 @@ vi.mock("axios", async (importOriginal) => {
   return { ...actual, isAxiosError: (e: { isAxiosError?: boolean }) => Boolean(e?.isAxiosError) };
 });
 
-import OnboardingPage from "../Onboarding";
+import { VerificationPanel } from "../VerificationPanel";
 
 const summary = (overrides: Record<string, unknown> = {}) => ({
   status: "not_started",
@@ -64,11 +64,11 @@ const renderPage = async () => {
   render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <OnboardingPage />
+        <VerificationPanel />
       </QueryClientProvider>
     </MemoryRouter>
   );
-  return screen.findByRole("heading", { name: "Your verification" });
+  return screen.findByRole("region", { name: "Verification status" });
 };
 
 beforeEach(() => {
@@ -253,10 +253,12 @@ describe("documents owed by a provider who was already working", () => {
     expect(within(identity).getByRole("button", { name: "Add National ID or passport" })).toBeInTheDocument();
 
     const professional = screen.getByRole("region", { name: "Your professional standing" });
-    expect(within(professional).getByText("Done")).toBeInTheDocument();
+    // Nothing required in this group, so it is not called "Done"; it says its documents are optional.
+    expect(within(professional).getByText("Optional")).toBeInTheDocument();
+    expect(within(professional).queryByText("Done")).not.toBeInTheDocument();
     expect(within(professional).queryByRole("button", { name: "Add Curriculum vitae" })).not.toBeInTheDocument();
     fireEvent.click(within(professional).getByRole("button", { name: /Your professional standing/ }));
-    expect(within(professional).getByText("Optional")).toBeInTheDocument();
+    expect(within(professional).getAllByText("Optional")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Add your documents" })).not.toBeInTheDocument();
   });
 
@@ -562,5 +564,66 @@ describe("the flow reads in the right order", () => {
     expect(document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: "ArrowUp" });
     expect(document.activeElement).toBe(second);
+  });
+});
+
+describe("what is missing stands out", () => {
+  const open = async () => {
+    state.status = summary({ status: "documents_needed", items_done: 1, items_total: 3 });
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [
+        appItem("1", "Curriculum vitae", "missing", {}, { key: "cv", required_for_verification: false }),
+        appItem("2", "Academic certificates", "pending", { file_url: "/x", download_url: "/x" }, { key: "academic-certificates", required_for_verification: false }),
+        appItem("3", "Current annual practising licence", "missing", {}, { key: "practising-licence", has_expiry: true }),
+        appItem("4", "Registration with your regulatory body", "missing", {}, { key: "professional-registration" })
+      ]
+    };
+    await renderPage();
+    return screen.getByRole("region", { name: "Your professional standing" });
+  };
+
+  it("marks required documents that are missing, and leaves optional ones quiet", async () => {
+    const group = await open();
+
+    const licence = within(group).getByRole("button", { name: "Add Current annual practising licence" }).closest("li")!;
+    expect(within(licence).getByText("Required")).toBeInTheDocument();
+    expect(licence.className).toContain("bg-amber-50");
+
+    const cv = within(group).getByRole("button", { name: "Add Curriculum vitae" }).closest("li")!;
+    expect(within(cv).queryByText("Required")).not.toBeInTheDocument();
+    expect(cv.className).not.toContain("bg-amber-50");
+  });
+
+  it("lists the required documents first in each group", async () => {
+    const group = await open();
+
+    const names = within(group)
+      .getAllByRole("heading", { level: 4 })
+      .map((heading) => heading.textContent ?? "");
+    expect(names[0]).toContain("practising licence");
+    expect(names[1]).toContain("Registration");
+    expect(names.slice(2).join(" ")).toContain("Curriculum vitae");
+  });
+
+  it("counts the missing required ones on the group in an attention colour", async () => {
+    const group = await open();
+    const badge = within(group).getByText("2 left");
+    expect(badge.className).toContain("bg-amber-100");
+  });
+
+  it("shows a licence's expiry date on its row, and flags one that has passed", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 1, items_total: 1 });
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [appItem("1", "Current annual practising licence", "pending", { file_url: "/x", download_url: "/x", expires_on: "2020-01-15" }, { key: "practising-licence", has_expiry: true })]
+    };
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Other documents|Your professional standing/ }));
+    const expired = screen.getByText("Expired 15 Jan 2020");
+    expect(expired.className).toContain("text-rose-800");
   });
 });

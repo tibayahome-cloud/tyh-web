@@ -126,7 +126,7 @@ const ProviderSettings = () => {
             <p className="mt-4 text-sm text-slate-500">All requirements look good.</p>
           )}
           <div className="mt-4 flex gap-2">
-            <Button variant="secondary" onClick={() => navigate("/pro/onboarding")}>
+            <Button variant="secondary" onClick={() => navigate("/pro/documents")}>
               Review onboarding
             </Button>
           </div>

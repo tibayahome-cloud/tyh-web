@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Loading } from "../../../shared/components/Loading";
-import { Button } from "../../../shared/components/Button";
-import { useToast } from "../../../shared/components/ToastProvider";
-import { useAuth } from "../../../shared/hooks/useAuth";
-import { useSocket } from "../../../shared/hooks/useSocket";
-import { api } from "../../../shared/libs/api";
-import { getApiError } from "../../../shared/utils/errors";
-import { onboardingStatusKey, useOnboardingStatus } from "../hooks/useOnboardingStatus";
-import { OnboardingChecklist, type ChecklistItem } from "../components/onboarding/OnboardingChecklist";
-import { OnboardingStatusCard } from "../components/onboarding/OnboardingStatusCard";
-import { OnboardingTimeline } from "../components/onboarding/OnboardingTimeline";
-import { SendForReviewDialog } from "../components/onboarding/SendForReviewDialog";
-import { DocumentPreviewModal } from "../components/onboarding/DocumentPreviewModal";
-import { applicationKey, useMyApplication } from "../hooks/useMyApplication";
+import { Loading } from "../../../../shared/components/Loading";
+import { Button } from "../../../../shared/components/Button";
+import { useToast } from "../../../../shared/components/ToastProvider";
+import { useAuth } from "../../../../shared/hooks/useAuth";
+import { useSocket } from "../../../../shared/hooks/useSocket";
+import { api } from "../../../../shared/libs/api";
+import { getApiError } from "../../../../shared/utils/errors";
+import { onboardingStatusKey, useOnboardingStatus } from "../../hooks/useOnboardingStatus";
+import { OnboardingChecklist, type ChecklistItem } from "./OnboardingChecklist";
+import { OnboardingStatusCard } from "./OnboardingStatusCard";
+import { OnboardingTimeline } from "./OnboardingTimeline";
+import { SendForReviewDialog } from "./SendForReviewDialog";
+import { DocumentPreviewModal } from "./DocumentPreviewModal";
+import { applicationKey, useMyApplication } from "../../hooks/useMyApplication";
 
-const OnboardingPage = () => {
+export const VerificationPanel = () => {
   const { user } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -157,7 +157,7 @@ const OnboardingPage = () => {
 
   if (statusQuery.isError || !statusQuery.data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
+      <div>
         <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
           <p className="font-semibold">We could not load your verification.</p>
           <Button type="button" className="mt-3 min-h-[44px]" variant="secondary" onClick={() => statusQuery.refetch()}>
@@ -184,12 +184,7 @@ const OnboardingPage = () => {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-16 pt-6 sm:px-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Your verification</h1>
-        <p className="text-sm text-slate-700">We check your documents once, so clients can trust who they book.</p>
-      </div>
-
+    <div className="flex flex-col gap-6">
       <OnboardingStatusCard
         summary={summary}
         starting={start.isPending}
@@ -232,4 +227,4 @@ const OnboardingPage = () => {
   );
 };
 
-export default OnboardingPage;
+export default VerificationPanel;

@@ -36,7 +36,7 @@ export const DocumentsDueCard = () => {
             </div>
           )}
           <Link
-            to="/pro/onboarding"
+            to="/pro/documents"
             className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-tiba-blue px-5 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-tiba-blue"
           >
             Add documents

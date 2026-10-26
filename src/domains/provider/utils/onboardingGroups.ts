@@ -51,7 +51,12 @@ export const itemsLeft = (items: ChecklistItem[]): number =>
 export const groupChecklistItems = (items: ChecklistItem[]): GroupedItems[] => {
   const placed = new Set<string>();
   const result: GroupedItems[] = DOCUMENT_GROUPS.map((group) => {
-    const inGroup = items.filter((item) => item.requirementKey && group.keys.includes(item.requirementKey));
+    // Required first, so what holds verification up is at the top; the checklist's own order otherwise.
+    const inGroup = items
+      .filter((item) => item.requirementKey && group.keys.includes(item.requirementKey))
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => Number(b.item.required) - Number(a.item.required) || a.index - b.index)
+      .map(({ item }) => item);
     inGroup.forEach((item) => placed.add(item.id));
     return { group, items: inGroup };
   });
