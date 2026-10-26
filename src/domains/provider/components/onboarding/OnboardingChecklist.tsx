@@ -4,7 +4,9 @@ import { Camera, Check, ChevronDown, Eye, FileText, Stethoscope, Trash2, Upload,
 import { Button } from "../../../../shared/components/Button";
 import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
 import { groupChecklistItems, itemsLeft, type DocumentGroupId } from "../../utils/onboardingGroups";
+import { DOCUMENT_ACCEPT, DOCUMENT_HINT, PHOTO_ACCEPT, documentFileProblem } from "../../utils/documentFiles";
 import { itemStatusLabel } from "../../utils/onboardingStatus";
+import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 export type ChecklistItem = {
   id: string;
@@ -70,8 +72,21 @@ const removeButton =
 const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50";
 
 /** One Upload button; choosing it offers a file or the camera, the way a document upload works in Google apps. */
-const UploadMenu = ({ label, busy, disabled, onPick }: { label: string; busy: boolean; disabled: boolean; onPick: (file: File) => void }) => {
+const UploadMenu = ({
+  label,
+  busy,
+  disabled,
+  onPick,
+  onProblem
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onPick: (file: File) => void;
+  onProblem: (message: string | null) => void;
+}) => {
   const [open, setOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -92,15 +107,33 @@ const UploadMenu = ({ label, busy, disabled, onPick }: { label: string; busy: bo
     };
   }, [open]);
 
+  const accept = (file: File) => {
+    const found = documentFileProblem(file);
+    onProblem(found);
+    if (!found) onPick(file);
+  };
+
   const picked = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) onPick(file);
+    if (file) accept(file);
     event.target.value = "";
   };
 
   const choose = (input: React.RefObject<HTMLInputElement>) => {
     setOpen(false);
     input.current?.click();
+  };
+
+  // A phone opens its own camera from the file picker. A computer ignores that, so the page asks for the camera itself.
+  const takePhoto = () => {
+    setOpen(false);
+    const touch = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    const canUseCamera = "mediaDevices" in navigator && typeof navigator.mediaDevices?.getUserMedia === "function";
+    if (!touch && canUseCamera) {
+      setCameraOpen(true);
+      return;
+    }
+    cameraInput.current?.click();
   };
 
   const menuItem = "flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-base text-slate-900 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
@@ -125,14 +158,15 @@ const UploadMenu = ({ label, busy, disabled, onPick }: { label: string; busy: bo
             <FileText aria-hidden="true" size={18} className="text-slate-600" />
             Choose a file
           </button>
-          <button type="button" role="menuitem" onClick={() => choose(cameraInput)} className={menuItem}>
+          <button type="button" role="menuitem" onClick={takePhoto} className={menuItem}>
             <Camera aria-hidden="true" size={18} className="text-slate-600" />
             Take a photo
           </button>
         </div>
       )}
-      <input ref={fileInput} type="file" accept="image/*,.pdf,.doc,.docx" tabIndex={-1} aria-hidden="true" className="sr-only" onChange={picked} data-testid="file-input" />
-      <input ref={cameraInput} type="file" accept="image/*" capture="environment" tabIndex={-1} aria-hidden="true" className="sr-only" onChange={picked} data-testid="camera-input" />
+      <CameraCaptureDialog open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={accept} />
+      <input ref={fileInput} type="file" accept={DOCUMENT_ACCEPT} tabIndex={-1} aria-hidden="true" className="sr-only" onChange={picked} data-testid="file-input" />
+      <input ref={cameraInput} type="file" accept={PHOTO_ACCEPT} capture="environment" tabIndex={-1} aria-hidden="true" className="sr-only" onChange={picked} data-testid="camera-input" />
     </div>
   );
 };
@@ -149,6 +183,7 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
   const panelId = `doc-${item.id}`;
 
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [uploadProblem, setUploadProblem] = useState<string | null>(null);
   const hasContent = item.status !== "missing";
 
   const actionLabel = approved ? "View" : item.status === "missing" ? "Add" : "Replace";
@@ -250,6 +285,7 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
                 busy={busy}
                 disabled={needsDate}
                 onPick={(file) => onUpload(item.id, file, item.hasExpiry ? expiresOn : undefined)}
+                onProblem={setUploadProblem}
               />
               {hasContent && (
                 <button type="button" onClick={() => setConfirmingRemove(true)} className={removeButton}>
@@ -258,6 +294,14 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
                 </button>
               )}
             </div>
+          )}
+          {!isText && (
+            <p className="text-sm text-slate-700">{DOCUMENT_HINT}</p>
+          )}
+          {uploadProblem && (
+            <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">
+              {uploadProblem}
+            </p>
           )}
           {sent && !sentForReview && <p className="text-sm text-slate-700">Uploaded, not sent yet. You send everything together when the required documents are in.</p>}
           <ConfirmDialog

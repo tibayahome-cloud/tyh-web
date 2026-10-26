@@ -186,7 +186,7 @@ describe("onboarding status", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
     const camera = screen.getByTestId("camera-input");
     expect(camera).toHaveAttribute("capture", "environment");
-    expect(camera).toHaveAttribute("accept", "image/*");
+    expect(camera).toHaveAttribute("accept", "image/jpeg,image/png");
   });
 });
 
@@ -319,5 +319,96 @@ describe("taking a document back", () => {
     fireEvent.click(screen.getByRole("button", { name: /Other documents/ }));
     expect(screen.getByText("Waiting for review")).toBeInTheDocument();
     expect(screen.queryByText("Uploaded")).not.toBeInTheDocument();
+  });
+});
+
+describe("which files are accepted", () => {
+  const openUploadFor = async () => {
+    state.status = summary({ status: "documents_needed", items_done: 0, items_total: 1 });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
+  };
+
+  it("says which files are allowed, and offers only those in the file picker", async () => {
+    await openUploadFor();
+
+    expect(screen.getByText("PDF, JPG or PNG, up to 10 MB")).toBeInTheDocument();
+    const accept = screen.getByTestId("file-input").getAttribute("accept") ?? "";
+    expect(accept).toContain(".pdf");
+    expect(accept).toContain("image/png");
+    expect(accept).not.toMatch(/doc|image\/\*/);
+  });
+
+  it("refuses a file of the wrong type before sending anything, and says why", async () => {
+    await openUploadFor();
+
+    fireEvent.change(screen.getByTestId("file-input"), { target: { files: [new File(["x"], "cv.docx", { type: "application/msword" })] } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("PDF, JPG or PNG");
+    expect(state.post).not.toHaveBeenCalled();
+  });
+
+  it("refuses a file over 10 MB", async () => {
+    await openUploadFor();
+    const big = new File(["x"], "scan.pdf", { type: "application/pdf" });
+    Object.defineProperty(big, "size", { value: 11 * 1024 * 1024 });
+
+    fireEvent.change(screen.getByTestId("file-input"), { target: { files: [big] } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("10 MB");
+    expect(state.post).not.toHaveBeenCalled();
+  });
+
+  it("accepts a PDF and a photo", async () => {
+    await openUploadFor();
+
+    fireEvent.change(screen.getByTestId("file-input"), { target: { files: [new File(["x"], "id.pdf", { type: "application/pdf" })] } });
+    await vi.waitFor(() => expect(state.post).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByTestId("camera-input"), { target: { files: [new File(["x"], "photo.jpg", { type: "image/jpeg" })] } });
+    await vi.waitFor(() => expect(state.post).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("taking a photo on a computer", () => {
+  const stopTrack = vi.fn();
+  const getUserMedia = vi.fn();
+
+  const openMenu = async () => {
+    state.status = summary({ status: "documents_needed", items_done: 0, items_total: 1 });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Add National ID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+  };
+
+  beforeEach(() => {
+    stopTrack.mockReset();
+    getUserMedia.mockReset();
+    Object.defineProperty(navigator, "mediaDevices", { value: { getUserMedia }, configurable: true });
+  });
+
+  it("asks the browser for the camera and shows a preview instead of the file list", async () => {
+    getUserMedia.mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] });
+    await openMenu();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Take a photo" }));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ audio: false }));
+    expect(screen.getByLabelText("Camera preview")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await vi.waitFor(() => expect(stopTrack).toHaveBeenCalled());
+  });
+
+  it("says how to fix a blocked camera, and points to choosing a file", async () => {
+    getUserMedia.mockRejectedValue(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
+    await openMenu();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Take a photo" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/camera is blocked/i);
+    expect(screen.queryByRole("button", { name: "Take photo" })).not.toBeInTheDocument();
   });
 });
