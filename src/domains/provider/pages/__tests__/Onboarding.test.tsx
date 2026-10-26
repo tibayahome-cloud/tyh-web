@@ -240,4 +240,35 @@ describe("documents owed by a provider who was already working", () => {
     const form = state.post.mock.calls[0][1] as FormData;
     expect(form.get("expires_on")).toBe("2027-03-31");
   });
+
+  it("takes the KRA PIN and the M-Pesa number as one-line typed answers with an example", async () => {
+    state.status = owing();
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [
+        {
+          ...appItem("1", "KRA PIN number", "missing"),
+          requirement_type: { id: "r1", key: "kra-pin", label: "KRA PIN number", input_type: "text", display_order: 1 }
+        },
+        {
+          ...appItem("2", "M-Pesa number for payouts", "missing"),
+          requirement_type: { id: "r2", key: "payout-details", label: "M-Pesa number for payouts", input_type: "text", display_order: 2 }
+        }
+      ]
+    };
+    await renderPage();
+
+    const kra = screen.getByLabelText("KRA PIN number") as HTMLInputElement;
+    expect(kra.tagName).toBe("INPUT");
+    expect(kra).toHaveAttribute("placeholder", "A123456789B");
+    expect(screen.getByLabelText("M-Pesa number for payouts")).toHaveAttribute("inputmode", "tel");
+    expect(document.querySelector("textarea")).toBeNull();
+
+    fireEvent.change(kra, { target: { value: "A123456789B" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Save answer" })[0]);
+    await vi.waitFor(() =>
+      expect(state.put).toHaveBeenCalledWith("/provider-applications/a1/items/1", { value_text: "A123456789B", status: "pending" })
+    );
+  });
 });

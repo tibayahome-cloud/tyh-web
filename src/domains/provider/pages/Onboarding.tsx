@@ -26,6 +26,7 @@ type ApplicationItem = {
   expires_on?: string | null;
   requirement_type?: {
     id: string;
+    key?: string;
     label: string;
     input_type: "file" | "image" | "text";
     display_order?: number | null;
@@ -176,6 +177,7 @@ const OnboardingPage = () => {
       .sort((a, b) => (a.requirement_type?.display_order ?? 0) - (b.requirement_type?.display_order ?? 0))
       .map((item) => ({
         id: item.id,
+        requirementKey: item.requirement_type?.key ?? null,
         label: item.requirement_type?.label ?? "Document",
         inputType: item.requirement_type?.input_type ?? "file",
         status: item.status,
