@@ -12,13 +12,17 @@ export type ChecklistItem = {
   valueText: string | null;
   hasFile: boolean;
   reviewerNote: string | null;
+  required: boolean;
+  /** A licence or cover that runs out: its end date is asked for with the upload. */
+  hasExpiry: boolean;
+  expiresOn: string | null;
 };
 
 type Props = {
   items: ChecklistItem[];
   /** Id of the item being saved or uploaded right now, so only its buttons wait. */
   busyItemId: string | null;
-  onUpload: (itemId: string, file: File) => void;
+  onUpload: (itemId: string, file: File, expiresOn?: string) => void;
   onSaveText: (itemId: string, text: string) => void;
   onView: (itemId: string) => void;
 };
@@ -36,19 +40,24 @@ const outlineButton =
 
 const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem; busy: boolean } & Omit<Props, "items" | "busyItemId">) => {
   const [text, setText] = useState(item.valueText ?? "");
+  const [expiresOn, setExpiresOn] = useState(item.expiresOn ?? "");
   const isText = item.inputType === "text";
   const approved = item.status === "verified";
+  const needsDate = item.hasExpiry && !expiresOn;
 
   const pick = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) onUpload(item.id, file);
+    if (file) onUpload(item.id, file, item.hasExpiry ? expiresOn : undefined);
     event.target.value = "";
   };
 
   return (
     <li className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-slate-900">{item.label}</h3>
+        <h3 className="text-base font-semibold text-slate-900">
+          {item.label}
+          {!item.required && <span className="ml-2 text-sm font-normal text-slate-600">Optional</span>}
+        </h3>
         <span className={`rounded-full px-3 py-1 text-sm font-medium ${PILL[item.status] ?? "bg-slate-100 text-slate-800"}`}>
           {itemStatusLabel(item.status)}
         </span>
@@ -59,6 +68,22 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
           <span className="font-semibold">From the reviewer: </span>
           {item.reviewerNote}
         </p>
+      )}
+
+      {item.hasExpiry && !isText && (
+        <div>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-800">Expiry date</span>
+              <input
+              type="date"
+              value={expiresOn}
+              onChange={(event) => setExpiresOn(event.target.value)}
+              disabled={approved || busy}
+              className="mt-1 h-11 w-full max-w-[220px] rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40 disabled:bg-slate-50"
+            />
+          </label>
+          {needsDate && !approved && <p className="mt-1 text-sm text-slate-700">Enter the date first, then choose the file.</p>}
+        </div>
       )}
 
       {isText ? (
@@ -93,12 +118,12 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
               <label className={outlineButton}>
                 <Upload aria-hidden="true" size={16} />
                 {busy ? "Uploading…" : item.hasFile ? "Replace file" : "Choose a file"}
-                <input type="file" accept="image/*,.pdf,.doc,.docx" className="sr-only" disabled={busy} onChange={pick} />
+                <input type="file" accept="image/*,.pdf,.doc,.docx" className="sr-only" disabled={busy || needsDate} onChange={pick} />
               </label>
               <label className={outlineButton}>
                 <Camera aria-hidden="true" size={16} />
                 Take a photo
-                <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={busy} onChange={pick} />
+                <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={busy || needsDate} onChange={pick} />
               </label>
             </>
           )}
@@ -108,11 +133,31 @@ const Row = ({ item, busy, onUpload, onSaveText, onView }: { item: ChecklistItem
   );
 };
 
-/** One row per document: what it is, where it stands in words, and the one action it needs. */
-export const OnboardingChecklist = ({ items, busyItemId, onUpload, onSaveText, onView }: Props) => (
-  <ul aria-label="Documents" className="space-y-3">
-    {items.map((item) => (
-      <Row key={item.id} item={item} busy={busyItemId === item.id} onUpload={onUpload} onSaveText={onSaveText} onView={onView} />
-    ))}
-  </ul>
-);
+/** One row per document, required ones first: what it is, where it stands in words, and the one action it needs. */
+export const OnboardingChecklist = ({ items, busyItemId, onUpload, onSaveText, onView }: Props) => {
+  const required = items.filter((item) => item.required);
+  const optional = items.filter((item) => !item.required);
+  const list = (group: ChecklistItem[], label: string) => (
+    <ul aria-label={label} className="space-y-3">
+      {group.map((item) => (
+        <Row key={item.id} item={item} busy={busyItemId === item.id} onUpload={onUpload} onSaveText={onSaveText} onView={onView} />
+      ))}
+    </ul>
+  );
+  // Nothing marked required (an older server): one plain list, as before.
+  if (required.length === 0) return list(items, "Documents");
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-800">Required to be verified</h3>
+        {list(required, "Documents")}
+      </div>
+      {optional.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-800">Also helpful</h3>
+          {list(optional, "Other documents")}
+        </div>
+      )}
+    </div>
+  );
+};

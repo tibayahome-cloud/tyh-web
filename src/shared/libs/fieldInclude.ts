@@ -111,10 +111,10 @@ export const provApp: FieldPreset = {
   fields: ["id", "status", "submitted_at", "reviewed_at", "notes"],
   includes: {
     items: {
-      fields: ["id", "status", "value_text", "file_url", "download_url", "comment"],
+      fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "expires_on"],
       children: {
         requirement_type: {
-          fields: ["id", "label", "input_type"]
+          fields: ["id", "label", "input_type", "display_order", "required_for_verification", "has_expiry"]
         }
       }
     },

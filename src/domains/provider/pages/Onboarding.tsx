@@ -23,7 +23,15 @@ type ApplicationItem = {
   file_url?: string | null;
   download_url?: string | null;
   comment?: string | null;
-  requirement_type?: { id: string; label: string; input_type: "file" | "image" | "text"; display_order?: number | null };
+  expires_on?: string | null;
+  requirement_type?: {
+    id: string;
+    label: string;
+    input_type: "file" | "image" | "text";
+    display_order?: number | null;
+    required_for_verification?: boolean;
+    has_expiry?: boolean;
+  };
 };
 
 type Application = { id: string; status: string; items?: ApplicationItem[] };
@@ -98,7 +106,8 @@ const OnboardingPage = () => {
 
   const start = useMutation({
     mutationFn: async () => {
-      await api.post("/provider-applications", {});
+      // Creates the checklist, or tops up an existing one with newly required documents, without touching verification.
+      await api.post("/provider-applications/me/open", {});
     },
     onSuccess: refresh,
     onError: fail("Could not start your verification")
@@ -117,10 +126,11 @@ const OnboardingPage = () => {
   });
 
   const upload = useMutation({
-    mutationFn: async ({ itemId, file }: { itemId: string; file: File }) => {
+    mutationFn: async ({ itemId, file, expiresOn }: { itemId: string; file: File; expiresOn?: string }) => {
       if (!application) throw new Error("No application yet");
       const formData = new FormData();
       formData.append("file", file);
+      if (expiresOn) formData.append("expires_on", expiresOn);
       await api.post(`/provider-applications/${application.id}/items/${itemId}/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
@@ -171,6 +181,9 @@ const OnboardingPage = () => {
         status: item.status,
         valueText: item.value_text ?? null,
         hasFile: Boolean(item.download_url || item.file_url),
+        required: Boolean(item.requirement_type?.required_for_verification),
+        hasExpiry: Boolean(item.requirement_type?.has_expiry),
+        expiresOn: item.expires_on ?? null,
         reviewerNote: noteByLabel.get(item.requirement_type?.label ?? "") ?? (item.status === "rejected" ? item.comment ?? null : null)
       }));
   }, [application?.items, statusQuery.data?.items]);
@@ -191,7 +204,8 @@ const OnboardingPage = () => {
   }
 
   const summary = statusQuery.data;
-  const showChecklist = items.length > 0 && summary.status !== "set_up_by_facility";
+  // A provider set up by their facility has nothing to upload, unless documents are now owed.
+  const showChecklist = items.length > 0 && (summary.status !== "set_up_by_facility" || !summary.documentsInOrder);
   const limitValue = dailyLimit !== "" ? dailyLimit : String(profile?.daily_request_limit ?? 0);
   const emergencyValue = canEmergency ?? profile?.can_emergency ?? false;
 
@@ -214,6 +228,7 @@ const OnboardingPage = () => {
         submitting={submit.isPending}
         onStart={() => start.mutate()}
         onSubmit={() => submit.mutate()}
+        checklistShown={showChecklist}
       />
 
       {showChecklist && (
@@ -222,7 +237,7 @@ const OnboardingPage = () => {
           <OnboardingChecklist
             items={items}
             busyItemId={busyItemId}
-            onUpload={(itemId, file) => upload.mutate({ itemId, file })}
+            onUpload={(itemId, file, expiresOn) => upload.mutate({ itemId, file, expiresOn })}
             onSaveText={(itemId, text) => saveText.mutate({ itemId, text })}
             onView={view}
           />
