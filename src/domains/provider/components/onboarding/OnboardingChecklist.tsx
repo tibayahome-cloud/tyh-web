@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, ChevronDown, Eye, FileText, Stethoscope, Trash2, Upload, User, Wallet } from "lucide-react";
+import { Camera, Check, CheckCircle2, ChevronDown, Eye, FileText, Stethoscope, Trash2, Upload, User, Wallet } from "lucide-react";
 
 import { Button } from "../../../../shared/components/Button";
 import { ConfirmDialog } from "../../../../shared/components/ConfirmDialog";
@@ -22,6 +22,8 @@ export type ChecklistItem = {
   /** A licence or cover that runs out: its end date is asked for with the upload. */
   hasExpiry: boolean;
   expiresOn: string | null;
+  /** Can still be changed after the application is sent (a CV, a renewed licence). Others are view-only once sent. */
+  editableAfterSend?: boolean;
 };
 
 type Props = {
@@ -185,8 +187,10 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [uploadProblem, setUploadProblem] = useState<string | null>(null);
   const hasContent = item.status !== "missing";
+  // Once sent, a document is view-only unless it is one that keeps changing.
+  const locked = sentForReview && !item.editableAfterSend;
 
-  const actionLabel = approved ? "View" : item.status === "missing" ? "Add" : "Replace";
+  const actionLabel = approved && !item.editableAfterSend ? "View" : item.status === "missing" ? "Add" : "Replace";
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white">
@@ -194,13 +198,18 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
         <div className="flex min-w-0 items-center gap-3">
           {approved ? (
             <Check aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-600" />
+          ) : sent ? (
+            <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-sky-600" />
           ) : (
             <span aria-hidden="true" className="h-5 w-5 shrink-0 rounded-full border-2 border-slate-300" />
           )}
-          <h4 className="min-w-0 text-base font-medium text-slate-900">
-            {item.label}
-            {!item.required && <span className="ml-2 text-sm font-normal text-slate-600">Optional</span>}
-          </h4>
+          <div className="min-w-0">
+            <h4 className="min-w-0 text-base font-medium text-slate-900">
+              {item.label}
+              {!item.required && <span className="ml-2 text-sm font-normal text-slate-600">Optional</span>}
+            </h4>
+            {isText && item.valueText && !open && <p className="text-sm text-slate-700">{item.valueText}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {item.status !== "missing" && (
@@ -208,20 +217,33 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
               {statusText(item.status, sentForReview)}
             </span>
           )}
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls={panelId}
-            aria-label={`${actionLabel} ${item.label}`}
-            onClick={() => (approved && item.hasFile ? onView(item.id) : setOpen((value) => !value))}
-            className={`min-h-[44px] rounded-lg px-3 text-base font-semibold text-tiba-blue hover:bg-sky-50 ${focusRing}`}
-          >
-            {actionLabel}
-          </button>
+          {locked ? (
+            item.hasFile && (
+              <button
+                type="button"
+                aria-label={`View ${item.label}`}
+                onClick={() => onView(item.id)}
+                className={`min-h-[44px] rounded-lg px-3 text-base font-semibold text-tiba-blue hover:bg-sky-50 ${focusRing}`}
+              >
+                View
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-controls={panelId}
+              aria-label={`${actionLabel} ${item.label}`}
+              onClick={() => (approved && item.hasFile && !item.editableAfterSend ? onView(item.id) : setOpen((value) => !value))}
+              className={`min-h-[44px] rounded-lg px-3 text-base font-semibold text-tiba-blue hover:bg-sky-50 ${focusRing}`}
+            >
+              {actionLabel}
+            </button>
+          )}
         </div>
       </div>
 
-      {open && !approved && (
+      {open && !locked && (!approved || item.editableAfterSend) && (
         <div id={panelId} className="space-y-3 border-t border-slate-100 px-4 py-4">
           {item.reviewerNote && (
             <p role="note" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">

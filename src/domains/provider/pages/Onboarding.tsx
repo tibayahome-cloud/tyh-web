@@ -10,11 +10,11 @@ import { useSocket } from "../../../shared/hooks/useSocket";
 import { api } from "../../../shared/libs/api";
 import { buildFieldParams, provApp } from "../../../shared/libs/fieldInclude";
 import { getApiError } from "../../../shared/utils/errors";
-import { useProviderProfile } from "../hooks/useProviderProfile";
 import { onboardingStatusKey, useOnboardingStatus } from "../hooks/useOnboardingStatus";
 import { OnboardingChecklist, type ChecklistItem } from "../components/onboarding/OnboardingChecklist";
 import { OnboardingStatusCard } from "../components/onboarding/OnboardingStatusCard";
 import { OnboardingTimeline } from "../components/onboarding/OnboardingTimeline";
+import { SendForReviewDialog } from "../components/onboarding/SendForReviewDialog";
 import { DocumentPreviewModal } from "../components/onboarding/DocumentPreviewModal";
 
 type ApplicationItem = {
@@ -33,6 +33,7 @@ type ApplicationItem = {
     display_order?: number | null;
     required_for_verification?: boolean;
     has_expiry?: boolean;
+    editable_after_submission?: boolean;
   };
 };
 
@@ -62,13 +63,11 @@ const OnboardingPage = () => {
   const socket = useSocket();
   const statusQuery = useOnboardingStatus();
   const applicationQuery = useApplicationQuery();
-  const { data: profile } = useProviderProfile(user?.id);
   const application = applicationQuery.data ?? null;
 
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ source: string; title: string } | null>(null);
-  const [dailyLimit, setDailyLimit] = useState<string>("");
-  const [canEmergency, setCanEmergency] = useState<boolean | null>(null);
+  const [confirmingSend, setConfirmingSend] = useState(false);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: applicationKey }).catch(() => undefined);
@@ -174,18 +173,6 @@ const OnboardingPage = () => {
     onSettled: () => setBusyItemId(null)
   });
 
-  const saveLimits = useMutation({
-    mutationFn: async (payload: { daily_request_limit: number; can_emergency: boolean }) => {
-      if (!user?.id) throw new Error("Not signed in");
-      await api.patch(`/providers/${user.id}`, payload);
-    },
-    onSuccess: () => {
-      toast.showToast({ title: "Saved", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["provider", "profile", user?.id] }).catch(() => undefined);
-    },
-    onError: fail("Could not save")
-  });
-
   const items: ChecklistItem[] = useMemo(() => {
     const noteByLabel = new Map((statusQuery.data?.items ?? []).map((item) => [item.label, item.reviewer_note]));
     return [...(application?.items ?? [])]
@@ -201,6 +188,7 @@ const OnboardingPage = () => {
         required: Boolean(item.requirement_type?.required_for_verification),
         hasExpiry: Boolean(item.requirement_type?.has_expiry),
         expiresOn: item.expires_on ?? null,
+        editableAfterSend: Boolean(item.requirement_type?.editable_after_submission),
         reviewerNote: noteByLabel.get(item.requirement_type?.label ?? "") ?? (item.status === "rejected" ? item.comment ?? null : null)
       }));
   }, [application?.items, statusQuery.data?.items]);
@@ -223,8 +211,6 @@ const OnboardingPage = () => {
   const summary = statusQuery.data;
   // A provider set up by their facility has nothing to upload, unless documents are now owed.
   const showChecklist = items.length > 0 && (summary.status !== "set_up_by_facility" || !summary.documentsInOrder);
-  const limitValue = dailyLimit !== "" ? dailyLimit : String(profile?.daily_request_limit ?? 0);
-  const emergencyValue = canEmergency ?? profile?.can_emergency ?? false;
 
   const view = (itemId: string) => {
     const item = application?.items?.find((entry) => entry.id === itemId);
@@ -244,7 +230,7 @@ const OnboardingPage = () => {
         starting={start.isPending}
         submitting={submit.isPending}
         onStart={() => start.mutate()}
-        onSubmit={() => submit.mutate()}
+        onSubmit={() => setConfirmingSend(true)}
         checklistShown={showChecklist}
       />
 
@@ -265,40 +251,13 @@ const OnboardingPage = () => {
         </section>
       )}
 
-      <section aria-label="Work settings" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-slate-900">How much work you can take</h2>
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveLimits.mutate({ daily_request_limit: Math.max(0, Number(limitValue) || 0), can_emergency: Boolean(emergencyValue) });
-          }}
-        >
-          <label className="block">
-            <span className="text-sm font-medium text-slate-800">Most requests you can take in a day</span>
-            <input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              value={limitValue}
-              onChange={(event) => setDailyLimit(event.target.value)}
-              className="mt-2 h-11 w-full max-w-[160px] rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-            />
-          </label>
-          <label className="flex min-h-[44px] items-start gap-3">
-            <input
-              type="checkbox"
-              checked={Boolean(emergencyValue)}
-              onChange={(event) => setCanEmergency(event.target.checked)}
-              className="mt-1 h-5 w-5 rounded border-slate-400"
-            />
-            <span className="text-sm text-slate-800">I can respond to urgent requests near me</span>
-          </label>
-          <Button type="submit" className="min-h-[44px]" loading={saveLimits.isPending}>
-            Save
-          </Button>
-        </form>
-      </section>
+      <SendForReviewDialog
+        open={confirmingSend}
+        items={items}
+        submitting={submit.isPending}
+        onConfirm={() => submit.mutate(undefined, { onSettled: () => setConfirmingSend(false) })}
+        onClose={() => setConfirmingSend(false)}
+      />
 
       <DocumentPreviewModal source={viewing?.source ?? null} title={viewing?.title ?? "Document"} onClose={() => setViewing(null)} />
     </div>

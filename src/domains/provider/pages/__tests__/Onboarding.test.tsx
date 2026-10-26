@@ -147,14 +147,36 @@ describe("onboarding status", () => {
     expect(screen.getByText("Approved")).toBeInTheDocument();
   });
 
-  it("everything uploaded: offers to send for review", async () => {
+  it("everything uploaded: asks you to check and confirm before it sends for review", async () => {
     state.status = summary({ status: "documents_needed", items_done: 1, items_total: 1, ready_to_submit: true });
     state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "pending")] };
     await renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Send for review" }));
 
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Check before you send")).toBeInTheDocument();
+    expect(within(dialog).getByRole("list", { name: "Required documents you are sending" })).toHaveTextContent("National ID");
+    expect(state.post).not.toHaveBeenCalled();
+
+    const send = within(dialog).getByRole("button", { name: "Send for review" });
+    expect(send).toBeDisabled();
+    fireEvent.click(within(dialog).getByLabelText(/These documents are mine/));
+    expect(send).not.toBeDisabled();
+    fireEvent.click(send);
+
     await vi.waitFor(() => expect(state.post).toHaveBeenCalledWith("/provider-applications/a1/submit", {}));
+  });
+
+  it("going back from the confirmation sends nothing", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 1, items_total: 1, ready_to_submit: true });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "pending")] };
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Send for review" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Go back" }));
+
+    expect(state.post).not.toHaveBeenCalled();
   });
 
   it("in review: nothing to do but wait", async () => {
@@ -410,5 +432,46 @@ describe("taking a photo on a computer", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/camera is blocked/i);
     expect(screen.queryByRole("button", { name: "Take photo" })).not.toBeInTheDocument();
+  });
+});
+
+describe("after the application is sent", () => {
+  const sent = () => {
+    state.status = summary({ status: "in_review", items_done: 3, items_total: 3 });
+    state.application = {
+      id: "a1",
+      status: "submitted",
+      items: [
+        appItem("1", "KRA PIN number", "pending", { value_text: "A123456789B" }, { key: "kra-pin", input_type: "text" }),
+        appItem("2", "Academic certificates", "pending", { file_url: "/x", download_url: "/x" }, { key: "academic-certificates" }),
+        appItem("3", "Curriculum vitae", "pending", { file_url: "/y", download_url: "/y" }, { key: "cv", editable_after_submission: true })
+      ]
+    };
+  };
+
+  it("makes documents that do not change view-only, and keeps the CV editable", async () => {
+    sent();
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Your identity/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Your professional standing/ }));
+
+    expect(screen.getByRole("button", { name: "View Academic certificates" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Replace Academic certificates" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /KRA PIN number/ })).not.toBeInTheDocument();
+    expect(screen.getByText("A123456789B")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace Curriculum vitae" }));
+    expect(screen.getByRole("button", { name: "Replace" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+  });
+
+  it("no longer shows how much work a provider can take: that is for a super admin", async () => {
+    state.status = summary({ status: "documents_needed", items_done: 0, items_total: 1 });
+    state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "missing")] };
+    await renderPage();
+
+    expect(screen.queryByText("How much work you can take")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Most requests you can take/)).not.toBeInTheDocument();
   });
 });
