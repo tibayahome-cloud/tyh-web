@@ -87,3 +87,4 @@ Detailed Android manifest, network security, app icon/splash, and push setup not
 - Tailwind for utility styling, MUI (tree-shaken) for complex widgets
 - i18next scaffolding for English/Swahili, Socket.IO provider ready for realtime features
 - Realtime notification center with field-filtered REST queries and live socket updates
+- Provider Documents page (`/pro/documents`): one grouped checklist for identity, professional and payment details, an Upload menu with a camera option, replace and remove, file type and size hints, a summary of what is missing, and a confirm step before sending for review
