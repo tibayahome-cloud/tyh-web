@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import DashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import GroupIcon from "@mui/icons-material/GroupsOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import AssignmentIcon from "@mui/icons-material/ChecklistOutlined";
 import ViewListIcon from "@mui/icons-material/ViewKanbanOutlined";
 import MapIcon from "@mui/icons-material/MapOutlined";
@@ -37,6 +38,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
       { label: "Overview", to: "/admin/facility/overview", icon: <DashboardIcon /> },
       { label: "Facility", to: "/admin/facility", icon: <BusinessIcon /> },
       { label: "Providers", to: "/admin/facility/providers", icon: <GroupIcon /> },
+      { label: "Documents", to: "/admin/documents", icon: <DescriptionOutlinedIcon /> },
       { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
       { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
       { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
@@ -50,6 +52,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
     { label: "Overview", to: "/admin/dashboard", icon: <DashboardIcon /> },
     { label: "Users", to: "/admin/users", icon: <GroupIcon /> },
     { label: "Pro Apps", to: "/admin/providers/applications", icon: <AssignmentIcon /> },
+    { label: "Documents", to: "/admin/documents", icon: <DescriptionOutlinedIcon /> },
     { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
     { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Telemedicine Health", to: "/admin/telemedicine/platform", icon: <VideocamOutlinedIcon /> },
