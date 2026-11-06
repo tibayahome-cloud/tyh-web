@@ -4,8 +4,9 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ superAdmin: false }));
+const state = vi.hoisted(() => ({ superAdmin: false, attention: { providers_waiting: 0, facilities_waiting: 0, facility_sent_back: 0, total: 0 } }));
 vi.mock("../../../../../shared/hooks/useRbac", () => ({ useRbac: () => ({ hasRole: () => state.superAdmin, roles: [] }) }));
+vi.mock("../../../hooks/useDocumentsAttention", () => ({ useDocumentsAttention: () => ({ data: state.attention }) }));
 
 import { DocumentsIndexRedirect, DocumentsLayout } from "../DocumentsLayout";
 
@@ -26,9 +27,33 @@ const renderAt = (path: string) =>
 
 beforeEach(() => {
   state.superAdmin = false;
+  state.attention = { providers_waiting: 0, facilities_waiting: 0, facility_sent_back: 0, total: 0 };
 });
 
 describe("Documents area", () => {
+  it("counts what needs a facility admin on each tab, and stays quiet at zero", () => {
+    state.attention = { providers_waiting: 3, facilities_waiting: 0, facility_sent_back: 2, total: 5 };
+    renderAt("/admin/documents/providers");
+
+    expect(screen.getByLabelText("3 providers waiting for review")).toHaveTextContent("3");
+    expect(screen.getByLabelText("2 documents sent back")).toHaveTextContent("2");
+  });
+
+  it("counts the facilities and providers waiting for a super admin", () => {
+    state.superAdmin = true;
+    state.attention = { providers_waiting: 1, facilities_waiting: 4, facility_sent_back: 0, total: 5 };
+    renderAt("/admin/documents/facilities");
+
+    expect(screen.getByLabelText("4 facilities waiting for review")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 providers waiting for review")).toBeInTheDocument();
+  });
+
+  it("shows no badge when nothing is waiting", () => {
+    renderAt("/admin/documents/providers");
+
+    expect(screen.queryByLabelText(/waiting for review|sent back/)).not.toBeInTheDocument();
+  });
+
   it("gives a facility admin their providers' documents and their own", () => {
     renderAt("/admin/documents/providers");
 

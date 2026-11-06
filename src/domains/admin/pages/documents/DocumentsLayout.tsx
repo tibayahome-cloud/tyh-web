@@ -2,6 +2,7 @@ import { NavLink, Navigate, Outlet } from "react-router-dom";
 
 import { useRbac } from "../../../../shared/hooks/useRbac";
 import { ROLE_ADMIN_SUPER } from "../../../../shared/rbac/roles";
+import { useDocumentsAttention } from "../../hooks/useDocumentsAttention";
 
 const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue";
 
@@ -15,14 +16,15 @@ export const DocumentsIndexRedirect = () => {
 export const DocumentsLayout = () => {
   const { hasRole } = useRbac();
   const superAdmin = hasRole(ROLE_ADMIN_SUPER);
+  const attention = useDocumentsAttention().data;
   const tabs = superAdmin
     ? [
-        { to: "/admin/documents/facilities", label: "Facilities" },
-        { to: "/admin/documents/providers", label: "Providers" }
+        { to: "/admin/documents/facilities", label: "Facilities", count: attention?.facilities_waiting ?? 0, what: "facilities waiting for review" },
+        { to: "/admin/documents/providers", label: "Providers", count: attention?.providers_waiting ?? 0, what: "providers waiting for review" }
       ]
     : [
-        { to: "/admin/documents/providers", label: "Provider documents" },
-        { to: "/admin/documents/facility", label: "Our documents" }
+        { to: "/admin/documents/providers", label: "Provider documents", count: attention?.providers_waiting ?? 0, what: "providers waiting for review" },
+        { to: "/admin/documents/facility", label: "Our documents", count: attention?.facility_sent_back ?? 0, what: "documents sent back" }
       ];
   return (
     <div>
@@ -38,6 +40,11 @@ export const DocumentsLayout = () => {
             }
           >
             {tab.label}
+            {tab.count > 0 && (
+              <span aria-label={`${tab.count} ${tab.what}`} className="ml-2 rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">
+                {tab.count}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

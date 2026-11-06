@@ -44,7 +44,7 @@ const Row = ({ row }: { row: FacilityQueueRow }) => {
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-slate-900">{row.facility_name}</p>
           <p className="mt-1 text-sm text-slate-600">{describeFacilityRow(row)}</p>
-          {due && <p className="mt-0.5 text-xs font-medium text-amber-800">{due}</p>}
+          {due && <p className={`mt-0.5 text-xs font-medium ${row.overdue ? "text-rose-700" : "text-amber-800"}`}>{due}</p>}
         </div>
         <span className={`hidden shrink-0 rounded-full border px-3 py-1 text-xs font-medium sm:inline-block ${CHIP_TONE[row.state]}`}>{STATE_CHIP_LABEL[row.state]}</span>
         <ChevronRightIcon aria-hidden className="shrink-0 text-slate-400" />
@@ -60,6 +60,7 @@ export const FacilitiesQueuePage = () => {
   const state: ReviewState = isState(stateParam) ? stateParam : "waiting";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const q = params.get("q") ?? "";
+  const overdueOnly = params.get("overdue") === "1";
   const [search, setSearch] = useState(q);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -77,11 +78,19 @@ export const FacilitiesQueuePage = () => {
   }, [search]);
 
   const query = useQuery({
-    queryKey: facilityQueueKey({ state, search: q, page }),
-    queryFn: () => fetchFacilityQueue({ state, search: q, page }),
+    queryKey: facilityQueueKey({ state, search: q, page, overdue: overdueOnly }),
+    queryFn: () => fetchFacilityQueue({ state, search: q, page, overdue: overdueOnly }),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000
   });
+
+  const toggleOverdue = () => {
+    const target = new URLSearchParams(params);
+    if (overdueOnly) target.delete("overdue");
+    else target.set("overdue", "1");
+    target.delete("page");
+    setParams(target);
+  };
 
   const go = (next: Partial<{ state: ReviewState; page: number }>) => {
     const target = new URLSearchParams(params);
@@ -156,6 +165,22 @@ export const FacilitiesQueuePage = () => {
           className={`min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 ${focusRing}`}
         />
       </label>
+
+      {(query.data?.overdue ?? 0) > 0 || overdueOnly ? (
+        <button
+          type="button"
+          aria-pressed={overdueOnly}
+          onClick={toggleOverdue}
+          className={`inline-flex min-h-[44px] w-fit items-center gap-2 rounded-full border px-4 text-sm font-medium ${focusRing} ${
+            overdueOnly ? "border-rose-700 bg-rose-700 text-white" : "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-400"
+          }`}
+        >
+          Past their documents date
+          <span aria-label={`${query.data?.overdue ?? 0} facilities`} className={`rounded-full px-2 py-0.5 text-xs ${overdueOnly ? "bg-white/20 text-white" : "bg-white text-rose-700"}`}>
+            {query.data?.overdue ?? 0}
+          </span>
+        </button>
+      ) : null}
 
       <section id="facilities-panel" role="tabpanel" aria-labelledby={`facilities-tab-${state}`} aria-live="polite">
         {query.isPending ? (

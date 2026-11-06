@@ -23,15 +23,19 @@ export type ReviewRow = {
   submitted_at: string | null;
   documents_due_on: string | null;
   documents_days_left: number | null;
+  /** Past the documents date with documents still owed. */
+  overdue: boolean;
 };
 
 export type ReviewQueue = {
   rows: ReviewRow[];
   counts: Record<ReviewState, number>;
+  /** How many providers are past their documents date, whatever tab is open. */
+  overdue: number;
   page: { number: number; size: number; total: number; total_pages: number };
 };
 
-export type QueueParams = { state: ReviewState; search: string; page: number };
+export type QueueParams = { state: ReviewState; search: string; page: number; overdue?: boolean };
 
 export const PAGE_SIZE = 20;
 
@@ -40,22 +44,25 @@ export const reviewDetailKey = (applicationId: string) => ["admin", "document-re
 
 const EMPTY_COUNTS: Record<ReviewState, number> = { waiting: 0, sent_back: 0, incomplete: 0, complete: 0 };
 
-export const fetchReviewQueue = async ({ state, search, page }: QueueParams): Promise<ReviewQueue> => {
+export const fetchReviewQueue = async ({ state, search, page, overdue }: QueueParams): Promise<ReviewQueue> => {
   const response = await api.get<{
     data: ReviewRow[];
-    meta?: { counts?: Partial<Record<ReviewState, number>>; page?: ReviewQueue["page"] };
+    meta?: { counts?: Partial<Record<ReviewState, number>> & { overdue?: number }; page?: ReviewQueue["page"] };
   }>("/provider-documents/review", {
     params: {
       "filter[state]": state,
+      ...(overdue ? { "filter[overdue]": "true" } : {}),
       ...(search.trim() ? { "filter[search]": search.trim() } : {}),
       "page[number]": page,
       "page[size]": PAGE_SIZE
     }
   });
   const meta = response.data.meta ?? {};
+  const { overdue: overdueCount = 0, ...stateCounts } = meta.counts ?? {};
   return {
     rows: response.data.data ?? [],
-    counts: { ...EMPTY_COUNTS, ...(meta.counts ?? {}) },
+    counts: { ...EMPTY_COUNTS, ...stateCounts },
+    overdue: overdueCount,
     page: meta.page ?? { number: page, size: PAGE_SIZE, total: response.data.data?.length ?? 0, total_pages: 1 }
   };
 };
@@ -68,6 +75,9 @@ export type ReviewItem = {
   download_url?: string | null;
   comment?: string | null;
   expires_on?: string | null;
+  verified_at?: string | null;
+  /** Who approved it, or sent it back. */
+  verifier_name?: string | null;
   requirement_type?: {
     id: string;
     key?: string;
@@ -84,6 +94,7 @@ export type ReviewApplication = {
   status: string;
   user_id?: string;
   submitted_at?: string | null;
+  documents_due_on?: string | null;
   user?: { id: string; full_name?: string | null; email?: string | null };
   items?: ReviewItem[];
 };
@@ -105,4 +116,9 @@ export const reviewItem = async (applicationId: string, itemId: string, decision
     decision.decision === "sent_back" ? { decision: "sent_back", note: decision.note } : { decision: "approved" }
   );
   return response.data.data ?? {};
+};
+
+/** The super admin moves a provider's documents date, or removes it (null). */
+export const changeProviderDocumentsDate = async (applicationId: string, dueOn: string | null) => {
+  await api.patch(`/provider-applications/${applicationId}/due-date`, { due_on: dueOn });
 };

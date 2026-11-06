@@ -14,6 +14,8 @@ export type FacilityDocument = {
   filename: string | null;
   submitted_at: string | null;
   verified_at: string | null;
+  /** Who approved it, or sent it back. */
+  reviewed_by: string | null;
   /** The signed-in person may add or replace this document (a facility admin cannot touch the papers Tiba Ya Home adds). */
   can_upload: boolean;
   requirement: {
@@ -49,7 +51,7 @@ export type FacilityDocumentsPayload = {
 };
 
 export const facilityDocumentsKey = (facilityId: string) => ["admin", "facility-documents", "detail", facilityId] as const;
-export const facilityQueueKey = (params: { state: ReviewState; search: string; page: number }) =>
+export const facilityQueueKey = (params: { state: ReviewState; search: string; page: number; overdue?: boolean }) =>
   ["admin", "facility-documents", "queue", params] as const;
 
 export const fetchFacilityDocuments = async (facilityId: string): Promise<FacilityDocumentsPayload> => {
@@ -94,32 +96,44 @@ export type FacilityQueueRow = FacilitySummary & {
   facility_name: string;
   facility_status: string;
   oldest_submitted_at: string | null;
+  /** Past the documents date with documents still owed. */
+  overdue: boolean;
 };
 
 export type FacilityQueue = {
   rows: FacilityQueueRow[];
   counts: Record<ReviewState, number>;
+  /** How many facilities are past their documents date, whatever tab is open. */
+  overdue: number;
   page: { number: number; size: number; total: number; total_pages: number };
 };
 
 const EMPTY_COUNTS: Record<ReviewState, number> = { waiting: 0, sent_back: 0, incomplete: 0, complete: 0 };
 
-export const fetchFacilityQueue = async (params: { state: ReviewState; search: string; page: number }): Promise<FacilityQueue> => {
+export const fetchFacilityQueue = async (params: { state: ReviewState; search: string; page: number; overdue?: boolean }): Promise<FacilityQueue> => {
   const response = await api.get<{
     data: FacilityQueueRow[];
-    meta?: { counts?: Partial<Record<ReviewState, number>>; page?: FacilityQueue["page"] };
+    meta?: { counts?: Partial<Record<ReviewState, number>> & { overdue?: number }; page?: FacilityQueue["page"] };
   }>("/facility-documents/review", {
     params: {
       "filter[state]": params.state,
+      ...(params.overdue ? { "filter[overdue]": "true" } : {}),
       ...(params.search.trim() ? { "filter[search]": params.search.trim() } : {}),
       "page[number]": params.page,
       "page[size]": PAGE_SIZE
     }
   });
   const meta = response.data.meta ?? {};
+  const { overdue: overdueCount = 0, ...stateCounts } = meta.counts ?? {};
   return {
     rows: response.data.data ?? [],
-    counts: { ...EMPTY_COUNTS, ...(meta.counts ?? {}) },
+    counts: { ...EMPTY_COUNTS, ...stateCounts },
+    overdue: overdueCount,
     page: meta.page ?? { number: params.page, size: PAGE_SIZE, total: response.data.data?.length ?? 0, total_pages: 1 }
   };
+};
+
+/** The super admin moves a facility's documents date, or removes it (null). */
+export const changeFacilityDocumentsDate = async (facilityId: string, dueOn: string | null) => {
+  await api.patch(`/facilities/${facilityId}/documents/due-date`, { due_on: dueOn });
 };
