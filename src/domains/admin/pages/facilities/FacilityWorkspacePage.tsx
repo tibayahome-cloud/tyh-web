@@ -45,6 +45,7 @@ import type { LiveBlocker } from "../../../../shared/libs/liveStatus";
 import { facilitySetupChecklist } from "../../../../shared/utils/telemedicineReadiness";
 import { FacilityProfileCard } from "../../components/FacilityProfileCard";
 import { FacilityAdministratorsSection } from "../../components/FacilityAdministratorsSection";
+import { FacilityDocumentsPanel } from "../documents/FacilityDocumentsPanel";
 import {
   cancelFacilityServiceRequest,
   createFacilityServiceRequest,
@@ -170,7 +171,7 @@ type FacilityWorkspacePageProps = {
   showOperationalSections?: boolean;
 };
 
-type WorkspaceTab = "overview" | "administrators" | "services" | "providers" | "operations" | "finance";
+type WorkspaceTab = "overview" | "administrators" | "services" | "providers" | "documents" | "operations" | "finance";
 
 type FacilitySettingsFormState = {
   phones: Array<Pick<FacilityPhone, "phone" | "label" | "isPrimary">>;
@@ -628,6 +629,8 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     // Providers do not depend on showOperationalSections: the platform admin route turns that off to
     // hide the booking queue, but a super admin still has to manage a facility's providers here.
     { id: "providers", label: "Providers", available: canVerifyProviders },
+    // A facility admin has their own Documents page; here the super admin adds and reviews on the facility's behalf.
+    { id: "documents", label: "Documents", available: isSuperAdmin },
     { id: "operations", label: "Bookings", available: canManageBookings },
     { id: "finance", label: "Finance", available: canManageFinance }
   ].filter((tab) => tab.available) as { id: WorkspaceTab; label: string; available: boolean }[];
@@ -667,7 +670,10 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
     if (window.location.hash === "#facility-administrators" && canManageAdmins) {
       setActiveTab("administrators");
     }
-  }, [canManageAdmins]);
+    if (window.location.hash === "#facility-documents" && isSuperAdmin) {
+      setActiveTab("documents");
+    }
+  }, [canManageAdmins, isSuperAdmin]);
 
   const handleWorkspaceTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const currentIndex = workspaceTabs.findIndex((tab) => tab.id === activeTab);
@@ -1329,6 +1335,12 @@ const FacilityWorkspacePage = ({ showOperationalSections = true }: FacilityWorks
       {activeTab === "administrators" && canManageAdmins && facilityId && (
         <section id="facility-administrators">
           <FacilityAdministratorsSection facilityId={String(facilityId)} />
+        </section>
+      )}
+
+      {activeTab === "documents" && isSuperAdmin && facilityId && (
+        <section id="facility-documents">
+          <FacilityDocumentsPanel facilityId={String(facilityId)} mode="super_admin" />
         </section>
       )}
 
