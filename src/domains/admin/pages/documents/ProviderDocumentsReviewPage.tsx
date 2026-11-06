@@ -265,6 +265,11 @@ export const ProviderDocumentsReviewPage = () => {
           setNote("");
         }}
       >
+        {verified && sendBack?.item.requirement_type?.required_for_verification && (
+          <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            {providerName} is verified. Sending back a required document removes their verification until they replace it and it is approved again.
+          </p>
+        )}
         <label className="block text-sm font-medium text-slate-800">
           What needs to change
           <textarea

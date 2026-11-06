@@ -69,8 +69,6 @@ const renderPanel = (mode: "facility_admin" | "super_admin") =>
     </QueryClientProvider>
   );
 
-const card = (label: string) => screen.getByRole("heading", { level: 3, name: label }).closest("li") as HTMLElement;
-
 beforeEach(() => {
   state.payload = {
     facility: { id: "f1", name: "Example Clinic" },
