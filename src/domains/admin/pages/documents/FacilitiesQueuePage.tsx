@@ -113,7 +113,7 @@ export const FacilitiesQueuePage = () => {
         <p className="mt-1 text-sm text-slate-600">Every facility's documents. Open one to approve its documents, send one back, or add one for the facility.</p>
       </header>
 
-      <div role="tablist" aria-label="Facilities by who is next" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div role="tablist" aria-label="Facilities by who is next" className="flex flex-wrap gap-2">
         {REVIEW_STATES.map((tab, index) => {
           const selected = tab === state;
           return (

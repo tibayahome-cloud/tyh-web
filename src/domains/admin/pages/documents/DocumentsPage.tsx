@@ -119,7 +119,7 @@ export const DocumentsPage = () => {
         </p>
       </header>
 
-      <div role="tablist" aria-label="Providers by who is next" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div role="tablist" aria-label="Providers by who is next" className="flex flex-wrap gap-2">
         {REVIEW_STATES.map((tab, index) => {
           const selected = tab === state;
           return (

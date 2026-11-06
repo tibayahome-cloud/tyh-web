@@ -189,6 +189,14 @@ describe("Facility checklist, as the facility admin", () => {
     await waitFor(() => expect(state.del).toHaveBeenCalledWith("/facilities/f1/documents/d-cr12/document"));
   });
 
+  it("keeps the upload button short on a card that already names the document, and still names it for screen readers", async () => {
+    renderPanel("facility_admin");
+    const cr12 = within(await screen.findByRole("heading", { level: 3, name: "CR12 or CR13" }).then((h) => h.closest("li") as HTMLElement));
+
+    const button = cr12.getByRole("button", { name: "Upload CR12 or CR13" });
+    expect(button).toHaveTextContent(/^Upload$/);
+  });
+
   it("never offers the facility admin a way to approve", async () => {
     state.payload = { ...state.payload, documents: [doc("cr12", "CR12 or CR13", "submitted")] };
     renderPanel("facility_admin");
@@ -278,6 +286,17 @@ describe("Facility checklist, as the super admin", () => {
     expect(agreement.getByRole("button", { name: /Upload Signed service agreement/ })).toBeEnabled();
     expect(screen.queryByRole("button", { name: /for review$/ })).not.toBeInTheDocument();
     expect(screen.getByText("2 documents are waiting for your review.")).toBeInTheDocument();
+  });
+
+  it("talks about this facility, not yours, when the super admin is looking at someone else's", async () => {
+    state.payload = {
+      ...state.payload,
+      documents: [doc("pharmacy", "Pharmacy licence", "missing", {}, { required: false, only_if_offered: true, has_expiry: true })]
+    };
+    renderPanel("super_admin");
+
+    expect(await screen.findByRole("heading", { level: 2, name: "If it applies to this facility" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "If it applies to your facility" })).not.toBeInTheDocument();
   });
 
   it("shows no decision on an approved document", async () => {

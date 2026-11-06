@@ -161,6 +161,21 @@ describe("Reviewing a provider's documents", () => {
     expect(screen.getByText("Sent back")).toBeInTheDocument();
   });
 
+  it("folds the documents that were never added into one line instead of a long empty list", async () => {
+    state.application = application("submitted", [
+      item("n1", "National ID", "pending"),
+      item("n4", "CV", "pending", {}, { required_for_verification: false }),
+      item("n5", "Passport photograph", "missing", {}, { required_for_verification: false }),
+      item("n6", "Certificate of good conduct", "missing", {}, { required_for_verification: false })
+    ]);
+    renderPage();
+
+    const summary = await screen.findByText("2 other documents not added");
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByRole("heading", { level: 2, name: "Other documents" })).toBeInTheDocument();
+    expect(within(summary.closest("details") as HTMLElement).getByText("Passport photograph")).toBeInTheDocument();
+  });
+
   it("offers no decisions while the provider has not sent the documents", async () => {
     state.application = application("draft", [item("n1", "National ID", "pending"), item("n2", "Practising licence", "missing")]);
     renderPage();
