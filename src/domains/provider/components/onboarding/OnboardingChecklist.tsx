@@ -70,7 +70,7 @@ const EXPIRY_TONE = { ok: "text-slate-700", soon: "font-medium text-amber-800", 
 const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50";
 
 /** One Upload button; choosing it offers a file or the camera, the way a document upload works in Google apps. */
-const UploadMenu = ({
+export const UploadMenu = ({
   label,
   busy,
   disabled,

@@ -54,7 +54,7 @@ const renderPage = () =>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <Routes>
           <Route path="/admin/documents/providers/:applicationId" element={<ProviderDocumentsReviewPage />} />
-          <Route path="/admin/documents" element={<p>queue</p>} />
+          <Route path="/admin/documents/providers" element={<p>queue</p>} />
         </Routes>
       </QueryClientProvider>
     </MemoryRouter>

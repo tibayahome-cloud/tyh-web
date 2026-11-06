@@ -5,6 +5,7 @@ import { Navigate, useRoutes } from "react-router-dom";
 import { Loading } from "../../shared/components/Loading";
 import { AdminShell } from "./components/AdminShell";
 import { PlatformAdminGuard } from "./guards";
+import { DocumentsIndexRedirect, DocumentsLayout } from "./pages/documents/DocumentsLayout";
 import { lazyWithRetry } from "../../shared/utils/lazyWithRetry";
 
 const AdminDashboard = lazyWithRetry(() => import("./pages/Dashboard"));
@@ -14,6 +15,9 @@ const ProviderApplicationsPage = lazyWithRetry(() => import("./pages/providers/A
 const ProviderApplicationReviewPage = lazyWithRetry(() => import("./pages/providers/ApplicationReviewPage"));
 const DocumentsPage = lazyWithRetry(() => import("./pages/documents/DocumentsPage"));
 const ProviderDocumentsReviewPage = lazyWithRetry(() => import("./pages/documents/ProviderDocumentsReviewPage"));
+const OurDocumentsPage = lazyWithRetry(() => import("./pages/documents/OurDocumentsPage"));
+const FacilitiesDocumentsQueuePage = lazyWithRetry(() => import("./pages/documents/FacilitiesQueuePage"));
+const FacilityDocumentsReviewPage = lazyWithRetry(() => import("./pages/documents/FacilityDocumentsReviewPage"));
 const ProviderDirectoryPage = lazyWithRetry(() => import("./pages/providers/DirectoryPage"));
 const ProviderDetailPage = lazyWithRetry(() => import("./pages/providers/ProviderDetailPage"));
 const ProviderOnboardingWizardPage = lazyWithRetry(() => import("./pages/providers/OnboardingWizardPage"));
@@ -152,19 +156,50 @@ const buildRoutes = (): RouteObject[] => [
       },
       {
         path: "documents",
-        element: (
-          <Suspense fallback={<Loading fullHeight />}>
-            <DocumentsPage />
-          </Suspense>
-        )
-      },
-      {
-        path: "documents/providers/:applicationId",
-        element: (
-          <Suspense fallback={<Loading fullHeight />}>
-            <ProviderDocumentsReviewPage />
-          </Suspense>
-        )
+        element: <DocumentsLayout />,
+        children: [
+          { index: true, element: <DocumentsIndexRedirect /> },
+          {
+            path: "providers",
+            element: (
+              <Suspense fallback={<Loading fullHeight />}>
+                <DocumentsPage />
+              </Suspense>
+            )
+          },
+          {
+            path: "providers/:applicationId",
+            element: (
+              <Suspense fallback={<Loading fullHeight />}>
+                <ProviderDocumentsReviewPage />
+              </Suspense>
+            )
+          },
+          {
+            path: "facility",
+            element: (
+              <Suspense fallback={<Loading fullHeight />}>
+                <OurDocumentsPage />
+              </Suspense>
+            )
+          },
+          {
+            path: "facilities",
+            element: platformAdmin(
+              <Suspense fallback={<Loading fullHeight />}>
+                <FacilitiesDocumentsQueuePage />
+              </Suspense>
+            )
+          },
+          {
+            path: "facilities/:facilityId",
+            element: platformAdmin(
+              <Suspense fallback={<Loading fullHeight />}>
+                <FacilityDocumentsReviewPage />
+              </Suspense>
+            )
+          }
+        ]
       },
       {
         path: "providers/applications",
