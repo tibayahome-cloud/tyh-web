@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import DashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import GroupIcon from "@mui/icons-material/GroupsOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import AssignmentIcon from "@mui/icons-material/ChecklistOutlined";
 import ViewListIcon from "@mui/icons-material/ViewKanbanOutlined";
 import MapIcon from "@mui/icons-material/MapOutlined";
@@ -21,14 +22,17 @@ import { useConversationBadge } from "../../../shared/hooks/useConversationBadge
 import { AppLayout } from "../../../shared/components/AppLayout";
 import type { NavItem } from "../../../shared/components/AppSidebar";
 import { useRbac } from "../../../shared/hooks/useRbac";
+import { useDocumentsAttention } from "../hooks/useDocumentsAttention";
 
 type AdminNavInput = {
   roles: string[];
   conversationUnread: number;
+  /** Documents waiting on this admin (providers to review, facilities to review, or sent-back documents). */
+  documentsAttention?: number;
 };
 
 /** Build admin navigation so facility admins land in their tenant workspace first. */
-export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput): NavItem[] => {
+export const buildAdminNavItems = ({ roles, conversationUnread, documentsAttention = 0 }: AdminNavInput): NavItem[] => {
   const roleSet = new Set(roles);
   const isFacilityAdmin = roleSet.has("admin.ops") && !roleSet.has("admin.super") && !roleSet.has("admin");
 
@@ -37,6 +41,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
       { label: "Overview", to: "/admin/facility/overview", icon: <DashboardIcon /> },
       { label: "Facility", to: "/admin/facility", icon: <BusinessIcon /> },
       { label: "Providers", to: "/admin/facility/providers", icon: <GroupIcon /> },
+      { label: "Documents", to: "/admin/documents", icon: <DescriptionOutlinedIcon />, badge: documentsAttention || undefined },
       { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
       { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
       { label: "Payments", to: "/admin/finance/payments", icon: <PaymentIcon /> },
@@ -50,6 +55,7 @@ export const buildAdminNavItems = ({ roles, conversationUnread }: AdminNavInput)
     { label: "Overview", to: "/admin/dashboard", icon: <DashboardIcon /> },
     { label: "Users", to: "/admin/users", icon: <GroupIcon /> },
     { label: "Pro Apps", to: "/admin/providers/applications", icon: <AssignmentIcon /> },
+    { label: "Documents", to: "/admin/documents", icon: <DescriptionOutlinedIcon />, badge: documentsAttention || undefined },
     { label: "Queue", to: "/admin/bookings", icon: <WorkIcon /> },
     { label: "Telemedicine", to: "/admin/telemedicine", icon: <VideocamOutlinedIcon /> },
     { label: "Telemedicine Health", to: "/admin/telemedicine/platform", icon: <VideocamOutlinedIcon /> },
@@ -71,6 +77,7 @@ export const AdminShell = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { unreadCount: conversationUnread } = useConversationBadge();
+  const documentsAttention = useDocumentsAttention().data?.total ?? 0;
 
   useEffect(() => {
     if (!socket) return;
@@ -100,7 +107,7 @@ export const AdminShell = () => {
     };
   }, [socket, user?.id]);
 
-  const navItems = buildAdminNavItems({ roles, conversationUnread });
+  const navItems = buildAdminNavItems({ roles, conversationUnread, documentsAttention });
 
   return (
     <AppLayout navItems={navItems}>

@@ -325,6 +325,25 @@ export const providerApplicationAdmin: FieldPreset = {
   }
 };
 
+/** What a reviewer needs to decide on a provider's documents: the provider, and each document with its dates. */
+export const providerApplicationReview: FieldPreset = {
+  resource: "provider_applications",
+  fields: ["id", "user_id", "status", "submitted_at", "documents_due_on"],
+  includes: {
+    items: {
+      fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "expires_on", "verified_at", "verifier_name"],
+      children: {
+        requirement_type: {
+          fields: ["id", "key", "label", "input_type", "display_order", "required_for_verification", "has_expiry"]
+        }
+      }
+    },
+    user: {
+      fields: ["id", "full_name", "email"]
+    }
+  }
+};
+
 export const serviceCategoryAdmin: FieldPreset = {
   resource: "service_categories",
   fields: ["id", "key", "name", "description", "is_system", "care_type"],
