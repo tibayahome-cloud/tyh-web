@@ -2,6 +2,7 @@ import { CheckCircle2, Clock, AlertTriangle, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "../../../../shared/components/Button";
+import { SegmentedProgress } from "./SegmentedProgress";
 import { describeOnboarding, type OnboardingSummary, type StatusTone } from "../../utils/onboardingStatus";
 
 type Props = {
@@ -12,6 +13,8 @@ type Props = {
   onSubmit: () => void;
   /** Whether the document list is already on the page below. */
   checklistShown?: boolean;
+  /** Takes the provider to the document list. */
+  onGoToDocuments?: () => void;
 };
 
 const TONES: Record<StatusTone, { box: string; icon: React.ReactNode }> = {
@@ -22,7 +25,7 @@ const TONES: Record<StatusTone, { box: string; icon: React.ReactNode }> = {
 };
 
 /** The one status at the top of the page, in words, with the one thing to do next. */
-export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, onSubmit, checklistShown = false }: Props) => {
+export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, onSubmit, checklistShown = false, onGoToDocuments }: Props) => {
   const copy = describeOnboarding(summary);
   const tone = TONES[copy.tone];
   const owesDocuments = !summary.documentsInOrder && summary.documentsDaysLeft !== null;
@@ -37,20 +40,16 @@ export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, o
           <p className="mt-1 text-sm text-slate-800">{copy.message}</p>
 
           {showProgress && (
-            <div className="mt-3">
-              <div
-                role="progressbar"
-                aria-label="Documents provided"
-                aria-valuemin={0}
-                aria-valuemax={summary.requiredTotal}
-                aria-valuenow={summary.requiredDone}
-                className="h-2 overflow-hidden rounded-full bg-white/80 ring-1 ring-slate-200"
-              >
-                <div className="h-full rounded-full bg-tiba-blue" style={{ width: `${(summary.requiredDone / summary.requiredTotal) * 100}%` }} />
-              </div>
-              <p className="mt-1 text-sm text-slate-700">
-                {summary.requiredDone} of {summary.requiredTotal} required provided
+            <div className="mt-4">
+              <p className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold tabular-nums text-slate-900">
+                  {summary.requiredDone} of {summary.requiredTotal}
+                </span>
+                <span className="text-sm text-slate-800">required documents sent</span>
               </p>
+              <div className="mt-2">
+                <SegmentedProgress done={summary.requiredDone} total={summary.requiredTotal} label="Documents provided" />
+              </div>
             </div>
           )}
 
@@ -63,6 +62,11 @@ export const OnboardingStatusCard = ({ summary, starting, submitting, onStart, o
             {summary.status === "documents_needed" && summary.readyToSubmit && (
               <Button type="button" className="min-h-[44px]" loading={submitting} onClick={onSubmit}>
                 Send for review
+              </Button>
+            )}
+            {checklistShown && summary.nextItem && onGoToDocuments && ["documents_needed", "needs_changes"].includes(summary.status) && !summary.readyToSubmit && (
+              <Button type="button" className="min-h-[44px]" onClick={onGoToDocuments}>
+                Go to {summary.nextItem.label}
               </Button>
             )}
             {owesDocuments && !checklistShown && (

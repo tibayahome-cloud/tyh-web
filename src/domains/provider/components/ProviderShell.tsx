@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import HomeIcon from "@mui/icons-material/HomeOutlined";
 import EventAvailableIcon from "@mui/icons-material/EventAvailableOutlined";
 import MiscServicesIcon from "@mui/icons-material/DesignServicesOutlined";
+import DocumentsIcon from "@mui/icons-material/DescriptionOutlined";
 import ForumIcon from "@mui/icons-material/ForumOutlined";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorderOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
@@ -87,6 +88,7 @@ export const ProviderShell = () => {
     { label: "Bookings", to: "/pro/bookings", icon: <EventAvailableIcon />, badge: attentionCount },
     { label: "Telemedicine", to: "/pro/telemedicine", icon: <VideocamOutlinedIcon />, attention: needsResponse },
     { label: "Services", to: "/pro/services", icon: <MiscServicesIcon /> },
+    { label: "Documents", to: "/pro/documents", icon: <DocumentsIcon /> },
     { label: "Care", to: "/pro/selfcare", icon: <FavoriteBorderIcon /> },
     ...(showPayments ? [{ label: "Payments", to: "/pro/payments", icon: <PaymentsIcon /> }] : []),
     { label: "Inbox", to: "/pro/inbox", icon: <ForumIcon />, badge: conversationUnread },
