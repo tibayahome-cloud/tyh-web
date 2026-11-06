@@ -10,8 +10,11 @@ import { Skeleton } from "../../../../shared/components/Skeleton";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { classifyApiError, getApiError } from "../../../../shared/utils/errors";
 import { DocumentPreviewModal } from "../../../provider/components/onboarding/DocumentPreviewModal";
-import { describeExpiry } from "../../../provider/utils/documentDisplay";
-import { fetchApplicationForReview, reviewDetailKey, reviewItem, type ReviewItem } from "./reviewApi";
+import { useRbac } from "../../../../shared/hooks/useRbac";
+import { ROLE_ADMIN_SUPER } from "../../../../shared/rbac/roles";
+import { describeExpiry, formatDocumentDate } from "../../../provider/utils/documentDisplay";
+import { DocumentsDateControl } from "./DocumentsDateControl";
+import { changeProviderDocumentsDate, fetchApplicationForReview, reviewDetailKey, reviewItem, type ReviewItem } from "./reviewApi";
 import { describeItem, requiredProgress, splitItems } from "./reviewDisplay";
 
 const TONE: Record<string, string> = {
@@ -33,6 +36,8 @@ export const ProviderDocumentsReviewPage = () => {
   const { applicationId = "" } = useParams<{ applicationId: string }>();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasRole } = useRbac();
+  const superAdmin = hasRole(ROLE_ADMIN_SUPER);
   const [viewing, setViewing] = useState<{ source: string; title: string } | null>(null);
   const [sendBack, setSendBack] = useState<Decision>(null);
   const [note, setNote] = useState("");
@@ -58,6 +63,15 @@ export const ProviderDocumentsReviewPage = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "document-review"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "provider-applications"] });
   };
+
+  const changeDate = useMutation({
+    mutationFn: (dueOn: string | null) => changeProviderDocumentsDate(applicationId, dueOn),
+    onSuccess: (_result, dueOn) => {
+      toast.showToast({ title: dueOn ? "Date saved" : "Date removed", description: `${providerName} has been told.`, variant: "success" });
+      refresh();
+    },
+    onError: (error) => toast.showToast({ title: "Could not change the date", description: getApiError(error, "Please try again."), variant: "error" })
+  });
 
   const decide = useMutation({
     mutationFn: ({ item, decision }: { item: ReviewItem; decision: { decision: "approved" } | { decision: "sent_back"; note: string } }) =>
@@ -101,6 +115,12 @@ export const ProviderDocumentsReviewPage = () => {
           <p className="mt-2 break-all text-sm text-slate-800">{item.value_text}</p>
         )}
         {expiry && <p className={`mt-2 text-sm ${EXPIRY_TONE[expiry.tone]}`}>{expiry.text}</p>}
+        {(item.status === "verified" || item.status === "rejected") && item.verifier_name && (
+          <p className="mt-2 text-xs text-slate-600">
+            {item.status === "verified" ? "Approved" : "Sent back"} by {item.verifier_name}
+            {item.status === "verified" && formatDocumentDate(item.verified_at) ? ` on ${formatDocumentDate(item.verified_at)}` : ""}
+          </p>
+        )}
         {item.status === "rejected" && item.comment && (
           <p className="mt-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">
             <span className="font-medium">What you asked them to fix: </span>
@@ -185,6 +205,10 @@ export const ProviderDocumentsReviewPage = () => {
               </div>
             </div>
           </header>
+
+          {(application.documents_due_on || superAdmin) && (
+            <DocumentsDateControl dueOn={application.documents_due_on ?? null} subject={providerName} canChange={superAdmin} onSave={(dueOn) => changeDate.mutateAsync(dueOn)} />
+          )}
 
           {verified ? (
             <p role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">

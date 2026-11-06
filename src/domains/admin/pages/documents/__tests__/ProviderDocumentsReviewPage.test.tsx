@@ -9,6 +9,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
+  superAdmin: false,
+  patch: vi.fn(),
   application: {} as Record<string, unknown>,
   get: vi.fn(),
   post: vi.fn(),
@@ -19,8 +21,9 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../../shared/libs/api", () => ({
-  api: { get: (...args: unknown[]) => state.get(...args), post: (...args: unknown[]) => state.post(...args) }
+  api: { get: (...args: unknown[]) => state.get(...args), post: (...args: unknown[]) => state.post(...args), patch: (...args: unknown[]) => state.patch(...args) }
 }));
+vi.mock("../../../../../shared/hooks/useRbac", () => ({ useRbac: () => ({ hasRole: () => state.superAdmin, roles: [] }) }));
 vi.mock("../../../../../shared/components/ToastProvider", () => ({ useToast: () => ({ showToast: state.toast }) }));
 vi.mock("../../../../provider/components/onboarding/DocumentPreviewModal", () => ({
   DocumentPreviewModal: ({ source, title }: { source: string | null; title: string }) =>
@@ -61,6 +64,9 @@ const renderPage = () =>
   );
 
 beforeEach(() => {
+  state.superAdmin = false;
+  state.patch.mockReset();
+  state.patch.mockResolvedValue({ data: { data: {} } });
   state.application = application("submitted", [
     item("n1", "National ID", "verified"),
     item("n2", "Practising licence", "pending", { expires_on: "2030-03-31" }, { has_expiry: true }),
@@ -174,6 +180,39 @@ describe("Reviewing a provider's documents", () => {
     expect(summary.closest("details")).not.toHaveAttribute("open");
     expect(screen.getByRole("heading", { level: 2, name: "Other documents" })).toBeInTheDocument();
     expect(within(summary.closest("details") as HTMLElement).getByText("Passport photograph")).toBeInTheDocument();
+  });
+
+  it("says who approved a document and when, and who sent one back", async () => {
+    state.application = application("under_review", [
+      item("n1", "National ID", "verified", { verifier_name: "Faith Reviewer", verified_at: "2026-11-05T08:00:00+00:00" }),
+      item("n2", "Practising licence", "rejected", { verifier_name: "Faith Reviewer", comment: "Blurry" })
+    ]);
+    renderPage();
+
+    expect(await screen.findByText("Approved by Faith Reviewer on 5 Nov 2026")).toBeInTheDocument();
+    expect(screen.getByText("Sent back by Faith Reviewer")).toBeInTheDocument();
+  });
+
+  it("lets a super admin move the provider's documents date, and a facility admin only read it", async () => {
+    state.application = { ...application("submitted", [item("n1", "National ID", "pending")]), documents_due_on: "2026-12-01" };
+    renderPage();
+    expect(await screen.findByText("Documents date: 1 Dec 2026")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change date" })).not.toBeInTheDocument();
+  });
+
+  it("saves a new date for the provider when the super admin changes it", async () => {
+    state.superAdmin = true;
+    state.application = { ...application("submitted", [item("n1", "National ID", "pending")]), documents_due_on: "2026-12-01" };
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change date" }));
+    const dialog = await screen.findByRole("dialog");
+    const next = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+    fireEvent.change(within(dialog).getByLabelText("New date"), { target: { value: next } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save date" }));
+
+    await waitFor(() => expect(state.patch).toHaveBeenCalledWith("/provider-applications/app-1/due-date", { due_on: next }));
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Date saved" }));
   });
 
   it("offers no decisions while the provider has not sent the documents", async () => {

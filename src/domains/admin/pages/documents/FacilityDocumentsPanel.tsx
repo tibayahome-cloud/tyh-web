@@ -9,9 +9,11 @@ import { useToast } from "../../../../shared/components/ToastProvider";
 import { classifyApiError, getApiError } from "../../../../shared/utils/errors";
 import { UploadMenu } from "../../../provider/components/onboarding/OnboardingChecklist";
 import { DocumentPreviewModal } from "../../../provider/components/onboarding/DocumentPreviewModal";
-import { describeExpiry } from "../../../provider/utils/documentDisplay";
+import { describeExpiry, formatDocumentDate } from "../../../provider/utils/documentDisplay";
 import { DOCUMENT_HINT } from "../../../provider/utils/documentFiles";
+import { DocumentsDateControl } from "./DocumentsDateControl";
 import {
+  changeFacilityDocumentsDate,
   facilityDocumentsKey,
   fetchFacilityDocuments,
   removeFacilityDocument,
@@ -51,7 +53,11 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
   const [note, setNote] = useState("");
 
   const query = useQuery({ queryKey: facilityDocumentsKey(facilityId), queryFn: () => fetchFacilityDocuments(facilityId) });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "facility-documents"] });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "facility-documents"] });
+    // The menu badge and the queues count what is waiting, so they move when a decision is made.
+    queryClient.invalidateQueries({ queryKey: ["admin", "document-review"] });
+  };
   const fail = (title: string) => (error: unknown) => toast.showToast({ title, description: getApiError(error, "Please try again."), variant: "error" });
 
   const upload = useMutation({
@@ -96,6 +102,15 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
     onSuccess: () => refresh(),
     onError: fail("Could not change that"),
     onSettled: () => setBusyId(null)
+  });
+
+  const changeDate = useMutation({
+    mutationFn: (dueOn: string | null) => changeFacilityDocumentsDate(facilityId, dueOn),
+    onSuccess: (_result, dueOn) => {
+      toast.showToast({ title: dueOn ? "Date saved" : "Date removed", description: "The facility has been told.", variant: "success" });
+      refresh();
+    },
+    onError: fail("Could not change the date")
   });
 
   const decide = useMutation({
@@ -156,6 +171,12 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
         </div>
         {heldByTiba && mode === "facility_admin" && <p className="mt-2 text-xs text-slate-600">Added by Tiba Ya Home. You do not need to upload it.</p>}
         {expiry && <p className={`mt-2 text-sm ${EXPIRY_TONE[expiry.tone]}`}>{expiry.text}</p>}
+        {(doc.status === "verified" || doc.status === "rejected") && doc.reviewed_by && (
+          <p className="mt-2 text-xs text-slate-600">
+            {doc.status === "verified" ? "Approved" : "Sent back"} by {doc.reviewed_by}
+            {doc.status === "verified" && formatDocumentDate(doc.verified_at) ? ` on ${formatDocumentDate(doc.verified_at)}` : ""}
+          </p>
+        )}
         {doc.status === "rejected" && doc.comment && (
           <p className="mt-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">
             <span className="font-medium">{mode === "super_admin" ? "What you asked them to fix: " : "What to change: "}</span>
@@ -261,6 +282,11 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
           <p className={`mt-3 text-sm font-medium ${grace.tone === "rose" ? "text-rose-700" : grace.tone === "amber" ? "text-amber-800" : "text-slate-600"}`}>
             {grace.text}
           </p>
+        )}
+        {mode === "super_admin" && (
+          <div className="mt-2">
+            <DocumentsDateControl dueOn={summary.documents_due_on} subject={query.data.facility.name} canChange onSave={(dueOn) => changeDate.mutateAsync(dueOn)} />
+          </div>
         )}
         {mode === "facility_admin" && summary.added_not_sent > 0 && (
           <Button type="button" className="mt-3 min-h-[44px]" loading={send.isPending} onClick={() => send.mutate()}>

@@ -13,6 +13,7 @@ const doc = (key: string, order: number, requirement: Partial<FacilityDocument["
   filename: null,
   submitted_at: null,
   verified_at: null,
+  reviewed_by: null,
   can_upload: true,
   requirement: { id: `r-${key}`, key, label: key, description: null, required: false, only_if_offered: false, has_expiry: false, super_admin_uploads: false, display_order: order, ...requirement }
 });
@@ -77,6 +78,7 @@ describe("queue rows", () => {
     facility_name: "Example Clinic",
     facility_status: "active",
     oldest_submitted_at: null,
+    overdue: false,
     ...overrides
   });
 

@@ -68,6 +68,29 @@ beforeEach(() => {
 });
 
 describe("Facilities documents queue", () => {
+  it("offers a lens for those past their documents date only when there are some, and asks the server for them", async () => {
+    state.counts = { waiting: 1, sent_back: 2, incomplete: 3, complete: 4, overdue: 2 } as typeof state.counts;
+    renderPage();
+    await screen.findByText("Example Hospital");
+
+    const lens = screen.getByRole("button", { name: /Past their documents date/ });
+    expect(lens).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(lens);
+
+    await waitFor(() =>
+      expect(state.get).toHaveBeenCalledWith("/facility-documents/review", expect.objectContaining({ params: expect.objectContaining({ "filter[overdue]": "true" }) }))
+    );
+    expect(screen.getByTestId("where").textContent).toContain("overdue=1");
+    expect(screen.getByRole("button", { name: /Past their documents date/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows no overdue lens when nobody is past their date", async () => {
+    renderPage();
+    await screen.findByText("Example Hospital");
+
+    expect(screen.queryByRole("button", { name: /Past their documents date/ })).not.toBeInTheDocument();
+  });
+
   it("opens on the facilities waiting for the super admin and counts every tab", async () => {
     renderPage();
 

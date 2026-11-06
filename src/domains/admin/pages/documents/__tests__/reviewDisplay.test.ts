@@ -20,6 +20,7 @@ const row = (overrides: Partial<ReviewRow> = {}): ReviewRow => ({
   submitted_at: null,
   documents_due_on: null,
   documents_days_left: null,
+  overdue: false,
   ...overrides
 });
 
