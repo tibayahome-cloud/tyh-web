@@ -6,6 +6,7 @@ import classNames from "classnames";
 import { PROVIDER_UPCOMING_STATUSES } from "../../../shared/utils/providerBookingStatuses";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { ProviderSetupCard } from "../components/ProviderSetupCard";
+import { DocumentsDueCard } from "../components/DocumentsDueCard";
 import { LiveStatusCard, type LiveFix } from "../../../shared/components/LiveStatusCard";
 import { useProviderLiveStatus } from "../../../shared/hooks/useLiveStatus";
 import type { LiveBlocker } from "../../../shared/libs/liveStatus";
@@ -310,6 +311,8 @@ const ProviderHome = () => {
         {/* Non-blocking: every provider predates these fields, and a required answer would
             lock them out of their own dashboard until they filled them in. */}
         <ProviderSetupCard />
+
+        <DocumentsDueCard />
 
         {/* Shown only while clients cannot book this provider, so a working provider sees no extra card. */}
         {providerLive.data && !providerLive.data.live && (

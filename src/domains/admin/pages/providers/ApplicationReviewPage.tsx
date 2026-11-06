@@ -11,12 +11,14 @@ import { Modal } from "../../../../shared/components/Modal";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { api } from "../../../../shared/libs/api";
 import { buildFieldParams, providerApplicationAdmin, reqType } from "../../../../shared/libs/fieldInclude";
+import { canApproveApplication } from "./applicationApproval";
 
 type RequirementType = {
   id: string;
   key: string;
   label: string;
   input_type: string;
+  required_for_verification?: boolean;
 };
 
 type RequirementItem = {
@@ -115,7 +117,7 @@ const ApplicationReviewPage = () => {
     });
     return groups;
   }, [items]);
-  const allVerified = items.length > 0 && items.every((item) => item.status === "verified");
+  const allVerified = canApproveApplication(items);
 
   const clearPreview = useCallback(() => {
     setPreviewItem(null);
@@ -596,8 +598,8 @@ const ApplicationReviewPage = () => {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <span className="text-xs text-slate-500">
             {allVerified
-              ? "All requirements verified. Approve the application to verify the provider."
-              : "Verify each requirement before approving. You can reject or request resubmission as needed."}
+              ? "Everything required is verified. Approve the application to verify the provider."
+              : "Verify each required document, and any optional one the provider sent, before approving. You can reject or request resubmission as needed."}
           </span>
           <div className="flex flex-wrap gap-2">
             <Button
