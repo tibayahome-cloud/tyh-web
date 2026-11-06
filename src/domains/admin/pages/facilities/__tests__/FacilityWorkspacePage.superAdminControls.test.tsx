@@ -107,6 +107,7 @@ describe("FacilityWorkspacePage super-admin controls", () => {
       "Administrators",
       "Services",
       "Providers",
+      "Documents",
       "Bookings",
       "Finance"
     ]);
