@@ -72,12 +72,15 @@ const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-ti
 /** One Upload button; choosing it offers a file or the camera, the way a document upload works in Google apps. */
 export const UploadMenu = ({
   label,
+  ariaLabel,
   busy,
   disabled,
   onPick,
   onProblem
 }: {
   label: string;
+  /** What a screen reader says when the visible label is short ("Upload") and the card supplies the context. */
+  ariaLabel?: string;
   busy: boolean;
   disabled: boolean;
   onPick: (file: File) => void;
@@ -155,6 +158,7 @@ export const UploadMenu = ({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={ariaLabel}
         disabled={busy || disabled}
         onClick={() => setOpen((value) => !value)}
         className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/50"
@@ -164,7 +168,7 @@ export const UploadMenu = ({
         <ChevronDown aria-hidden="true" size={14} />
       </button>
       {open && (
-        <div role="menu" aria-label={label} onKeyDown={onMenuKey} className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        <div role="menu" aria-label={ariaLabel ?? label} onKeyDown={onMenuKey} className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           <button type="button" role="menuitem" autoFocus onClick={() => choose(fileInput)} className={menuItem}>
             <FileText aria-hidden="true" size={18} className="text-slate-600" />
             Choose a file

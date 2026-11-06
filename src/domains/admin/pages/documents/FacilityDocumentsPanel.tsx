@@ -181,13 +181,14 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {doc.has_file && doc.download_url && (
-            <Button type="button" variant="secondary" size="sm" className="min-h-[44px]" aria-label={`View ${doc.requirement.label}`} onClick={() => setViewing({ source: doc.download_url as string, title: doc.requirement.label })}>
+            <Button type="button" variant="outline" size="sm" className="min-h-[44px]" aria-label={`View ${doc.requirement.label}`} onClick={() => setViewing({ source: doc.download_url as string, title: doc.requirement.label })}>
               View
             </Button>
           )}
           {doc.can_upload && (
             <UploadMenu
-              label={doc.has_file ? `Replace ${doc.requirement.label}` : `Upload ${doc.requirement.label}`}
+              label={doc.has_file ? "Replace" : "Upload"}
+              ariaLabel={doc.has_file ? `Replace ${doc.requirement.label}` : `Upload ${doc.requirement.label}`}
               busy={busy && upload.isPending}
               disabled={decide.isPending || (needsDate && !date)}
               onPick={(file) => upload.mutate({ doc, file })}
@@ -256,7 +257,11 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
         <p role="status" className={`mt-3 rounded-xl border p-3 text-sm ${TONE[banner.tone]}`}>
           {banner.text}
         </p>
-        {grace && <p className={`mt-2 rounded-xl border p-3 text-sm ${TONE[grace.tone]}`}>{grace.text}</p>}
+        {grace && (
+          <p className={`mt-3 text-sm font-medium ${grace.tone === "rose" ? "text-rose-700" : grace.tone === "amber" ? "text-amber-800" : "text-slate-600"}`}>
+            {grace.text}
+          </p>
+        )}
         {mode === "facility_admin" && summary.added_not_sent > 0 && (
           <Button type="button" className="mt-3 min-h-[44px]" loading={send.isPending} onClick={() => send.mutate()}>
             Send {summary.added_not_sent} for review
@@ -265,7 +270,7 @@ export const FacilityDocumentsPanel = ({ facilityId, mode }: Props) => {
       </section>
 
       {section("Required documents", groups.required)}
-      {section("If it applies to your facility", groups.ifItApplies)}
+      {section(mode === "super_admin" ? "If it applies to this facility" : "If it applies to your facility", groups.ifItApplies)}
       {section("Other documents", groups.optional)}
 
       <DocumentPreviewModal source={viewing?.source ?? null} title={viewing?.title ?? "Document"} onClose={() => setViewing(null)} />

@@ -26,13 +26,13 @@ export const DocumentsLayout = () => {
       ];
   return (
     <div>
-      <nav aria-label="Documents" className="mx-auto flex w-full max-w-4xl gap-2 overflow-x-auto px-4 pt-6">
+      <nav aria-label="Documents" className="mx-auto flex w-full max-w-4xl gap-2 px-4 pt-6">
         {tabs.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `inline-flex min-h-[44px] shrink-0 items-center rounded-full border px-5 text-sm font-semibold ${focusRing} ${
+              `inline-flex min-h-[44px] flex-1 items-center justify-center rounded-full border px-4 text-center text-sm font-semibold sm:flex-none sm:px-5 ${focusRing} ${
                 isActive ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
               }`
             }

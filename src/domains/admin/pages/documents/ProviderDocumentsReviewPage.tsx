@@ -49,6 +49,9 @@ export const ProviderDocumentsReviewPage = () => {
   const items = application?.items ?? [];
   const progress = requiredProgress(items);
   const { required, other } = splitItems(items);
+  // Documents the provider has not added need no decision, so they sit behind one line instead of a long empty list.
+  const provided = other.filter((item) => item.status !== "missing");
+  const notAdded = other.filter((item) => item.status === "missing");
   const verified = application?.status === "approved";
 
   const refresh = () => {
@@ -107,7 +110,7 @@ export const ProviderDocumentsReviewPage = () => {
         {(hasFile || state.canDecide) && (
           <div className="mt-3 flex flex-wrap gap-2">
             {hasFile && (
-              <Button type="button" variant="secondary" size="sm" className="min-h-[44px]" onClick={() => view(item)} aria-label={`View ${label}`}>
+              <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={() => view(item)} aria-label={`View ${label}`}>
                 View
               </Button>
             )}
@@ -202,11 +205,20 @@ export const ProviderDocumentsReviewPage = () => {
             <ul className="flex flex-col gap-3">{required.map(renderItem)}</ul>
           </section>
 
-          {other.length > 0 && (
+          {provided.length > 0 && (
             <section aria-label="Other documents" className="flex flex-col gap-3">
               <h2 className="text-base font-semibold text-slate-900">Other documents</h2>
-              <ul className="flex flex-col gap-3">{other.map(renderItem)}</ul>
+              <ul className="flex flex-col gap-3">{provided.map(renderItem)}</ul>
             </section>
+          )}
+
+          {notAdded.length > 0 && (
+            <details className="rounded-2xl border border-slate-200 bg-white p-4">
+              <summary className={`min-h-[44px] cursor-pointer text-sm font-medium text-slate-700 ${focusRing}`}>
+                {notAdded.length} other {notAdded.length === 1 ? "document" : "documents"} not added
+              </summary>
+              <ul className="mt-3 flex flex-col gap-3">{notAdded.map(renderItem)}</ul>
+            </details>
           )}
         </>
       )}
