@@ -12,6 +12,8 @@ const UserManagementPage = lazyWithRetry(() => import("./pages/UserManagement"))
 const UserDetailPage = lazyWithRetry(() => import("./pages/UserDetail"));
 const ProviderApplicationsPage = lazyWithRetry(() => import("./pages/providers/ApplicationsPage"));
 const ProviderApplicationReviewPage = lazyWithRetry(() => import("./pages/providers/ApplicationReviewPage"));
+const DocumentsPage = lazyWithRetry(() => import("./pages/documents/DocumentsPage"));
+const ProviderDocumentsReviewPage = lazyWithRetry(() => import("./pages/documents/ProviderDocumentsReviewPage"));
 const ProviderDirectoryPage = lazyWithRetry(() => import("./pages/providers/DirectoryPage"));
 const ProviderDetailPage = lazyWithRetry(() => import("./pages/providers/ProviderDetailPage"));
 const ProviderOnboardingWizardPage = lazyWithRetry(() => import("./pages/providers/OnboardingWizardPage"));
@@ -145,6 +147,22 @@ const buildRoutes = (): RouteObject[] => [
         element: platformAdmin(
           <Suspense fallback={<Loading fullHeight />}>
             <UserDetailPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "documents",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <DocumentsPage />
+          </Suspense>
+        )
+      },
+      {
+        path: "documents/providers/:applicationId",
+        element: (
+          <Suspense fallback={<Loading fullHeight />}>
+            <ProviderDocumentsReviewPage />
           </Suspense>
         )
       },
