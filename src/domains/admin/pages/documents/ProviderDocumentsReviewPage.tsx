@@ -148,7 +148,7 @@ export const ProviderDocumentsReviewPage = () => {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
-      <Link to="/admin/documents" className={`inline-flex min-h-[44px] w-fit items-center gap-1 rounded-lg text-sm font-medium text-tiba-blue ${focusRing}`}>
+      <Link to="/admin/documents/providers" className={`inline-flex min-h-[44px] w-fit items-center gap-1 rounded-lg text-sm font-medium text-tiba-blue ${focusRing}`}>
         <ArrowBackIcon aria-hidden fontSize="small" />
         All providers
       </Link>
