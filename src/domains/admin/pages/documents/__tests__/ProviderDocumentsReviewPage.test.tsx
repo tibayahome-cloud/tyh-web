@@ -233,6 +233,24 @@ describe("Reviewing a provider's documents", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Dr Example is verified.");
   });
 
+  it("warns before a required document is sent back from a verified provider", async () => {
+    state.application = application("approved", [item("n1", "Practising licence", "pending")]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Send back Practising licence" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/removes their verification/)).toBeInTheDocument();
+  });
+
+  it("gives no such warning for an optional document", async () => {
+    state.application = application("approved", [item("n1", "CV", "pending", {}, { required_for_verification: false })]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Send back CV" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText(/removes their verification/)).not.toBeInTheDocument();
+  });
+
   it("shows typed answers such as a KRA PIN right on the page", async () => {
     state.application = application("submitted", [
       item("n1", "KRA PIN", "pending", { value_text: "A123456789B", file_url: null, download_url: null }, { input_type: "text", required_for_verification: false })
