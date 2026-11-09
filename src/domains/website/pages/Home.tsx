@@ -1,5 +1,6 @@
 
 import { Link, useNavigate } from "react-router-dom";
+import { TELEMEDICINE_BOOKING_PATH, withReturnPath } from "../../../shared/utils/returnPath";
 import {
     ArrowRight,
     ShieldCheck,
@@ -55,22 +56,23 @@ export const Home = () => {
         if (isAuthenticated) {
             navigate("/app/home");
         } else {
-            navigate("/login");
+            navigate("/signup");
         }
     };
 
     // Remote consultations are booked in the client app, which owns the catalogue, the
     // slot picker and payment. The public page only introduces the service and hands the
-    // visitor over: signed-in clients land on the booking screen, everyone else signs in
-    // first. Nothing about providers, availability or the catalogue is fetched or shown
+    // visitor over: signed-in clients land on the booking screen, everyone else is taken to
+    // create an account and then straight to booking (the destination travels with them).
+    // Nothing about providers, availability or the catalogue is fetched or shown
     // here -- that data is not public, and duplicating any of it would give us a second
     // booking flow to keep in step with the real one.
     const handleTelemedicineClick = (e: React.MouseEvent) => {
         e.preventDefault();
         if (isAuthenticated) {
-            navigate("/app/telemedicine");
+            navigate(TELEMEDICINE_BOOKING_PATH);
         } else {
-            navigate("/login");
+            navigate(withReturnPath("/signup", TELEMEDICINE_BOOKING_PATH));
         }
     };
 

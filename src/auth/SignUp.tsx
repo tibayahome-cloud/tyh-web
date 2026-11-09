@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
-import { Phone, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
@@ -18,7 +18,9 @@ import { withPasswordConfirmation } from "../shared/utils/passwordResolver";
 
 const REQUIREMENTS_ID = "signup-password-requirements";
 import api from "../shared/libs/api";
-import { getApiError } from "../shared/utils/errors";
+import { useAuth } from "../shared/hooks/useAuth";
+import { returnPathFrom, withReturnPath } from "../shared/utils/returnPath";
+import { toInternationalPhone } from "../shared/utils/phoneInput";
 import { PHONE_PLACEHOLDER } from "../shared/constants/contact";
 import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
 
@@ -32,18 +34,14 @@ const defaultValues: RegisterSchema = {
   acknowledgedPrivacy: false
 };
 
-type Step = "register" | "verify" | "success";
-
 export const SignUp = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>("register");
+  const location = useLocation();
+  // Where the person was heading when they were asked to create an account (for example straight into booking).
+  const returnTo = useMemo(() => returnPathFrom(location), [location]);
+  const { loginClientProvider } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [registeredPhone, setRegisteredPhone] = useState<string>("");
-  const [otpCode, setOtpCode] = useState("");
-  const [resending, setResending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const {
     control,
@@ -74,37 +72,28 @@ export const SignUp = () => {
   const submit = handleSubmit(async (values) => {
     setError(null);
     try {
-      const response = await api.post("/auth/register", {
+      const phone = toInternationalPhone(values.phone);
+      const email = values.email?.trim() || "";
+      await api.post("/auth/register", {
         full_name: values.fullName.trim(),
-        email: values.email?.trim() || undefined,
-        phone: values.phone?.trim() || undefined,
+        email: email || undefined,
+        phone: phone || undefined,
         password: values.password,
         legal_documents: currentLegalDocumentPayload()
       });
 
-      const meta = response.data?.meta;
-      if (values.phone?.trim()) {
-        setRegisteredPhone(values.phone.trim());
-
-        if (meta?.verification_required && meta?.otp_sent) {
-          setStep("verify");
-        } else {
-          try {
-            const loginRes = await api.post("/auth/login", {
-              emailOrPhone: values.phone.trim(),
-              password: values.password
-            });
-            if (loginRes.data?.data?.access_token) {
-              setAccessToken(loginRes.data.data.access_token);
-            }
-            setStep("success");
-          } catch {
-            setStep("verify");
-          }
+      // Signed in at once: the person came here to book, not to fill in a second form. They go where they were
+      // heading, or to Home when they were not heading anywhere in particular.
+      try {
+        const result = await loginClientProvider({ emailOrPhone: phone || email, password: values.password, remember: true });
+        if (result.status !== "mfa_required") {
+          navigate(returnTo ?? "/app/home", { replace: true });
+          return;
         }
-      } else {
-        setStep("success");
+      } catch {
+        // The account exists; only the automatic sign-in failed. The sign-in page below finishes the job.
       }
+      navigate(withReturnPath("/login", returnTo), { replace: true });
     } catch (err) {
       const failure = describePasswordSubmitError(err, t("auth.signUpError"));
       if (failure.field === "password") {
@@ -117,136 +106,6 @@ export const SignUp = () => {
     }
   });
 
-  const handleVerify = async () => {
-    if (!otpCode || otpCode.length < 4) {
-      setError("Please enter a valid code");
-      return;
-    }
-    setError(null);
-    setVerifying(true);
-    try {
-      await api.post(
-        "/auth/verify/phone/confirm",
-        { code: otpCode },
-        { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
-      );
-      setStep("success");
-    } catch (err) {
-      setError(getApiError(err, "Invalid code. Please try again."));
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setError(null);
-    setResending(true);
-    try {
-      await api.post(
-        "/auth/verify/phone/init",
-        {},
-        { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
-      );
-    } catch (err) {
-      setError(getApiError(err, "Failed to resend code"));
-    } finally {
-      setResending(false);
-    }
-  };
-
-  if (step === "success") {
-    return (
-      <AuthLayout
-        split
-        title="Account Verified!"
-        subtitle="Your account is ready to use."
-        footer={null}
-      >
-        <div className="text-center py-6">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
-          </div>
-          <p className="text-slate-600 mb-6">
-            You can now sign in and start booking services.
-          </p>
-          <Button onClick={() => navigate("/login")} className="w-full">
-            Sign In
-          </Button>
-        </div>
-      </AuthLayout>
-    );
-  }
-
-  if (step === "verify") {
-    return (
-      <AuthLayout
-        split
-        title="Verify Your Phone"
-        subtitle={`We sent a code to ${registeredPhone}`}
-        footer={
-          <p className="type-caption text-slate-500">
-            Didn't receive the code?{" "}
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={resending}
-              className="font-semibold text-tiba-blue hover:underline disabled:opacity-50"
-            >
-              {resending ? "Sending..." : "Resend Code"}
-            </button>
-          </p>
-        }
-      >
-        <div className="space-y-6">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <Phone className="w-8 h-8 text-blue-600" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Enter verification code
-            </label>
-            <Input
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value)}
-              placeholder="Enter 6-digit code"
-              maxLength={6}
-              className="text-center text-2xl tracking-widest"
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
-              <p className="type-caption text-red-600">{error}</p>
-            </div>
-          )}
-
-          <Button
-            onClick={handleVerify}
-            disabled={verifying || otpCode.length < 4}
-            className="w-full h-11"
-          >
-            {verifying ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Verifying...
-              </>
-            ) : (
-              "Verify Phone"
-            )}
-          </Button>
-
-          <p className="text-xs text-center text-slate-500">
-            Verification is required to book services
-          </p>
-        </div>
-      </AuthLayout>
-    );
-  }
-
   return (
     <AuthLayout
       split
@@ -255,7 +114,7 @@ export const SignUp = () => {
       footer={
         <p className="type-caption text-slate-500">
           {t("auth.haveAccount")}{" "}
-          <Link to="/login" className="font-semibold text-tiba-blue hover:underline">
+          <Link to={withReturnPath("/login", returnTo)} className="font-semibold text-tiba-blue hover:underline">
             {t("auth.backToLogin")}
           </Link>
         </p>
@@ -388,9 +247,6 @@ export const SignUp = () => {
           {t("auth.signUpCta")}
         </Button>
 
-        <p className="text-xs text-center text-slate-500">
-          Phone verification required after registration
-        </p>
       </form>
     </AuthLayout>
   );

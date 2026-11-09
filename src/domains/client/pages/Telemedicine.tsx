@@ -1,6 +1,6 @@
 import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Video, ChevronRight, Calendar as CalendarIcon, Clock as ClockIcon } from "lucide-react";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
@@ -63,7 +63,21 @@ const ClientTelemedicinePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const policyQuery = useTelemedicinePolicy();
+
+  // "Talk to a Doctor Online" arrives as /app/telemedicine?book=1: the person has already said what they want, so the
+  // booking opens at once instead of asking them to find and tap "Book a consultation". The marker is then removed, so
+  // closing the dialog or reloading the page does not open it again.
+  useEffect(() => {
+    if (searchParams.get("book") !== "1") {
+      return;
+    }
+    setDialogOpen(true);
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("book");
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const { data, isLoading } = useBookingList(
     { clientId: user?.id ?? undefined, pageSize: 50, preset: "card" },
