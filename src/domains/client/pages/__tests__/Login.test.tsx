@@ -52,13 +52,14 @@ const Where = () => {
   return (
     <div data-testid="where" data-state={JSON.stringify(location.state ?? null)}>
       {location.pathname}
+      {location.search}
     </div>
   );
 };
 
-const renderLogin = () =>
+const renderLogin = (entry = "/login") =>
   render(
-    <MemoryRouter initialEntries={["/login"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/login" element={<ClientLoginPage />} />
         <Route path="*" element={<Where />} />
@@ -204,6 +205,45 @@ describe("client sign-in page", () => {
         password: "correct-horse",
         remember: true
       });
+    });
+
+    it("returns a client to where they were heading, such as straight into booking", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
+      renderLogin("/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/app/telemedicine?book=1"));
+    });
+
+    it("never follows a destination that leaves the site", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
+      renderLogin("/login?next=https%3A%2F%2Felsewhere.example%2Fapp");
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/app/home"));
+    });
+
+    it("keeps the destination on the link to create an account", () => {
+      renderLogin("/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+
+      expect(screen.getByRole("link", { name: "Create account" })).toHaveAttribute(
+        "href",
+        "/signup?next=%2Fapp%2Ftelemedicine%3Fbook%3D1"
+      );
+    });
+
+    it("sends a provider to the provider home whatever destination was carried", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["provider"] } });
+      renderLogin("/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
     });
 
     it("passes remember-me through when the person turns it off", async () => {

@@ -29,17 +29,21 @@ export const adminLoginSchema = z.object({
   remember: z.boolean().optional()
 });
 
+// Blank is fine (a phone number can stand in); anything typed has to be an email. A plain `.email()` rejects the empty
+// string the form starts with, which made an email compulsory even though the API takes either.
 const optionalEmail = z
   .string()
-  .email("Provide a valid email")
+  .trim()
   .optional()
-  .transform((value) => value?.trim() ?? "");
+  .transform((value) => value ?? "")
+  .pipe(z.union([z.literal(""), z.string().email("Provide a valid email")]));
 
 const optionalPhone = z
   .string()
   .trim()
   .optional()
-  .transform((value) => value ?? "")
+  // "0712 345 678", "0712-345-678" and "(0712) 345 678" are ordinary ways to write a number: read the digits.
+  .transform((value) => (value ?? "").replace(/[\s().-]/gu, ""))
   .pipe(
     z
       .string()

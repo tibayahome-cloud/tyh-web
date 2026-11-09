@@ -7,12 +7,15 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError } from "axios";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const postMock = vi.fn();
+const loginClientProviderMock = vi.fn();
 
 vi.mock("../../shared/libs/api", () => ({ default: { post: (...args: unknown[]) => postMock(...args) } }));
+
+vi.mock("../../shared/hooks/useAuth", () => ({ useAuth: () => ({ loginClientProvider: loginClientProviderMock }) }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -47,8 +50,11 @@ const httpError = (status: number, message: string) =>
 
 const renderPage = () =>
   render(
-    <MemoryRouter>
-      <SignUp />
+    <MemoryRouter initialEntries={["/signup"]}>
+      <Routes>
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="*" element={<div>signed-in-destination</div>} />
+      </Routes>
     </MemoryRouter>
   );
 
@@ -73,6 +79,8 @@ const submitButton = () => {
 describe("registration password", () => {
   beforeEach(() => {
     postMock.mockReset();
+    loginClientProviderMock.mockReset();
+    loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
   });
 
   it("shows the requirements before anything is typed", () => {
@@ -115,7 +123,7 @@ describe("registration password", () => {
     await waitFor(() => expect(passwordField()).toHaveFocus());
   });
 
-  it("registers with a valid password and carries on to the next step", async () => {
+  it("registers with a valid password and signs the person in", async () => {
     const user = userEvent.setup();
     postMock.mockResolvedValue({ data: { meta: {} } });
     renderPage();
@@ -126,7 +134,7 @@ describe("registration password", () => {
     await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
     expect(postMock.mock.calls[0][0]).toBe("/auth/register");
     expect(postMock.mock.calls[0][1]).toMatchObject({ email: "jane@example.com", password: GOOD });
-    expect(await screen.findByText("Account Verified!")).toBeInTheDocument();
+    expect(await screen.findByText("signed-in-destination")).toBeInTheDocument();
   });
 
   it("shows a server rejection of the password on the password field", async () => {
@@ -159,7 +167,7 @@ describe("registration password", () => {
 
     await user.click(submitButton());
 
-    expect(await screen.findByText("Account Verified!")).toBeInTheDocument();
+    expect(await screen.findByText("signed-in-destination")).toBeInTheDocument();
     expect(postMock).toHaveBeenCalledTimes(2);
   });
 
