@@ -24,7 +24,6 @@ vi.mock("react-i18next", () => ({
         "auth.email": "Email",
         "auth.phone": "Phone",
         "auth.password": "Password",
-        "auth.confirmPassword": "Confirm password",
         "auth.signUpError": "We could not complete your registration.",
         "auth.haveAccount": "Already have an account?",
         "auth.backToLogin": "Back to sign in",
@@ -54,10 +53,12 @@ const renderPage = (entry = "/signup") =>
 
 const fill = async (user: ReturnType<typeof userEvent.setup>, { phone = "0712 345 678", email = "" } = {}) => {
   await user.type(screen.getByLabelText(/^Full name/), "Jane Client");
-  if (email) await user.type(screen.getByLabelText(/^Email/), email);
+  if (email) {
+    await user.click(screen.getByRole("button", { name: /add an email/i }));
+    await user.type(screen.getByLabelText(/^Email/), email);
+  }
   if (phone) await user.type(screen.getByLabelText(/^Phone/), phone);
   await user.type(screen.getByLabelText(/^Password/), PASSWORD);
-  await user.type(screen.getByLabelText(/^Confirm password/), PASSWORD);
   for (const box of screen.getAllByRole("checkbox")) {
     await user.click(box);
   }
@@ -149,7 +150,7 @@ describe("creating an account", () => {
   it("keeps the destination on the link to sign in", () => {
     renderPage("/signup?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
 
-    expect(screen.getByRole("link", { name: "Back to sign in" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
       "/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1"
     );

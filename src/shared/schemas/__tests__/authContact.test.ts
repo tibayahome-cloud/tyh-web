@@ -15,7 +15,6 @@ const base = {
   email: "",
   phone: "",
   password: PASSWORD,
-  confirmPassword: PASSWORD,
   acceptedTerms: true,
   acknowledgedPrivacy: true
 };
@@ -39,7 +38,7 @@ describe("sign-up contact details", () => {
   });
 
   it("asks for one of them when neither is given", () => {
-    expect(issues({})).toContain("email: Provide an email or phone number");
+    expect(issues({})).toContain("phone: Enter a phone number or an email address");
   });
 
   it("still rejects an email that is not one", () => {

@@ -59,20 +59,17 @@ describe("registerSchema password rules", () => {
     email: "jane@example.com",
     phone: "",
     password: "@Qwerty123",
-    confirmPassword: "@Qwerty123",
     acceptedTerms: true,
     acknowledgedPrivacy: true
   };
 
   it("applies the same policy as the reset page", () => {
-    expect(messagesFor(registerSchema.safeParse({ ...valid, password: "abcdefg1!x", confirmPassword: "abcdefg1!x" }), "password")).toEqual([
+    expect(messagesFor(registerSchema.safeParse({ ...valid, password: "abcdefg1!x" }), "password")).toEqual([
       "Password needs an uppercase letter"
     ]);
   });
 
-  it("checks the confirmation once the password itself is valid", () => {
-    expect(messagesFor(registerSchema.safeParse({ ...valid, confirmPassword: "@Qwerty12" }), "confirmPassword")).toEqual([
-      "Passwords must match"
-    ]);
+  it("has no confirmation field: one password is enough", () => {
+    expect(registerSchema.safeParse(valid).success).toBe(true);
   });
 });

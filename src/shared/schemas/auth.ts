@@ -56,7 +56,6 @@ export const registerSchema = z
     email: optionalEmail,
     phone: optionalPhone,
     password: newPasswordSchema,
-    confirmPassword: z.string().min(1, "Confirm your password"),
     acceptedTerms: z.boolean(),
     acknowledgedPrivacy: z.boolean()
   })
@@ -64,16 +63,9 @@ export const registerSchema = z
     if (!data.email && !data.phone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "Provide an email or phone number"
-      });
-    }
-
-    if (data.confirmPassword && data.password !== data.confirmPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["confirmPassword"],
-        message: "Passwords must match"
+        // Reported on the phone field: the email field is folded away until the person asks for it.
+        path: ["phone"],
+        message: "Enter a phone number or an email address"
       });
     }
 
