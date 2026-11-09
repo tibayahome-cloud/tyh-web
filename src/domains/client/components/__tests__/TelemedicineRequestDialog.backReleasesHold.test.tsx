@@ -99,7 +99,6 @@ const openConfirmStep = async (user: ReturnType<typeof userEvent.setup>) => {
     </QueryClientProvider>
   );
   await user.click(await screen.findByText(FACILITY.name));
-  await user.click(await screen.findByRole("button", { name: /skip for now/i }));
   await user.click(await screen.findByRole("button", { name: SLOT_LABEL }));
   await screen.findByRole("button", { name: /confirm & pay/i });
 };

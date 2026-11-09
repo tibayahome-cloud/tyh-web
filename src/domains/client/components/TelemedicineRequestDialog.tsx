@@ -70,12 +70,11 @@ type RemoteServiceOption = {
   active?: boolean;
 };
 
-const TM_STEP_INDEX = { service: 0, facility: 1, preferences: 2, slot: 3, confirm: 4 } as const;
+const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, confirm: 3 } as const;
 
 const TM_STEPS = [
   { title: "Service", description: "What kind of consultation?" },
   { title: "Facility", description: "Choose a care site" },
-  { title: "Preferences", description: "Optional requests" },
   { title: "Slot", description: "Pick a time" },
   { title: "Confirm", description: "Review & pay" }
 ];
@@ -420,7 +419,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
           // Same reset as choosing a facility by hand: another facility may keep a different calendar.
           setSelectedDate(null);
           setPreference({});
-          setStep(TM_STEP_INDEX.preferences);
+          setStep(TM_STEP_INDEX.slot);
         }
       }
     );
@@ -502,7 +501,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   return (
     <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth={isServiceStep ? "lg" : "md"}>
       <div className="space-y-6">
-        <Stepper steps={TM_STEPS} current={step} />
+        <Stepper steps={TM_STEPS} current={step} compactOnMobile />
 
         {step === TM_STEP_INDEX.service && (
           <div className="space-y-3">
@@ -702,7 +701,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   <div className="pt-1">
                     <p className="text-sm font-medium text-slate-600">Facilities offering this consultation</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      The list confirms service coverage; appointment availability is checked separately.
+                      Open times for the clinic you choose are shown on the next step.
                     </p>
                   </div>
                 )}
@@ -718,7 +717,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                         // the same date string would not mean the same window.
                         setSelectedDate(null);
                         setPreference({});
-                        setStep(TM_STEP_INDEX.preferences);
+                        setStep(TM_STEP_INDEX.slot);
                       }}
                       className="w-full rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
                     >
@@ -738,44 +737,11 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
           </div>
         )}
 
-        {step === TM_STEP_INDEX.preferences && selectedFacility && (
-          <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-            {fastestPick && fastestPick.facilityId === selectedFacility.id && (
-              <div className="rounded-xl border border-tiba-blue/30 bg-white px-4 py-3 text-sm text-slate-700" role="status">
-                <span className="font-semibold text-slate-900">Fastest available: {selectedFacility.name}.</span>{" "}
-                Earliest open time {formatSlotDate(fastestPick.startAt, selectedFacility.timezone ?? undefined)} at{" "}
-                {formatSlotTime(fastestPick.startAt, selectedFacility.timezone ?? undefined)}.
-              </div>
-            )}
-            <div>
-              <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
-              <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
-            </div>
-            <ProviderPreferenceFields
-              value={preference}
-              alwaysExpanded
-              onChange={(next) => {
-                setPreference(next);
-              }}
-            />
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button type="button" onClick={() => setStep(TM_STEP_INDEX.slot)}>
-                Continue to choose a time
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(TM_STEP_INDEX.slot)}>
-                Skip for now
-              </Button>
-            </div>
-            <div className="flex justify-start border-t border-slate-200 pt-3">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
-                Back
-              </Button>
-            </div>
-          </div>
-        )}
-
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
+            {/* Asked here, before a time is chosen and so before the ten-minute hold starts: nothing optional is ever
+                left to do on the pay screen while the reserved time runs down. Collapsed unless the person opens it. */}
+            <ProviderPreferenceFields value={preference} onChange={(next) => setPreference(next)} />
             {fastestPick && fastestPick.facilityId === selectedFacility.id && !slotsQuery.isLoading && !slotsQuery.isError && (
               earliestSlot ? (
                 <div className="flex flex-col gap-3 rounded-2xl border border-tiba-blue/30 bg-tiba-blue/5 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -886,7 +852,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               ))}
             </div>
             <div className="flex justify-start">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.preferences)}>
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
                 Back
               </Button>
             </div>
@@ -944,6 +910,15 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   error={phoneError ?? undefined}
                   hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
+                {/* What happens if plans change or the appointment cannot be confirmed. The cancellation window is the
+                    server's (GET /telemedicine/policy), never typed here; the second sentence promises review and
+                    contact, not money back, exactly as the notification a client would receive does. */}
+                <p className="text-xs text-slate-600">
+                  {(policyQuery.data?.cancellationCutoffMinutes ?? 0) > 0
+                    ? `You can cancel until ${policyQuery.data?.cancellationCutoffMinutes} minutes before your appointment. `
+                    : ""}
+                  If we cannot confirm your appointment after you pay, we review the payment and contact you.
+                </p>
                 {paymentInFlight && (
                   <p role="status" className="text-sm text-slate-600">
                     Preparing payment...
