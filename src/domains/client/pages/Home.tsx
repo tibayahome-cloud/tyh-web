@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
 import { TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
+import { shouldAskForLocation } from "../utils/locationRelevance";
 import { useHasAmbulanceService } from "../hooks/useHasAmbulanceService";
 
 // A popup on a phone keeps a margin all round and never taller than the screen; its content scrolls inside.
@@ -512,11 +513,13 @@ const ClientHome = () => {
             </div>
           </section>
 
-          <LocationPermissionBanner
-            status={locationAccess.status}
-            error={locationAccess.error}
-            onRetry={locationAccess.requestAccess}
-          />
+          {shouldAskForLocation([activeBooking, matchingBooking]) && (
+            <LocationPermissionBanner
+              status={locationAccess.status}
+              error={locationAccess.error}
+              onRetry={locationAccess.requestAccess}
+            />
+          )}
 
           {/* MAIN CONTENT GRID */}
           <div className="grid gap-4">

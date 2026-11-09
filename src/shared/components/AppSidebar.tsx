@@ -5,6 +5,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type NavItem = {
     label: string;
+    // A shorter name for the phone's bottom bar, where five or more tabs share 375 px and a long label is cut off.
+    shortLabel?: string;
     to: string;
     icon: ReactNode;
     badge?: number;
