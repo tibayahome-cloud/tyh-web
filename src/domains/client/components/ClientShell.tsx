@@ -28,7 +28,7 @@ export const ClientShell = () => {
   const navItems: NavItem[] = [
     { label: "Home", to: "/app/home", icon: <HomeIcon /> },
     { label: "Services", to: "/app/services", icon: <MedicalServicesIcon /> },
-    { label: "Telemedicine", to: "/app/telemedicine", icon: <VideocamOutlinedIcon />, attention: needsResponse },
+    { label: "Telemedicine", shortLabel: "Video", to: "/app/telemedicine", icon: <VideocamOutlinedIcon />, attention: needsResponse },
     { label: "Care", to: "/app/selfcare", icon: <FavoriteBorderIcon /> },
     { label: "Bookings", to: "/app/bookings", icon: <CalendarMonthIcon /> },
     { label: "Inbox", to: "/app/inbox", icon: <ForumIcon />, badge: conversationUnread },
