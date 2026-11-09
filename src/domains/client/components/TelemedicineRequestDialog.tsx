@@ -376,6 +376,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     }
   };
 
+  // Also what Back does on the pay step: the slot was held the moment it was tapped, so going back gives it up at once
+  // instead of leaving it reserved for ten minutes.
   const resetToStart = () => {
     releaseCurrentHold();
     setHoldId(null);
@@ -980,7 +982,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
             {!paymentConfirmed && (
               <div className="flex justify-start">
-                <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.slot)} disabled={paymentInitiated}>
+                <Button type="button" variant="secondary" onClick={resetToStart} disabled={paymentInitiated}>
                   Back
                 </Button>
               </div>
