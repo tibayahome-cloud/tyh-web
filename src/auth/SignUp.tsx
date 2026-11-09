@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -9,19 +9,17 @@ import { AuthLayout } from "../shared/components/AuthLayout";
 import { FormField } from "../shared/components/FormField";
 import { Input } from "../shared/components/Input";
 import { PasswordField } from "../shared/components/PasswordField";
-import { PasswordRequirements } from "../shared/components/PasswordRequirements";
+import { PasswordHint } from "../shared/components/PasswordHint";
 import { Button } from "../shared/components/Button";
 import type { RegisterSchema } from "../shared/schemas/auth";
 import { registerSchema } from "../shared/schemas/auth";
 import { describePasswordSubmitError } from "../shared/utils/passwordErrors";
-import { withPasswordConfirmation } from "../shared/utils/passwordResolver";
 
-const REQUIREMENTS_ID = "signup-password-requirements";
+const PASSWORD_HINT_ID = "signup-password-hint";
 import api from "../shared/libs/api";
 import { useAuth } from "../shared/hooks/useAuth";
 import { returnPathFrom, withReturnPath } from "../shared/utils/returnPath";
 import { toInternationalPhone } from "../shared/utils/phoneInput";
-import { PHONE_PLACEHOLDER } from "../shared/constants/contact";
 import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
 
 const defaultValues: RegisterSchema = {
@@ -29,7 +27,6 @@ const defaultValues: RegisterSchema = {
   email: "",
   phone: "",
   password: "",
-  confirmPassword: "",
   acceptedTerms: false,
   acknowledgedPrivacy: false
 };
@@ -42,32 +39,23 @@ export const SignUp = () => {
   const returnTo = useMemo(() => returnPathFrom(location), [location]);
   const { loginClientProvider } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
 
   const {
     control,
     handleSubmit,
     watch,
-    trigger,
     setError: setFieldError,
     setFocus,
-    formState: { isSubmitting }
+    formState: { isSubmitting, isSubmitted }
   } = useForm<RegisterSchema>({
-    resolver: withPasswordConfirmation(zodResolver(registerSchema)),
-    // Validate as the person types so every password rule reports live, not only on submit.
+    resolver: zodResolver(registerSchema),
+    // Validate as the person types, so the Create account button and the hint under the password stay truthful.
     mode: "onChange",
     defaultValues
   });
 
   const password = watch("password");
-  const confirmPassword = watch("confirmPassword");
-
-  // Editing the password can make an already-typed confirmation match (or stop matching).
-  useEffect(() => {
-    if (confirmPassword) {
-      void trigger("confirmPassword");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password]);
 
   const submit = handleSubmit(async (values) => {
     setError(null);
@@ -110,12 +98,15 @@ export const SignUp = () => {
     <AuthLayout
       split
       title={t("auth.signUpTitle")}
-      subtitle="Join our community for a premium care experience."
+      subtitle="Book a doctor online or care at home."
       footer={
-        <p className="type-caption text-slate-500">
+        <p className="text-sm text-slate-600">
           {t("auth.haveAccount")}{" "}
-          <Link to={withReturnPath("/login", returnTo)} className="font-semibold text-tiba-blue hover:underline">
-            {t("auth.backToLogin")}
+          <Link
+            to={withReturnPath("/login", returnTo)}
+            className="inline-flex min-h-11 items-center rounded px-1 font-semibold text-tiba-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+          >
+            Sign in
           </Link>
         </p>
       }
@@ -129,7 +120,45 @@ export const SignUp = () => {
           )}
         />
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <FormField
+          control={control}
+          name="phone"
+          render={({ field, fieldState }) => (
+            <Input
+              {...field}
+              type="tel"
+              inputMode="tel"
+              label="Phone number"
+              placeholder="0712 345 678"
+              autoComplete="tel"
+              hint="We use it to reach you about your appointments."
+              error={fieldState.error?.message}
+            />
+          )}
+        />
+
+        <div>
+          <FormField
+            control={control}
+            name="password"
+            render={({ field, fieldState }) => (
+              <PasswordField
+                {...field}
+                label={t("auth.password")}
+                autoComplete="new-password"
+                aria-describedby={PASSWORD_HINT_ID}
+                // The hint below says what is missing, while typing and after a refused submit (it turns red), so the
+                // same sentence is not shown twice. This line is for a refusal from the server.
+                error={fieldState.error?.type === "server" ? fieldState.error.message : undefined}
+              />
+            )}
+          />
+          <div className="mt-1.5">
+            <PasswordHint id={PASSWORD_HINT_ID} password={password ?? ""} invalid={isSubmitted} />
+          </div>
+        </div>
+
+        {showEmail ? (
           <FormField
             control={control}
             name="email"
@@ -137,64 +166,27 @@ export const SignUp = () => {
               <Input
                 {...field}
                 type="email"
-                label={t("auth.email")}
+                inputMode="email"
+                label="Email (optional)"
                 placeholder="jane@example.com"
                 autoComplete="email"
+                hint="For receipts and appointment emails."
                 error={fieldState.error?.message}
               />
             )}
           />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowEmail(true)}
+            aria-expanded="false"
+            className="-my-1 inline-flex min-h-11 items-center rounded px-1 text-sm font-semibold text-tiba-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+          >
+            Add an email for receipts (optional)
+          </button>
+        )}
 
-          <FormField
-            control={control}
-            name="phone"
-            render={({ field, fieldState }) => (
-              <Input
-                {...field}
-                label={t("auth.phone")}
-                placeholder={PHONE_PLACEHOLDER}
-                autoComplete="tel"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-        </div>
-
-        <FormField
-          control={control}
-          name="password"
-          render={({ field, fieldState }) => (
-            <PasswordField
-              {...field}
-              label={t("auth.password")}
-              autoComplete="new-password"
-              aria-describedby={REQUIREMENTS_ID}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-
-        <PasswordRequirements
-          id={REQUIREMENTS_ID}
-          password={password ?? ""}
-          confirmPassword={confirmPassword ?? ""}
-        />
-
-        <FormField
-          control={control}
-          name="confirmPassword"
-          render={({ field, fieldState }) => (
-            <PasswordField
-              {...field}
-              label={t("auth.confirmPassword")}
-              autoComplete="new-password"
-              aria-describedby={REQUIREMENTS_ID}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="space-y-1 pt-1">
           {CURRENT_LEGAL_DOCUMENTS.map((document) => {
             const fieldName = document.type === "terms" ? "acceptedTerms" : "acknowledgedPrivacy";
             return (
@@ -204,31 +196,32 @@ export const SignUp = () => {
                 name={fieldName}
                 render={({ field, fieldState }) => (
                   <div>
-                    <label className="flex items-start gap-3">
+                    <label className="flex min-h-11 items-center gap-3 text-sm text-slate-700">
                       <input
                         type="checkbox"
-                        className="mt-1 h-5 w-5 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
+                        className="h-5 w-5 shrink-0 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
                         checked={Boolean(field.value)}
                         onChange={(event) => field.onChange(event.target.checked)}
                         onBlur={field.onBlur}
                         name={field.name}
                         ref={field.ref}
                       />
-                      <span className="text-sm font-medium text-slate-700">
+                      <span>
                         {document.actionLabel}{" "}
                         <a
                           href={document.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-tiba-blue hover:underline"
+                          aria-label={`Read the ${document.title} ${document.version} (opens in a new tab)`}
+                          className="inline-flex items-center gap-1 font-medium text-tiba-blue underline-offset-2 hover:underline"
                         >
-                          View {document.title} {document.version}
-                          <ExternalLink className="h-3.5 w-3.5" />
+                          Read
+                          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                         </a>
                       </span>
                     </label>
                     {fieldState.error?.message && (
-                      <p className="mt-1 text-xs font-medium text-red-600">{fieldState.error.message}</p>
+                      <p className="ml-8 text-xs font-medium text-red-600">{fieldState.error.message}</p>
                     )}
                   </div>
                 )}
@@ -246,7 +239,6 @@ export const SignUp = () => {
         <Button type="submit" className="w-full h-11" loading={isSubmitting}>
           {t("auth.signUpCta")}
         </Button>
-
       </form>
     </AuthLayout>
   );
