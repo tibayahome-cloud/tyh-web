@@ -344,6 +344,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const accessExpiryRef = useRef<number | null>(decodeTokenExpiry(tokens.accessToken));
   const refreshExpiryRef = useRef<number | null>(decodeTokenExpiry(tokens.refreshToken));
   const expiryTimerRef = useRef<number | null>(null);
+  // Set once performRefresh exists (it is declared further down); the expiry timer calls it through here.
+  const refreshRef = useRef<() => Promise<string | null>>(async () => null);
+  // True when a freshly issued access token already looks expired by this device's clock, so the clock is wrong.
+  const clockLooksWrongRef = useRef(false);
 
   const setUserState = useCallback((value: AuthUser | null) => {
     setUser(value);
@@ -415,19 +419,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         return;
       }
       clearExpiryTimer();
-      if (!expiry) {
+      if (!expiry || clockLooksWrongRef.current) {
         return;
       }
+      // Renew the session shortly before the short-lived access token runs out. A client stays signed in for as long
+      // as their refresh token lives (14 days), instead of being signed out every couple of hours. If the renewal
+      // is refused, performRefresh ends the session as before.
       const delay = Math.max(0, expiry - Date.now() - TOKEN_EXPIRY_SKEW_MS);
-      if (delay <= 0) {
-        clearTokens(true);
-        return;
-      }
       expiryTimerRef.current = window.setTimeout(() => {
-        clearTokens(true);
+        void refreshRef.current();
       }, delay);
     },
-    [clearExpiryTimer, clearTokens]
+    [clearExpiryTimer]
   );
 
   useEffect(() => {
@@ -459,7 +462,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
 
     const refreshToken = tokensRef.current.refreshToken;
-    if (!refreshToken) {
+    if (!refreshToken || isRefreshExpired()) {
       clearTokens(true);
       return null;
     }
@@ -469,6 +472,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         const response = await api.post("/auth/refresh", { refresh_token: refreshToken });
         const payload = extractData<Record<string, unknown>>(response.data);
         const { accessToken, refreshToken: nextRefresh } = extractTokens(payload);
+        // A phone whose clock is wrong sees every new token as already expired and would renew in a loop. While the
+        // clock disagrees with the server, stop renewing on a timer and rely on the 401 path, which needs no clock.
+        const newExpiry = decodeTokenExpiry(accessToken);
+        clockLooksWrongRef.current = newExpiry !== null && newExpiry - Date.now() <= TOKEN_EXPIRY_SKEW_MS;
         updateTokens({
           accessToken,
           refreshToken: nextRefresh ?? refreshToken
@@ -484,12 +491,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     })();
 
     return refreshInFlight.current;
-  }, [clearTokens, updateTokens]);
+  }, [clearTokens, isRefreshExpired, updateTokens]);
+
+  useEffect(() => {
+    refreshRef.current = performRefresh;
+  }, [performRefresh]);
 
   useEffect(() => {
     configureApiAuth({
       getAccessToken: () => {
-        if (isAccessExpired()) {
+        // An expired access token alone does not end the session: the server answers 401 and the API client renews
+        // it and retries. Only a missing or expired refresh token means the person has to sign in again.
+        if (isAccessExpired() && (!tokensRef.current.refreshToken || isRefreshExpired())) {
           clearTokens(true);
           return null;
         }
