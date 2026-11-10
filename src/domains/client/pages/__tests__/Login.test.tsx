@@ -353,7 +353,7 @@ describe("client sign-in page", () => {
       await user.click(screen.getByRole("button", { name: "Sign in" }));
 
       expect(await screen.findByText("Email or phone is required")).toBeInTheDocument();
-      expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
+      expect(screen.getByText("Enter your password")).toBeInTheDocument();
       expect(loginClientProviderMock).not.toHaveBeenCalled();
     });
 
