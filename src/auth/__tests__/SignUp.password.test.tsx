@@ -85,7 +85,7 @@ describe("registration password", () => {
     renderPage();
 
     const hint = document.getElementById("signup-password-hint") as HTMLElement;
-    expect(hint).toHaveTextContent(/at least 10 characters/i);
+    expect(hint).toHaveTextContent(/at least 6 characters/i);
     expect(passwordField()).toHaveAttribute("aria-describedby", "signup-password-hint");
     expect(screen.queryByLabelText(/confirm password/i)).not.toBeInTheDocument();
   });
@@ -96,7 +96,7 @@ describe("registration password", () => {
     const hint = document.getElementById("signup-password-hint") as HTMLElement;
 
     await user.type(passwordField(), "abc");
-    expect(hint).toHaveTextContent("Keep going: at least 10 characters.");
+    expect(hint).toHaveTextContent("Keep going: at least 6 characters.");
 
     await user.clear(passwordField());
     await user.type(passwordField(), "abcdefg1!x");
@@ -120,15 +120,15 @@ describe("registration password", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await fillAccount(user, "weakpass");
+    await fillAccount(user, "weak");
     await user.click(submitButton());
 
     expect(postMock).not.toHaveBeenCalled();
     await waitFor(() => expect(passwordField()).toHaveFocus());
     // The one hint line turns into the error; no second line repeats it.
     const hint = await screen.findByRole("alert");
-    expect(hint).toHaveTextContent("Keep going: at least 10 characters.");
-    expect(screen.queryByText("Password must be at least 10 characters")).not.toBeInTheDocument();
+    expect(hint).toHaveTextContent("Keep going: at least 6 characters.");
+    expect(screen.queryByText("Password must be at least 6 characters")).not.toBeInTheDocument();
   });
 
   it("registers with a valid password and signs the person in", async () => {
@@ -147,14 +147,14 @@ describe("registration password", () => {
 
   it("shows a server rejection of the password on the password field", async () => {
     const user = userEvent.setup();
-    postMock.mockRejectedValue(httpError(400, "Password must be 10+ chars with upper, lower, digit, special."));
+    postMock.mockRejectedValue(httpError(400, "Password must be 6+ chars with upper, lower, digit, special."));
     renderPage();
 
     await fillAccount(user);
     await user.click(submitButton());
 
     expect(
-      await screen.findByText("Password must be 10+ chars with upper, lower, digit, special.", {
+      await screen.findByText("Password must be 6+ chars with upper, lower, digit, special.", {
         selector: "span.text-red-500"
       })
     ).toBeInTheDocument();

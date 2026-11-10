@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { PasswordRequirements } from "../PasswordRequirements";
 
-const LENGTH = /Password must be at least 10 characters/;
+const LENGTH = /Password must be at least 6 characters/;
 const NUMBER = /Password must contain 1 number/;
 const SPECIAL = /Password must contain 1 special character/;
 const CASE = /Password must contain 1 upper case and 1 lower case letter/;
