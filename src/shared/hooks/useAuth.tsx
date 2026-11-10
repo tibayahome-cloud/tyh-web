@@ -604,6 +604,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           refreshToken,
           persist: Boolean(credentials.remember)
         });
+        // Requests sent in the same moment as signing in read this ref, which otherwise only catches up once React has
+        // re-rendered. The booking creates its slot hold straight after the account is made, so without this the first
+        // request after signing in could go out with no token.
+        tokensRef.current = { accessToken, refreshToken, persist: Boolean(credentials.remember) };
 
         setSessionExpired(false);
 
