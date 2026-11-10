@@ -773,7 +773,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 onClick={() => setWeekOffset((current) => Math.max(0, current - 1))}
                 disabled={!canGoBack}
                 aria-label="Previous week"
-                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-xl text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
               >
                 &lsaquo;
               </button>
@@ -783,7 +783,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 onClick={() => setWeekOffset((current) => current + 1)}
                 disabled={!canGoForward}
                 aria-label="Next week"
-                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-xl text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
               >
                 &rsaquo;
               </button>
@@ -844,7 +844,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   type="button"
                   disabled={createHoldMutation.isPending}
                   onClick={() => handleSelectSlot(slot)}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
+                  className="min-h-[44px] rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
                   {formatSlotTime(slot.startAt, slotTimezone)} &ndash;{" "}
                   {formatSlotTime(slot.endAt, slotTimezone)}
@@ -881,9 +881,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             </div>
 
             {!holdExpired && !paymentConfirmed && (
-              <p className="text-xs text-amber-700">
-                Holding this slot for {Math.floor(remainingHoldSeconds / 60)}:
-                {String(remainingHoldSeconds % 60).padStart(2, "0")} -- complete payment before it expires.
+              <p className="text-sm font-medium text-amber-800">
+                Holding this slot for{" "}
+                <span className="tabular-nums">
+                  {Math.floor(remainingHoldSeconds / 60)}:{String(remainingHoldSeconds % 60).padStart(2, "0")}
+                </span>
+                . Complete payment before it expires.
               </p>
             )}
 
