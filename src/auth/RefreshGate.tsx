@@ -11,6 +11,9 @@ type RefreshGateProps = {
 export const RefreshGate = ({ children }: RefreshGateProps) => {
   const { accessToken, hasRefreshToken, refresh, isBootstrapping } = useAuth();
   const [attempted, setAttempted] = useState(false);
+  // True from the first time the app is let through. The gate is for the first load, so that a stored session is restored
+  // before any page decides the person is signed out. After that it stays out of the way.
+  const [released, setReleased] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +42,18 @@ export const RefreshGate = ({ children }: RefreshGateProps) => {
     };
   }, [accessToken, hasRefreshToken, refresh, attempted]);
 
-  if (!attempted || isBootstrapping) {
+  const ready = attempted && !isBootstrapping;
+
+  useEffect(() => {
+    if (ready) {
+      setReleased(true);
+    }
+  }, [ready]);
+
+  // Signing in later refreshes the profile in the background, which sets isBootstrapping again. Swapping the whole app for
+  // a spinner then unmounted every page, and a booking made without an account lost its place the moment the account
+  // existed. The areas that need the profile (LogoutGate, LegalConsentGate, Can) wait for it themselves.
+  if (!ready && !released) {
     return <Loading fullHeight />;
   }
 
