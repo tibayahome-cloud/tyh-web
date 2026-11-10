@@ -8,6 +8,9 @@ import { lazyWithRetry } from "../../shared/utils/lazyWithRetry";
 
 // Lazy load pages
 const Home = lazyWithRetry(() => import("./pages/Home").then((module) => ({ default: module.Home })));
+const BookTelemedicine = lazyWithRetry(() =>
+    import("./pages/BookTelemedicine").then((module) => ({ default: module.BookTelemedicine }))
+);
 // Legal & Extra
 const Privacy = lazyWithRetry(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Privacy })));
 const Terms = lazyWithRetry(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Terms })));
@@ -32,6 +35,11 @@ export const websiteRoutes: RouteObject[] = [
             {
                 index: true,
                 element: <NativeRedirect />,
+            },
+            {
+                // Booking a remote consultation needs no account to start: the booking asks for details after the time.
+                path: "book/telemedicine",
+                element: <BookTelemedicine />,
             },
             {
                 path: "privacy",

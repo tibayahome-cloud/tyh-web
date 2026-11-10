@@ -111,15 +111,17 @@ export const mapTelemedicineCatalogService = (value: unknown): TelemedicineCatal
   };
 };
 
+// The three reads below are what a person browsing the booking steps sees, so they use the public routes: they work
+// before anyone has signed in, and return the same active-only lists a signed-in client gets.
 export const fetchTelemedicineCategories = async (): Promise<TelemedicineCategory[]> => {
-  const response = await api.get("/telemedicine/catalog/categories");
+  const response = await api.get("/public/telemedicine/catalog/categories");
   return dataRows(response.data).map(mapTelemedicineCategory).filter((item) => item.id && item.status === "active");
 };
 
 export const fetchTelemedicineSubcategories = async (
   categoryId?: string
 ): Promise<TelemedicineSubcategory[]> => {
-  const response = await api.get("/telemedicine/catalog/subcategories", {
+  const response = await api.get("/public/telemedicine/catalog/subcategories", {
     params: categoryId ? { category_id: categoryId } : undefined
   });
   return dataRows(response.data).map(mapTelemedicineSubcategory).filter((item) => item.id && item.status === "active");
@@ -146,7 +148,7 @@ export const fetchSelectableTelemedicineSubcategories = async (): Promise<Teleme
 export const fetchTelemedicineCatalogServices = async (
   subcategoryId?: string
 ): Promise<TelemedicineCatalogService[]> => {
-  const response = await api.get("/telemedicine/catalog/services", {
+  const response = await api.get("/public/telemedicine/catalog/services", {
     params: subcategoryId ? { subcategory_id: subcategoryId } : undefined
   });
   return dataRows(response.data).map(mapTelemedicineCatalogService).filter((item) => item.id && item.status === "active");

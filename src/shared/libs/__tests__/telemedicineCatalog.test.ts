@@ -32,7 +32,7 @@ describe("telemedicine catalog client", () => {
     await expect(fetchTelemedicineCategories()).resolves.toEqual([
       expect.objectContaining({ id: "c1", name: "Medical", displayOrder: 1 })
     ]);
-    expect(mockGet).toHaveBeenCalledWith("/telemedicine/catalog/categories");
+    expect(mockGet).toHaveBeenCalledWith("/public/telemedicine/catalog/categories");
   });
 
   it("scopes subcategories and services to the selected parent", async () => {
@@ -43,8 +43,8 @@ describe("telemedicine catalog client", () => {
     await fetchTelemedicineSubcategories("c1");
     await fetchTelemedicineCatalogServices("sc1");
 
-    expect(mockGet).toHaveBeenNthCalledWith(1, "/telemedicine/catalog/subcategories", { params: { category_id: "c1" } });
-    expect(mockGet).toHaveBeenNthCalledWith(2, "/telemedicine/catalog/services", { params: { subcategory_id: "sc1" } });
+    expect(mockGet).toHaveBeenNthCalledWith(1, "/public/telemedicine/catalog/subcategories", { params: { category_id: "c1" } });
+    expect(mockGet).toHaveBeenNthCalledWith(2, "/public/telemedicine/catalog/services", { params: { subcategory_id: "sc1" } });
   });
 
   it("loads all active services when no subcategory is selected", async () => {
@@ -55,7 +55,7 @@ describe("telemedicine catalog client", () => {
     await expect(fetchTelemedicineCatalogServices()).resolves.toEqual([
       expect.objectContaining({ id: "s1", subcategoryId: "sc1" })
     ]);
-    expect(mockGet).toHaveBeenCalledWith("/telemedicine/catalog/services", { params: undefined });
+    expect(mockGet).toHaveBeenCalledWith("/public/telemedicine/catalog/services", { params: undefined });
   });
 
   it("preserves inactive entries for admin catalog management", async () => {

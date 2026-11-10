@@ -13,6 +13,12 @@ const AUTH_PAGES = /^\/(login|signup|forgot-password|reset-password|two-factor|s
 
 export const TELEMEDICINE_BOOKING_PATH = "/app/telemedicine?book=1";
 
+/**
+ * Where a visitor who is not signed in starts booking a remote consultation. It needs no account: they choose a
+ * consultation, a clinic and a time first, and are asked for their details only then.
+ */
+export const PUBLIC_TELEMEDICINE_BOOKING_PATH = "/book/telemedicine";
+
 export const safeReturnPath = (raw: unknown): string | null => {
   if (typeof raw !== "string") {
     return null;
