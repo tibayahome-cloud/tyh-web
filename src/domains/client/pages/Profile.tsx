@@ -7,25 +7,22 @@ import { Button } from "../../../shared/components/Button";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useToast } from "../../../shared/components/ToastProvider";
 import api from "../../../shared/libs/api";
-import { SUPPORTED_COUNTRIES } from "../../../shared/constants/region";
 
+// There is no country field: where a client is comes from their phone number, so nobody is asked to pick one.
 type ProfileFormState = {
   fullName: string;
   email: string;
   phone: string;
-  countryCode: string;
 };
 
 const buildInitialForm = (user?: {
   fullName: string;
   email: string | null;
   phone: string | null;
-  countryCode: string | null;
 }): ProfileFormState => ({
   fullName: user?.fullName ?? "",
   email: user?.email ?? "",
-  phone: user?.phone ?? "",
-  countryCode: user?.countryCode ?? ""
+  phone: user?.phone ?? ""
 });
 
 const ClientProfilePage = () => {
@@ -58,8 +55,7 @@ const ClientProfilePage = () => {
       await api.patch(`/users/${user.id}`, {
         full_name: payload.fullName,
         email: payload.email,
-        phone: payload.phone,
-        country_code: payload.countryCode || null
+        phone: payload.phone
       });
     },
     onSuccess: async () => {
@@ -236,29 +232,12 @@ const ClientProfilePage = () => {
                   onChange={(event) => setFormState((prev) => ({ ...prev, phone: event.target.value }))}
                   className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
                   placeholder="+254 700 000000"
+                  aria-describedby="phone-hint"
                 />
+                <p id="phone-hint" className="mt-1 text-xs text-slate-500">
+                  Remote consultations are available for Kenyan numbers (+254) for now.
+                </p>
               </div>
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="country">
-                Country
-              </label>
-              <select
-                id="country"
-                value={formState.countryCode}
-                onChange={(event) => setFormState((prev) => ({ ...prev, countryCode: event.target.value }))}
-                className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
-              >
-                <option value="">Select your country</option>
-                {SUPPORTED_COUNTRIES.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.name}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-slate-500">
-                Required to book remote (telemedicine) consultations.
-              </p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <Button type="submit" loading={profileMutation.isPending}>
