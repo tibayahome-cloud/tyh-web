@@ -10,9 +10,18 @@ describe("newPasswordSchema", () => {
     expect(newPasswordSchema.safeParse("@Qwerty123").success).toBe(true);
   });
 
+  it("accepts six characters when every kind of character is there", () => {
+    expect(newPasswordSchema.safeParse("Ab1!xy").success).toBe(true);
+  });
+
+  it("still turns away five characters, and a short one with a missing kind", () => {
+    expect(newPasswordSchema.safeParse("Ab1!x").success).toBe(false);
+    expect(newPasswordSchema.safeParse("abcdef").success).toBe(false);
+  });
+
   it.each([
     ["", "Enter a password"],
-    ["Ab1!", "Password must be at least 10 characters"],
+    ["Ab1!", "Password must be at least 6 characters"],
     ["abcdefg1!x", "Password needs an uppercase letter"],
     ["ABCDEFG1!X", "Password needs a lowercase letter"],
     ["Abcdefgh!x", "Password needs a number"],
@@ -39,7 +48,7 @@ describe("passwordResetPerformSchema", () => {
 
   it("rejects a weak password on the password field", () => {
     const result = passwordResetPerformSchema.safeParse({ ...valid, password: "weak", confirmPassword: "weak" });
-    expect(messagesFor(result, "password")).toEqual(["Password must be at least 10 characters"]);
+    expect(messagesFor(result, "password")).toEqual(["Password must be at least 6 characters"]);
   });
 
   it("rejects a confirmation that differs", () => {

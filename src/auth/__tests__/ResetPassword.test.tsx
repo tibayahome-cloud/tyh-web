@@ -76,7 +76,7 @@ describe("reset and set-up password page", () => {
 
       const list = screen.getByRole("list", { name: "Requirements for your password" });
       for (const rule of [
-        /Password must be at least 10 characters/,
+        /Password must be at least 6 characters/,
         /Password must contain 1 number/,
         /Password must contain 1 special character/,
         /Password must contain 1 upper case and 1 lower case letter/,
@@ -108,7 +108,7 @@ describe("reset and set-up password page", () => {
 
   describe("live validation", () => {
     it.each([
-      ["Ab1!", /at least 10 characters/, "Password must be at least 10 characters"],
+      ["Ab1!", /at least 6 characters/, "Password must be at least 6 characters"],
       ["abcdefg1!x", /upper case and 1 lower case/, "Password needs an uppercase letter"],
       ["ABCDEFG1!X", /upper case and 1 lower case/, "Password needs a lowercase letter"],
       ["Abcdefgh!x", /1 number/, "Password needs a number"],
@@ -128,7 +128,7 @@ describe("reset and set-up password page", () => {
       renderPage();
 
       await user.type(passwordField(), "short");
-      await screen.findByText("Password must be at least 10 characters", { selector: "span.text-red-500" });
+      await screen.findByText("Password must be at least 6 characters", { selector: "span.text-red-500" });
       await user.clear(passwordField());
       await user.type(passwordField(), GOOD);
 
@@ -262,13 +262,13 @@ describe("reset and set-up password page", () => {
 
     it("shows the server's rejection of the password on the password field and focuses it", async () => {
       const user = userEvent.setup();
-      postMock.mockRejectedValue(httpError(400, "Password must be 10+ chars with upper, lower, digit, special."));
+      postMock.mockRejectedValue(httpError(400, "Password must be 6+ chars with upper, lower, digit, special."));
       renderPage();
 
       await submitValid(user);
 
       expect(
-        await screen.findByText("Password must be 10+ chars with upper, lower, digit, special.", {
+        await screen.findByText("Password must be 6+ chars with upper, lower, digit, special.", {
           selector: "span.text-red-500"
         })
       ).toBeInTheDocument();
