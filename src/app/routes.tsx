@@ -129,7 +129,7 @@ export const router = createBrowserRouter(
       element: (
         <LogoutGate redirectTo="/login">
           <LegalConsentGate>
-            <PhoneVerificationGate>
+            <PhoneVerificationGate after="first-booking">
               <RequireRole role={ROLE_CLIENT}>
                 <SuspenseWrapper>
                   <ClientRoutes />
