@@ -44,6 +44,7 @@ beforeAll(() => {
 
 const CLIENT_APP_HOME = "client-app-home";
 const SIGNUP_PAGE = "signup-page";
+const PUBLIC_BOOKING_PAGE = "public-booking-page";
 const NOT_FOUND_FALLBACK = "not-found-fallback";
 
 /** Shows where a visitor landed, including the destination carried in ?next=. */
@@ -70,6 +71,7 @@ const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
             /app routes this test did not happen to enumerate. */}
         <Route path="/app/*" element={<div>{CLIENT_APP_HOME}</div>} />
         <Route path="/signup" element={<SignUpProbe />} />
+        <Route path="/book/telemedicine" element={<div>{PUBLIC_BOOKING_PAGE}</div>} />
         {/* Mirrors src/app/routes.tsx: an unknown path redirects to login. */}
         <Route path="/unknown" element={<div>{NOT_FOUND_FALLBACK}</div>} />
         <Route path="*" element={<Navigate to="/unknown" replace />} />
@@ -152,16 +154,17 @@ describe("homepage calls to action", () => {
     });
 
     it.each(["Talk to a Doctor", "Find a Specialist", "Video Doctor Consultation"])(
-      "sends %s to create an account and remembers that the visitor came to book a consultation",
+      "sends %s to the public booking page, so the visitor sees services and times before any sign-up",
       async (label) => {
         const user = userEvent.setup();
         renderHome({ isAuthenticated: false });
 
         await user.click(screen.getAllByRole("button", { name: new RegExp(label, "i") })[0]);
 
-        expect(screen.getByText(SIGNUP_PAGE)).toBeInTheDocument();
-        expect(screen.getByTestId("signup-search")).toHaveTextContent("?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+        expect(screen.getByText(PUBLIC_BOOKING_PAGE)).toBeInTheDocument();
+        expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
         expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
+        expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
       }
     );
   });

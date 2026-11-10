@@ -1,6 +1,6 @@
 
 import { Link, useNavigate } from "react-router-dom";
-import { TELEMEDICINE_BOOKING_PATH, withReturnPath } from "../../../shared/utils/returnPath";
+import { PUBLIC_TELEMEDICINE_BOOKING_PATH, TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
 import {
     ArrowRight,
     ShieldCheck,
@@ -60,20 +60,16 @@ export const Home = () => {
         }
     };
 
-    // Remote consultations are booked in the client app, which owns the catalogue, the
-    // slot picker and payment. The public page only introduces the service and hands the
-    // visitor over: signed-in clients land on the booking screen, everyone else is taken to
-    // create an account and then straight to booking (the destination travels with them).
-    // Nothing about providers, availability or the catalogue is fetched or shown
-    // here -- that data is not public, and duplicating any of it would give us a second
-    // booking flow to keep in step with the real one.
+    // Remote consultations are booked in the one booking dialog, which owns the catalogue, the
+    // slot picker and payment. The landing page only introduces the service and hands the
+    // visitor over: a signed-in client lands on the booking screen in the app, and everyone else
+    // on the public booking page, where they choose a consultation, a clinic and a time before
+    // being asked for any details. Nothing about providers, availability or the catalogue is
+    // fetched or shown on this page -- the booking dialog fetches it, so there is no second
+    // booking flow here to keep in step with the real one.
     const handleTelemedicineClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        if (isAuthenticated) {
-            navigate(TELEMEDICINE_BOOKING_PATH);
-        } else {
-            navigate(withReturnPath("/signup", TELEMEDICINE_BOOKING_PATH));
-        }
+        navigate(isAuthenticated ? TELEMEDICINE_BOOKING_PATH : PUBLIC_TELEMEDICINE_BOOKING_PATH);
     };
 
     const telemedicineHighlights = [

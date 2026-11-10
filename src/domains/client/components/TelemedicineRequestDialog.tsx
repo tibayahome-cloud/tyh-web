@@ -20,6 +20,7 @@ import {
 } from "../../../shared/libs/telemedicineCategoryAssets";
 import { TelemedicineServiceVisual } from "../../../shared/components/TelemedicineServiceVisual";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
+import { BookingAccountStep } from "./BookingAccountStep";
 import { useFastestFacility } from "../../../shared/hooks/useFastestFacility";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
 import { RemoteCareRegionNotice } from "../../../shared/components/RemoteCareRegionNotice";
@@ -70,13 +71,23 @@ type RemoteServiceOption = {
   active?: boolean;
 };
 
-const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, confirm: 3 } as const;
+// "details" only happens for someone who is not signed in. It comes after the time is chosen, so a person sees what is on
+// offer, at what price and when, before they are asked who they are; the account made there is what the time is held for.
+const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, details: 3, confirm: 4 } as const;
 
 const TM_STEPS = [
   { title: "Service", description: "What kind of consultation?" },
   { title: "Facility", description: "Choose a care site" },
   { title: "Slot", description: "Pick a time" },
   { title: "Confirm", description: "Review & pay" }
+];
+
+const TM_STEPS_WITH_DETAILS = [
+  TM_STEPS[0],
+  TM_STEPS[1],
+  TM_STEPS[2],
+  { title: "Details", description: "Your name and number" },
+  TM_STEPS[3]
 ];
 
 const formatCurrency = (cents: number, currency = "KES") =>
@@ -129,6 +140,18 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
+  const isSignedIn = Boolean(user);
+  // Whether this booking began without an account. Decided when the dialog opens and then kept, so the steps do not
+  // change from five to four in the middle of the journey when the account is made at the details step.
+  const [startedSignedOut, setStartedSignedOut] = useState(!user);
+  useEffect(() => {
+    if (open) {
+      setStartedSignedOut(!user);
+    }
+    // Only when the dialog opens: making the account must not flip this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const [holdingAfterAccount, setHoldingAfterAccount] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -140,6 +163,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const fastestFacility = useFastestFacility();
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
+  // The account made (or signed in to) during this booking supplies the M-Pesa number, unless the person typed their own.
+  useEffect(() => {
+    if (user?.phone) {
+      setPhone((current) => current || (user.phone ?? ""));
+    }
+  }, [user?.phone]);
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
   // Guards against a double-tap sending two M-Pesa prompts; see handlePay.
   const payInFlightRef = useRef(false);
@@ -425,10 +454,11 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     );
   };
 
-  const handleSelectSlot = async (slot: TelemedicineSlot) => {
+  // Holds the chosen time for the signed-in person and moves on to pay. Done straight away for someone who is signed in,
+  // and right after the account is made for someone who was not. A time that has just been taken sends them back to the
+  // list with the reason.
+  const holdSlot = async (slot: TelemedicineSlot) => {
     if (!selectedFacility) return;
-    setSubmitError(null);
-    setSelectedSlot(slot);
     try {
       const newHold = await createHoldMutation.mutateAsync({
         facilityId: selectedFacility.id,
@@ -444,6 +474,33 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     } catch (error) {
       setSubmitError(classifyApiError(error, "Please try a different slot."));
       setSelectedSlot(null);
+      setStep(TM_STEP_INDEX.slot);
+    }
+  };
+
+  const handleSelectSlot = async (slot: TelemedicineSlot) => {
+    if (!selectedFacility) return;
+    setSubmitError(null);
+    setSelectedSlot(slot);
+    if (!isSignedIn) {
+      // Nothing is held for someone with no account yet: they give their details first, then the time is held.
+      setStep(TM_STEP_INDEX.details);
+      return;
+    }
+    await holdSlot(slot);
+  };
+
+  // The account now exists and the person is signed in: hold the time they chose and go on to pay.
+  const handleAccountReady = async () => {
+    if (!selectedSlot) {
+      setStep(TM_STEP_INDEX.slot);
+      return;
+    }
+    setHoldingAfterAccount(true);
+    try {
+      await holdSlot(selectedSlot);
+    } finally {
+      setHoldingAfterAccount(false);
     }
   };
 
@@ -497,15 +554,21 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   // cards need room to breathe; every later step is still a single-column form/list that "md"
   // already fits. One Modal, one DOM tree; this is a prop value, not a second layout branch.
   const isServiceStep = step === TM_STEP_INDEX.service && !serviceId;
+  // A person who began without an account sees five steps; a signed-in client sees four, and Confirm is the fourth.
+  const stepperSteps = startedSignedOut ? TM_STEPS_WITH_DETAILS : TM_STEPS;
+  const stepperCurrent = !startedSignedOut && step === TM_STEP_INDEX.confirm ? 3 : step;
+  // A person who is signed in but whose number gives no country is told so. Someone who has not signed in is simply
+  // shown Kenya's consultations: their country is read from the number they give at the details step.
+  const countryUnknown = isSignedIn && !user?.countryCode;
 
   return (
     <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth={isServiceStep ? "lg" : "md"}>
       <div className="space-y-6">
-        <Stepper steps={TM_STEPS} current={step} compactOnMobile />
+        <Stepper steps={stepperSteps} current={stepperCurrent} compactOnMobile />
 
         {step === TM_STEP_INDEX.service && (
           <div className="space-y-3">
-            {!user?.countryCode && <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />}
+            {countryUnknown && <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />}
             {serviceId ? (
               servicesQuery.isLoading && <Loading />
             ) : (
@@ -654,7 +717,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.facility && (
           <div className="space-y-3">
-            {!user?.countryCode ? (
+            {countryUnknown ? (
               <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />
             ) : (
               <>
@@ -857,6 +920,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               </Button>
             </div>
           </div>
+        )}
+
+        {step === TM_STEP_INDEX.details && (
+          <BookingAccountStep
+            busy={holdingAfterAccount}
+            onReady={handleAccountReady}
+            onBack={() => {
+              setSubmitError(null);
+              setStep(TM_STEP_INDEX.slot);
+            }}
+          />
         )}
 
         {step === TM_STEP_INDEX.confirm && selectedFacility && selectedSlot && (

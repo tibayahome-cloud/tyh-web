@@ -41,6 +41,7 @@ beforeAll(() => {
 const TELEMEDICINE_PAGE = "client-telemedicine-page";
 const CLIENT_APP_HOME = "client-app-home";
 const SIGNUP_PAGE = "signup-page";
+const PUBLIC_BOOKING_PAGE = "public-booking-page";
 const NOT_FOUND_FALLBACK = "not-found-fallback";
 
 const CTA_NAME = /Book online consultation/i;
@@ -66,6 +67,7 @@ const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
         <Route path="/app/telemedicine" element={<div>{TELEMEDICINE_PAGE}</div>} />
         <Route path="/app/*" element={<div>{CLIENT_APP_HOME}</div>} />
         <Route path="/signup" element={<SignUpProbe />} />
+        <Route path="/book/telemedicine" element={<div>{PUBLIC_BOOKING_PAGE}</div>} />
         <Route path="/unknown" element={<div>{NOT_FOUND_FALLBACK}</div>} />
         <Route path="*" element={<Navigate to="/unknown" replace />} />
       </Routes>
@@ -91,14 +93,14 @@ describe("public telemedicine entry point", () => {
       expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
     });
 
-    it("sends a signed-out visitor to create an account, and on to booking afterwards", async () => {
+    it("sends a signed-out visitor to the public booking page, with no sign-up first", async () => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: false });
 
       await user.click(screen.getByRole("button", { name: CTA_NAME }));
 
-      expect(screen.getByText(SIGNUP_PAGE)).toBeInTheDocument();
-      expect(screen.getByTestId("signup-search")).toHaveTextContent("?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+      expect(screen.getByText(PUBLIC_BOOKING_PAGE)).toBeInTheDocument();
+      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(TELEMEDICINE_PAGE)).not.toBeInTheDocument();
     });
 

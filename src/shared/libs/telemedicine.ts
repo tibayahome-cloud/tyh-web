@@ -37,12 +37,14 @@ export type RemoteFacility = {
   timezone: string | null;
 };
 
+// Browsing needs no account, so the clinics, the open times and the policy come from the public routes. They return the
+// same shapes as the signed-in routes (open times without the provider count, which nothing here uses).
 export const discoverRemoteFacilities = async (
   serviceId: string,
   countryCode?: string,
   options: { ranking?: "earliest_slot" } = {}
 ): Promise<RemoteFacility[]> => {
-  const response = await api.get("/facilities/discover-remote", {
+  const response = await api.get("/public/telemedicine/facilities", {
     params: {
       service_id: serviceId,
       ...(countryCode ? { country_code: countryCode } : {}),
@@ -91,7 +93,7 @@ export const fetchAvailableSlots = async (
   startDate: string,
   endDate?: string
 ): Promise<AvailableSlotsResult> => {
-  const response = await api.get(`/facilities/${facilityId}/telemedicine/available-slots`, {
+  const response = await api.get(`/public/telemedicine/facilities/${facilityId}/available-slots`, {
     params: {
       facility_service_id: facilityServiceId,
       start_date: startDate,
@@ -269,7 +271,7 @@ export const reassignProvider = async (
 };
 
 export const fetchTelemedicinePolicy = async (): Promise<TelemedicinePolicy> => {
-  const response = await api.get("/telemedicine/policy");
+  const response = await api.get("/public/telemedicine/policy");
   const policy = mapTelemedicinePolicy(response.data?.data);
   if (!policy) {
     throw new Error("Failed to load telemedicine policy");
