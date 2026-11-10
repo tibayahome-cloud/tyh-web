@@ -22,7 +22,7 @@ import { TelemedicineServiceVisual } from "../../../shared/components/Telemedici
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
 import { useFastestFacility } from "../../../shared/hooks/useFastestFacility";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
-import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
+import { RemoteCareRegionNotice } from "../../../shared/components/RemoteCareRegionNotice";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -505,7 +505,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.service && (
           <div className="space-y-3">
-            {!user?.countryCode && <CountryRequiredBanner onComplete={handleClose} />}
+            {!user?.countryCode && <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />}
             {serviceId ? (
               servicesQuery.isLoading && <Loading />
             ) : (
@@ -655,7 +655,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
         {step === TM_STEP_INDEX.facility && (
           <div className="space-y-3">
             {!user?.countryCode ? (
-              <CountryRequiredBanner onComplete={handleClose} />
+              <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />
             ) : (
               <>
                 {facilitiesQuery.isLoading && <Loading />}

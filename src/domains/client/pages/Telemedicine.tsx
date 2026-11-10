@@ -6,7 +6,7 @@ import { Video, ChevronRight, Calendar as CalendarIcon, Clock as ClockIcon } fro
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
-import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
+import { RemoteCareRegionNotice } from "../../../shared/components/RemoteCareRegionNotice";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useBookingList } from "../../../shared/hooks/useBookings";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
@@ -106,7 +106,9 @@ const ClientTelemedicinePage = () => {
           </Button>
         </div>
 
-        {!user?.countryCode && <CountryRequiredBanner onComplete={() => navigate("/app/profile")} />}
+        {!user?.countryCode && (
+          <RemoteCareRegionNotice actionLabel="Update phone number" onAction={() => navigate("/app/profile")} />
+        )}
 
         <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
 
