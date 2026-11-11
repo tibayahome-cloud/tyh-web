@@ -10,7 +10,7 @@ import { PasswordField } from "../shared/components/PasswordField";
 import { PasswordHint } from "../shared/components/PasswordHint";
 import { Button } from "../shared/components/Button";
 import type { RegisterSchema } from "../shared/schemas/auth";
-import { registerSchema } from "../shared/schemas/auth";
+import { bookingRegisterSchema, registerSchema } from "../shared/schemas/auth";
 import { describePasswordSubmitError } from "../shared/utils/passwordErrors";
 import api from "../shared/libs/api";
 import { useAuth } from "../shared/hooks/useAuth";
@@ -31,6 +31,8 @@ const defaultValues: RegisterSchema = {
 export type SignUpFormProps = {
   /** What the submit button says. Defaults to the sign-up page's own wording. */
   submitLabel?: string;
+  /** Ask for a phone number rather than "a phone number or an email". The booking needs one; the sign-up page does not. */
+  requirePhone?: boolean;
   /** Runs once the account exists and the person is signed in. `phone` is the number in international form. */
   onSignedUp: (account: { phone: string; email: string }) => void;
   /** Runs when the account was made but signing in did not work, so the person can finish on a sign-in screen. */
@@ -51,7 +53,7 @@ const ACCOUNT_EXISTS_MESSAGE = /\b(phone|email)\b.*\balready\b.*\b(in use|regist
  * The sign-up fields and what happens on submit, shared by the sign-up page and the booking's details step: register,
  * then sign the person in at once. The caller decides where they go next.
  */
-export const SignUpForm = ({ submitLabel, onSignedUp, onSignInNeeded, onAccountExists }: SignUpFormProps) => {
+export const SignUpForm = ({ submitLabel, requirePhone = false, onSignedUp, onSignInNeeded, onAccountExists }: SignUpFormProps) => {
   const { t } = useTranslation();
   const { loginClientProvider } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export const SignUpForm = ({ submitLabel, onSignedUp, onSignInNeeded, onAccountE
     setFocus,
     formState: { isSubmitting, isSubmitted }
   } = useForm<RegisterSchema>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(requirePhone ? bookingRegisterSchema : registerSchema),
     // Validate as the person types, so the Create account button and the hint under the password stay truthful.
     mode: "onChange",
     defaultValues

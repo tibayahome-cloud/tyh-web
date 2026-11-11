@@ -50,41 +50,62 @@ const optionalPhone = z
       .regex(/^$|^\+?[0-9]{7,15}$/u, "Provide a valid phone")
   );
 
-export const registerSchema = z
-  .object({
-    fullName: z.string().min(1, "Full name is required"),
-    email: optionalEmail,
-    phone: optionalPhone,
-    password: newPasswordSchema,
-    acceptedTerms: z.boolean(),
-    acknowledgedPrivacy: z.boolean()
-  })
-  .superRefine((data, ctx) => {
-    if (!data.email && !data.phone) {
+const registerFields = z.object({
+  fullName: z.string().min(1, "Full name is required"),
+  email: optionalEmail,
+  phone: optionalPhone,
+  password: newPasswordSchema,
+  acceptedTerms: z.boolean(),
+  acknowledgedPrivacy: z.boolean()
+});
+
+const checkRegistration = (
+  data: z.infer<typeof registerFields>,
+  ctx: z.RefinementCtx,
+  { requirePhone }: { requirePhone: boolean }
+) => {
+  if (requirePhone) {
+    if (!data.phone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        // Reported on the phone field: the email field is folded away until the person asks for it.
         path: ["phone"],
-        message: "Enter a phone number or an email address"
+        message: "Enter your phone number. We need it to book your consultation."
       });
     }
+  } else if (!data.email && !data.phone) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      // Reported on the phone field: the email field is folded away until the person asks for it.
+      path: ["phone"],
+      message: "Enter a phone number or an email address"
+    });
+  }
 
-    if (!data.acceptedTerms) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["acceptedTerms"],
-        message: "You must agree to the Terms of Service"
-      });
-    }
+  if (!data.acceptedTerms) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["acceptedTerms"],
+      message: "You must agree to the Terms of Service"
+    });
+  }
 
-    if (!data.acknowledgedPrivacy) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["acknowledgedPrivacy"],
-        message: "You must acknowledge the Privacy Policy"
-      });
-    }
-  });
+  if (!data.acknowledgedPrivacy) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["acknowledgedPrivacy"],
+      message: "You must acknowledge the Privacy Policy"
+    });
+  }
+};
+
+export const registerSchema = registerFields.superRefine((data, ctx) => checkRegistration(data, ctx, { requirePhone: false }));
+
+// Making an account in the middle of a booking asks for a phone number, not "a phone number or an email". The country for a
+// remote consultation is read from the number on the account, so an account with only an email can sign in but can never
+// book, and the appointment texts go to it.
+export const bookingRegisterSchema = registerFields.superRefine((data, ctx) =>
+  checkRegistration(data, ctx, { requirePhone: true })
+);
 
 export const passwordResetSchema = z.object({
   email: z.string().email("Provide a valid email")

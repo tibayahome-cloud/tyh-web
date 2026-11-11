@@ -11,6 +11,8 @@ import userEvent from "@testing-library/user-event";
 import { AxiosError } from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../../shared/constants/contact";
+
 const { postMock, loginClientProviderMock, logoutMock } = vi.hoisted(() => ({
   postMock: vi.fn(),
   loginClientProviderMock: vi.fn(),
@@ -369,7 +371,7 @@ describe("signing in instead", () => {
   });
 
   it.each([["provider"], ["admin.ops"], ["admin.super"], ["admin"]])(
-    "signs a %s account straight out again and does not let it book",
+    "signs a %s account straight out again and takes the person to making a patient account",
     async (role) => {
       loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: [role] } });
       const user = userEvent.setup();
@@ -378,13 +380,44 @@ describe("signing in instead", () => {
 
       await fillSignIn(user);
 
-      expect(await screen.findByRole("alert")).toHaveTextContent(/staff account/i);
+      expect(await screen.findByRole("heading", { name: "Your details" })).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /That is a staff account, and staff accounts cannot be used to book a consultation\. A phone number can belong to only one account, so to book as a patient create a patient account with a different phone number\./
+        )
+      ).toBeInTheDocument();
       expect(logoutMock).toHaveBeenCalledTimes(1);
       expect(onReady).not.toHaveBeenCalled();
     }
   );
 
-  it("still tells the person it is a staff account when signing out fails", async () => {
+  it("treats a person who holds the patient role and an administrator role as staff too, whichever comes first", async () => {
+    loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client", "admin.ops"] } });
+    const user = userEvent.setup();
+    const { onReady } = renderStep();
+    await openSignIn(user);
+
+    await fillSignIn(user);
+
+    expect(await screen.findByRole("heading", { name: "Your details" })).toBeInTheDocument();
+    expect(screen.getByText(/staff account/i)).toBeInTheDocument();
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it("still lets an ordinary patient account through", async () => {
+    loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
+    const user = userEvent.setup();
+    const { onReady } = renderStep();
+    await openSignIn(user);
+
+    await fillSignIn(user);
+
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    expect(logoutMock).not.toHaveBeenCalled();
+  });
+
+  it("goes on to making a patient account even when signing the staff session out fails", async () => {
     loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["provider"] } });
     logoutMock.mockRejectedValue(new Error("offline"));
     const user = userEvent.setup();
@@ -393,7 +426,68 @@ describe("signing in instead", () => {
 
     await fillSignIn(user);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/staff account/i);
+    expect(await screen.findByRole("heading", { name: "Your details" })).toBeInTheDocument();
+    expect(screen.getByText(/staff account/i)).toBeInTheDocument();
     expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it("offers a way out for staff with no other number: the number to call", async () => {
+    loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["provider"] } });
+    const user = userEvent.setup();
+    renderStep();
+    await openSignIn(user);
+
+    await fillSignIn(user);
+
+    const call = await screen.findByRole("link", { name: COMPANY_PHONE_DISPLAY });
+    expect(call).toHaveAttribute("href", `tel:${COMPANY_PHONE}`);
+    expect(screen.getByText(/If you have no other number, call/)).toBeInTheDocument();
+  });
+
+  it("makes the patient account with a different phone number, leaving the staff number out of the new form", async () => {
+    loginClientProviderMock.mockResolvedValueOnce({ status: "authenticated", user: { roles: ["provider"] } });
+    const user = userEvent.setup();
+    const { onReady } = renderStep();
+    await openSignIn(user);
+    await fillSignIn(user);
+    await screen.findByRole("heading", { name: "Your details" });
+    expect(screen.getByLabelText(/^Phone/)).toHaveValue("");
+
+    loginClientProviderMock.mockResolvedValue(CLIENT_RESULT);
+    await fillSignUp(user, { phone: "0733 111 222" });
+
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0][1]).toMatchObject({ phone: "+254733111222" });
+  });
+
+  it("does not make an account without a phone number, and says why, instead of making one that can never book", async () => {
+    const user = userEvent.setup();
+    const { onReady } = renderStep();
+    await user.type(screen.getByLabelText(/^Full name/), "Dr Jane Client");
+    await user.click(screen.getByRole("button", { name: /add an email/i }));
+    await user.type(screen.getByLabelText(/^Email/), "jane.patient@example.com");
+    await user.type(screen.getByLabelText(/^Password/), PASSWORD);
+    for (const box of screen.getAllByRole("checkbox")) {
+      await user.click(box);
+    }
+
+    await user.click(screen.getByRole("button", { name: "Continue to payment" }));
+
+    expect(await screen.findByText("Enter your phone number. We need it to book your consultation.")).toBeInTheDocument();
+    expect(postMock).not.toHaveBeenCalled();
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it("drops the staff notice when the person goes back to signing in", async () => {
+    loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["provider"] } });
+    const user = userEvent.setup();
+    renderStep();
+    await openSignIn(user);
+    await fillSignIn(user);
+    await screen.findByRole("heading", { name: "Your details" });
+
+    await openSignIn(user);
+
+    expect(screen.queryByText(/staff account/i)).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { SignUpForm } from "../../../auth/SignUpForm";
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
-import { BookingSignInForm } from "./BookingSignInForm";
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
+import { BookingSignInForm, STAFF_ACCOUNT_MESSAGE } from "./BookingSignInForm";
 
 type BookingAccountStepProps = {
   /** Runs once the account exists (or the person has signed in) and the person is signed in. */
@@ -22,9 +23,10 @@ type BookingAccountStepProps = {
  */
 export const BookingAccountStep = ({ onReady, onBack, busy = false }: BookingAccountStepProps) => {
   const [mode, setMode] = useState<"create" | "signin">("create");
-  // Why the person was moved to signing in, when it was not their own choice: the account was made but signing in did not
-  // work ("ready"), or the number or email they gave already has one ("exists", with what they typed so it carries over).
-  const [handover, setHandover] = useState<{ reason: "ready" | "exists"; identifier: string } | null>(null);
+  // Why the person was moved to the other form, when it was not their own choice: the account was made but signing in did
+  // not work ("ready"), the number or email they gave already has one ("exists", with what they typed so it carries over), or
+  // the account they signed in to is a staff account and a patient account is needed instead ("staff").
+  const [handover, setHandover] = useState<{ reason: "ready" | "exists" | "staff"; identifier: string } | null>(null);
 
   if (busy) {
     // Loading announces itself, and a minimum height keeps the dialog from collapsing for the moment before payment.
@@ -61,6 +63,15 @@ export const BookingAccountStep = ({ onReady, onBack, busy = false }: BookingAcc
           Your account is ready. Sign in to continue.
         </p>
       )}
+      {handover?.reason === "staff" && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          {STAFF_ACCOUNT_MESSAGE} If you have no other number, call{" "}
+          <a href={`tel:${COMPANY_PHONE}`} className="font-semibold underline underline-offset-2">
+            {COMPANY_PHONE_DISPLAY}
+          </a>
+          .
+        </p>
+      )}
       {handover?.reason === "exists" && (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           {handover.identifier.includes("@") ? "That email" : "That number"} already has an account. Sign in to carry on with
@@ -71,6 +82,7 @@ export const BookingAccountStep = ({ onReady, onBack, busy = false }: BookingAcc
       {creating ? (
         <SignUpForm
           submitLabel="Continue to payment"
+          requirePhone
           onSignedUp={onReady}
           onSignInNeeded={() => {
             setHandover({ reason: "ready", identifier: "" });
@@ -82,7 +94,14 @@ export const BookingAccountStep = ({ onReady, onBack, busy = false }: BookingAcc
           }}
         />
       ) : (
-        <BookingSignInForm onSignedIn={onReady} defaultEmailOrPhone={handover?.identifier ?? ""} />
+        <BookingSignInForm
+          onSignedIn={onReady}
+          defaultEmailOrPhone={handover?.identifier ?? ""}
+          onStaffAccount={() => {
+            setHandover({ reason: "staff", identifier: "" });
+            setMode("create");
+          }}
+        />
       )}
 
       <div className="flex justify-start">
