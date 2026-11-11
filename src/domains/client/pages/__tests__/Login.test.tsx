@@ -268,6 +268,34 @@ describe("client sign-in page", () => {
       await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
     });
 
+    it.each([[["admin.ops", "provider"]], [["provider", "admin.ops"]]])(
+      "lands a facility admin who is also a provider (%j) in the provider area, without signing them out",
+      async (roles) => {
+        const user = userEvent.setup();
+        loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles } });
+        renderLogin();
+
+        await fillAndSubmit(user);
+
+        await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
+        expect(logoutMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([[["admin.ops", "client"]], [["client", "admin.ops"]]])(
+      "lands a facility admin who is also a patient (%j) in the patient area, without signing them out",
+      async (roles) => {
+        const user = userEvent.setup();
+        loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles } });
+        renderLogin();
+
+        await fillAndSubmit(user);
+
+        await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/app/home"));
+        expect(logoutMock).not.toHaveBeenCalled();
+      }
+    );
+
     it("signs a system admin out and sends them to their own sign-in instead", async () => {
       const user = userEvent.setup();
       loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["admin.super"] } });

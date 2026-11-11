@@ -60,6 +60,12 @@ export const TwoFactorPage = () => {
 
   const handleSuccessRedirect = (roles: string[] | undefined) => {
     const effectiveRoles = roles && roles.length ? roles : authRoles;
+    // Someone who holds several areas goes to the one their sign-in was for: the personal sign-in opens the provider area, a
+    // staff sign-in the admin area. The menu offers the other.
+    if (challenge?.origin !== "admin" && effectiveRoles?.includes(ROLE_PROVIDER)) {
+      navigate("/pro/home", { replace: true });
+      return;
+    }
     if (effectiveRoles?.some(isAdminPortalRole)) {
       navigate(adminPortalHome(effectiveRoles), { replace: true });
       return;
