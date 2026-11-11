@@ -1,33 +1,24 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Button } from "../../../shared/components/Button";
 import { TelemedicineRequestDialog } from "../../client/components/TelemedicineRequestDialog";
 
 /**
- * Where a visitor who is not signed in starts booking a remote consultation. The booking dialog opens at once: they
- * choose a consultation, a clinic and a time without an account, give their details only then, and pay. When the
- * booking is made they are taken to it. Closing the dialog leaves this page, with a button to open it again.
+ * Where a visitor who is not signed in books a remote consultation. The booking is the page itself, not a popup over it:
+ * there is nothing underneath to go back to, and a five-step task with a long catalogue, a sign-up and a payment needs the
+ * room, the scrolling and the address of a page. They choose a consultation, a clinic and a time without an account, give
+ * their details only then, and pay. When the booking is made they are taken to it.
  */
 export const BookTelemedicine = () => {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(true);
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-16 text-center sm:py-24">
-      <h1 className="text-3xl font-bold text-slate-950 sm:text-4xl">Talk to a doctor online</h1>
-      <p className="mx-auto mt-3 max-w-xl text-slate-600">
-        Choose the consultation you need, pick a time and pay with M-Pesa. You give your details only once you have
-        chosen a time.
-      </p>
-      <div className="mt-8">
-        <Button type="button" onClick={() => setOpen(true)}>
-          Choose a consultation
-        </Button>
-      </div>
+    // The same container as the site header, so the page lines up with the logo and the phone number above it. The header
+    // is fixed, so the first step starts below it.
+    <section className="container mx-auto px-4 pb-16 pt-4 sm:pt-8 md:px-6">
       <TelemedicineRequestDialog
-        open={open}
-        onClose={() => setOpen(false)}
+        layout="page"
+        open
+        onClose={() => navigate("/")}
         onCreated={(bookingId) => navigate(`/app/bookings/${bookingId}`)}
       />
     </section>

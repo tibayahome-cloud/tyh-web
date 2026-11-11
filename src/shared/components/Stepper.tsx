@@ -11,9 +11,12 @@ type StepperProps = {
   // On a phone, show "Step 2 of 4: Facility" and a thin progress bar instead of the whole list, which otherwise takes
   // about 40% of the screen before any choice is visible. From the sm breakpoint up the full list shows as before.
   compactOnMobile?: boolean;
+  // Titles only. For a page whose steps each say what to do in their own heading, the descriptions would repeat it, and in a
+  // narrow column they wrap onto several lines.
+  showDescriptions?: boolean;
 };
 
-export const Stepper = ({ steps, current, compactOnMobile = false }: StepperProps) => {
+export const Stepper = ({ steps, current, compactOnMobile = false, showDescriptions = true }: StepperProps) => {
   const position = Math.min(Math.max(current, 0), steps.length - 1);
 
   return (
@@ -47,7 +50,7 @@ export const Stepper = ({ steps, current, compactOnMobile = false }: StepperProp
               </span>
               <div>
                 <p className={classNames("text-sm font-semibold", active ? "text-tiba-blue" : "text-slate-700")}>{step.title}</p>
-                {step.description && <p className="text-xs text-slate-500">{step.description}</p>}
+                {showDescriptions && step.description && <p className="text-xs text-slate-500">{step.description}</p>}
               </div>
             </li>
           );
