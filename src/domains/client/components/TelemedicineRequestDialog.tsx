@@ -240,10 +240,13 @@ export const TelemedicineRequestDialog = ({
   const fastestFacility = useFastestFacility();
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
-  // The account made (or signed in to) during this booking supplies the M-Pesa number, unless the person typed their own.
+  // The M-Pesa number follows whoever is signed in, until the person types one of their own. It follows them back to blank
+  // too: a staff account that was signed in and out again during this booking must not leave its number on the pay screen of
+  // the patient account made next.
+  const phoneTypedRef = useRef(false);
   useEffect(() => {
-    if (user?.phone) {
-      setPhone((current) => current || (user.phone ?? ""));
+    if (!phoneTypedRef.current) {
+      setPhone(user?.phone ?? "");
     }
   }, [user?.phone]);
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
@@ -1137,7 +1140,10 @@ export const TelemedicineRequestDialog = ({
                   label="M-Pesa phone number"
                   type="tel"
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  onChange={(event) => {
+                    phoneTypedRef.current = true;
+                    setPhone(event.target.value);
+                  }}
                   onBlur={() => setPhoneTouched(true)}
                   placeholder="+254 700 000000"
                   error={phoneError ?? undefined}

@@ -19,15 +19,28 @@ type BookingSignInFormProps = {
   onSignedIn: () => void;
   /** The number or email to start with, when the person has just typed it on the sign-up form. */
   defaultEmailOrPhone?: string;
+  /** Runs when the account was a staff account. It has been signed out again by then, so the caller can take the person on to making a patient account. */
+  onStaffAccount: () => void;
 };
 
 const defaultValues: LoginSchema = { emailOrPhone: "", password: "", remember: true };
+
+// Staff and patients are separate accounts: a phone number belongs to one account, and the platform does not let a provider
+// book as a patient at all (a provider could pay for a slot and then be assigned to it) or an administrator book outside
+// their own facility. So a staff member who needs care makes a patient account of their own, and it needs its own phone
+// number, because the country for a remote consultation is read from the number on the account.
+export const STAFF_ACCOUNT_MESSAGE =
+  "That is a staff account, and staff accounts cannot be used to book a consultation. A phone number can belong to only one account, so to book as a patient create a patient account with a different phone number.";
+
+// Every role counts, not only the first: a person can hold an administrator role and the patient role together, and the
+// booking would still be refused for the administrator side of them.
+const isStaffRole = (role: string) => role === ROLE_PROVIDER || isFacilityAdminRole(role) || isSystemAdminRole(role);
 
 /**
  * Signing in without leaving the booking, for someone who already has an account and reached the details step. It
  * keeps their chosen consultation, clinic and time exactly where they are, which a trip to the sign-in page would not.
  */
-export const BookingSignInForm = ({ onSignedIn, defaultEmailOrPhone = "" }: BookingSignInFormProps) => {
+export const BookingSignInForm = ({ onSignedIn, defaultEmailOrPhone = "", onStaffAccount }: BookingSignInFormProps) => {
   const { t } = useTranslation();
   const { loginClientProvider, logout } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -60,15 +73,14 @@ export const BookingSignInForm = ({ onSignedIn, defaultEmailOrPhone = "" }: Book
         setError("This account asks for a verification code. Sign in from the sign-in page, then come back to book.");
         return;
       }
-      const role = result.user?.roles?.[0];
-      if (role === ROLE_PROVIDER || isFacilityAdminRole(role) || isSystemAdminRole(role)) {
-        // A booking is made by a client. Staff sign in from their own pages.
+      if ((result.user?.roles ?? []).some(isStaffRole)) {
+        // A booking is made by a patient. Do not leave a staff session open on a public page.
         try {
           await logout();
         } catch {
-          // The message below is what matters; signing out is best effort.
+          // What matters is where the person goes next; signing out is best effort.
         }
-        setError("That is a staff account. Staff sign in from their own sign-in page.");
+        onStaffAccount();
         return;
       }
       onSignedIn();
