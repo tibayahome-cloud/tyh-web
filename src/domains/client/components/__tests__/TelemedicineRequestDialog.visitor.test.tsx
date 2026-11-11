@@ -131,11 +131,15 @@ beforeEach(() => {
 
 const renderDialog = () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const tree = () => (
     <QueryClientProvider client={client}>
       <TelemedicineRequestDialog open onClose={vi.fn()} serviceId="service-1" />
     </QueryClientProvider>
   );
+  const view = render(tree());
+  // The mocked sign-in state is read on every render, so a re-render is how a change of who is signed in reaches the dialog.
+  // A new element each time: React skips a render for the same element object.
+  return { ...view, refresh: () => view.rerender(tree()) };
 };
 
 const stepTitles = async () => {
@@ -213,6 +217,40 @@ describe("booking without an account", () => {
     // The hint sits inside the label, so the label's text is longer than its name.
     const phone = await screen.findByLabelText(/M-Pesa phone number/);
     expect(phone).toHaveValue(NEW_ACCOUNT.phone);
+  });
+
+  it("puts the new account's number on the pay screen, not one left by a staff account that was signed in and out", async () => {
+    const STAFF: TestUser = { phone: "+254799000111", countryCode: "KE" };
+    const user = userEvent.setup();
+    const view = renderDialog();
+    await chooseClinicAndTime(user);
+    await screen.findByText("account step");
+
+    // The person signs in with a staff account, which is signed out again at once.
+    auth.user = STAFF;
+    view.refresh();
+    auth.user = null;
+    view.refresh();
+    await user.click(await screen.findByRole("button", { name: "Account made" }));
+
+    const phone = await screen.findByLabelText(/M-Pesa phone number/);
+    expect(phone).toHaveValue(NEW_ACCOUNT.phone);
+    expect(phone).not.toHaveValue(STAFF.phone);
+  });
+
+  it("keeps a number the person typed on the pay screen, whoever signs in or out", async () => {
+    const user = userEvent.setup();
+    const view = renderDialog();
+    await chooseClinicAndTime(user);
+    await user.click(await screen.findByRole("button", { name: "Account made" }));
+    const phone = await screen.findByLabelText(/M-Pesa phone number/);
+    await user.clear(phone);
+    await user.type(phone, "+254733555666");
+
+    auth.user = { phone: "+254722000333", countryCode: "KE" };
+    view.refresh();
+
+    expect(screen.getByLabelText(/M-Pesa phone number/)).toHaveValue("+254733555666");
   });
 
   it("says the time is being held while the hold is made", async () => {
