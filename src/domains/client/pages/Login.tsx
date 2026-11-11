@@ -14,8 +14,7 @@ import type { LoginSchema } from "../../../shared/schemas/auth";
 import { loginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import type { AuthUser } from "../../../shared/schemas/user";
-import { ROLE_PROVIDER } from "../../../shared/rbac/roles";
-import { isFacilityAdminRole, isSystemAdminRole } from "../../../shared/rbac/portalRoles";
+import { personalSignInDestination } from "../../../shared/rbac/portalRoles";
 import { AuthPortalSwitch } from "../../../shared/components/AuthPortalSwitch";
 import { returnPathFrom, withReturnPath } from "../../../shared/utils/returnPath";
 import {
@@ -41,8 +40,10 @@ const ClientLoginPage = () => {
   const [redirecting, setRedirecting] = useState(false);
 
   const handlePostAuth = useCallback(async (authUser: AuthUser | null) => {
-    const primaryRole = authUser?.roles?.[0];
-    if (isFacilityAdminRole(primaryRole) || isSystemAdminRole(primaryRole)) {
+    // What the account holds decides, not which role the API happens to list first: a person can be an administrator and a
+    // provider at once.
+    const destination = personalSignInDestination(authUser?.roles);
+    if (destination.kind === "staff") {
       setRedirecting(true);
       try {
         await logout();
@@ -51,7 +52,7 @@ const ClientLoginPage = () => {
       }
       // Each admin audience is sent to its own sign-in; a facility admin is never pointed at the
       // system administration page.
-      if (isFacilityAdminRole(primaryRole)) {
+      if (destination.audience === "facility") {
         navigate("/facility/login", { replace: true, state: { redirected: "facility-role" } });
       } else {
         navigate("/admin/login", { replace: true, state: { redirected: "admin-role" } });
@@ -60,7 +61,7 @@ const ClientLoginPage = () => {
     }
 
     setRedirecting(true);
-    if (primaryRole === ROLE_PROVIDER) {
+    if (destination.kind === "provider") {
       navigate("/pro/home", { replace: true });
       return;
     }
