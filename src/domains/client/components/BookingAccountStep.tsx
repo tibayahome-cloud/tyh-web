@@ -36,7 +36,7 @@ export const BookingAccountStep = ({ onReady, onBack, busy = false }: BookingAcc
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-base font-semibold text-slate-900">{creating ? "Your details" : "Sign in to continue"}</h3>
+        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">{creating ? "Your details" : "Sign in to continue"}</h2>
         <p className="mt-1 text-sm text-slate-600">
           {creating
             ? "The last step before you pay. We use these to confirm your booking and to text you about your appointment."
