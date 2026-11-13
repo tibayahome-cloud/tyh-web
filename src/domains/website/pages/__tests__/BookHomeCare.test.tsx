@@ -44,8 +44,8 @@ vi.mock("../../../client/components/PlacePicker", () => ({
 import { BookHomeCare } from "../BookHomeCare";
 
 const SERVICES = [
-  { id: "svc-wound", name: "Wound dressing", description: "Dressing at home", base_price_cents: 100000, default_estimate_minutes: 45, category: { id: "c-nurse", name: "Nursing" } },
-  { id: "svc-physio", name: "Physiotherapy", description: "Exercises at home", base_price_cents: 200000, default_estimate_minutes: 60, category: { id: "c-rehab", name: "Rehabilitation" } }
+  { id: "svc-wound", key: "wound_care_home", name: "Wound dressing", description: "Dressing at home", base_price_cents: 100000, default_estimate_minutes: 45, category: { id: "c-nurse", name: "Nursing" } },
+  { id: "svc-physio", key: "physiotherapy_home", name: "Physiotherapy", description: "Exercises at home", base_price_cents: 200000, default_estimate_minutes: 60, category: { id: "c-rehab", name: "Rehabilitation" } }
 ];
 const CLINIC = { id: "fac-1", name: "Kilimani Clinic", distance_km: 3.8, price_cents: 250000, currency: "KES", estimate_duration_minutes: 45 };
 
@@ -92,6 +92,20 @@ describe("choosing the care", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Book home care" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Wound dressing/ })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows a picture on each service card and beside the chosen service on the later steps", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const card = await screen.findByRole("button", { name: /Wound dressing/ });
+
+    expect(card.querySelector("img")).toHaveAttribute("src");
+    expect(card.querySelector("img")).toHaveAttribute("alt", "");
+
+    await user.click(card);
+    await screen.findByText("We can reach you.");
+    const chosen = screen.getAllByText("Wound dressing")[0].parentElement as HTMLElement;
+    expect(chosen.querySelector("img")).toHaveAttribute("src");
   });
 
   it("narrows the list by search and by kind of care", async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Stepper } from "../../../shared/components/Stepper";
+import { careServiceImage } from "../../../shared/utils/careServiceImage";
 import type { HomeCareClinic, HomeCareRequestResult, HomeCareService } from "../../../shared/libs/homeCarePublic";
 import { DetailsStep } from "../components/homeCare/DetailsStep";
 import { DoneStep } from "../components/homeCare/DoneStep";
@@ -52,7 +53,8 @@ export const BookHomeCare = () => {
         )}
 
         {!done && step > 0 && service && (
-          <p className="mb-4 flex flex-wrap items-center gap-x-2 text-sm text-slate-600">
+          <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+            <img src={careServiceImage(service)} alt="" className="h-12 w-20 shrink-0 rounded-lg object-cover" />
             <span className="font-semibold text-slate-900">{service.name}</span>
             <button type="button" className="min-h-[44px] font-semibold text-tiba-blue underline underline-offset-2" onClick={() => setStep(0)}>
               Change
