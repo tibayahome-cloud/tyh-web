@@ -26,7 +26,7 @@ vi.mock("../../../../shared/libs/homeCarePublic", async (importOriginal) => ({
 
 vi.mock("../../../../shared/utils/geocoding", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../../shared/utils/geocoding")>()),
-  reverseGeocode: vi.fn(async () => "Argwings Kodhek Road, Kilimani, Nairobi")
+  describePlace: vi.fn(async () => ({ address: "Argwings Kodhek Road, Kilimani, Nairobi", plusCode: "7GRP+J3 Nairobi" }))
 }));
 
 // The real picker draws a Google map and searches Google Places; here it only shows the chosen place and lets a test change it.

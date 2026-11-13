@@ -9,9 +9,9 @@ import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../../shared/constan
 import { useDeviceLocation } from "../../../../shared/hooks/useDeviceLocation";
 import { fetchHomeCareCoverage, type HomeCareClinic, type HomeCareService } from "../../../../shared/libs/homeCarePublic";
 import { classifyApiError } from "../../../../shared/utils/errors";
-import { CURRENT_PLACE, reverseGeocode, UNNAMED_PLACE, type Place } from "../../../../shared/utils/geocoding";
-import { PlacePicker } from "../../../client/components/PlacePicker";
+import { CURRENT_PLACE, describePlace, UNNAMED_PLACE, type Place } from "../../../../shared/utils/geocoding";
 import { formatKm, paidAfterLine } from "./format";
+import { PinPicker } from "./PinPicker";
 import { StepHeading } from "./ServiceStep";
 
 export type VisitPlace = { place: Place | null; landmark: string };
@@ -23,9 +23,6 @@ type PlaceStepProps = {
   onContinue: (clinics: HomeCareClinic[]) => void;
 };
 
-// A reading worse than this is worth checking by searching for the exact address.
-const GOOD_ENOUGH_M = 300;
-
 /** A place with no real name ("Pinned location") cannot guide a carer on its own: a landmark is then needed. */
 const isUnnamed = (place: Place | null) => !place || place.name === UNNAMED_PLACE || place.name === CURRENT_PLACE;
 
@@ -34,14 +31,17 @@ export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepPro
   const latest = useRef(value);
   latest.current = value;
 
-  // The first reading from the device becomes the place, named in words. Later changes are the person's own.
+  // Every new reading from the device (the first one on arrival, and each press of "Use my current location") becomes the
+  // place, named in full. The person then moves the map from there.
+  const applied = useRef<unknown>(null);
   useEffect(() => {
-    if (device.status !== "found" || !device.coords || latest.current.place !== null) return;
+    if (device.status !== "found" || !device.coords || applied.current === device.coords) return;
+    applied.current = device.coords;
     const coords = device.coords;
     let cancelled = false;
-    void reverseGeocode(coords).then((name) => {
-      if (cancelled || latest.current.place !== null) return;
-      onChange({ ...latest.current, place: { name: name ?? CURRENT_PLACE, coords } });
+    void describePlace(coords).then((described) => {
+      if (cancelled) return;
+      onChange({ ...latest.current, place: { name: described?.address ?? CURRENT_PLACE, coords, plusCode: described?.plusCode ?? null } });
     });
     return () => {
       cancelled = true;
@@ -61,11 +61,10 @@ export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepPro
   const covered = Boolean(coverage.data?.covered && nearest);
   const needsLandmark = isUnnamed(value.place) && value.landmark.trim().length < 3;
   const locating = device.status === "asking" && value.place === null;
-  const poorReading = device.accuracyM !== null && device.accuracyM > GOOD_ENOUGH_M && value.place !== null;
 
   return (
     <div className="space-y-4">
-      <StepHeading hint="We read your location, like a ride app. Change it if it is not the right place.">Where should we come?</StepHeading>
+      <StepHeading hint="We read your location, like a ride app. Move the map until the pin is on your gate.">Where should we come?</StepHeading>
 
       {locating && (
         <p role="status" aria-live="polite" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
@@ -81,11 +80,11 @@ export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepPro
         </p>
       )}
 
-      <PlacePicker key={value.place ? "chosen" : "none"} value={value.place} onChange={(place) => onChange({ ...value, place })} />
-
-      {poorReading && (
-        <p className="text-sm text-amber-800">Your location may be off by about {device.accuracyM} metres. Use Change to search for the exact address.</p>
-      )}
+      <PinPicker
+        value={value.place}
+        onChange={(place) => onChange({ ...latest.current, place })}
+        device={{ coords: device.coords, accuracyM: device.accuracyM, locating: device.status === "asking", ask: device.ask }}
+      />
 
       {value.place && (
         <Input
