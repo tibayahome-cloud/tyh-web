@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 type TurnstileApi = {
   render: (element: HTMLElement, options: Record<string, unknown>) => string;
@@ -40,6 +40,7 @@ export type TurnstileHandle = {
 export const TurnstileCheck = forwardRef<TurnstileHandle, { onToken: (token: string | null) => void }>(({ onToken }, ref) => {
   const holder = useRef<HTMLDivElement>(null);
   const widget = useRef<{ api: TurnstileApi; id: string } | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -63,7 +64,10 @@ export const TurnstileCheck = forwardRef<TurnstileHandle, { onToken: (token: str
         });
         widget.current = { api: turnstile, id };
       })
-      .catch(() => onToken(null));
+      .catch(() => {
+        setUnavailable(true);
+        onToken(null);
+      });
     return () => {
       cancelled = true;
       if (widget.current) {
@@ -74,6 +78,16 @@ export const TurnstileCheck = forwardRef<TurnstileHandle, { onToken: (token: str
   }, [onToken]);
 
   if (!siteKey()) return null;
-  return <div ref={holder} className="min-h-[65px]" aria-label="Check that you are a person" />;
+  return (
+    <>
+      <div ref={holder} className="min-h-[65px]" aria-label="Check that you are a person" />
+      {unavailable && (
+        <p role="alert" className="text-sm text-amber-800">
+          The check could not load, so we cannot text a code yet. Check your connection or switch off any ad blocker, then reload
+          the page. You can also call us to book.
+        </p>
+      )}
+    </>
+  );
 });
 TurnstileCheck.displayName = "TurnstileCheck";

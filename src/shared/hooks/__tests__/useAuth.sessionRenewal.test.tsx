@@ -50,6 +50,7 @@ describe("session renewal", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mockPost.mockReset();
     localStorage.clear();
     mockGet.mockResolvedValue({
       data: { id: "1", attributes: { full_name: "Jane Client", roles: ["client"], permissions: [] } }
@@ -140,6 +141,22 @@ describe("session renewal", () => {
     await settle(30_000);
     expect(result.current.accessToken).toBe(renewed);
     expect(result.current.refreshToken).toBe("refresh-2");
+  });
+
+  it("does not renew again 30 seconds later if the person signed out in the meantime", async () => {
+    storeTokens(tokenExpiringIn(5 * 60), "refresh-1");
+    mockPost.mockRejectedValueOnce({ isAxiosError: true, code: "ERR_NETWORK", message: "Network Error" });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await settle(5 * MINUTE);
+    const callsBefore = mockPost.mock.calls.filter(([url]) => url === "/auth/refresh").length;
+    await act(async () => {
+      await result.current.logout();
+    });
+    await settle(31_000);
+
+    expect(mockPost.mock.calls.filter(([url]) => url === "/auth/refresh").length).toBe(callsBefore);
+    expect(result.current.sessionExpired).toBe(false);
   });
 
   it("takes the new tokens another tab already stored instead of signing out when its own renewal is refused", async () => {
