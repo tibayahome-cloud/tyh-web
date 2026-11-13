@@ -1,6 +1,11 @@
 
 import { Link, useNavigate } from "react-router-dom";
-import { PUBLIC_TELEMEDICINE_BOOKING_PATH, TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
+import {
+    CLIENT_HOME_CARE_PATH,
+    PUBLIC_HOME_CARE_BOOKING_PATH,
+    PUBLIC_TELEMEDICINE_BOOKING_PATH,
+    TELEMEDICINE_BOOKING_PATH
+} from "../../../shared/utils/returnPath";
 import {
     ArrowRight,
     ShieldCheck,
@@ -53,11 +58,8 @@ export const Home = () => {
     const navigate = useNavigate();
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        if (isAuthenticated) {
-            navigate("/app/home");
-        } else {
-            navigate("/signup");
-        }
+        // Home care is booked where the visitor lands without an account; a signed-in client books it inside the app.
+        navigate(isAuthenticated ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH);
     };
 
     // Remote consultations are booked in the one booking dialog, which owns the catalogue, the

@@ -55,9 +55,13 @@ export const reverseGeocode = async (coords: Coords, signal?: AbortSignal): Prom
   const google = googleGeocoder();
   try {
     if (google) {
-      const { results } = await google.geocode({ location: coords });
-      const first = results?.[0];
-      return first ? shortPlaceName(googleParts(first.address_components), first.formatted_address) : null;
+      try {
+        const { results } = await google.geocode({ location: coords });
+        const first = results?.[0];
+        if (first) return shortPlaceName(googleParts(first.address_components), first.formatted_address);
+      } catch {
+        // Google refused or failed (a key that does not allow this site, no quota): ask OpenStreetMap instead.
+      }
     }
     const response = await fetch(
       `${NOMINATIM}/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat=${coords.lat}&lon=${coords.lng}`,
@@ -146,7 +150,14 @@ export const searchPlaces = async (query: string, signal?: AbortSignal): Promise
   if (text.length < 3) return [];
   const places = placesApi();
   try {
-    if (places) return await googleSuggestions(text, places);
+    if (places) {
+      try {
+        const suggestions = await googleSuggestions(text, places);
+        if (suggestions.length > 0) return suggestions;
+      } catch {
+        // Google refused or failed (billing off, quota): fall through to OpenStreetMap.
+      }
+    }
     const response = await fetch(
       `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=ke&accept-language=en&q=${encodeURIComponent(text)}`,
       { signal }

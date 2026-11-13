@@ -11,6 +11,7 @@ const Home = lazyWithRetry(() => import("./pages/Home").then((module) => ({ defa
 const BookTelemedicine = lazyWithRetry(() =>
     import("./pages/BookTelemedicine").then((module) => ({ default: module.BookTelemedicine }))
 );
+const BookHomeCare = lazyWithRetry(() => import("./pages/BookHomeCare").then((module) => ({ default: module.BookHomeCare })));
 // Legal & Extra
 const Privacy = lazyWithRetry(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Privacy })));
 const Terms = lazyWithRetry(() => import("./pages/legal/SimplePages").then((module) => ({ default: module.Terms })));
@@ -40,6 +41,11 @@ export const websiteRoutes: RouteObject[] = [
                 // Booking a remote consultation needs no account to start: the booking asks for details after the time.
                 path: "book/telemedicine",
                 element: <BookTelemedicine />,
+            },
+            {
+                // Asking for a home visit needs no account either: a texted code checks the phone number.
+                path: "book/home-care",
+                element: <BookHomeCare />,
             },
             {
                 path: "privacy",
