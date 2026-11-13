@@ -19,6 +19,8 @@ type AuthHandlers = {
   refresh: () => Promise<string | null>;
   clear: () => void;
   onUnauthorized?: () => void;
+  /** True when the last renewal failed for a reason that says nothing about the session (no network, a timeout, a server error). */
+  sessionKept?: () => boolean;
 };
 
 interface RetryConfig extends AxiosRequestConfig {
@@ -98,8 +100,12 @@ api.interceptors.response.use(
         return api(retryConfig);
       }
 
-      handlers.clear();
-      handlers.onUnauthorized?.();
+      // A renewal that could not be made (no network, a timeout, a server error) says nothing about the session: the person is
+      // still signed in, so fail only this request. A refusal has already ended the session inside the renewal.
+      if (!handlers.sessionKept?.()) {
+        handlers.clear();
+        handlers.onUnauthorized?.();
+      }
     }
 
     // Every screen shows `error.message`, which for axios is "Request failed with status code 400".

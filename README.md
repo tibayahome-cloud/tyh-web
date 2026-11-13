@@ -26,7 +26,8 @@ Optional keys (public values, safe in the build):
 # Google Maps, for the place map on the home care page and the facility screens.
 VITE_GOOGLE_MAPS_API_KEY=
 # Cloudflare Turnstile site key, for the "are you a person" check before a home care code is texted. Leave empty for no
-# check. Turn it on only together with BOT_CHECK_SECRET on the API, or the API will not ask for the token.
+# check. Turn it on only together with BOT_CHECK_SECRET on the API, or the API will not ask for the token. It is read
+# when the site is built: rebuild and redeploy after changing it.
 VITE_TURNSTILE_SITE_KEY=
 ```
 

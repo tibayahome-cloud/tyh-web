@@ -342,6 +342,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const refreshInFlight = useRef<Promise<string | null> | null>(null);
+  // Set when a renewal failed for a reason that does not end the session (see the API client), cleared at the start of the next.
+  const renewalKeptSession = useRef(false);
   const tokensRef = useRef<AuthTokens>(tokens);
   const rememberRef = useRef<boolean>(false);
   const accessExpiryRef = useRef<number | null>(decodeTokenExpiry(tokens.accessToken));
@@ -463,6 +465,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     if (refreshInFlight.current) {
       return refreshInFlight.current;
     }
+    renewalKeptSession.current = false;
 
     const refreshToken = tokensRef.current.refreshToken;
     if (!refreshToken || isRefreshExpired()) {
@@ -501,10 +504,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           clearTokens(true);
           return null;
         }
+        renewalKeptSession.current = true;
         if (typeof window !== "undefined") {
           clearExpiryTimer();
           expiryTimerRef.current = window.setTimeout(() => {
-            void refreshRef.current();
+            // Only if this is still the session that failed to renew: signing out meanwhile must not bring "session expired".
+            if (tokensRef.current.refreshToken === refreshToken) void refreshRef.current();
           }, RENEWAL_RETRY_MS);
         }
         return null;
@@ -539,6 +544,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         return tokensRef.current.refreshToken;
       },
       refresh: performRefresh,
+      sessionKept: () => renewalKeptSession.current,
       clear: () => clearTokens(true),
       onUnauthorized: () => setSessionExpired(true)
     });
