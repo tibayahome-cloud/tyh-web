@@ -40,6 +40,23 @@ describe("useMapFailed", () => {
     expect(result.current).toBe(true);
   });
 
+  it("turns true when Google shows its 'can't load Google Maps correctly' box over the map", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useMapFailed(true));
+    const map = document.createElement("div");
+    map.className = "gm-style";
+    const box = document.createElement("div");
+    box.textContent = "This page can't load Google Maps correctly.";
+    map.appendChild(box);
+    document.body.appendChild(map);
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(result.current).toBe(true);
+  });
+
   it("turns true when no map has been drawn after ten seconds, but not while nothing is being watched", () => {
     vi.useFakeTimers();
     const watching = renderHook(() => useMapFailed(true));

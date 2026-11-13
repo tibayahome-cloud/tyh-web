@@ -26,7 +26,12 @@ export const useMapFailed = (watching: boolean): boolean => {
     const timer = window.setInterval(() => {
       // Google draws its own error panel inside the map when it refuses the key; a map with no drawing at all after ten
       // seconds is also treated as failed.
-      const refused = document.querySelector(".gm-err-container, .gm-err-title");
+      const refused =
+        document.querySelector(".gm-err-container, .gm-err-title, .dismissButton") ||
+        // Google's own box over a map it will not serve properly: "This page can't load Google Maps correctly."
+        Array.from(document.querySelectorAll(".gm-style div")).some(
+          (el) => el.children.length < 6 && /can.t load Google Maps correctly/i.test(el.textContent ?? "")
+        );
       const notDrawn = Date.now() - startedAt > 10000 && !document.querySelector(".gm-style");
       if (refused || notDrawn) setFailed(true);
     }, 500);
