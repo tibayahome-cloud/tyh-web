@@ -7,6 +7,7 @@ import { Input } from "../../../../shared/components/Input";
 import { Skeleton } from "../../../../shared/components/Skeleton";
 import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../../shared/constants/contact";
 import { fetchHomeCareServices, type HomeCareService } from "../../../../shared/libs/homeCarePublic";
+import { careServiceImage } from "../../../../shared/utils/careServiceImage";
 import { classifyApiError } from "../../../../shared/utils/errors";
 
 export const StepHeading = ({ children, hint }: { children: string; hint?: string }) => (
@@ -78,7 +79,7 @@ export const ServiceStep = ({ onChoose }: { onChoose: (service: HomeCareService)
             name="search-care"
             type="search"
             aria-label="Search care"
-            placeholder="Search, for example wound dressing"
+            placeholder="Search care"
             icon={<Search className="h-4 w-4 text-slate-400" aria-hidden />}
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -113,11 +114,21 @@ export const ServiceStep = ({ onChoose }: { onChoose: (service: HomeCareService)
                   <button
                     type="button"
                     onClick={() => onChoose(service)}
-                    className="flex min-h-[96px] w-full flex-col items-start gap-1 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
+                    className="flex h-full min-h-[96px] w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
                   >
-                    <span className="text-base font-semibold text-slate-900">{service.name}</span>
-                    {service.description && <span className="line-clamp-2 text-sm text-slate-600">{service.description}</span>}
-                    <span className="mt-auto text-xs text-slate-500">About {service.default_estimate_minutes} minutes</span>
+                    {/* The picture made for this service, or the closest stock photo. It is decoration: the name says it. */}
+                    <img
+                      src={careServiceImage(service)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="aspect-[16/9] w-full object-cover"
+                    />
+                    <span className="flex flex-1 flex-col gap-1 p-4">
+                      <span className="text-base font-semibold text-slate-900">{service.name}</span>
+                      {service.description && <span className="line-clamp-2 text-sm text-slate-600">{service.description}</span>}
+                      <span className="mt-auto pt-1 text-xs text-slate-500">About {service.default_estimate_minutes} minutes</span>
+                    </span>
                   </button>
                 </li>
               ))}

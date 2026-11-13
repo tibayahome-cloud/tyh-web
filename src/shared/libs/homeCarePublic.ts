@@ -9,6 +9,8 @@ import { api } from "./api";
 
 export type HomeCareService = {
   id: string;
+  /** The catalogue key; a photo named after it is used automatically (see src/assets/images/services/README.md). */
+  key: string;
   name: string;
   description?: string | null;
   base_price_cents: number;
@@ -53,7 +55,7 @@ type Envelope<T> = { data: T };
 export const fetchHomeCareServices = async (): Promise<HomeCareService[]> => {
   const response = await api.get<Envelope<HomeCareService[]>>("/services", {
     params: {
-      fields: "id,name,description,base_price_cents,default_estimate_minutes",
+      fields: "id,key,name,description,base_price_cents,default_estimate_minutes",
       include: "category:id,name",
       "filter[active]": "true",
       "filter[has_active_offering]": "true",
