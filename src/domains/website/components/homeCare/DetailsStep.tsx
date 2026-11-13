@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "../../../../shared/components/Button";
@@ -13,7 +13,7 @@ import {
   type HomeCareRequestResult
 } from "../../../../shared/libs/homeCarePublic";
 import { getApiError } from "../../../../shared/utils/errors";
-import { botCheckConfigured, TurnstileCheck } from "./TurnstileCheck";
+import { isBotCheckOn, TurnstileCheck, type TurnstileHandle } from "./TurnstileCheck";
 import { StepHeading } from "./ServiceStep";
 
 type DetailsStepProps = {
@@ -36,6 +36,8 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
   const [busy, setBusy] = useState<"code" | "request" | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  const check = useRef<TurnstileHandle>(null);
+  const botCheckOn = isBotCheckOn();
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -45,7 +47,7 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
 
   const onToken = useCallback((token: string | null) => setBotToken(token), []);
 
-  const detailsOk = fullName.trim().length > 1 && phone.replace(/\D/g, "").length >= 9 && agreed && (!botCheckConfigured || botToken !== null);
+  const detailsOk = fullName.trim().length > 1 && phone.replace(/\D/g, "").length >= 9 && agreed && (!botCheckOn || botToken !== null);
 
   const explain = (error: unknown): Problem => {
     const reason = homeCareErrorCode(error);
@@ -79,6 +81,8 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
       if (wait && wait <= 600) setResendIn(wait);
     } finally {
       setBusy(null);
+      // The token works once, used or refused: the next "send" needs a fresh check.
+      check.current?.reset();
     }
   };
 
@@ -102,7 +106,7 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
       onDone(result, phone.trim());
     } catch (error) {
       const reason = homeCareErrorCode(error);
-      setProblem(explain(error));
+      setProblem(reason === "sign_in" ? { message: getApiError(error, "This number already has an account."), signIn: true } : explain(error));
       if (reason === "code_expired") {
         setCodeSent(false);
         setCode("");
@@ -161,7 +165,7 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
         </label>
       </div>
 
-      {!codeSent && <TurnstileCheck onToken={onToken} />}
+      <TurnstileCheck ref={check} onToken={onToken} />
 
       {problem && (
         <div role="alert" className="rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm text-danger-600">
@@ -180,6 +184,12 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
               <Link className="font-semibold underline underline-offset-2" to="/login">
                 Sign in
               </Link>
+              {" "}
+              or call us on{" "}
+              <a className="font-semibold underline underline-offset-2" href={`tel:${COMPANY_PHONE}`}>
+                {COMPANY_PHONE_DISPLAY}
+              </a>{" "}
+              if you cannot.
             </p>
           )}
         </div>
@@ -205,7 +215,13 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
           <Button type="button" size="lg" fullWidth disabled={code.length !== 6} loading={busy === "request"} onClick={() => void sendRequest()}>
             Request my visit
           </Button>
-          <Button type="button" variant="ghost" fullWidth disabled={resendIn > 0 || busy !== null} onClick={() => void askForCode()}>
+          <Button
+            type="button"
+            variant="ghost"
+            fullWidth
+            disabled={resendIn > 0 || busy !== null || (botCheckOn && botToken === null)}
+            onClick={() => void askForCode()}
+          >
             {resendIn > 0 ? `Send a new code in ${resendIn} s` : "Send a new code"}
           </Button>
         </div>
