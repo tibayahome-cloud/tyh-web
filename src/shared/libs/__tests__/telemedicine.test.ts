@@ -121,7 +121,7 @@ describe("remote facility discovery", () => {
 
     const result = await discoverRemoteFacilities("service-1", "KE");
 
-    expect(mockGet).toHaveBeenCalledWith("/facilities/discover-remote", {
+    expect(mockGet).toHaveBeenCalledWith("/public/telemedicine/facilities", {
       params: { service_id: "service-1", country_code: "KE" }
     });
     expect(result).toHaveLength(1);
@@ -135,7 +135,7 @@ describe("remote facility discovery", () => {
 
     const result = await discoverRemoteFacilities("service-1", undefined, { ranking: "earliest_slot" });
 
-    expect(mockGet).toHaveBeenCalledWith("/facilities/discover-remote", {
+    expect(mockGet).toHaveBeenCalledWith("/public/telemedicine/facilities", {
       params: { service_id: "service-1", ranking: "earliest_slot" }
     });
     expect(result[0]).toMatchObject({ earliestAvailableAt: "2026-10-01T06:00:00Z", availableSlotCount: 4 });

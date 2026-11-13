@@ -1,5 +1,7 @@
 
+import { Link } from "react-router-dom";
 import { Check, Heart, Shield, Clock, Users, Star } from "lucide-react";
+import { PUBLIC_HOME_CARE_BOOKING_PATH } from "../../../shared/utils/returnPath";
 import aboutImage from "../../../assets/images/about-story.png";
 
 export const About = () => {
@@ -75,9 +77,12 @@ export const About = () => {
                             Tiba Ya Home was built to solve the real Kenyan challenge: families needing reliable care at home with clear coordination, speed, and trust. We believe that healing happens best where you are most comfortable — at home.
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <button className="px-6 py-3 bg-blue-900 text-white rounded-xl font-bold hover:bg-blue-800 transition-colors">
+                            <Link
+                                to={PUBLIC_HOME_CARE_BOOKING_PATH}
+                                className="px-6 py-3 bg-blue-900 text-white text-center rounded-xl font-bold hover:bg-blue-800 transition-colors"
+                            >
                                 Book Home Care
-                            </button>
+                            </Link>
                             <button className="px-6 py-3 bg-white border-2 border-slate-200 text-slate-900 rounded-xl font-bold hover:bg-slate-50 transition-colors">
                                 Request Ambulance
                             </button>

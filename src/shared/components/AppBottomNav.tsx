@@ -36,7 +36,7 @@ export const AppBottomNav = ({ items }: AppBottomNavProps) => {
                             )}
                         </div>
                         <span className="block max-w-full truncate px-1 text-center text-[11px] font-semibold leading-none">
-                            {item.label}
+                            {item.shortLabel ?? item.label}
                         </span>
                     </NavLink>
                 ))}

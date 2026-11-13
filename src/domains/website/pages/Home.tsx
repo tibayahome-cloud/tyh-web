@@ -1,6 +1,12 @@
 
 import { Link, useNavigate } from "react-router-dom";
 import {
+    CLIENT_HOME_CARE_PATH,
+    PUBLIC_HOME_CARE_BOOKING_PATH,
+    PUBLIC_TELEMEDICINE_BOOKING_PATH,
+    TELEMEDICINE_BOOKING_PATH
+} from "../../../shared/utils/returnPath";
+import {
     ArrowRight,
     ShieldCheck,
     Clock,
@@ -52,26 +58,20 @@ export const Home = () => {
     const navigate = useNavigate();
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        if (isAuthenticated) {
-            navigate("/app/home");
-        } else {
-            navigate("/login");
-        }
+        // Home care is booked where the visitor lands without an account; a signed-in client books it inside the app.
+        navigate(isAuthenticated ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH);
     };
 
-    // Remote consultations are booked in the client app, which owns the catalogue, the
-    // slot picker and payment. The public page only introduces the service and hands the
-    // visitor over: signed-in clients land on the booking screen, everyone else signs in
-    // first. Nothing about providers, availability or the catalogue is fetched or shown
-    // here -- that data is not public, and duplicating any of it would give us a second
-    // booking flow to keep in step with the real one.
+    // Remote consultations are booked in the one booking dialog, which owns the catalogue, the
+    // slot picker and payment. The landing page only introduces the service and hands the
+    // visitor over: a signed-in client lands on the booking screen in the app, and everyone else
+    // on the public booking page, where they choose a consultation, a clinic and a time before
+    // being asked for any details. Nothing about providers, availability or the catalogue is
+    // fetched or shown on this page -- the booking dialog fetches it, so there is no second
+    // booking flow here to keep in step with the real one.
     const handleTelemedicineClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        if (isAuthenticated) {
-            navigate("/app/telemedicine");
-        } else {
-            navigate("/login");
-        }
+        navigate(isAuthenticated ? TELEMEDICINE_BOOKING_PATH : PUBLIC_TELEMEDICINE_BOOKING_PATH);
     };
 
     const telemedicineHighlights = [

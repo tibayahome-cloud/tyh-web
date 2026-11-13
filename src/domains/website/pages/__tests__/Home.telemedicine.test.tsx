@@ -9,7 +9,7 @@
 
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useAuthMock = vi.fn();
@@ -40,10 +40,22 @@ beforeAll(() => {
 
 const TELEMEDICINE_PAGE = "client-telemedicine-page";
 const CLIENT_APP_HOME = "client-app-home";
-const LOGIN_PAGE = "login-page";
+const SIGNUP_PAGE = "signup-page";
+const PUBLIC_BOOKING_PAGE = "public-booking-page";
 const NOT_FOUND_FALLBACK = "not-found-fallback";
 
 const CTA_NAME = /Book online consultation/i;
+
+/** Shows where a visitor landed, including the destination carried in ?next=. */
+const SignUpProbe = () => {
+  const location = useLocation();
+  return (
+    <div>
+      {SIGNUP_PAGE}
+      <span data-testid="signup-search">{location.search}</span>
+    </div>
+  );
+};
 
 const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
   useAuthMock.mockReturnValue({ isAuthenticated });
@@ -54,7 +66,8 @@ const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
         <Route path="/" element={<Home />} />
         <Route path="/app/telemedicine" element={<div>{TELEMEDICINE_PAGE}</div>} />
         <Route path="/app/*" element={<div>{CLIENT_APP_HOME}</div>} />
-        <Route path="/login" element={<div>{LOGIN_PAGE}</div>} />
+        <Route path="/signup" element={<SignUpProbe />} />
+        <Route path="/book/telemedicine" element={<div>{PUBLIC_BOOKING_PAGE}</div>} />
         <Route path="/unknown" element={<div>{NOT_FOUND_FALLBACK}</div>} />
         <Route path="*" element={<Navigate to="/unknown" replace />} />
       </Routes>
@@ -76,17 +89,18 @@ describe("public telemedicine entry point", () => {
       await user.click(screen.getByRole("button", { name: CTA_NAME }));
 
       expect(screen.getByText(TELEMEDICINE_PAGE)).toBeInTheDocument();
-      expect(screen.queryByText(LOGIN_PAGE)).not.toBeInTheDocument();
+      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
     });
 
-    it("sends a signed-out visitor to sign in", async () => {
+    it("sends a signed-out visitor to the public booking page, with no sign-up first", async () => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: false });
 
       await user.click(screen.getByRole("button", { name: CTA_NAME }));
 
-      expect(screen.getByText(LOGIN_PAGE)).toBeInTheDocument();
+      expect(screen.getByText(PUBLIC_BOOKING_PAGE)).toBeInTheDocument();
+      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(TELEMEDICINE_PAGE)).not.toBeInTheDocument();
     });
 

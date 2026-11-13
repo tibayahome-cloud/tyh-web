@@ -52,13 +52,14 @@ const Where = () => {
   return (
     <div data-testid="where" data-state={JSON.stringify(location.state ?? null)}>
       {location.pathname}
+      {location.search}
     </div>
   );
 };
 
-const renderLogin = () =>
+const renderLogin = (entry = "/login") =>
   render(
-    <MemoryRouter initialEntries={["/login"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/login" element={<ClientLoginPage />} />
         <Route path="*" element={<Where />} />
@@ -206,6 +207,45 @@ describe("client sign-in page", () => {
       });
     });
 
+    it("returns a client to where they were heading, such as straight into booking", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
+      renderLogin("/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/app/telemedicine?book=1"));
+    });
+
+    it("never follows a destination that leaves the site", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
+      renderLogin("/login?next=https%3A%2F%2Felsewhere.example%2Fapp");
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/app/home"));
+    });
+
+    it("keeps the destination on the link to create an account", () => {
+      renderLogin("/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+
+      expect(screen.getByRole("link", { name: "Create account" })).toHaveAttribute(
+        "href",
+        "/signup?next=%2Fapp%2Ftelemedicine%3Fbook%3D1"
+      );
+    });
+
+    it("sends a provider to the provider home whatever destination was carried", async () => {
+      const user = userEvent.setup();
+      loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["provider"] } });
+      renderLogin("/login?next=%2Fapp%2Ftelemedicine%3Fbook%3D1");
+
+      await fillAndSubmit(user);
+
+      await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
+    });
+
     it("passes remember-me through when the person turns it off", async () => {
       const user = userEvent.setup();
       loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles: ["client"] } });
@@ -227,6 +267,34 @@ describe("client sign-in page", () => {
 
       await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
     });
+
+    it.each([[["admin.ops", "provider"]], [["provider", "admin.ops"]]])(
+      "lands a facility admin who is also a provider (%j) in the provider area, without signing them out",
+      async (roles) => {
+        const user = userEvent.setup();
+        loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles } });
+        renderLogin();
+
+        await fillAndSubmit(user);
+
+        await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/pro/home"));
+        expect(logoutMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([[["admin.ops", "client"]], [["client", "admin.ops"]]])(
+      "lands a facility admin who is also a patient (%j) in the patient area, without signing them out",
+      async (roles) => {
+        const user = userEvent.setup();
+        loginClientProviderMock.mockResolvedValue({ status: "authenticated", user: { roles } });
+        renderLogin();
+
+        await fillAndSubmit(user);
+
+        await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/app/home"));
+        expect(logoutMock).not.toHaveBeenCalled();
+      }
+    );
 
     it("signs a system admin out and sends them to their own sign-in instead", async () => {
       const user = userEvent.setup();
@@ -313,7 +381,7 @@ describe("client sign-in page", () => {
       await user.click(screen.getByRole("button", { name: "Sign in" }));
 
       expect(await screen.findByText("Email or phone is required")).toBeInTheDocument();
-      expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
+      expect(screen.getByText("Enter your password")).toBeInTheDocument();
       expect(loginClientProviderMock).not.toHaveBeenCalled();
     });
 

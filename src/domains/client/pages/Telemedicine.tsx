@@ -1,12 +1,12 @@
 import { NeedsYourResponse } from "../../../shared/components/NeedsYourResponse";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Video, ChevronRight, Calendar as CalendarIcon, Clock as ClockIcon } from "lucide-react";
 
 import { AppLayout } from "../../../shared/components/AppLayout";
 import { Button } from "../../../shared/components/Button";
 import { Loading } from "../../../shared/components/Loading";
-import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
+import { RemoteCareRegionNotice } from "../../../shared/components/RemoteCareRegionNotice";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useBookingList } from "../../../shared/hooks/useBookings";
 import { useTelemedicinePolicy } from "../../../shared/hooks/useTelemedicine";
@@ -63,7 +63,21 @@ const ClientTelemedicinePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const policyQuery = useTelemedicinePolicy();
+
+  // "Talk to a Doctor Online" arrives as /app/telemedicine?book=1: the person has already said what they want, so the
+  // booking opens at once instead of asking them to find and tap "Book a consultation". The marker is then removed, so
+  // closing the dialog or reloading the page does not open it again.
+  useEffect(() => {
+    if (searchParams.get("book") !== "1") {
+      return;
+    }
+    setDialogOpen(true);
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("book");
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const { data, isLoading } = useBookingList(
     { clientId: user?.id ?? undefined, pageSize: 50, preset: "card" },
@@ -92,7 +106,9 @@ const ClientTelemedicinePage = () => {
           </Button>
         </div>
 
-        {!user?.countryCode && <CountryRequiredBanner onComplete={() => navigate("/app/profile")} />}
+        {!user?.countryCode && (
+          <RemoteCareRegionNotice actionLabel="Update phone number" onAction={() => navigate("/app/profile")} />
+        )}
 
         <NeedsYourResponse bookingPath={(id) => `/app/bookings/${id}`} />
 

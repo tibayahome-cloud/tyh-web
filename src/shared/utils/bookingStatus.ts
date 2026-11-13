@@ -61,6 +61,13 @@ export const getBookingStatusTheme = (status: string) => {
 /** Every booking status the app has a label for, so a list can prove it places each one in a filter. */
 export const KNOWN_BOOKING_STATUSES = Object.keys(STATUS_THEMES);
 
+// A booking in one of these is still being set up (a provider is being found, or payment has not arrived), so the person
+// is in the middle of booking, not past it.
+const STILL_BEING_SET_UP = new Set(["requested", "broadcasting", "telemedicine_payment_pending"]);
+
+/** Whether a booking has got beyond setup: confirmed, paid for, under way, finished or cancelled. */
+export const isBookingPastSetup = (status: string): boolean => !STILL_BEING_SET_UP.has(status?.toLowerCase() ?? "");
+
 export const formatBookingStatus = (status: string) => getBookingStatusTheme(status).label;
 
 export const getSessionStatusTheme = (status: string) => {

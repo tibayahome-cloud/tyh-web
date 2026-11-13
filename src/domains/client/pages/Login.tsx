@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -14,9 +14,9 @@ import type { LoginSchema } from "../../../shared/schemas/auth";
 import { loginSchema } from "../../../shared/schemas/auth";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import type { AuthUser } from "../../../shared/schemas/user";
-import { ROLE_PROVIDER } from "../../../shared/rbac/roles";
-import { isFacilityAdminRole, isSystemAdminRole } from "../../../shared/rbac/portalRoles";
+import { personalSignInDestination } from "../../../shared/rbac/portalRoles";
 import { AuthPortalSwitch } from "../../../shared/components/AuthPortalSwitch";
+import { returnPathFrom, withReturnPath } from "../../../shared/utils/returnPath";
 import {
   saveTwofaChallenge,
   setTwofaPendingFlag,
@@ -32,14 +32,18 @@ const defaultValues: LoginSchema = {
 
 const ClientLoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = useMemo(() => returnPathFrom(location), [location]);
   const { t } = useTranslation();
   const { loginClientProvider, logout } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
 
   const handlePostAuth = useCallback(async (authUser: AuthUser | null) => {
-    const primaryRole = authUser?.roles?.[0];
-    if (isFacilityAdminRole(primaryRole) || isSystemAdminRole(primaryRole)) {
+    // What the account holds decides, not which role the API happens to list first: a person can be an administrator and a
+    // provider at once.
+    const destination = personalSignInDestination(authUser?.roles);
+    if (destination.kind === "staff") {
       setRedirecting(true);
       try {
         await logout();
@@ -48,7 +52,7 @@ const ClientLoginPage = () => {
       }
       // Each admin audience is sent to its own sign-in; a facility admin is never pointed at the
       // system administration page.
-      if (isFacilityAdminRole(primaryRole)) {
+      if (destination.audience === "facility") {
         navigate("/facility/login", { replace: true, state: { redirected: "facility-role" } });
       } else {
         navigate("/admin/login", { replace: true, state: { redirected: "admin-role" } });
@@ -57,13 +61,15 @@ const ClientLoginPage = () => {
     }
 
     setRedirecting(true);
-    if (primaryRole === ROLE_PROVIDER) {
+    if (destination.kind === "provider") {
       navigate("/pro/home", { replace: true });
       return;
     }
 
-    navigate("/app/home", { replace: true });
-  }, [logout, navigate]);
+    // A client goes where they were heading (for example straight into booking); anyone else, or nobody who was
+    // heading anywhere, lands on Home.
+    navigate(returnTo ?? "/app/home", { replace: true });
+  }, [logout, navigate, returnTo]);
 
 
   const {
@@ -125,7 +131,7 @@ const ClientLoginPage = () => {
         <p className="text-sm text-slate-600">
           New to Tiba Ya Home?{" "}
           <Link
-            to="/signup"
+            to={withReturnPath("/signup", returnTo)}
             className="inline-flex min-h-11 items-center rounded px-1 font-semibold text-tiba-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
           >
             {t("auth.signUp")}

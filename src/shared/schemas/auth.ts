@@ -19,76 +19,93 @@ export const newPasswordSchema = z
 
 export const loginSchema = z.object({
   emailOrPhone: z.string().min(1, "Email or phone is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string().min(1, "Enter your password"),
   remember: z.boolean().optional()
 });
 
 export const adminLoginSchema = z.object({
   email: z.string().email("A valid email is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string().min(1, "Enter your password"),
   remember: z.boolean().optional()
 });
 
+// Blank is fine (a phone number can stand in); anything typed has to be an email. A plain `.email()` rejects the empty
+// string the form starts with, which made an email compulsory even though the API takes either.
 const optionalEmail = z
   .string()
-  .email("Provide a valid email")
+  .trim()
   .optional()
-  .transform((value) => value?.trim() ?? "");
+  .transform((value) => value ?? "")
+  .pipe(z.union([z.literal(""), z.string().email("Provide a valid email")]));
 
 const optionalPhone = z
   .string()
   .trim()
   .optional()
-  .transform((value) => value ?? "")
+  // "0712 345 678", "0712-345-678" and "(0712) 345 678" are ordinary ways to write a number: read the digits.
+  .transform((value) => (value ?? "").replace(/[\s().-]/gu, ""))
   .pipe(
     z
       .string()
       .regex(/^$|^\+?[0-9]{7,15}$/u, "Provide a valid phone")
   );
 
-export const registerSchema = z
-  .object({
-    fullName: z.string().min(1, "Full name is required"),
-    email: optionalEmail,
-    phone: optionalPhone,
-    password: newPasswordSchema,
-    confirmPassword: z.string().min(1, "Confirm your password"),
-    acceptedTerms: z.boolean(),
-    acknowledgedPrivacy: z.boolean()
-  })
-  .superRefine((data, ctx) => {
-    if (!data.email && !data.phone) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "Provide an email or phone number"
-      });
-    }
+const registerFields = z.object({
+  fullName: z.string().min(1, "Full name is required"),
+  email: optionalEmail,
+  phone: optionalPhone,
+  password: newPasswordSchema,
+  acceptedTerms: z.boolean(),
+  acknowledgedPrivacy: z.boolean()
+});
 
-    if (data.confirmPassword && data.password !== data.confirmPassword) {
+const checkRegistration = (
+  data: z.infer<typeof registerFields>,
+  ctx: z.RefinementCtx,
+  { requirePhone }: { requirePhone: boolean }
+) => {
+  if (requirePhone) {
+    if (!data.phone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["confirmPassword"],
-        message: "Passwords must match"
+        path: ["phone"],
+        message: "Enter your phone number. We need it to book your consultation."
       });
     }
+  } else if (!data.email && !data.phone) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      // Reported on the phone field: the email field is folded away until the person asks for it.
+      path: ["phone"],
+      message: "Enter a phone number or an email address"
+    });
+  }
 
-    if (!data.acceptedTerms) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["acceptedTerms"],
-        message: "You must agree to the Terms of Service"
-      });
-    }
+  if (!data.acceptedTerms) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["acceptedTerms"],
+      message: "You must agree to the Terms of Service"
+    });
+  }
 
-    if (!data.acknowledgedPrivacy) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["acknowledgedPrivacy"],
-        message: "You must acknowledge the Privacy Policy"
-      });
-    }
-  });
+  if (!data.acknowledgedPrivacy) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["acknowledgedPrivacy"],
+      message: "You must acknowledge the Privacy Policy"
+    });
+  }
+};
+
+export const registerSchema = registerFields.superRefine((data, ctx) => checkRegistration(data, ctx, { requirePhone: false }));
+
+// Making an account in the middle of a booking asks for a phone number, not "a phone number or an email". The country for a
+// remote consultation is read from the number on the account, so an account with only an email can sign in but can never
+// book, and the appointment texts go to it.
+export const bookingRegisterSchema = registerFields.superRefine((data, ctx) =>
+  checkRegistration(data, ctx, { requirePhone: true })
+);
 
 export const passwordResetSchema = z.object({
   email: z.string().email("Provide a valid email")

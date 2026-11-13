@@ -1,5 +1,5 @@
 export type Coords = { lat: number; lng: number };
-export type Place = { name: string; coords: Coords };
+export type Place = { name: string; coords: Coords; /** A short exact code for the spot, e.g. "7GRP+J3 Nairobi", when Google gives one. */ plusCode?: string | null };
 
 /** What a person reads when we know a point on the map but not what it is called. Never the numbers. */
 export const UNNAMED_PLACE = "Pinned location";
@@ -29,6 +29,8 @@ export const shortPlaceName = (address: AddressParts, fallbackLabel?: string | n
 const NOMINATIM = "https://nominatim.openstreetmap.org";
 
 type GoogleResult = {
+  types?: string[];
+  plus_code?: { compound_code?: string; global_code?: string };
   formatted_address?: string;
   address_components?: Array<{ long_name: string; types: string[] }>;
   geometry: { location: { lat: () => number; lng: () => number } };
@@ -55,9 +57,13 @@ export const reverseGeocode = async (coords: Coords, signal?: AbortSignal): Prom
   const google = googleGeocoder();
   try {
     if (google) {
-      const { results } = await google.geocode({ location: coords });
-      const first = results?.[0];
-      return first ? shortPlaceName(googleParts(first.address_components), first.formatted_address) : null;
+      try {
+        const { results } = await google.geocode({ location: coords });
+        const first = results?.[0];
+        if (first) return shortPlaceName(googleParts(first.address_components), first.formatted_address);
+      } catch {
+        // Google refused or failed (a key that does not allow this site, no quota): ask OpenStreetMap instead.
+      }
     }
     const response = await fetch(
       `${NOMINATIM}/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat=${coords.lat}&lon=${coords.lng}`,
@@ -66,6 +72,59 @@ export const reverseGeocode = async (coords: Coords, signal?: AbortSignal): Prom
     if (!response.ok) return null;
     const body = (await response.json()) as { address?: AddressParts; display_name?: string };
     return shortPlaceName(body.address ?? {}, body.display_name);
+  } catch {
+    return null;
+  }
+};
+
+/** What a point is called in full, and its plus code (a short exact code for the spot). */
+export type PlaceDescription = { address: string; plusCode: string | null };
+
+// Result kinds in the order they say where someone actually is: a building or house first, then the street.
+const EXACT_KINDS = ["street_address", "premise", "subpremise", "establishment", "point_of_interest"];
+
+const tidyAddress = (text: string): string =>
+  text
+    .replace(/^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3},?\s*/i, "") // a leading plus code is not an address
+    .replace(/,\s*Kenya$/i, "")
+    .trim();
+
+const tidyPlusCode = (text: string): string => text.replace(/,\s*Kenya$/i, "").trim();
+
+/**
+ * Where a point is, for a person to confirm: the most specific address Google has for it (a building or street, not just
+ * the ward), with the plus code beside it. Without Google it falls back to OpenStreetMap's street, area and town.
+ * Null when neither answers. Never returns coordinates as text.
+ */
+export const describePlace = async (coords: Coords, signal?: AbortSignal): Promise<PlaceDescription | null> => {
+  const google = googleGeocoder();
+  if (google) {
+    try {
+      const { results } = await google.geocode({ location: coords });
+      const addressed = (results ?? []).filter((result) => !result.types?.includes("plus_code"));
+      const best =
+        addressed.find((result) => result.types?.some((type) => EXACT_KINDS.includes(type))) ??
+        addressed.find((result) => result.types?.includes("route")) ??
+        addressed[0];
+      const address = best?.formatted_address ? tidyAddress(best.formatted_address) : "";
+      const compound = (results ?? []).find((result) => result.plus_code?.compound_code)?.plus_code?.compound_code;
+      if (address && !isCoordinateText(address)) {
+        return { address, plusCode: compound ? tidyPlusCode(compound) : null };
+      }
+    } catch {
+      // Google refused or failed (billing off, quota): ask OpenStreetMap instead.
+    }
+  }
+  try {
+    const response = await fetch(
+      `${NOMINATIM}/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat=${coords.lat}&lon=${coords.lng}`,
+      { signal }
+    );
+    if (!response.ok) return null;
+    const body = (await response.json()) as { address?: AddressParts; display_name?: string };
+    const named = shortPlaceName(body.address ?? {}, body.display_name);
+    const address = tidyAddress(named === UNNAMED_PLACE ? "" : named);
+    return address && !isCoordinateText(address) ? { address, plusCode: null } : null;
   } catch {
     return null;
   }
@@ -146,7 +205,14 @@ export const searchPlaces = async (query: string, signal?: AbortSignal): Promise
   if (text.length < 3) return [];
   const places = placesApi();
   try {
-    if (places) return await googleSuggestions(text, places);
+    if (places) {
+      try {
+        const suggestions = await googleSuggestions(text, places);
+        if (suggestions.length > 0) return suggestions;
+      } catch {
+        // Google refused or failed (billing off, quota): fall through to OpenStreetMap.
+      }
+    }
     const response = await fetch(
       `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=ke&accept-language=en&q=${encodeURIComponent(text)}`,
       { signal }

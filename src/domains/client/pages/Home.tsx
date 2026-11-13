@@ -45,6 +45,8 @@ import {
   Video
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
+import { TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
+import { shouldAskForLocation } from "../utils/locationRelevance";
 import { useHasAmbulanceService } from "../hooks/useHasAmbulanceService";
 
 // A popup on a phone keeps a margin all round and never taller than the screen; its content scrolls inside.
@@ -473,7 +475,7 @@ const ClientHome = () => {
           <section aria-label="Choose your care" className="border-y border-slate-200 py-4">
             <h2 className="mb-3 text-base font-semibold text-slate-900">How would you like to receive care?</h2>
             <div className="grid gap-3 md:grid-cols-2">
-              <button type="button" onClick={() => navigate("/app/telemedicine")}
+              <button type="button" onClick={() => navigate(TELEMEDICINE_BOOKING_PATH)}
                 className="flex min-w-0 items-center gap-3 rounded-lg bg-tiba-blue p-4 text-left text-white transition hover:bg-tiba-blue/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
                 <Video className="h-6 w-6 shrink-0" />
                 <span className="min-w-0 flex-1">
@@ -511,11 +513,13 @@ const ClientHome = () => {
             </div>
           </section>
 
-          <LocationPermissionBanner
-            status={locationAccess.status}
-            error={locationAccess.error}
-            onRetry={locationAccess.requestAccess}
-          />
+          {shouldAskForLocation([activeBooking, matchingBooking]) && (
+            <LocationPermissionBanner
+              status={locationAccess.status}
+              error={locationAccess.error}
+              onRetry={locationAccess.requestAccess}
+            />
+          )}
 
           {/* MAIN CONTENT GRID */}
           <div className="grid gap-4">

@@ -3,8 +3,10 @@ import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import PaymentIcon from "@mui/icons-material/PaymentOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import SwapHorizIcon from "@mui/icons-material/SwapHorizOutlined";
 import logoImage from "../../assets/images/logo.jpeg";
 
+import type { OpenArea } from "../rbac/portalRoles";
 import type { AuthUser } from "../schemas/user";
 import { NotificationCenter } from "./NotificationCenter";
 
@@ -15,6 +17,9 @@ type AppHeaderProps = {
   onNavigateProfile?: () => void;
   onNavigatePayments?: () => void;
   onNavigateSettings?: () => void;
+  /** The other areas this person's roles open, when they hold more than one. Left out or empty, the menu is as it always was. */
+  otherAreas?: OpenArea[];
+  onSwitchArea?: (area: OpenArea) => void;
 };
 
 export const AppHeader = ({
@@ -23,7 +28,9 @@ export const AppHeader = ({
   onLogout,
   onNavigateProfile,
   onNavigatePayments,
-  onNavigateSettings
+  onNavigateSettings,
+  otherAreas = [],
+  onSwitchArea
 }: AppHeaderProps) => {
   const [open, setOpen] = useState(false);
   const initials = useMemo(() => {
@@ -47,6 +54,11 @@ export const AppHeader = ({
 
   const handleSettings = () => {
     onNavigateSettings?.();
+    setOpen(false);
+  };
+
+  const handleSwitch = (area: OpenArea) => {
+    onSwitchArea?.(area);
     setOpen(false);
   };
 
@@ -93,6 +105,22 @@ export const AppHeader = ({
                       <p className="type-body font-semibold text-neutral-900">{user.fullName || "Account"}</p>
                       <p className="type-caption text-neutral-500 truncate">{user.email}</p>
                     </div>
+                    {otherAreas.length > 0 && (
+                      // For someone who is, say, both a facility admin and a provider: the way from one area to the other.
+                      <nav aria-label="Switch area" className="flex flex-col border-b border-neutral-100 py-1 text-sm">
+                        {otherAreas.map((area) => (
+                          <button
+                            key={area.key}
+                            type="button"
+                            className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 font-medium text-tiba-blue transition hover:bg-neutral-50"
+                            onClick={() => handleSwitch(area)}
+                          >
+                            <SwapHorizIcon className="h-4 w-4" />
+                            Switch to {area.label}
+                          </button>
+                        ))}
+                      </nav>
+                    )}
                     <nav className="flex flex-col py-1 text-sm">
                       <button
                         type="button"

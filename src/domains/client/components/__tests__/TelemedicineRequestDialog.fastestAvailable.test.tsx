@@ -166,10 +166,10 @@ describe("fastest available facility selection", () => {
 
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
 
-      await screen.findByText(/Fastest available: Kilimani Clinic\./);
+      const banner = await screen.findByText(/Earliest available:/);
       expect(discoverRemoteFacilitiesMock).toHaveBeenCalledTimes(1);
       expect(discoverRemoteFacilitiesMock).toHaveBeenCalledWith("service-1", "KE", { ranking: "earliest_slot" });
-      expect(screen.getByRole("status")).toHaveTextContent(new RegExp(`Earliest open time .* at ${time(EARLY.toISOString())}`));
+      expect(banner.parentElement).toHaveTextContent(`at ${time(EARLY.toISOString())} at Kilimani Clinic`);
       expect(createHoldMock).not.toHaveBeenCalled();
     });
 
@@ -179,7 +179,7 @@ describe("fastest available facility selection", () => {
 
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
 
-      await screen.findByText(/Fastest available: Kilimani Clinic\./);
+      await screen.findByText(/Earliest available:/);
       expect(screen.queryByText(/Nyali Hospital/)).not.toBeInTheDocument();
     });
 
@@ -187,7 +187,6 @@ describe("fastest available facility selection", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
 
       const banner = await screen.findByText(/Earliest available:/);
       expect(banner.parentElement).toHaveTextContent(`at ${time(EARLY.toISOString())} at Kilimani Clinic`);
@@ -207,7 +206,6 @@ describe("fastest available facility selection", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
       await user.click(await screen.findByRole("button", { name: "Book this time" }));
 
       const confirm = await screen.findByRole("button", { name: /confirm & pay/i });
@@ -221,7 +219,6 @@ describe("fastest available facility selection", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(screen.getByRole("button", { name: /Kilimani Clinic/ }));
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
       await user.click(await screen.findByRole("button", { name: new RegExp(time(EARLY.toISOString())) }));
 
       await waitFor(() => expect(createHoldMock).toHaveBeenCalledTimes(1));
@@ -230,14 +227,15 @@ describe("fastest available facility selection", () => {
       expect(manualPayload).not.toHaveProperty("ranking");
     });
 
-    it("takes the person to the preferences step first, so preferences are still asked for", async () => {
+    it("takes the person straight to the times, with preferences collapsed there rather than a step of their own", async () => {
       const user = userEvent.setup();
       renderDialog();
 
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
 
-      expect(await screen.findByRole("button", { name: "Continue to choose a time" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Skip for now" })).toBeInTheDocument();
+      expect(await screen.findByText(/Earliest available:/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /add a preference for your clinician/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Continue to choose a time" })).not.toBeInTheDocument();
     });
   });
 
@@ -251,7 +249,6 @@ describe("fastest available facility selection", () => {
       });
       renderDialog();
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
 
       expect(await screen.findByText(/has just been taken/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Book this time" })).not.toBeInTheDocument();
@@ -279,7 +276,7 @@ describe("fastest available facility selection", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent(/could not check availability/i);
       await user.click(screen.getByRole("button", { name: "Try again" }));
 
-      await screen.findByText(/Fastest available: Kilimani Clinic\./);
+      await screen.findByText(/Earliest available:/);
       expect(discoverRemoteFacilitiesMock).toHaveBeenCalledTimes(2);
     });
 
@@ -306,7 +303,6 @@ describe("fastest available facility selection", () => {
       await user.click(screen.getByRole("button", { name: /Nyali Hospital/ }));
 
       expect(screen.queryByText(/Fastest available:/)).not.toBeInTheDocument();
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
       expect(screen.queryByText(/Earliest available:/)).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Book this time" })).not.toBeInTheDocument();
     });
@@ -316,7 +312,6 @@ describe("fastest available facility selection", () => {
       renderDialog();
 
       await user.click(screen.getByRole("button", { name: /Nyali Hospital/ }));
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
       await user.click(await screen.findByRole("button", { name: new RegExp(time(LATER.toISOString())) }));
 
       await waitFor(() => expect(createHoldMock).toHaveBeenCalledTimes(1));
@@ -327,13 +322,12 @@ describe("fastest available facility selection", () => {
       const user = userEvent.setup();
       renderDialog();
       await user.click(screen.getByRole("button", { name: "Find the earliest time" }));
-      await screen.findByText(/Fastest available: Kilimani Clinic\./);
+      await screen.findByText(/Earliest available:/);
 
       await user.click(screen.getByRole("button", { name: "Back" }));
       await user.click(await screen.findByRole("button", { name: /Nyali Hospital/ }));
 
       expect(screen.queryByText(/Fastest available: /)).not.toBeInTheDocument();
-      await user.click(await screen.findByRole("button", { name: "Continue to choose a time" }));
       expect(screen.queryByText(/Earliest available:/)).not.toBeInTheDocument();
     });
   });

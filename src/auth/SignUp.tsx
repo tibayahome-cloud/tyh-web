@@ -1,397 +1,41 @@
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
-import { Phone, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { AuthLayout } from "../shared/components/AuthLayout";
-import { FormField } from "../shared/components/FormField";
-import { Input } from "../shared/components/Input";
-import { PasswordField } from "../shared/components/PasswordField";
-import { PasswordRequirements } from "../shared/components/PasswordRequirements";
-import { Button } from "../shared/components/Button";
-import type { RegisterSchema } from "../shared/schemas/auth";
-import { registerSchema } from "../shared/schemas/auth";
-import { describePasswordSubmitError } from "../shared/utils/passwordErrors";
-import { withPasswordConfirmation } from "../shared/utils/passwordResolver";
-
-const REQUIREMENTS_ID = "signup-password-requirements";
-import api from "../shared/libs/api";
-import { getApiError } from "../shared/utils/errors";
-import { PHONE_PLACEHOLDER } from "../shared/constants/contact";
-import { CURRENT_LEGAL_DOCUMENTS, currentLegalDocumentPayload } from "../shared/constants/legal";
-
-const defaultValues: RegisterSchema = {
-  fullName: "",
-  email: "",
-  phone: "",
-  password: "",
-  confirmPassword: "",
-  acceptedTerms: false,
-  acknowledgedPrivacy: false
-};
-
-type Step = "register" | "verify" | "success";
+import { returnPathFrom, withReturnPath } from "../shared/utils/returnPath";
+import { SignUpForm } from "./SignUpForm";
 
 export const SignUp = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>("register");
-  const [error, setError] = useState<string | null>(null);
-  const [registeredPhone, setRegisteredPhone] = useState<string>("");
-  const [otpCode, setOtpCode] = useState("");
-  const [resending, setResending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-
-  const {
-    control,
-    handleSubmit,
-    watch,
-    trigger,
-    setError: setFieldError,
-    setFocus,
-    formState: { isSubmitting }
-  } = useForm<RegisterSchema>({
-    resolver: withPasswordConfirmation(zodResolver(registerSchema)),
-    // Validate as the person types so every password rule reports live, not only on submit.
-    mode: "onChange",
-    defaultValues
-  });
-
-  const password = watch("password");
-  const confirmPassword = watch("confirmPassword");
-
-  // Editing the password can make an already-typed confirmation match (or stop matching).
-  useEffect(() => {
-    if (confirmPassword) {
-      void trigger("confirmPassword");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password]);
-
-  const submit = handleSubmit(async (values) => {
-    setError(null);
-    try {
-      const response = await api.post("/auth/register", {
-        full_name: values.fullName.trim(),
-        email: values.email?.trim() || undefined,
-        phone: values.phone?.trim() || undefined,
-        password: values.password,
-        legal_documents: currentLegalDocumentPayload()
-      });
-
-      const meta = response.data?.meta;
-      if (values.phone?.trim()) {
-        setRegisteredPhone(values.phone.trim());
-
-        if (meta?.verification_required && meta?.otp_sent) {
-          setStep("verify");
-        } else {
-          try {
-            const loginRes = await api.post("/auth/login", {
-              emailOrPhone: values.phone.trim(),
-              password: values.password
-            });
-            if (loginRes.data?.data?.access_token) {
-              setAccessToken(loginRes.data.data.access_token);
-            }
-            setStep("success");
-          } catch {
-            setStep("verify");
-          }
-        }
-      } else {
-        setStep("success");
-      }
-    } catch (err) {
-      const failure = describePasswordSubmitError(err, t("auth.signUpError"));
-      if (failure.field === "password") {
-        // The server rejected the password itself: say so on the field and put focus there.
-        setFieldError("password", { type: "server", message: failure.message });
-        setFocus("password");
-        return;
-      }
-      setError(failure.message);
-    }
-  });
-
-  const handleVerify = async () => {
-    if (!otpCode || otpCode.length < 4) {
-      setError("Please enter a valid code");
-      return;
-    }
-    setError(null);
-    setVerifying(true);
-    try {
-      await api.post(
-        "/auth/verify/phone/confirm",
-        { code: otpCode },
-        { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
-      );
-      setStep("success");
-    } catch (err) {
-      setError(getApiError(err, "Invalid code. Please try again."));
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setError(null);
-    setResending(true);
-    try {
-      await api.post(
-        "/auth/verify/phone/init",
-        {},
-        { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
-      );
-    } catch (err) {
-      setError(getApiError(err, "Failed to resend code"));
-    } finally {
-      setResending(false);
-    }
-  };
-
-  if (step === "success") {
-    return (
-      <AuthLayout
-        split
-        title="Account Verified!"
-        subtitle="Your account is ready to use."
-        footer={null}
-      >
-        <div className="text-center py-6">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
-          </div>
-          <p className="text-slate-600 mb-6">
-            You can now sign in and start booking services.
-          </p>
-          <Button onClick={() => navigate("/login")} className="w-full">
-            Sign In
-          </Button>
-        </div>
-      </AuthLayout>
-    );
-  }
-
-  if (step === "verify") {
-    return (
-      <AuthLayout
-        split
-        title="Verify Your Phone"
-        subtitle={`We sent a code to ${registeredPhone}`}
-        footer={
-          <p className="type-caption text-slate-500">
-            Didn't receive the code?{" "}
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={resending}
-              className="font-semibold text-tiba-blue hover:underline disabled:opacity-50"
-            >
-              {resending ? "Sending..." : "Resend Code"}
-            </button>
-          </p>
-        }
-      >
-        <div className="space-y-6">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <Phone className="w-8 h-8 text-blue-600" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Enter verification code
-            </label>
-            <Input
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value)}
-              placeholder="Enter 6-digit code"
-              maxLength={6}
-              className="text-center text-2xl tracking-widest"
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
-              <p className="type-caption text-red-600">{error}</p>
-            </div>
-          )}
-
-          <Button
-            onClick={handleVerify}
-            disabled={verifying || otpCode.length < 4}
-            className="w-full h-11"
-          >
-            {verifying ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Verifying...
-              </>
-            ) : (
-              "Verify Phone"
-            )}
-          </Button>
-
-          <p className="text-xs text-center text-slate-500">
-            Verification is required to book services
-          </p>
-        </div>
-      </AuthLayout>
-    );
-  }
+  const location = useLocation();
+  // Where the person was heading when they were asked to create an account (for example straight into booking).
+  const returnTo = useMemo(() => returnPathFrom(location), [location]);
 
   return (
     <AuthLayout
       split
       title={t("auth.signUpTitle")}
-      subtitle="Join our community for a premium care experience."
+      subtitle="Book a doctor online or care at home."
       footer={
-        <p className="type-caption text-slate-500">
+        <p className="text-sm text-slate-600">
           {t("auth.haveAccount")}{" "}
-          <Link to="/login" className="font-semibold text-tiba-blue hover:underline">
-            {t("auth.backToLogin")}
+          <Link
+            to={withReturnPath("/login", returnTo)}
+            className="inline-flex min-h-11 items-center rounded px-1 font-semibold text-tiba-blue underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+          >
+            Sign in
           </Link>
         </p>
       }
     >
-      <form className="space-y-4" onSubmit={submit} noValidate>
-        <FormField
-          control={control}
-          name="fullName"
-          render={({ field, fieldState }) => (
-            <Input {...field} label={t("auth.fullName")} autoComplete="name" error={fieldState.error?.message} />
-          )}
-        />
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <FormField
-            control={control}
-            name="email"
-            render={({ field, fieldState }) => (
-              <Input
-                {...field}
-                type="email"
-                label={t("auth.email")}
-                placeholder="jane@example.com"
-                autoComplete="email"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-
-          <FormField
-            control={control}
-            name="phone"
-            render={({ field, fieldState }) => (
-              <Input
-                {...field}
-                label={t("auth.phone")}
-                placeholder={PHONE_PLACEHOLDER}
-                autoComplete="tel"
-                error={fieldState.error?.message}
-              />
-            )}
-          />
-        </div>
-
-        <FormField
-          control={control}
-          name="password"
-          render={({ field, fieldState }) => (
-            <PasswordField
-              {...field}
-              label={t("auth.password")}
-              autoComplete="new-password"
-              aria-describedby={REQUIREMENTS_ID}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-
-        <PasswordRequirements
-          id={REQUIREMENTS_ID}
-          password={password ?? ""}
-          confirmPassword={confirmPassword ?? ""}
-        />
-
-        <FormField
-          control={control}
-          name="confirmPassword"
-          render={({ field, fieldState }) => (
-            <PasswordField
-              {...field}
-              label={t("auth.confirmPassword")}
-              autoComplete="new-password"
-              aria-describedby={REQUIREMENTS_ID}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          {CURRENT_LEGAL_DOCUMENTS.map((document) => {
-            const fieldName = document.type === "terms" ? "acceptedTerms" : "acknowledgedPrivacy";
-            return (
-              <FormField
-                key={document.type}
-                control={control}
-                name={fieldName}
-                render={({ field, fieldState }) => (
-                  <div>
-                    <label className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-5 w-5 rounded border-slate-300 text-tiba-blue focus:ring-tiba-blue"
-                        checked={Boolean(field.value)}
-                        onChange={(event) => field.onChange(event.target.checked)}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        {document.actionLabel}{" "}
-                        <a
-                          href={document.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-tiba-blue hover:underline"
-                        >
-                          View {document.title} {document.version}
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </span>
-                    </label>
-                    {fieldState.error?.message && (
-                      <p className="mt-1 text-xs font-medium text-red-600">{fieldState.error.message}</p>
-                    )}
-                  </div>
-                )}
-              />
-            );
-          })}
-        </div>
-
-        {error && (
-          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
-            <p className="type-caption text-red-600">{error}</p>
-          </div>
-        )}
-
-        <Button type="submit" className="w-full h-11" loading={isSubmitting}>
-          {t("auth.signUpCta")}
-        </Button>
-
-        <p className="text-xs text-center text-slate-500">
-          Phone verification required after registration
-        </p>
-      </form>
+      <SignUpForm
+        // They go where they were heading, or to Home when they were not heading anywhere in particular.
+        onSignedUp={() => navigate(returnTo ?? "/app/home", { replace: true })}
+        // The account exists; only the automatic sign-in failed. The sign-in page finishes the job.
+        onSignInNeeded={() => navigate(withReturnPath("/login", returnTo), { replace: true })}
+      />
     </AuthLayout>
   );
 };

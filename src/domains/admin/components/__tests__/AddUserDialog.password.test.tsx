@@ -47,13 +47,13 @@ describe("add user dialog temporary password", () => {
     expect(passwordField()).toHaveAttribute("aria-describedby", "add-user-password-requirements");
   });
 
-  it("rejects an eight-character password that the old check allowed", async () => {
+  it("rejects five characters even when every kind of character is there", async () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.type(passwordField(), "Abcde12!");
+    await user.type(passwordField(), "Ab1!x");
 
-    expect(await screen.findByText("Password must be at least 10 characters", { selector: "span.text-red-500" })).toBeInTheDocument();
+    expect(await screen.findByText("Password must be at least 6 characters", { selector: "span.text-red-500" })).toBeInTheDocument();
   });
 
   it("does not send the request for a password the API would reject", async () => {

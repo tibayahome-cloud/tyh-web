@@ -1,8 +1,9 @@
 // Mirrors the API's password policy (app/utils/validation.py, PASSWORD_PATTERN):
-// 10 or more characters with an upper-case letter, a lower-case letter, a digit and a special
-// character. The API is the authority; this only tells people what it will ask for before they
-// submit, so keep the two in step.
-export const PASSWORD_MIN_LENGTH = 10;
+// 6 or more characters with an upper-case letter, a lower-case letter, a digit and a special
+// character. Six is the owner's decision (2026-11-10): shorter to type on a phone, with the mix of
+// characters still required. The API is the authority; this only tells people what it will ask for
+// before they submit, so keep the two in step.
+export const PASSWORD_MIN_LENGTH = 6;
 
 export type PasswordRequirementId = "length" | "uppercase" | "lowercase" | "digit" | "special";
 

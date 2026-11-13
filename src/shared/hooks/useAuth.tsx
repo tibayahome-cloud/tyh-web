@@ -84,6 +84,9 @@ type AuthContextValue = {
   expireSession: () => void;
 };
 
+// How long to wait before trying to renew again after a failure that says nothing about the session (no network, a timeout).
+const RENEWAL_RETRY_MS = 30_000;
+
 const readStoredTokens = (): AuthTokens => {
   if (typeof window === "undefined") {
     return { accessToken: null, refreshToken: null, persist: false };
@@ -339,11 +342,17 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const refreshInFlight = useRef<Promise<string | null> | null>(null);
+  // Set when a renewal failed for a reason that does not end the session (see the API client), cleared at the start of the next.
+  const renewalKeptSession = useRef(false);
   const tokensRef = useRef<AuthTokens>(tokens);
   const rememberRef = useRef<boolean>(false);
   const accessExpiryRef = useRef<number | null>(decodeTokenExpiry(tokens.accessToken));
   const refreshExpiryRef = useRef<number | null>(decodeTokenExpiry(tokens.refreshToken));
   const expiryTimerRef = useRef<number | null>(null);
+  // Set once performRefresh exists (it is declared further down); the expiry timer calls it through here.
+  const refreshRef = useRef<() => Promise<string | null>>(async () => null);
+  // True when a freshly issued access token already looks expired by this device's clock, so the clock is wrong.
+  const clockLooksWrongRef = useRef(false);
 
   const setUserState = useCallback((value: AuthUser | null) => {
     setUser(value);
@@ -415,19 +424,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         return;
       }
       clearExpiryTimer();
-      if (!expiry) {
+      if (!expiry || clockLooksWrongRef.current) {
         return;
       }
+      // Renew the session shortly before the short-lived access token runs out. A client stays signed in for as long
+      // as their refresh token lives (14 days), instead of being signed out every couple of hours. If the renewal
+      // is refused, performRefresh ends the session as before.
       const delay = Math.max(0, expiry - Date.now() - TOKEN_EXPIRY_SKEW_MS);
-      if (delay <= 0) {
-        clearTokens(true);
-        return;
-      }
       expiryTimerRef.current = window.setTimeout(() => {
-        clearTokens(true);
+        void refreshRef.current();
       }, delay);
     },
-    [clearExpiryTimer, clearTokens]
+    [clearExpiryTimer]
   );
 
   useEffect(() => {
@@ -457,9 +465,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     if (refreshInFlight.current) {
       return refreshInFlight.current;
     }
+    renewalKeptSession.current = false;
 
     const refreshToken = tokensRef.current.refreshToken;
-    if (!refreshToken) {
+    if (!refreshToken || isRefreshExpired()) {
       clearTokens(true);
       return null;
     }
@@ -469,14 +478,40 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         const response = await api.post("/auth/refresh", { refresh_token: refreshToken });
         const payload = extractData<Record<string, unknown>>(response.data);
         const { accessToken, refreshToken: nextRefresh } = extractTokens(payload);
+        // A phone whose clock is wrong sees every new token as already expired and would renew in a loop. While the
+        // clock disagrees with the server, stop renewing on a timer and rely on the 401 path, which needs no clock.
+        const newExpiry = decodeTokenExpiry(accessToken);
+        clockLooksWrongRef.current = newExpiry !== null && newExpiry - Date.now() <= TOKEN_EXPIRY_SKEW_MS;
         updateTokens({
           accessToken,
           refreshToken: nextRefresh ?? refreshToken
         });
         setSessionExpired(false);
         return accessToken;
-      } catch {
-        clearTokens(true);
+      } catch (error) {
+        // Another tab may have used this refresh token a moment ago and stored the new pair: that is a renewal that worked,
+        // so take it instead of treating this tab's refusal as the end of the session.
+        const stored = readStoredTokens();
+        if (stored.accessToken && stored.refreshToken && stored.refreshToken !== refreshToken) {
+          updateTokens({ accessToken: stored.accessToken, refreshToken: stored.refreshToken });
+          setSessionExpired(false);
+          return stored.accessToken;
+        }
+        // Only a refusal ends the session. No network, a timeout or a server error says nothing about the session, so stay
+        // signed in and try again shortly.
+        const status = isAxiosError(error) ? error.response?.status : undefined;
+        if (status === 400 || status === 401) {
+          clearTokens(true);
+          return null;
+        }
+        renewalKeptSession.current = true;
+        if (typeof window !== "undefined") {
+          clearExpiryTimer();
+          expiryTimerRef.current = window.setTimeout(() => {
+            // Only if this is still the session that failed to renew: signing out meanwhile must not bring "session expired".
+            if (tokensRef.current.refreshToken === refreshToken) void refreshRef.current();
+          }, RENEWAL_RETRY_MS);
+        }
         return null;
       } finally {
         refreshInFlight.current = null;
@@ -484,12 +519,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     })();
 
     return refreshInFlight.current;
-  }, [clearTokens, updateTokens]);
+  }, [clearExpiryTimer, clearTokens, isRefreshExpired, updateTokens]);
+
+  useEffect(() => {
+    refreshRef.current = performRefresh;
+  }, [performRefresh]);
 
   useEffect(() => {
     configureApiAuth({
       getAccessToken: () => {
-        if (isAccessExpired()) {
+        // An expired access token alone does not end the session: the server answers 401 and the API client renews
+        // it and retries. Only a missing or expired refresh token means the person has to sign in again.
+        if (isAccessExpired() && (!tokensRef.current.refreshToken || isRefreshExpired())) {
           clearTokens(true);
           return null;
         }
@@ -503,6 +544,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         return tokensRef.current.refreshToken;
       },
       refresh: performRefresh,
+      sessionKept: () => renewalKeptSession.current,
       clear: () => clearTokens(true),
       onUnauthorized: () => setSessionExpired(true)
     });
@@ -591,6 +633,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           refreshToken,
           persist: Boolean(credentials.remember)
         });
+        // Requests sent in the same moment as signing in read this ref, which otherwise only catches up once React has
+        // re-rendered. The booking creates its slot hold straight after the account is made, so without this the first
+        // request after signing in could go out with no token.
+        tokensRef.current = { accessToken, refreshToken, persist: Boolean(credentials.remember) };
 
         setSessionExpired(false);
 

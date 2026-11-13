@@ -3,20 +3,33 @@ import type { ReactNode } from "react";
 
 import { useAuth } from "../shared/hooks/useAuth";
 import { PhoneVerificationPrompt } from "../shared/components/PhoneVerificationPrompt";
+import { useBookedAtLoad } from "./useBookedAtLoad";
 
 type PhoneVerificationGateProps = {
   children: ReactNode;
+  /**
+   * When to ask. By default straight away, which is what providers get. A client is asked only after their first
+   * booking: confirming a phone number is not needed to book, and putting it on their first screen is one more thing
+   * between a new person and their appointment.
+   */
+  after?: "first-booking";
 };
 
 const DISMISSED_KEY = "tiba.phone_verification_dismissed";
 const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-export const PhoneVerificationGate = ({ children }: PhoneVerificationGateProps) => {
+const PhoneVerificationGateCore = ({ children, ready }: { children: ReactNode; ready: boolean }) => {
   const { user, isAuthenticated } = useAuth();
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
+      setShowPrompt(false);
+      return;
+    }
+
+    // Not time to ask yet (a client who has not booked)
+    if (!ready) {
       setShowPrompt(false);
       return;
     }
@@ -53,7 +66,7 @@ export const PhoneVerificationGate = ({ children }: PhoneVerificationGateProps) 
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, ready]);
 
   const handleClose = () => {
     setShowPrompt(false);
@@ -86,3 +99,17 @@ export const PhoneVerificationGate = ({ children }: PhoneVerificationGateProps) 
     </>
   );
 };
+
+// Kept apart so that only the client app asks for a person's bookings: the provider app does not need them, and the
+// hook needs the query client the client app has.
+const PhoneVerificationGateAfterFirstBooking = ({ children }: { children: ReactNode }) => {
+  const bookedAtLoad = useBookedAtLoad();
+  return <PhoneVerificationGateCore ready={bookedAtLoad}>{children}</PhoneVerificationGateCore>;
+};
+
+export const PhoneVerificationGate = ({ children, after }: PhoneVerificationGateProps) =>
+  after === "first-booking" ? (
+    <PhoneVerificationGateAfterFirstBooking>{children}</PhoneVerificationGateAfterFirstBooking>
+  ) : (
+    <PhoneVerificationGateCore ready>{children}</PhoneVerificationGateCore>
+  );

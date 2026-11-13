@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, Ref } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Modal } from "../../../shared/components/Modal";
@@ -6,6 +7,7 @@ import { Button } from "../../../shared/components/Button";
 import { Input } from "../../../shared/components/Input";
 import { Stepper } from "../../../shared/components/Stepper";
 import { Loading } from "../../../shared/components/Loading";
+import { Skeleton } from "../../../shared/components/Skeleton";
 import type { ProviderPreference } from "../../../shared/libs/telemedicineOps";
 import {
   fetchTelemedicineCatalogServices,
@@ -20,9 +22,10 @@ import {
 } from "../../../shared/libs/telemedicineCategoryAssets";
 import { TelemedicineServiceVisual } from "../../../shared/components/TelemedicineServiceVisual";
 import { ProviderPreferenceFields } from "./ProviderPreferenceFields";
+import { BookingAccountStep } from "./BookingAccountStep";
 import { useFastestFacility } from "../../../shared/hooks/useFastestFacility";
 import { MpesaPaymentInstructions } from "../../../shared/components/MpesaPaymentInstructions";
-import { CountryRequiredBanner } from "../../../shared/components/CountryRequiredBanner";
+import { RemoteCareRegionNotice } from "../../../shared/components/RemoteCareRegionNotice";
 import { ApiErrorBanner } from "../../../shared/components/ApiErrorBanner";
 import { useAuth } from "../../../shared/hooks/useAuth";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -58,6 +61,12 @@ type TelemedicineRequestDialogProps = {
   onClose: () => void;
   serviceId?: string | null;
   onCreated?: (bookingId: string) => void;
+  /**
+   * "dialog" (the default) shows the booking in a popup over the screen it was opened from, which suits a client who is
+   * already inside the app. "page" lays the same steps out as the page itself, for the public booking page, where there is
+   * nothing underneath to go back to. Everything inside is the same in both.
+   */
+  layout?: "dialog" | "page";
 };
 
 type RemoteServiceOption = {
@@ -70,15 +79,42 @@ type RemoteServiceOption = {
   active?: boolean;
 };
 
-const TM_STEP_INDEX = { service: 0, facility: 1, preferences: 2, slot: 3, confirm: 4 } as const;
+// "details" only happens for someone who is not signed in. It comes after the time is chosen, so a person sees what is on
+// offer, at what price and when, before they are asked who they are; the account made there is what the time is held for.
+const TM_STEP_INDEX = { service: 0, facility: 1, slot: 2, details: 3, confirm: 4 } as const;
 
 const TM_STEPS = [
   { title: "Service", description: "What kind of consultation?" },
   { title: "Facility", description: "Choose a care site" },
-  { title: "Preferences", description: "Optional requests" },
   { title: "Slot", description: "Pick a time" },
   { title: "Confirm", description: "Review & pay" }
 ];
+
+const TM_STEPS_WITH_DETAILS = [
+  TM_STEPS[0],
+  TM_STEPS[1],
+  TM_STEPS[2],
+  { title: "Details", description: "Your name and number" },
+  TM_STEPS[3]
+];
+
+// The page names its steps in a visitor's words, and each step says what to do in a heading of its own, so there are no
+// descriptions here. The popup keeps the titles and descriptions above.
+const PAGE_STEPS = [{ title: "Consultation" }, { title: "Clinic" }, { title: "Time" }, { title: "Pay" }];
+const PAGE_STEPS_WITH_DETAILS = [
+  PAGE_STEPS[0],
+  PAGE_STEPS[1],
+  PAGE_STEPS[2],
+  { title: "Details" },
+  PAGE_STEPS[3]
+];
+
+const PageStepHeading = ({ children, hint }: { children: ReactNode; hint?: string }) => (
+  <div>
+    <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">{children}</h2>
+    {hint && <p className="mt-1 text-sm text-slate-600">{hint}</p>}
+  </div>
+);
 
 const formatCurrency = (cents: number, currency = "KES") =>
   new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
@@ -124,12 +160,75 @@ const useRemoteServiceOptions = (enabled: boolean) =>
     enabled
   });
 
-export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated }: TelemedicineRequestDialogProps) => {
+type BookingShellProps = {
+  open: boolean;
+  onClose: () => void;
+  /** The service step shows a wide catalogue; every later step is a single column. */
+  wide: boolean;
+  regionLabel: string;
+  regionRef: Ref<HTMLDivElement>;
+  children: ReactNode;
+};
+
+const DialogShell = ({ open, onClose, wide, children }: BookingShellProps) => (
+  <Modal open={open} onClose={onClose} title="Book a remote consultation" maxWidth={wide ? "lg" : "md"}>
+    {children}
+  </Modal>
+);
+
+// The booking as the page itself. The region is what gets focus when the step changes, so a screen reader is told where
+// the person now is; it has no outline because it is not something to operate.
+const PageShell = ({ wide, regionLabel, regionRef, children }: BookingShellProps) => (
+  <div className={wide ? "w-full" : "mx-auto w-full max-w-2xl"}>
+    <h1 className="mb-3 text-xl font-bold tracking-tight text-slate-950 sm:mb-5 sm:text-3xl">Talk to a doctor online</h1>
+    <div ref={regionRef} role="region" aria-label={regionLabel} tabIndex={-1} className="outline-none">
+      {children}
+    </div>
+  </div>
+);
+
+// Shaped like what replaces it (search, care areas, a grid of cards), so the page does not jump when the catalogue arrives.
+const CatalogSkeleton = ({ gridClass }: { gridClass: string }) => (
+  <div className="space-y-4" role="status" aria-live="polite">
+    <span className="sr-only">Loading consultations</span>
+    <Skeleton height={48} />
+    <div className="flex gap-2 overflow-hidden">
+      {[110, 130, 140, 150].map((width) => (
+        <Skeleton key={width} height={44} width={width} rounded="pill" className="shrink-0" />
+      ))}
+    </div>
+    <div className={`grid gap-3 ${gridClass}`}>
+      {Array.from({ length: 6 }, (_, index) => (
+        <Skeleton key={index} height={112} />
+      ))}
+    </div>
+  </div>
+);
+
+export const TelemedicineRequestDialog = ({
+  open,
+  onClose,
+  serviceId,
+  onCreated,
+  layout = "dialog"
+}: TelemedicineRequestDialogProps) => {
   const { user } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<number>(serviceId ? TM_STEP_INDEX.facility : TM_STEP_INDEX.service);
+  const isSignedIn = Boolean(user);
+  // Whether this booking began without an account. Decided when the dialog opens and then kept, so the steps do not
+  // change from five to four in the middle of the journey when the account is made at the details step.
+  const [startedSignedOut, setStartedSignedOut] = useState(!user);
+  useEffect(() => {
+    if (open) {
+      setStartedSignedOut(!user);
+    }
+    // Only when the dialog opens: making the account must not flip this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const [holdingAfterAccount, setHoldingAfterAccount] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(serviceId ?? null);
   const [selectedFacility, setSelectedFacility] = useState<RemoteFacility | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -141,6 +240,15 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   const fastestFacility = useFastestFacility();
   const [holdId, setHoldId] = useState<string | null>(null);
   const [phone, setPhone] = useState(user?.phone ?? "");
+  // The M-Pesa number follows whoever is signed in, until the person types one of their own. It follows them back to blank
+  // too: a staff account that was signed in and out again during this booking must not leave its number on the pay screen of
+  // the patient account made next.
+  const phoneTypedRef = useRef(false);
+  useEffect(() => {
+    if (!phoneTypedRef.current) {
+      setPhone(user?.phone ?? "");
+    }
+  }, [user?.phone]);
   const [preference, setPreference] = useState<Partial<ProviderPreference>>({});
   // Guards against a double-tap sending two M-Pesa prompts; see handlePay.
   const payInFlightRef = useRef(false);
@@ -346,6 +454,24 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
       .filter(({ specialties }) => specialties.length > 0);
   }, [catalogCategoryFilter, catalogSearch, categoryCards]);
 
+  const catalogLoading = categoriesQuery.isLoading || subcategoriesQuery.isLoading || catalogServicesQuery.isLoading;
+  const catalogFailed =
+    !catalogLoading && (categoriesQuery.isError || subcategoriesQuery.isError || catalogServicesQuery.isError);
+  // A failed load must not read as "nothing is available": say what failed and offer to try again.
+  const catalogError = catalogFailed
+    ? classifyApiError(
+        categoriesQuery.error ?? subcategoriesQuery.error ?? catalogServicesQuery.error,
+        "We could not load the consultations."
+      )
+    : null;
+  const retryCatalog = () => {
+    [categoriesQuery, subcategoriesQuery, catalogServicesQuery]
+      .filter((query) => query.isError)
+      .forEach((query) => {
+        query.refetch().catch(() => undefined);
+      });
+  };
+
   useEffect(() => {
     if (!hold) {
       setRemainingHoldSeconds(0);
@@ -376,6 +502,8 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     }
   };
 
+  // Also what Back does on the pay step: the slot was held the moment it was tapped, so going back gives it up at once
+  // instead of leaving it reserved for ten minutes.
   const resetToStart = () => {
     releaseCurrentHold();
     setHoldId(null);
@@ -418,16 +546,17 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
           // Same reset as choosing a facility by hand: another facility may keep a different calendar.
           setSelectedDate(null);
           setPreference({});
-          setStep(TM_STEP_INDEX.preferences);
+          setStep(TM_STEP_INDEX.slot);
         }
       }
     );
   };
 
-  const handleSelectSlot = async (slot: TelemedicineSlot) => {
+  // Holds the chosen time for the signed-in person and moves on to pay. Done straight away for someone who is signed in,
+  // and right after the account is made for someone who was not. A time that has just been taken sends them back to the
+  // list with the reason.
+  const holdSlot = async (slot: TelemedicineSlot) => {
     if (!selectedFacility) return;
-    setSubmitError(null);
-    setSelectedSlot(slot);
     try {
       const newHold = await createHoldMutation.mutateAsync({
         facilityId: selectedFacility.id,
@@ -443,6 +572,33 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
     } catch (error) {
       setSubmitError(classifyApiError(error, "Please try a different slot."));
       setSelectedSlot(null);
+      setStep(TM_STEP_INDEX.slot);
+    }
+  };
+
+  const handleSelectSlot = async (slot: TelemedicineSlot) => {
+    if (!selectedFacility) return;
+    setSubmitError(null);
+    setSelectedSlot(slot);
+    if (!isSignedIn) {
+      // Nothing is held for someone with no account yet: they give their details first, then the time is held.
+      setStep(TM_STEP_INDEX.details);
+      return;
+    }
+    await holdSlot(slot);
+  };
+
+  // The account now exists and the person is signed in: hold the time they chose and go on to pay.
+  const handleAccountReady = async () => {
+    if (!selectedSlot) {
+      setStep(TM_STEP_INDEX.slot);
+      return;
+    }
+    setHoldingAfterAccount(true);
+    try {
+      await holdSlot(selectedSlot);
+    } finally {
+      setHoldingAfterAccount(false);
     }
   };
 
@@ -496,42 +652,85 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
   // cards need room to breathe; every later step is still a single-column form/list that "md"
   // already fits. One Modal, one DOM tree; this is a prop value, not a second layout branch.
   const isServiceStep = step === TM_STEP_INDEX.service && !serviceId;
+  // A person who began without an account sees five steps; a signed-in client sees four, and Confirm is the fourth.
+  const isPage = layout === "page";
+  const stepperSteps = isPage
+    ? startedSignedOut
+      ? PAGE_STEPS_WITH_DETAILS
+      : PAGE_STEPS
+    : startedSignedOut
+      ? TM_STEPS_WITH_DETAILS
+      : TM_STEPS;
+  const stepperCurrent = !startedSignedOut && step === TM_STEP_INDEX.confirm ? 3 : step;
+  // A person who is signed in but whose number gives no country is told so. Someone who has not signed in is simply
+  // shown Kenya's consultations: their country is read from the number they give at the details step.
+  const countryUnknown = isSignedIn && !user?.countryCode;
+  // Room for three cards across on the page; the popup is narrower and keeps two.
+  const serviceGridClass = layout === "page" ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2";
+
+  // On the page a new step replaces the content in place. Take the person back to the top of it and tell a screen reader
+  // where they now are. A popup scrolls itself and keeps focus inside, so it needs neither.
+  const stepRegionRef = useRef<HTMLDivElement | null>(null);
+  const lastStepRef = useRef(step);
+  useEffect(() => {
+    if (lastStepRef.current === step) {
+      return;
+    }
+    lastStepRef.current = step;
+    if (layout === "page") {
+      window.scrollTo({ top: 0 });
+      stepRegionRef.current?.focus({ preventScroll: true });
+    }
+  }, [step, layout]);
+  const stepRegionLabel = `Step ${stepperCurrent + 1} of ${stepperSteps.length}: ${stepperSteps[stepperCurrent]?.title ?? ""}`;
+  const Shell = layout === "page" ? PageShell : DialogShell;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Book a remote consultation" maxWidth={isServiceStep ? "lg" : "md"}>
+    <Shell open={open} onClose={handleClose} wide={isServiceStep} regionLabel={stepRegionLabel} regionRef={stepRegionRef}>
       <div className="space-y-6">
-        <Stepper steps={TM_STEPS} current={step} />
+        <Stepper steps={stepperSteps} current={stepperCurrent} compactOnMobile showDescriptions={!isPage} />
 
         {step === TM_STEP_INDEX.service && (
-          <div className="space-y-3">
-            {!user?.countryCode && <CountryRequiredBanner onComplete={handleClose} />}
-            {serviceId ? (
-              servicesQuery.isLoading && <Loading />
-            ) : (
-              <>
-                {(categoriesQuery.isLoading || subcategoriesQuery.isLoading || catalogServicesQuery.isLoading) && <Loading />}
-              </>
+          <div className="space-y-4">
+            {countryUnknown && <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />}
+            {serviceId && servicesQuery.isLoading && <Loading />}
+            {!serviceId && catalogLoading && <CatalogSkeleton gridClass={serviceGridClass} />}
+            {!serviceId && catalogError && (
+              <ApiErrorBanner category={catalogError.category} message={catalogError.message} onRetry={retryCatalog} />
             )}
-            {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && categoryCards.length === 0 && (
+            {!serviceId && !catalogLoading && !catalogFailed && categoryCards.length === 0 && (
               <p className="text-sm text-slate-500">No remote consultations are available right now.</p>
             )}
             {serviceId && !servicesQuery.isLoading && serviceOptions.length === 0 && (
               <p className="text-sm text-slate-500">No remote-consultation services are available right now.</p>
             )}
-            {!serviceId && !categoriesQuery.isLoading && !subcategoriesQuery.isLoading && !catalogServicesQuery.isLoading && (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600">Choose a consultation below to see available facilities and times.</p>
-                <Input
-                  type="search"
-                  label="Search consultations"
-                  value={catalogSearch}
-                  onChange={(event) => setCatalogSearch(event.target.value)}
-                  placeholder="Search services, specialties, or care areas"
-                />
-                {/* Visual replacement for the old "Care area" <select> -- same catalogCategoryFilter
-                    state, same values ("all" or a category id), just a richer control. */}
+            {!serviceId && !catalogLoading && !catalogFailed && categoryCards.length > 0 && (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+                  <PageStepHeading
+                    hint={
+                      startedSignedOut
+                        ? "Next you pick a clinic and a time. You give your details only after choosing a time."
+                        : "Next you pick a clinic and a time, then pay with M-Pesa."
+                    }
+                  >
+                    Choose a consultation
+                  </PageStepHeading>
+                  {/* The heading says what this is for, so the field needs no label of its own, only a name for assistive technology. */}
+                  <div className="w-full sm:max-w-xs">
+                    <Input
+                      type="search"
+                      aria-label="Search consultations"
+                      value={catalogSearch}
+                      onChange={(event) => setCatalogSearch(event.target.value)}
+                      placeholder="Search services or specialties"
+                    />
+                  </div>
+                </div>
+                {/* One row of care areas: it scrolls sideways on a phone instead of using four rows of the first screen.
+                    Same catalogCategoryFilter state as before, same values ("all" or a category id). */}
                 <div
-                  className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+                  className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0"
                   role="group"
                   aria-label="Filter by care area"
                 >
@@ -551,101 +750,122 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                         type="button"
                         aria-pressed={isActive}
                         onClick={() => setCatalogCategoryFilter(id)}
-                        className={`flex items-center gap-2 rounded-2xl border p-2.5 text-left transition ${
-                          isActive ? "border-tiba-blue bg-tiba-blue/5" : "border-slate-200 bg-white hover:border-tiba-blue"
+                        className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border py-1.5 pl-2 pr-4 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue ${
+                          isActive
+                            ? "border-tiba-blue bg-tiba-blue/5 text-tiba-blue"
+                            : "border-slate-200 bg-white text-slate-800 hover:border-tiba-blue"
                         }`}
                       >
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${asset.bgClass}`}>
-                          <Icon className={`h-5 w-5 ${asset.iconClass}`} aria-hidden="true" />
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${asset.bgClass}`}>
+                          <Icon className={`h-4 w-4 ${asset.iconClass}`} aria-hidden="true" />
                         </span>
-                        <span className="min-w-0 text-sm font-semibold leading-tight text-slate-800">{name}</span>
+                        <span className="whitespace-nowrap">{name}</span>
                       </button>
                     );
                   })}
                 </div>
                 {visibleCategoryCards.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-                    No consultations match your search or filter.
-                  </p>
-                ) : visibleCategoryCards.map(({ category, specialties }) => (
-                  <section key={category.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3">
-                      <h3 className="text-base font-bold text-slate-900">{category.name}</h3>
-                      {category.description && <p className="mt-1 text-sm text-slate-500">{category.description}</p>}
-                    </div>
-                    {specialties.length === 0 ? (
-                      <p className="text-sm text-slate-500">No consultations are available in this area yet.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {specialties.map(({ subcategory, services }) => {
-                          return (
-                            <div key={subcategory.id} className="rounded-xl bg-slate-50 p-3">
-                              <p className="text-sm font-semibold text-slate-800">{subcategory.name}</p>
-                              {subcategory.description && <p className="mt-1 text-xs text-slate-500">{subcategory.description}</p>}
-                              {services.length === 0 ? (
-                                <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
-                              ) : (
-                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                  {services.map((service) => {
-                                    const serviceAsset = getTelemedicineServiceAsset({
-                                      serviceKey: service.key,
-                                      subcategoryKey: subcategory.key,
-                                      categoryKey: category.key
-                                    });
-                                    return (
-                                      <button
-                                        key={service.id}
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedServiceId(service.id);
-                                          setStep(TM_STEP_INDEX.facility);
-                                        }}
-                                        className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm"
-                                      >
-                                        <TelemedicineServiceVisual asset={serviceAsset} />
-                                        <span className="min-w-0 flex-1">
-                                          <span className="flex items-start justify-between gap-2">
-                                            <span className="text-sm font-semibold text-slate-900">{service.name}</span>
-                                            {service.isEmergencyCapable && (
-                                              <span className="shrink-0 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase text-danger-600">
-                                                Urgent care
+                  <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center">
+                    <p className="text-sm text-slate-600">No consultations match your search or filter.</p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-3"
+                      onClick={() => {
+                        setCatalogSearch("");
+                        setCatalogCategoryFilter("all");
+                      }}
+                    >
+                      Show all consultations
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {visibleCategoryCards.map(({ category, specialties }) => (
+                      <section key={category.id} aria-labelledby={`care-area-${category.id}`} className="space-y-4">
+                        <div>
+                          <h3 id={`care-area-${category.id}`} className="text-lg font-bold text-slate-900">
+                            {category.name}
+                          </h3>
+                          {category.description && (
+                            <p className="mt-0.5 line-clamp-2 text-sm text-slate-500 sm:line-clamp-none">{category.description}</p>
+                          )}
+                        </div>
+                        {specialties.length === 0 ? (
+                          <p className="text-sm text-slate-500">No consultations are available in this area yet.</p>
+                        ) : (
+                          <div className="space-y-5">
+                            {specialties.map(({ subcategory, services }) => (
+                              <div key={subcategory.id}>
+                                <h4 className="text-sm font-semibold text-slate-700">{subcategory.name}</h4>
+                                {subcategory.description && (
+                                  <p className="mt-0.5 hidden text-xs text-slate-500 sm:block">{subcategory.description}</p>
+                                )}
+                                {services.length === 0 ? (
+                                  <p className="mt-2 text-xs text-slate-500">No bookable services available yet.</p>
+                                ) : (
+                                  <div className={`mt-2 grid gap-3 ${serviceGridClass}`}>
+                                    {services.map((service) => {
+                                      const serviceAsset = getTelemedicineServiceAsset({
+                                        serviceKey: service.key,
+                                        subcategoryKey: subcategory.key,
+                                        categoryKey: category.key
+                                      });
+                                      return (
+                                        <button
+                                          key={service.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedServiceId(service.id);
+                                            setStep(TM_STEP_INDEX.facility);
+                                          }}
+                                          className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-tiba-blue hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+                                        >
+                                          <TelemedicineServiceVisual asset={serviceAsset} />
+                                          <span className="min-w-0 flex-1">
+                                            <span className="flex items-start justify-between gap-2">
+                                              <span className="text-sm font-semibold text-slate-900">{service.name}</span>
+                                              {service.isEmergencyCapable && (
+                                                <span className="shrink-0 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase text-danger-600">
+                                                  Urgent care
+                                                </span>
+                                              )}
+                                            </span>
+                                            {service.description && (
+                                              <span className="mt-1 block text-xs text-slate-500">{service.description}</span>
+                                            )}
+                                            <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                              <span className="text-sm font-medium text-tiba-blue">
+                                                From {formatCurrency(service.basePriceCents, service.currency)}
+                                              </span>
+                                              <span className="text-xs text-slate-500">{service.defaultEstimateMinutes} min</span>
+                                            </span>
+                                            {service.tags.length > 0 && (
+                                              <span className="mt-2 flex flex-wrap gap-1">
+                                                {service.tags.map((tag) => (
+                                                  <span
+                                                    key={tag}
+                                                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                                                  >
+                                                    {tag}
+                                                  </span>
+                                                ))}
                                               </span>
                                             )}
                                           </span>
-                                          {service.description && (
-                                            <span className="mt-1 block text-xs text-slate-500">{service.description}</span>
-                                          )}
-                                          <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                            <span className="text-sm font-medium text-tiba-blue">
-                                              From {formatCurrency(service.basePriceCents, service.currency)}
-                                            </span>
-                                            <span className="text-xs text-slate-500">{service.defaultEstimateMinutes} min</span>
-                                          </span>
-                                          {service.tags.length > 0 && (
-                                            <span className="mt-2 flex flex-wrap gap-1">
-                                              {service.tags.map((tag) => (
-                                                <span
-                                                  key={tag}
-                                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
-                                                >
-                                                  {tag}
-                                                </span>
-                                              ))}
-                                            </span>
-                                          )}
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </section>
-                ))}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -653,8 +873,9 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
         {step === TM_STEP_INDEX.facility && (
           <div className="space-y-3">
-            {!user?.countryCode ? (
-              <CountryRequiredBanner onComplete={handleClose} />
+            {isPage && !countryUnknown && <PageStepHeading>Choose a clinic</PageStepHeading>}
+            {countryUnknown ? (
+              <RemoteCareRegionNotice actionLabel="Close" onAction={handleClose} />
             ) : (
               <>
                 {facilitiesQuery.isLoading && <Loading />}
@@ -700,7 +921,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   <div className="pt-1">
                     <p className="text-sm font-medium text-slate-600">Facilities offering this consultation</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      The list confirms service coverage; appointment availability is checked separately.
+                      Open times for the clinic you choose are shown on the next step.
                     </p>
                   </div>
                 )}
@@ -716,7 +937,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                         // the same date string would not mean the same window.
                         setSelectedDate(null);
                         setPreference({});
-                        setStep(TM_STEP_INDEX.preferences);
+                        setStep(TM_STEP_INDEX.slot);
                       }}
                       className="w-full rounded-2xl border border-slate-200 p-4 text-left shadow-sm transition hover:border-tiba-blue hover:shadow-md"
                     >
@@ -736,44 +957,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
           </div>
         )}
 
-        {step === TM_STEP_INDEX.preferences && selectedFacility && (
-          <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-            {fastestPick && fastestPick.facilityId === selectedFacility.id && (
-              <div className="rounded-xl border border-tiba-blue/30 bg-white px-4 py-3 text-sm text-slate-700" role="status">
-                <span className="font-semibold text-slate-900">Fastest available: {selectedFacility.name}.</span>{" "}
-                Earliest open time {formatSlotDate(fastestPick.startAt, selectedFacility.timezone ?? undefined)} at{" "}
-                {formatSlotTime(fastestPick.startAt, selectedFacility.timezone ?? undefined)}.
-              </div>
-            )}
-            <div>
-              <p className="text-lg font-semibold text-slate-900">Preferences <span className="font-normal text-slate-500">(optional)</span></p>
-              <p className="mt-1 text-sm text-slate-500">Tell us what matters to you before you choose a time.</p>
-            </div>
-            <ProviderPreferenceFields
-              value={preference}
-              alwaysExpanded
-              onChange={(next) => {
-                setPreference(next);
-              }}
-            />
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button type="button" onClick={() => setStep(TM_STEP_INDEX.slot)}>
-                Continue to choose a time
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(TM_STEP_INDEX.slot)}>
-                Skip for now
-              </Button>
-            </div>
-            <div className="flex justify-start border-t border-slate-200 pt-3">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
-                Back
-              </Button>
-            </div>
-          </div>
-        )}
-
         {step === TM_STEP_INDEX.slot && selectedFacility && (
           <div className="space-y-3">
+            {isPage && <PageStepHeading>Pick a time</PageStepHeading>}
+            {/* Asked here, before a time is chosen and so before the ten-minute hold starts: nothing optional is ever
+                left to do on the pay screen while the reserved time runs down. Collapsed unless the person opens it. */}
+            <ProviderPreferenceFields value={preference} onChange={(next) => setPreference(next)} />
             {fastestPick && fastestPick.facilityId === selectedFacility.id && !slotsQuery.isLoading && !slotsQuery.isError && (
               earliestSlot ? (
                 <div className="flex flex-col gap-3 rounded-2xl border border-tiba-blue/30 bg-tiba-blue/5 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -805,7 +994,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 onClick={() => setWeekOffset((current) => Math.max(0, current - 1))}
                 disabled={!canGoBack}
                 aria-label="Previous week"
-                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-xl text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
               >
                 &lsaquo;
               </button>
@@ -815,7 +1004,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                 onClick={() => setWeekOffset((current) => current + 1)}
                 disabled={!canGoForward}
                 aria-label="Next week"
-                className="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-xl text-slate-600 transition hover:border-tiba-blue disabled:cursor-not-allowed disabled:opacity-40"
               >
                 &rsaquo;
               </button>
@@ -876,7 +1065,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   type="button"
                   disabled={createHoldMutation.isPending}
                   onClick={() => handleSelectSlot(slot)}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
+                  className="min-h-[44px] rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-tiba-blue hover:text-tiba-blue disabled:opacity-50"
                 >
                   {formatSlotTime(slot.startAt, slotTimezone)} &ndash;{" "}
                   {formatSlotTime(slot.endAt, slotTimezone)}
@@ -884,15 +1073,27 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
               ))}
             </div>
             <div className="flex justify-start">
-              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.preferences)}>
+              <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.facility)}>
                 Back
               </Button>
             </div>
           </div>
         )}
 
+        {step === TM_STEP_INDEX.details && (
+          <BookingAccountStep
+            busy={holdingAfterAccount}
+            onReady={handleAccountReady}
+            onBack={() => {
+              setSubmitError(null);
+              setStep(TM_STEP_INDEX.slot);
+            }}
+          />
+        )}
+
         {step === TM_STEP_INDEX.confirm && selectedFacility && selectedSlot && (
           <div className="space-y-4">
+            {isPage && <PageStepHeading>Review and pay</PageStepHeading>}
             <div className="rounded-2xl border border-slate-200 p-4">
               <div className="flex items-center gap-3">
                 {selectedServiceAssetKeys && (
@@ -913,9 +1114,12 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
             </div>
 
             {!holdExpired && !paymentConfirmed && (
-              <p className="text-xs text-amber-700">
-                Holding this slot for {Math.floor(remainingHoldSeconds / 60)}:
-                {String(remainingHoldSeconds % 60).padStart(2, "0")} -- complete payment before it expires.
+              <p className="text-sm font-medium text-amber-800">
+                Holding this slot for{" "}
+                <span className="tabular-nums">
+                  {Math.floor(remainingHoldSeconds / 60)}:{String(remainingHoldSeconds % 60).padStart(2, "0")}
+                </span>
+                . Complete payment before it expires.
               </p>
             )}
 
@@ -936,12 +1140,24 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
                   label="M-Pesa phone number"
                   type="tel"
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  onChange={(event) => {
+                    phoneTypedRef.current = true;
+                    setPhone(event.target.value);
+                  }}
                   onBlur={() => setPhoneTouched(true)}
                   placeholder="+254 700 000000"
                   error={phoneError ?? undefined}
                   hint={phoneError ? undefined : "The STK push to approve payment goes to this number."}
                 />
+                {/* What happens if plans change or the appointment cannot be confirmed. The cancellation window is the
+                    server's (GET /telemedicine/policy), never typed here; the second sentence promises review and
+                    contact, not money back, exactly as the notification a client would receive does. */}
+                <p className="text-xs text-slate-600">
+                  {(policyQuery.data?.cancellationCutoffMinutes ?? 0) > 0
+                    ? `You can cancel until ${policyQuery.data?.cancellationCutoffMinutes} minutes before your appointment. `
+                    : ""}
+                  If we cannot confirm your appointment after you pay, we review the payment and contact you.
+                </p>
                 {paymentInFlight && (
                   <p role="status" className="text-sm text-slate-600">
                     Preparing payment...
@@ -980,7 +1196,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
 
             {!paymentConfirmed && (
               <div className="flex justify-start">
-                <Button type="button" variant="secondary" onClick={() => setStep(TM_STEP_INDEX.slot)} disabled={paymentInitiated}>
+                <Button type="button" variant="secondary" onClick={resetToStart} disabled={paymentInitiated}>
                   Back
                 </Button>
               </div>
@@ -988,7 +1204,7 @@ export const TelemedicineRequestDialog = ({ open, onClose, serviceId, onCreated 
           </div>
         )}
       </div>
-    </Modal>
+    </Shell>
   );
 };
 

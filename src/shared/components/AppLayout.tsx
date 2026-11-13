@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
+import { areaOfPath, areasOpenedBy } from "../rbac/portalRoles";
 import classNames from "classnames";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar, type NavItem } from "./AppSidebar";
@@ -94,6 +95,10 @@ export const AppLayout = ({
     return resolveSettingsPath(location.pathname, user?.roles ?? []);
   };
 
+  // The areas this person's roles open, other than the one they are in. Empty for nearly everyone, who hold one role.
+  const currentArea = areaOfPath(location.pathname);
+  const otherAreas = areasOpenedBy(user?.roles).filter((area) => area.key !== currentArea);
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50" style={layoutStyle}>
       {/* Sidebar for Desktop */}
@@ -115,6 +120,8 @@ export const AppLayout = ({
             onNavigateProfile={() => navigate(getProfilePath())}
             onNavigatePayments={() => navigate(getPaymentsPath())}
             onNavigateSettings={() => navigate(getSettingsPath())}
+            otherAreas={otherAreas}
+            onSwitchArea={(area) => navigate(area.path)}
           />
         )}
 

@@ -11,7 +11,7 @@
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useAuthMock = vi.fn();
@@ -43,8 +43,21 @@ beforeAll(() => {
 });
 
 const CLIENT_APP_HOME = "client-app-home";
-const LOGIN_PAGE = "login-page";
+const SIGNUP_PAGE = "signup-page";
+const PUBLIC_BOOKING_PAGE = "public-booking-page";
+const PUBLIC_HOME_CARE_PAGE = "public-home-care-page";
 const NOT_FOUND_FALLBACK = "not-found-fallback";
+
+/** Shows where a visitor landed, including the destination carried in ?next=. */
+const SignUpProbe = () => {
+  const location = useLocation();
+  return (
+    <div>
+      {SIGNUP_PAGE}
+      <span data-testid="signup-search">{location.search}</span>
+    </div>
+  );
+};
 
 const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
   useAuthMock.mockReturnValue({ isAuthenticated });
@@ -58,7 +71,9 @@ const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
             honest: it fires for paths the app genuinely does not serve, rather than for
             /app routes this test did not happen to enumerate. */}
         <Route path="/app/*" element={<div>{CLIENT_APP_HOME}</div>} />
-        <Route path="/login" element={<div>{LOGIN_PAGE}</div>} />
+        <Route path="/signup" element={<SignUpProbe />} />
+        <Route path="/book/telemedicine" element={<div>{PUBLIC_BOOKING_PAGE}</div>} />
+        <Route path="/book/home-care" element={<div>{PUBLIC_HOME_CARE_PAGE}</div>} />
         {/* Mirrors src/app/routes.tsx: an unknown path redirects to login. */}
         <Route path="/unknown" element={<div>{NOT_FOUND_FALLBACK}</div>} />
         <Route path="*" element={<Navigate to="/unknown" replace />} />
@@ -106,7 +121,7 @@ describe("homepage calls to action", () => {
       await user.click(screen.getAllByRole("button", { name: new RegExp(label, "i") })[0]);
 
       expect(screen.getByText(CLIENT_APP_HOME)).toBeInTheDocument();
-      expect(screen.queryByText(LOGIN_PAGE)).not.toBeInTheDocument();
+      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
     });
 
@@ -129,26 +144,39 @@ describe("homepage calls to action", () => {
   });
 
   describe("when the visitor is signed out", () => {
-    it("sends the primary call to action to login", async () => {
+    it("sends the home-care call to action to the public home care booking page, not to sign-up", async () => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: false });
 
       await user.click(screen.getAllByRole("button", { name: /Book Home Care/i })[0]);
 
-      expect(screen.getByText(LOGIN_PAGE)).toBeInTheDocument();
+      expect(screen.getByText(PUBLIC_HOME_CARE_PAGE)).toBeInTheDocument();
+      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
     });
 
+    it("sends every home care card on the page to the home care booking page", async () => {
+      const user = userEvent.setup();
+      for (const label of ["Doctor & Nurse Home Visits", "Nursing & Long-Term Care", "Therapy & Rehabilitation", "Lab Sample Collection"]) {
+        const view = renderHome({ isAuthenticated: false });
+        await user.click(screen.getAllByText(label)[0]);
+        expect(screen.getByText(PUBLIC_HOME_CARE_PAGE)).toBeInTheDocument();
+        view.unmount();
+      }
+    });
+
     it.each(["Talk to a Doctor", "Find a Specialist", "Video Doctor Consultation"])(
-      "sends %s to login when the visitor is signed out",
+      "sends %s to the public booking page, so the visitor sees services and times before any sign-up",
       async (label) => {
         const user = userEvent.setup();
         renderHome({ isAuthenticated: false });
 
         await user.click(screen.getAllByRole("button", { name: new RegExp(label, "i") })[0]);
 
-        expect(screen.getByText(LOGIN_PAGE)).toBeInTheDocument();
+        expect(screen.getByText(PUBLIC_BOOKING_PAGE)).toBeInTheDocument();
+        expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
         expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
+        expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
       }
     );
   });
