@@ -54,11 +54,21 @@ describe("the site header on the booking page", () => {
   });
 });
 
+describe("the site header on the home care booking page", () => {
+  it("steps back the same way: no Book Now to itself and no empty menu, and the number stays one tap away", () => {
+    renderAt("/book/home-care");
+
+    expect(screen.queryByRole("link", { name: "Book Now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: `Call ${COMPANY_PHONE_DISPLAY}` })).toHaveAttribute("href", `tel:${COMPANY_PHONE}`);
+  });
+});
+
 describe("the site header elsewhere", () => {
   it("keeps Book Now and the menu button on the landing page", () => {
     renderAt("/");
 
-    expect(screen.getByRole("link", { name: "Book Now" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Book Now" })).toHaveAttribute("href", "/book/home-care");
     expect(screen.getByRole("button")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: `Call ${COMPANY_PHONE_DISPLAY}` })).not.toBeInTheDocument();
   });

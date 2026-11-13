@@ -6,6 +6,7 @@ import { LocationPickerMap } from "../../../shared/components/LocationPickerMap"
 import { useJsApiLoader } from "@react-google-maps/api";
 
 import { MAP_LIBRARIES } from "../../../shared/constants/maps";
+import { useMapFailed } from "../../../shared/hooks/useMapFailed";
 import { CURRENT_PLACE, reverseGeocode, searchPlaces, type Coords, type Place, type PlaceSuggestion } from "../../../shared/utils/geocoding";
 
 export type PlaceSource = "current" | "search" | "map";
@@ -44,6 +45,7 @@ export const PlacePicker = ({ value, onChange }: Props) => {
   const searchRun = useRef(0);
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   const hasMap = Boolean(mapsKey);
+  const mapFailed = useMapFailed(hasMap && Boolean(value));
 
   useEffect(() => {
     if (!value) setEditing(true);
@@ -218,8 +220,8 @@ export const PlacePicker = ({ value, onChange }: Props) => {
 
       {mapsKey && <GoogleMapsLoader apiKey={mapsKey} onReady={() => setGoogleReady(true)} />}
 
-      {hasMap && value && (
-        <LocationPickerMap value={value.coords} onChange={mapMoved} height={220} />
+      {hasMap && value && !mapFailed && (
+        <LocationPickerMap value={value.coords} onChange={mapMoved} height={220} showSearch={false} />
       )}
     </div>
   );

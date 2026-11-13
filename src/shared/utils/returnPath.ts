@@ -18,6 +18,10 @@ export const TELEMEDICINE_BOOKING_PATH = "/app/telemedicine?book=1";
  * consultation, a clinic and a time first, and are asked for their details only then.
  */
 export const PUBLIC_TELEMEDICINE_BOOKING_PATH = "/book/telemedicine";
+/** Where a visitor with no account asks for a carer to visit them at home. */
+export const PUBLIC_HOME_CARE_BOOKING_PATH = "/book/home-care";
+/** Where a signed-in client chooses and books home care inside the app. */
+export const CLIENT_HOME_CARE_PATH = "/app/services";
 
 export const safeReturnPath = (raw: unknown): string | null => {
   if (typeof raw !== "string") {

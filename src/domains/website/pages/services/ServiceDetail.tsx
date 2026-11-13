@@ -1,10 +1,9 @@
 
-import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Check, ArrowRight, HelpCircle, Phone, Calendar, Stethoscope, UserCheck } from "lucide-react";
 
 import { COMPANY_PHONE } from "../../../../shared/constants/contact";
-import { GuestBookingDialog } from "../../components/GuestBookingDialog";
+import { PUBLIC_HOME_CARE_BOOKING_PATH } from "../../../../shared/utils/returnPath";
 import doctorImage from "../../../assets/images/service-doctor.png";
 import nurseImage from "../../../assets/images/service-nurse.png";
 import therapyImage from "../../../assets/images/service-therapy.png";
@@ -183,11 +182,10 @@ const defaultService = {
 export const ServiceDetail = () => {
     const { slug } = useParams();
     const service = serviceData[slug || ""] || defaultService;
-    const [showGuestBooking, setShowGuestBooking] = useState(false);
 
     if (!service.title) return <div>Service not found</div>;
 
-    const serviceKey = slug || "";
+    const bookingPath = PUBLIC_HOME_CARE_BOOKING_PATH;
 
     const steps = [
         { title: "Book", desc: "Select service & time." },
@@ -208,12 +206,12 @@ export const ServiceDetail = () => {
                     <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 font-display">{service.title}</h1>
                     <p className="text-xl text-blue-200 mb-10 font-medium">{service.subtitle}</p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button
-                            onClick={() => setShowGuestBooking(true)}
+                        <Link
+                            to={bookingPath}
                             className="px-8 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/30"
                         >
                             Book Now
-                        </button>
+                        </Link>
                         <Link to="/login" className="px-8 py-4 bg-white/10 text-white rounded-xl font-bold hover:bg-white/20 transition-all border border-white/20">
                             Sign In to Book
                         </Link>
@@ -311,12 +309,12 @@ export const ServiceDetail = () => {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => setShowGuestBooking(true)}
+                            <Link
+                                to={bookingPath}
                                 className="block w-full py-4 bg-blue-900 text-white text-center rounded-xl font-bold hover:bg-blue-800 transition-colors mb-2"
                             >
                                 Book Now (No Account)
-                            </button>
+                            </Link>
                             <Link to="/login" className="block w-full py-3 bg-slate-100 text-slate-700 text-center rounded-xl font-medium hover:bg-slate-200 transition-colors mb-4">
                                 Sign In to Book
                             </Link>
@@ -332,12 +330,6 @@ export const ServiceDetail = () => {
                 </div>
             </div>
 
-            <GuestBookingDialog
-                open={showGuestBooking}
-                onClose={() => setShowGuestBooking(false)}
-                serviceKey={serviceKey}
-                serviceName={service.title}
-            />
         </div>
     );
 };

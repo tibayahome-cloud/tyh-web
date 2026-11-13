@@ -5,7 +5,7 @@ import { Menu, X, Phone, ChevronDown } from "lucide-react";
 import classNames from "classnames";
 import logo from "../../../assets/images/logo.jpeg";
 import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
-import { PUBLIC_TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
+import { PUBLIC_HOME_CARE_BOOKING_PATH, PUBLIC_TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
 
 export const WebsiteHeader = () => {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -13,7 +13,8 @@ export const WebsiteHeader = () => {
     const location = useLocation();
     // On the booking page the page is the booking: no "Book Now" (it goes to sign-in, away from a booking in progress), no
     // menu with nothing else in it, and a slimmer bar so the first choice is not pushed down the screen.
-    const onBookingPage = location.pathname === PUBLIC_TELEMEDICINE_BOOKING_PATH;
+    const onBookingPage =
+        location.pathname === PUBLIC_TELEMEDICINE_BOOKING_PATH || location.pathname === PUBLIC_HOME_CARE_BOOKING_PATH;
 
     useEffect(() => {
         const handleScroll = () => {
@@ -61,7 +62,7 @@ export const WebsiteHeader = () => {
                         </a>
                         {!onBookingPage && (
                             <Link
-                                to="/login"
+                                to={PUBLIC_HOME_CARE_BOOKING_PATH}
                                 className="px-5 py-2.5 rounded-full bg-tiba-blue text-white font-medium text-sm hover:opacity-90 transition-colors shadow-lg shadow-tiba-blue/20"
                             >
                                 Book Now
@@ -94,7 +95,7 @@ export const WebsiteHeader = () => {
             {isMobileMenuOpen && !onBookingPage && (
                 <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-xl p-4 flex flex-col gap-4">
                     <Link
-                        to="/login"
+                        to={PUBLIC_HOME_CARE_BOOKING_PATH}
                         className="px-4 py-3 rounded-xl bg-tiba-blue text-white font-medium text-center"
                         onClick={() => setIsMobileMenuOpen(false)}
                     >
