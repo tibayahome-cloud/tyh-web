@@ -84,6 +84,9 @@ type AuthContextValue = {
   expireSession: () => void;
 };
 
+// How long to wait before trying to renew again after a failure that says nothing about the session (no network, a timeout).
+const RENEWAL_RETRY_MS = 30_000;
+
 const readStoredTokens = (): AuthTokens => {
   if (typeof window === "undefined") {
     return { accessToken: null, refreshToken: null, persist: false };
@@ -482,8 +485,28 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         });
         setSessionExpired(false);
         return accessToken;
-      } catch {
-        clearTokens(true);
+      } catch (error) {
+        // Another tab may have used this refresh token a moment ago and stored the new pair: that is a renewal that worked,
+        // so take it instead of treating this tab's refusal as the end of the session.
+        const stored = readStoredTokens();
+        if (stored.accessToken && stored.refreshToken && stored.refreshToken !== refreshToken) {
+          updateTokens({ accessToken: stored.accessToken, refreshToken: stored.refreshToken });
+          setSessionExpired(false);
+          return stored.accessToken;
+        }
+        // Only a refusal ends the session. No network, a timeout or a server error says nothing about the session, so stay
+        // signed in and try again shortly.
+        const status = isAxiosError(error) ? error.response?.status : undefined;
+        if (status === 400 || status === 401) {
+          clearTokens(true);
+          return null;
+        }
+        if (typeof window !== "undefined") {
+          clearExpiryTimer();
+          expiryTimerRef.current = window.setTimeout(() => {
+            void refreshRef.current();
+          }, RENEWAL_RETRY_MS);
+        }
         return null;
       } finally {
         refreshInFlight.current = null;
@@ -491,7 +514,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     })();
 
     return refreshInFlight.current;
-  }, [clearTokens, isRefreshExpired, updateTokens]);
+  }, [clearExpiryTimer, clearTokens, isRefreshExpired, updateTokens]);
 
   useEffect(() => {
     refreshRef.current = performRefresh;

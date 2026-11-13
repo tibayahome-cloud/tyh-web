@@ -108,15 +108,55 @@ describe("session renewal", () => {
     expect(result.current.sessionExpired).toBe(false);
   });
 
-  it("ends the session when the renewal is refused", async () => {
+  const answeredWith = (status: number) => ({ isAxiosError: true, response: { status } });
+
+  it.each([400, 401])("ends the session when the server refuses the renewal (%i)", async (status) => {
     storeTokens(tokenExpiringIn(5 * 60), "refresh-1");
-    mockPost.mockRejectedValue(new Error("refresh refused"));
+    mockPost.mockRejectedValue(answeredWith(status));
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await settle(5 * MINUTE);
 
     expect(result.current.accessToken).toBeNull();
     expect(result.current.sessionExpired).toBe(true);
+  });
+
+  it("stays signed in when the renewal fails for a reason that says nothing about the session, and tries again", async () => {
+    storeTokens(tokenExpiringIn(5 * 60), "refresh-1");
+    const renewed = tokenExpiringIn(2 * 60 * 60);
+    mockPost
+      .mockRejectedValueOnce({ isAxiosError: true, code: "ERR_NETWORK", message: "Network Error" }) // no response at all
+      .mockRejectedValueOnce(answeredWith(503))
+      .mockResolvedValue({ data: { data: { access_token: renewed, refresh_token: "refresh-2" } } });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await settle(5 * MINUTE);
+    expect(result.current.sessionExpired).toBe(false);
+    expect(result.current.refreshToken).toBe("refresh-1");
+
+    await settle(30_000);
+    expect(result.current.sessionExpired).toBe(false);
+
+    await settle(30_000);
+    expect(result.current.accessToken).toBe(renewed);
+    expect(result.current.refreshToken).toBe("refresh-2");
+  });
+
+  it("takes the new tokens another tab already stored instead of signing out when its own renewal is refused", async () => {
+    storeTokens(tokenExpiringIn(5 * 60), "refresh-1");
+    const fromOtherTab = tokenExpiringIn(2 * 60 * 60);
+    mockPost.mockImplementation(async () => {
+      // The other tab used refresh-1 first and stored the pair it got back; this tab's call is then refused.
+      storeTokens(fromOtherTab, "refresh-2");
+      throw answeredWith(401);
+    });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await settle(5 * MINUTE);
+
+    expect(result.current.sessionExpired).toBe(false);
+    expect(result.current.accessToken).toBe(fromOtherTab);
+    expect(result.current.refreshToken).toBe("refresh-2");
   });
 
   it("ends the session when there is no refresh token to renew with", async () => {
