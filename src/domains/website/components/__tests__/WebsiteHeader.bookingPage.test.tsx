@@ -79,4 +79,24 @@ describe("the site header elsewhere", () => {
     expect(container.querySelector("header")).toHaveClass("py-5");
     expect(container.querySelector("header > div > div")).toHaveClass("h-20");
   });
+
+  it("gives a returning client a Sign in link to the login page, on the bar for both desktop and phone", () => {
+    renderAt("/");
+
+    const links = screen.getAllByRole("link", { name: "Sign in" });
+    expect(links).toHaveLength(2);
+    links.forEach((link) => expect(link).toHaveAttribute("href", "/login"));
+  });
+
+  it("names the menu button for screen readers", () => {
+    renderAt("/");
+
+    expect(screen.getByRole("button", { name: "Open menu" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("does not add Sign in to the booking page, where the details step already signs a returning client in", () => {
+    renderAt("/book/telemedicine");
+
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+  });
 });
