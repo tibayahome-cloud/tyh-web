@@ -62,6 +62,14 @@ export const WebsiteHeader = () => {
                         </a>
                         {!onBookingPage && (
                             <Link
+                                to="/login"
+                                className="px-3 py-2.5 rounded-full text-slate-700 font-medium text-sm hover:text-tiba-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+                            >
+                                Sign in
+                            </Link>
+                        )}
+                        {!onBookingPage && (
+                            <Link
                                 to={PUBLIC_HOME_CARE_BOOKING_PATH}
                                 className="px-5 py-2.5 rounded-full bg-tiba-blue text-white font-medium text-sm hover:opacity-90 transition-colors shadow-lg shadow-tiba-blue/20"
                             >
@@ -80,13 +88,23 @@ export const WebsiteHeader = () => {
                             <Phone className="w-5 h-5" aria-hidden="true" />
                         </a>
                     ) : (
-                        /* Mobile Menu Button */
-                        <button
-                            className="lg:hidden p-2 text-slate-900"
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        >
-                            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                        </button>
+                        /* Sign in stays on the bar on a phone (a returning client should not have to open a menu for it), then the menu button. */
+                        <div className="lg:hidden flex items-center gap-1">
+                            <Link
+                                to="/login"
+                                className="flex h-11 items-center rounded-full px-3 text-sm font-medium text-slate-800 hover:text-tiba-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+                            >
+                                Sign in
+                            </Link>
+                            <button
+                                className="flex h-11 w-11 items-center justify-center text-slate-900"
+                                aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                                aria-expanded={isMobileMenuOpen}
+                                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            >
+                                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
