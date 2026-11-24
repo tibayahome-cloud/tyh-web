@@ -14,6 +14,8 @@ type Props = {
   /** Some papers (a licence) must carry the date they run out; the API asks for it. */
   hasExpiry: boolean;
   expiresOn: string | null;
+  /** False where the page already has its own View button. */
+  showView?: boolean;
   onUploaded: () => void;
 };
 
@@ -23,7 +25,7 @@ const ACCEPT = "application/pdf,image/jpeg,image/png";
  * Lets an administrator add or replace one of a provider's documents for them, and open what is on file.
  * The server decides who may: a super admin for any provider, a facility admin for their own facility's.
  */
-export const ProviderItemDocument = ({ applicationId, itemId, label, hasFile, hasExpiry, expiresOn, onUploaded }: Props) => {
+export const ProviderItemDocument = ({ applicationId, itemId, label, hasFile, hasExpiry, expiresOn, showView = true, onUploaded }: Props) => {
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [expiry, setExpiry] = useState(expiresOn ?? "");
@@ -122,7 +124,7 @@ export const ProviderItemDocument = ({ applicationId, itemId, label, hasFile, ha
         >
           {hasFile ? `Replace ${label}` : `Add ${label}`}
         </Button>
-        {hasFile && (
+        {hasFile && showView && (
           <Button variant="ghost" className="min-h-[44px] px-3 text-xs" onClick={open} disabled={opening}>
             View {label}
           </Button>

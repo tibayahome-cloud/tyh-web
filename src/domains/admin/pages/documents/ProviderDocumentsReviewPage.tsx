@@ -14,6 +14,7 @@ import { useRbac } from "../../../../shared/hooks/useRbac";
 import { ROLE_ADMIN_SUPER } from "../../../../shared/rbac/roles";
 import { describeExpiry, formatDocumentDate } from "../../../provider/utils/documentDisplay";
 import { DocumentsDateControl } from "./DocumentsDateControl";
+import { ProviderItemDocument } from "../../components/ProviderItemDocument";
 import { changeProviderDocumentsDate, fetchApplicationForReview, reviewDetailKey, reviewItem, type ReviewItem } from "./reviewApi";
 import { describeItem, requiredProgress, splitItems } from "./reviewDisplay";
 
@@ -127,6 +128,12 @@ export const ProviderDocumentsReviewPage = () => {
             {item.comment}
           </p>
         )}
+        {item.uploaded_by && (
+          <p className="mt-2 text-xs text-slate-600">
+            Added for the provider by {item.uploaded_by.kind === "platform" ? "Tiba Ya Home" : "their facility"}
+            {item.uploaded_by.name ? ` (${item.uploaded_by.name})` : ""}
+          </p>
+        )}
         {(hasFile || state.canDecide) && (
           <div className="mt-3 flex flex-wrap gap-2">
             {hasFile && (
@@ -164,6 +171,18 @@ export const ProviderDocumentsReviewPage = () => {
               </>
             )}
           </div>
+        )}
+        {item.requirement_type?.input_type !== "text" && application && (
+          <ProviderItemDocument
+            applicationId={application.id}
+            itemId={item.id}
+            label={label}
+            hasFile={hasFile}
+            hasExpiry={Boolean(item.requirement_type?.has_expiry)}
+            expiresOn={item.expires_on ?? null}
+            showView={false}
+            onUploaded={refresh}
+          />
         )}
       </li>
     );
