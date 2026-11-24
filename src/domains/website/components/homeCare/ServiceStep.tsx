@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 
@@ -6,7 +6,7 @@ import { ApiErrorBanner } from "../../../../shared/components/ApiErrorBanner";
 import { Input } from "../../../../shared/components/Input";
 import { Skeleton } from "../../../../shared/components/Skeleton";
 import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../../shared/constants/contact";
-import { fetchHomeCareServices, type HomeCareService } from "../../../../shared/libs/homeCarePublic";
+import { fetchHomeCareServices, type CareKind, type HomeCareService } from "../../../../shared/libs/homeCarePublic";
 import { careServiceImage } from "../../../../shared/utils/careServiceImage";
 import { classifyApiError } from "../../../../shared/utils/errors";
 
@@ -19,8 +19,16 @@ export const StepHeading = ({ children, hint }: { children: string; hint?: strin
 
 const ALL = "all";
 
-export const ServiceStep = ({ onChoose }: { onChoose: (service: HomeCareService) => void }) => {
-  const query = useQuery({ queryKey: ["public", "home-care", "services"], queryFn: fetchHomeCareServices, staleTime: 60_000 });
+export const ServiceStep = ({ onChoose, kind = "home" }: { onChoose: (service: HomeCareService) => void; kind?: CareKind }) => {
+  const query = useQuery({ queryKey: ["public", "home-care", "services", kind], queryFn: () => fetchHomeCareServices(kind), staleTime: 60_000 });
+  const ambulance = kind === "ambulance";
+  // An ambulance request with one service on offer needs no choosing: go straight on, once. Back brings the list.
+  const autoChosen = useRef(false);
+  useEffect(() => {
+    if (!ambulance || autoChosen.current || !query.data || query.data.length !== 1) return;
+    autoChosen.current = true;
+    onChoose(query.data[0]);
+  }, [ambulance, query.data, onChoose]);
   const [text, setText] = useState("");
   const [category, setCategory] = useState(ALL);
 
@@ -45,7 +53,9 @@ export const ServiceStep = ({ onChoose }: { onChoose: (service: HomeCareService)
 
   return (
     <div className="space-y-4">
-      <StepHeading hint="A carer comes to you. You pay after the visit.">What care do you need at home?</StepHeading>
+      <StepHeading hint={ambulance ? "An ambulance is sent to you. You pay after." : "A carer comes to you. You pay after the visit."}>
+        {ambulance ? "Which ambulance service do you need?" : "What care do you need at home?"}
+      </StepHeading>
 
       {query.isLoading && (
         <div className="space-y-3" role="status" aria-live="polite">
@@ -65,11 +75,11 @@ export const ServiceStep = ({ onChoose }: { onChoose: (service: HomeCareService)
 
       {query.data && query.data.length === 0 && (
         <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-          No home care services are open for booking online right now. Call us on{" "}
+          {ambulance ? "No ambulance service is open for online requests right now. Call 999 or 112, or us on" : "No home care services are open for booking online right now. Call us on"}{" "}
           <a className="font-semibold underline underline-offset-2" href={`tel:${COMPANY_PHONE}`}>
             {COMPANY_PHONE_DISPLAY}
-          </a>{" "}
-          and we will arrange a visit.
+          </a>
+          {ambulance ? "." : " and we will arrange a visit."}
         </p>
       )}
 
