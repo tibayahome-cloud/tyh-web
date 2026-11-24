@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let denied: string[] = [];
 let applicationStatus = "approved";
+let applicationItems: unknown[] = [];
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
 vi.mock("../../../../../shared/libs/api", () => ({ api }));
@@ -70,6 +71,7 @@ beforeEach(() => {
   denied = [];
   offered = [];
   applicationStatus = "approved";
+  applicationItems = [];
   vi.clearAllMocks();
   vi.mocked(fetchFacilityBookings).mockResolvedValue({ bookings: [], meta: null, counts: null, raw: {} } as never);
   api.put.mockResolvedValue({});
@@ -79,7 +81,7 @@ beforeEach(() => {
     if (url === "/providers/u1") return { data: { data: providerPayload } };
     if (url === "/providers/u1/analytics") return { data: { data: { rank: 1, total_providers: 4, rating_avg: 4.5, rating_count: 3, active_services: 2, upcoming_blackouts: 1 } } };
     if (url === "/provider-applications")
-      return { data: { data: [{ id: "app1", status: applicationStatus, progress_percent: 50, items: [] }] } };
+      return { data: { data: [{ id: "app1", status: applicationStatus, progress_percent: 50, items: applicationItems }] } };
     if (url === "/users/u1/activity") return { data: { data: { audit: [{ id: "e1", action: "UPDATE", resource_type: "provider_availability", at: "2026-10-13T08:00:00Z", reason: "provider availability replaced" }], requests: [] } } };
     if (url === "/providers/u1/available-services") return { data: { data: offered } };
     return { data: { data: [] } };
@@ -105,6 +107,17 @@ describe("provider header and actions", () => {
     expect(screen.getByRole("menuitem", { name: "Enable emergency" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Resend welcome message" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Refresh data" })).toBeInTheDocument();
+  });
+
+  it("lets an administrator add a document for the provider against each file requirement, and not for a typed answer", async () => {
+    applicationItems = [
+      { id: "i1", status: "missing", file_url: null, requirement_type: { id: "r1", key: "licence", label: "Practising licence", input_type: "file", has_expiry: false } },
+      { id: "i2", status: "pending", value_text: "A123456789B", requirement_type: { id: "r2", key: "kra-pin", label: "KRA PIN", input_type: "text" } }
+    ];
+    renderPage();
+    await userEvent.click(await screen.findByRole("tab", { name: /Onboarding/ }));
+    expect(await screen.findByRole("button", { name: "Add Practising licence" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /KRA PIN/ })).not.toBeInTheDocument();
   });
 
   it("shows Approve and Reject only while an application is waiting for a decision", async () => {
