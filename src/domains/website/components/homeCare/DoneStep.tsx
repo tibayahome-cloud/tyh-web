@@ -5,11 +5,21 @@ import { type HomeCareRequestResult } from "../../../../shared/libs/homeCarePubl
 import { bookingReference } from "../../../../shared/utils/bookingReference";
 import { paidAfterLine } from "./format";
 
-export const DoneStep = ({ result, serviceName, phone }: { result: HomeCareRequestResult; serviceName: string; phone: string }) => (
+export const DoneStep = ({
+  result,
+  serviceName,
+  phone,
+  ambulance = false
+}: {
+  result: HomeCareRequestResult;
+  serviceName: string;
+  phone: string;
+  ambulance?: boolean;
+}) => (
   <div className="space-y-4" role="status">
     <div className="flex items-center gap-3">
       <CheckCircle2 className="h-8 w-8 shrink-0 text-emerald-600" aria-hidden />
-      <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">Your visit is requested</h2>
+      <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">{ambulance ? "Your ambulance is requested" : "Your visit is requested"}</h2>
     </div>
     <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
       <p>
@@ -17,6 +27,11 @@ export const DoneStep = ({ result, serviceName, phone }: { result: HomeCareReque
         {result.scheduled_at ? ` on ${new Date(result.scheduled_at).toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })}` : ", as soon as possible"}.
       </p>
       <p className="mt-2">They will call {phone} to confirm. {paidAfterLine(result.price_cents, result.currency)}</p>
+      {ambulance && (
+        <p className="mt-2 font-semibold text-slate-900">
+          If it is getting worse, do not wait for the call: dial 999 or 112.
+        </p>
+      )}
       <p className="mt-2">
         Your reference: <span className="font-mono font-semibold text-slate-900">{bookingReference(result.booking_id)}</span>
       </p>

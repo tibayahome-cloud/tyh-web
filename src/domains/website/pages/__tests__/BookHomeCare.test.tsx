@@ -49,10 +49,10 @@ const SERVICES = [
 ];
 const CLINIC = { id: "fac-1", name: "Kilimani Clinic", distance_km: 3.8, price_cents: 250000, currency: "KES", estimate_duration_minutes: 45 };
 
-const renderPage = () =>
+const renderPage = (path = "/book/home-care") =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <BookHomeCare />
       </MemoryRouter>
     </QueryClientProvider>
@@ -319,5 +319,48 @@ describe("the details and the code", () => {
     await user.click(screen.getByRole("button", { name: "Request my visit" }));
     expect(await screen.findByText(/has expired/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Text me a code" })).toBeInTheDocument());
+  });
+});
+
+
+describe("requesting an ambulance (the same page with ?care=ambulance)", () => {
+  const AMBULANCE = {
+    id: "svc-amb", key: "ambulance_transport", name: "Ambulance transport", description: "Transport to hospital",
+    base_price_cents: 500000, default_estimate_minutes: 30, category: { id: "c-amb", name: "Ambulance" }
+  };
+
+  it("asks the API for ambulance services, with the numbers to call at the top", async () => {
+    api.fetchHomeCareServices.mockResolvedValue([AMBULANCE, { ...AMBULANCE, id: "svc-amb2", name: "Ambulance with oxygen" }]);
+    renderPage("/book/home-care?care=ambulance");
+
+    expect(screen.getByRole("heading", { level: 1, name: "Request an ambulance" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Ambulance transport/ })).toBeInTheDocument();
+    expect(api.fetchHomeCareServices).toHaveBeenCalledWith("ambulance");
+    const note = screen.getByRole("note");
+    expect(within(note).getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
+    expect(within(note).getByRole("link", { name: "Call 112" })).toHaveAttribute("href", "tel:112");
+  });
+
+  it("goes straight to the place when only one ambulance service is on offer, and has no time step", async () => {
+    api.fetchHomeCareServices.mockResolvedValue([AMBULANCE]);
+    api.fetchHomeCareCoverage.mockResolvedValue({ covered: true, service_id: "svc-amb", facilities: [CLINIC] });
+    const user = userEvent.setup();
+    renderPage("/book/home-care?care=ambulance");
+
+    await screen.findByText("We can reach you.");
+    expect(screen.queryByRole("button", { name: /Ambulance transport/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Time")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Yes, come here" }));
+
+    expect(await screen.findByRole("region", { name: "Your details" })).toBeInTheDocument();
+  });
+
+  it("keeps the ordinary home care page unchanged", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: /Wound dressing/ })).toBeInTheDocument();
+    expect(api.fetchHomeCareServices).toHaveBeenCalledWith("home");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 });
