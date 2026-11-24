@@ -33,21 +33,17 @@ import { hasConsultationEnded } from "../../../shared/utils/telemedicine";
 import { WidgetError } from "../../../shared/components/WidgetError";
 import { PaymentRequestNotice } from "../components/PaymentRequestNotice";
 import {
-  ArrowRight,
   ChevronRight,
   ChevronDown,
   ChevronUp,
   TrendingUp,
   Minus,
   Calendar,
-  House,
-  Ambulance,
   Video
 } from "lucide-react";
 import { formatTelemedicineDateTime } from "../../../shared/utils/telemedicine";
-import { TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
 import { shouldAskForLocation } from "../utils/locationRelevance";
-import { useHasAmbulanceService } from "../hooks/useHasAmbulanceService";
+import { TaskTiles } from "../../website/components/TaskTiles";
 
 // A popup on a phone keeps a margin all round and never taller than the screen; its content scrolls inside.
 const FIT_PHONE_PAPER = { borderRadius: "24px", p: 1, m: 2, width: "calc(100% - 32px)", maxHeight: "calc(100dvh - 32px)" } as const;
@@ -97,7 +93,6 @@ const ClientHome = () => {
   const socket = useSocket();
   const locationAccess = useLocationAccess();
   const confirmCompletion = useConfirmBookingMutation("detail");
-  const hasAmbulance = useHasAmbulanceService();
   const cancelBookingMutation = useCancelBookingMutation("detail");
   const [completionPrompt, setCompletionPrompt] = useState<Booking | null>(null);
   // The booking whose confirm-and-pay prompt the client put away. It is not opened again by itself; a reminder on the
@@ -472,46 +467,9 @@ const ClientHome = () => {
           </section>
           )}
 
-          <section aria-label="Choose your care" className="border-y border-slate-200 py-4">
-            <h2 className="mb-3 text-base font-semibold text-slate-900">How would you like to receive care?</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              <button type="button" onClick={() => navigate(TELEMEDICINE_BOOKING_PATH)}
-                className="flex min-w-0 items-center gap-3 rounded-lg bg-tiba-blue p-4 text-left text-white transition hover:bg-tiba-blue/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
-                <Video className="h-6 w-6 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-semibold">Talk to a Doctor Online</span>
-                  <span className="mt-1 block text-sm text-white/90">A consultation by call or video. No home visit needed.</span>
-                </span>
-                <ArrowRight className="h-5 w-5 shrink-0" />
-              </button>
-              <div className="rounded-lg border border-tiba-gold bg-white p-4">
-                <div className="mb-3 flex items-center gap-3">
-                  <House className="h-6 w-6 shrink-0 text-tiba-gold" />
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">Home-based care</h3>
-                    <p className="mt-1 text-sm text-slate-600">Care and support at your location.</p>
-                  </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button type="button" onClick={() => navigate("/app/services")}
-                    className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
-                    <House className="h-5 w-5 shrink-0 text-tiba-gold" />
-                    <span className="min-w-0 flex-1 text-sm font-semibold">Book home care</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
-                  </button>
-                  {/* Only when the catalogue has an ambulance service: a button that opens a list with none in it only confuses. */}
-                  {hasAmbulance && (
-                    <button type="button" onClick={() => navigate("/app/services?group=ambulance")}
-                      className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md bg-amber-50 p-3 text-left text-slate-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue">
-                      <Ambulance className="h-5 w-5 shrink-0 text-tiba-gold" />
-                      <span className="min-w-0 flex-1 text-sm font-semibold">Request an ambulance</span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-tiba-gold" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
+          <div className="border-y border-slate-200 py-4">
+            <TaskTiles isAuthenticated />
+          </div>
 
           {shouldAskForLocation([activeBooking, matchingBooking]) && (
             <LocationPermissionBanner
