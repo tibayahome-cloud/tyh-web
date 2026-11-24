@@ -63,6 +63,8 @@ const ClientTelemedicinePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
+  // What the person already chose on the way here (a care area or one service); the markers are then removed below.
+  const [choice, setChoice] = useState<{ category: string | null; service: string | null }>({ category: null, service: null });
   const [searchParams, setSearchParams] = useSearchParams();
   const policyQuery = useTelemedicinePolicy();
 
@@ -73,9 +75,12 @@ const ClientTelemedicinePage = () => {
     if (searchParams.get("book") !== "1") {
       return;
     }
+    setChoice({ category: searchParams.get("category"), service: searchParams.get("service") });
     setDialogOpen(true);
     const rest = new URLSearchParams(searchParams);
     rest.delete("book");
+    rest.delete("category");
+    rest.delete("service");
     setSearchParams(rest, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -156,7 +161,11 @@ const ClientTelemedicinePage = () => {
         )}
       </div>
 
-      <TelemedicineRequestDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={handleCreated} />
+      <TelemedicineRequestDialog
+        key={`${choice.category ?? ""}|${choice.service ?? ""}`}
+        categoryKey={choice.category}
+        serviceKey={choice.service}
+        open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={handleCreated} />
     </AppLayout>
   );
 };

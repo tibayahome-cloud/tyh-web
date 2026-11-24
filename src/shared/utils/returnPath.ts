@@ -58,3 +58,19 @@ export const returnPathFrom = (location: LocationLike): string | null => {
 /** `/signup` or `/signup?next=%2Fapp%2Ftelemedicine%3Fbook%3D1`. */
 export const withReturnPath = (target: string, next: string | null | undefined): string =>
   next ? `${target}?next=${encodeURIComponent(next)}` : target;
+
+/**
+ * What a visitor already chose before the booking opens: a whole care area (`category`, a catalogue key such as
+ * "mental-health") to open the list filtered to it, or one service (`service`, a catalogue key such as
+ * "prescription-review") to open straight at choosing a clinic. An unknown key opens the full list.
+ */
+export type TelemedicineChoice = { category?: string; service?: string };
+
+export const telemedicineBookingPath = (inApp: boolean, choice: TelemedicineChoice = {}): string => {
+  const query = new URLSearchParams(inApp ? { book: "1" } : {});
+  if (choice.category) query.set("category", choice.category);
+  if (choice.service) query.set("service", choice.service);
+  const base = inApp ? "/app/telemedicine" : PUBLIC_TELEMEDICINE_BOOKING_PATH;
+  const text = query.toString();
+  return text ? `${base}?${text}` : base;
+};

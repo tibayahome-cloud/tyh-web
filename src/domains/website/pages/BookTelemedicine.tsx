@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { TelemedicineRequestDialog } from "../../client/components/TelemedicineRequestDialog";
 
@@ -10,6 +10,7 @@ import { TelemedicineRequestDialog } from "../../client/components/TelemedicineR
  */
 export const BookTelemedicine = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   return (
     // The same container as the site header, so the page lines up with the logo and the phone number above it. The header
@@ -18,6 +19,8 @@ export const BookTelemedicine = () => {
       <TelemedicineRequestDialog
         layout="page"
         open
+        categoryKey={searchParams.get("category")}
+        serviceKey={searchParams.get("service")}
         onClose={() => navigate("/")}
         onCreated={(bookingId) => navigate(`/app/bookings/${bookingId}`)}
       />

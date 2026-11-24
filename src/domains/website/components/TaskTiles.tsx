@@ -17,8 +17,8 @@ import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/
 import {
     CLIENT_HOME_CARE_PATH,
     PUBLIC_HOME_CARE_BOOKING_PATH,
-    PUBLIC_TELEMEDICINE_BOOKING_PATH,
-    TELEMEDICINE_BOOKING_PATH
+    telemedicineBookingPath,
+    type TelemedicineChoice
 } from "../../../shared/utils/returnPath";
 
 export type TaskTile = {
@@ -33,23 +33,22 @@ export type TaskTile = {
 };
 
 /**
- * The eight things a visitor comes to do. Where a tile goes depends only on whether the visitor is signed in:
- * a signed-in client books inside the app, everyone else on the public booking pages.
- *
- * Lab results, scans and prescriptions all lead to the doctor review (the patient brings the report and the doctor reviews
- * it), which is booked like any telemedicine consultation. The ambulance tile opens the numbers to call right under the
- * tiles, and not a booking form.
+ * The eight things a visitor comes to do. Each tile takes the person to the place where that thing is done, with their
+ * choice already made: a care area filtered (video doctor, specialist, mental health) or the one service that matches
+ * (lab results, scans, prescriptions: a doctor reviews the report the patient brings). `inApp` is true only on the signed-in
+ * client home, where the booking is inside the app; the public landing page always uses the public booking pages.
+ * The ambulance tile opens the numbers to call until the ambulance request is built.
  */
-export const taskTiles = (isAuthenticated: boolean): TaskTile[] => {
-    const telemedicine = isAuthenticated ? TELEMEDICINE_BOOKING_PATH : PUBLIC_TELEMEDICINE_BOOKING_PATH;
-    const homeCare = isAuthenticated ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH;
+export const taskTiles = (inApp: boolean): TaskTile[] => {
+    const homeCare = inApp ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH;
+    const book = (choice: TelemedicineChoice) => telemedicineBookingPath(inApp, choice);
     return [
-        { key: "video", label: "Video doctor", icon: Video, to: telemedicine, tint: "blue" },
-        { key: "specialist", label: "Find a specialist", icon: Stethoscope, to: telemedicine, tint: "blue" },
-        { key: "mental-health", label: "Mental health", icon: MessageCircleHeart, to: telemedicine, tint: "gold" },
-        { key: "lab-results", label: "Lab results", icon: FlaskConical, to: telemedicine, tint: "blue" },
-        { key: "scan-results", label: "Scan results", icon: ScanLine, to: telemedicine, tint: "blue" },
-        { key: "prescriptions", label: "Prescriptions", icon: Pill, to: telemedicine, tint: "blue" },
+        { key: "video", label: "Video doctor", icon: Video, to: book({ category: "firstcare" }), tint: "blue" },
+        { key: "specialist", label: "Find a specialist", icon: Stethoscope, to: book({ category: "specialistcare" }), tint: "blue" },
+        { key: "mental-health", label: "Mental health", icon: MessageCircleHeart, to: book({ category: "mental-health" }), tint: "gold" },
+        { key: "lab-results", label: "Lab results", icon: FlaskConical, to: book({ service: "follow-up-medical-consultation" }), tint: "blue" },
+        { key: "scan-results", label: "Scan results", icon: ScanLine, to: book({ service: "diagnostic-report-review" }), tint: "blue" },
+        { key: "prescriptions", label: "Prescriptions", icon: Pill, to: book({ service: "medical-advice-referral" }), tint: "blue" },
         { key: "home-care", label: "Home care", icon: House, to: homeCare, tint: "blue" },
         { key: "ambulance", label: "Ambulance", icon: Siren, to: "", emergency: true, tint: "blue" }
     ];
@@ -137,9 +136,6 @@ export const TaskTiles = ({ isAuthenticated }: { isAuthenticated: boolean }) => 
                     </div>
                 </div>
             )}
-            <p className="mt-3 max-w-xl text-sm text-slate-600">
-                For lab results, scans and prescriptions, book a doctor to go through your report with you.
-            </p>
         </section>
     );
 };

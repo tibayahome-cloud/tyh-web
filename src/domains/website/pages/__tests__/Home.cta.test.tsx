@@ -59,6 +59,17 @@ const SignUpProbe = () => {
   );
 };
 
+/** Shows where a visitor landed on the public booking page, with what they had already chosen. */
+const BookingProbe = () => {
+  const location = useLocation();
+  return (
+    <div>
+      {PUBLIC_BOOKING_PAGE}
+      <span data-testid="booking-search">{location.search}</span>
+    </div>
+  );
+};
+
 const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
   useAuthMock.mockReturnValue({ isAuthenticated });
 
@@ -72,7 +83,7 @@ const renderHome = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
             /app routes this test did not happen to enumerate. */}
         <Route path="/app/*" element={<div>{CLIENT_APP_HOME}</div>} />
         <Route path="/signup" element={<SignUpProbe />} />
-        <Route path="/book/telemedicine" element={<div>{PUBLIC_BOOKING_PAGE}</div>} />
+        <Route path="/book/telemedicine" element={<BookingProbe />} />
         <Route path="/book/home-care" element={<div>{PUBLIC_HOME_CARE_PAGE}</div>} />
         {/* Mirrors src/app/routes.tsx: an unknown path redirects to login. */}
         <Route path="/unknown" element={<div>{NOT_FOUND_FALLBACK}</div>} />
@@ -107,30 +118,30 @@ describe("homepage calls to action", () => {
     expect(screen.getByText("Premium Palliative")).toBeInTheDocument();
   });
 
-  describe("when the visitor is signed in", () => {
+  describe("when the browser still holds a session", () => {
+    // The site only checks that a login token is saved, not that it still works. A button that promised a booking must
+    // therefore never lead into the app, where an expired session ends at the login page.
     it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results", "Scan results", "Prescriptions", "Home care"])(
-      "sends the %s tile into the client app rather than back to login",
+      "sends the %s tile to the public booking pages, not into the app",
       async (label) => {
         const user = userEvent.setup();
         renderHome({ isAuthenticated: true });
 
         await user.click(screen.getByRole("link", { name: label }));
 
-        expect(screen.getByText(CLIENT_APP_HOME)).toBeInTheDocument();
+        expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
         expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
         expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
       }
     );
 
-    it.each(["View All Services & Care Packages"])("sends %s into the client app rather than back to login", async (label) => {
+    it("sends View All Services & Care Packages to the public home care page", async () => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: true });
 
-      await user.click(screen.getAllByRole("button", { name: new RegExp(label, "i") })[0]);
+      await user.click(screen.getAllByRole("button", { name: /View All Services & Care Packages/i })[0]);
 
-      expect(screen.getByText(CLIENT_APP_HOME)).toBeInTheDocument();
-      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
-      expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
+      expect(screen.getByText(PUBLIC_HOME_CARE_PAGE)).toBeInTheDocument();
     });
 
     it("routes every call to action to a route the router actually serves", async () => {
@@ -146,6 +157,7 @@ describe("homepage calls to action", () => {
         await user.click(screen.getAllByRole("button")[index]);
 
         expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
+        expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
         view.unmount();
       }
     });
@@ -163,16 +175,6 @@ describe("homepage calls to action", () => {
       expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
     });
 
-    it("sends every home care card on the page to the home care booking page", async () => {
-      const user = userEvent.setup();
-      for (const label of ["Doctor & Nurse Home Visits", "Nursing & Long-Term Care", "Therapy & Rehabilitation", "Lab Sample Collection"]) {
-        const view = renderHome({ isAuthenticated: false });
-        await user.click(screen.getAllByText(label)[0]);
-        expect(screen.getByText(PUBLIC_HOME_CARE_PAGE)).toBeInTheDocument();
-        view.unmount();
-      }
-    });
-
     it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results", "Scan results", "Prescriptions"])(
       "sends the %s tile to the public booking page, so the visitor sees services and times before any sign-up",
       async (label) => {
@@ -187,6 +189,46 @@ describe("homepage calls to action", () => {
         expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
       }
     );
+  });
+
+  describe("what the visitor already chose is carried to the booking page", () => {
+    const TILE_CHOICES: Array<[string, string]> = [
+      ["Video doctor", "?category=firstcare"],
+      ["Find a specialist", "?category=specialistcare"],
+      ["Mental health", "?category=mental-health"],
+      ["Lab results", "?service=follow-up-medical-consultation"],
+      ["Scan results", "?service=diagnostic-report-review"],
+      ["Prescriptions", "?service=medical-advice-referral"]
+    ];
+
+    it.each(TILE_CHOICES)("the %s tile opens the booking with %s", async (label, search) => {
+      const user = userEvent.setup();
+      renderHome({ isAuthenticated: false });
+
+      await user.click(screen.getByRole("link", { name: label }));
+
+      expect(screen.getByTestId("booking-search")).toHaveTextContent(search);
+    });
+
+    it.each([
+      ["Video Consultation", "?service=first-medical-consultation"],
+      ["Drug & Lab Report Review", "?service=follow-up-medical-consultation"],
+      ["Specialist Consultation", "?category=specialistcare"]
+    ])("the %s card opens the booking with %s", async (name, search) => {
+      const user = userEvent.setup();
+      renderHome({ isAuthenticated: false });
+
+      await user.click(screen.getByRole("button", { name: new RegExp(name) }));
+
+      expect(screen.getByTestId("booking-search")).toHaveTextContent(search);
+    });
+
+    it("no longer repeats the tiles as a second grid of photo cards", () => {
+      renderHome({ isAuthenticated: false });
+
+      expect(screen.queryByRole("heading", { name: "Our Services" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Doctor & Nurse Home Visits")).not.toBeInTheDocument();
+    });
   });
 
   describe("the task tiles", () => {

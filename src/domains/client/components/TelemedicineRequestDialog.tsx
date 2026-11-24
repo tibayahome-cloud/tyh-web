@@ -60,6 +60,10 @@ type TelemedicineRequestDialogProps = {
   open: boolean;
   onClose: () => void;
   serviceId?: string | null;
+  /** Open the list already filtered to this care area (a catalogue category key). Ignored if the key is unknown. */
+  categoryKey?: string | null;
+  /** Open straight at choosing a clinic for this service (a catalogue service key). Ignored if the key is unknown. */
+  serviceKey?: string | null;
   onCreated?: (bookingId: string) => void;
   /**
    * "dialog" (the default) shows the booking in a popup over the screen it was opened from, which suits a client who is
@@ -209,6 +213,8 @@ export const TelemedicineRequestDialog = ({
   open,
   onClose,
   serviceId,
+  categoryKey,
+  serviceKey,
   onCreated,
   layout = "dialog"
 }: TelemedicineRequestDialogProps) => {
@@ -258,6 +264,8 @@ export const TelemedicineRequestDialog = ({
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState("all");
 
+  const [choiceApplied, setChoiceApplied] = useState(false);
+
   const policyQuery = useTelemedicinePolicy();
   const servicesQuery = useRemoteServiceOptions(open && Boolean(serviceId));
   // Matches useTelemedicinePolicy's own staleTime convention: this catalog (categories,
@@ -283,6 +291,25 @@ export const TelemedicineRequestDialog = ({
     enabled: open && step === TM_STEP_INDEX.service && !serviceId,
     staleTime: TELEMEDICINE_CATALOG_STALE_TIME
   });
+  // A choice made before the booking opened (a tile or card on the site): apply it once the catalogue has loaded. A service
+  // goes straight to choosing a clinic; a care area filters the list. A key that is not in the catalogue changes nothing.
+  useEffect(() => {
+    if (choiceApplied || serviceId || (!categoryKey && !serviceKey)) return;
+    if (serviceKey) {
+      if (!catalogServicesQuery.isSuccess) return;
+      const match = catalogServicesQuery.data?.find((service) => service.key === serviceKey);
+      if (match) {
+        setSelectedServiceId(match.id);
+        setStep(TM_STEP_INDEX.facility);
+      }
+      setChoiceApplied(true);
+      return;
+    }
+    if (!categoriesQuery.isSuccess) return;
+    const match = categoriesQuery.data?.find((category) => category.key === categoryKey);
+    if (match) setCatalogCategoryFilter(match.id);
+    setChoiceApplied(true);
+  }, [choiceApplied, serviceId, categoryKey, serviceKey, catalogServicesQuery.isSuccess, catalogServicesQuery.data, categoriesQuery.isSuccess, categoriesQuery.data]);
   const facilitiesQuery = useRemoteFacilities(selectedServiceId, user?.countryCode ?? undefined, {
     enabled: open && step === TM_STEP_INDEX.facility && Boolean(selectedServiceId)
   });
