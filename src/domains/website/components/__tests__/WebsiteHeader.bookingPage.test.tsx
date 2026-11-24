@@ -108,13 +108,13 @@ describe("the site header elsewhere", () => {
   });
 });
 
-describe("Book Now follows the sign-in state", () => {
-  it("opens the in-app doctor booking for a signed-in client and drops the Sign in link", () => {
+describe("Book Now always opens the public booking pages", () => {
+  it("does so even when the browser still holds a session, and keeps the Sign in link", () => {
     auth.isAuthenticated = true;
     renderAt("/");
 
-    expect(screen.getByRole("link", { name: "Book Now" }).getAttribute("href")).toMatch(/^\/app\//);
-    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Book Now" })).toHaveAttribute("href", "/book/telemedicine");
+    expect(screen.getAllByRole("link", { name: "Sign in" }).length).toBeGreaterThan(0);
   });
 
   it("offers doctor and home care in the phone menu", async () => {

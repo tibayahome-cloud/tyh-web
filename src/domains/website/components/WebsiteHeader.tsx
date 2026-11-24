@@ -5,23 +5,17 @@ import { Menu, X, Phone, ChevronDown } from "lucide-react";
 import classNames from "classnames";
 import logo from "../../../assets/images/logo.jpeg";
 import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
-import { useAuth } from "../../../shared/hooks/useAuth";
-import {
-    CLIENT_HOME_CARE_PATH,
-    PUBLIC_HOME_CARE_BOOKING_PATH,
-    PUBLIC_TELEMEDICINE_BOOKING_PATH,
-    TELEMEDICINE_BOOKING_PATH
-} from "../../../shared/utils/returnPath";
+import { PUBLIC_HOME_CARE_BOOKING_PATH, PUBLIC_TELEMEDICINE_BOOKING_PATH } from "../../../shared/utils/returnPath";
 
 export const WebsiteHeader = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
-    const { isAuthenticated } = useAuth();
-    // A signed-in client books inside the app; a visitor books on the public pages. Book Now opens the doctor booking, the
-    // first and most used choice; the phone menu also offers home care.
-    const doctorPath = isAuthenticated ? TELEMEDICINE_BOOKING_PATH : PUBLIC_TELEMEDICINE_BOOKING_PATH;
-    const homeCarePath = isAuthenticated ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH;
+    // Always the public booking pages: the browser can hold a session that has expired, and a button that promised a
+    // booking must not end at the login page. The booking page itself recognises a signed-in client. Book Now opens the
+    // doctor booking, the first and most used choice; the phone menu also offers home care.
+    const doctorPath = PUBLIC_TELEMEDICINE_BOOKING_PATH;
+    const homeCarePath = PUBLIC_HOME_CARE_BOOKING_PATH;
     // On the booking page the page is the booking: no "Book Now" (it goes to sign-in, away from a booking in progress), no
     // menu with nothing else in it, and a slimmer bar so the first choice is not pushed down the screen.
     const onBookingPage =
@@ -71,7 +65,7 @@ export const WebsiteHeader = () => {
                             <Phone className="w-4 h-4" />
                             <span>{COMPANY_PHONE_DISPLAY}</span>
                         </a>
-                        {!onBookingPage && !isAuthenticated && (
+                        {!onBookingPage && (
                             <Link
                                 to="/login"
                                 className="px-3 py-2.5 rounded-full text-slate-700 font-medium text-sm hover:text-tiba-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
@@ -101,14 +95,12 @@ export const WebsiteHeader = () => {
                     ) : (
                         /* Sign in stays on the bar on a phone (a returning client should not have to open a menu for it), then the menu button. */
                         <div className="lg:hidden flex items-center gap-1">
-                            {!isAuthenticated && (
                             <Link
                                 to="/login"
                                 className="flex h-11 items-center rounded-full px-3 text-sm font-medium text-slate-800 hover:text-tiba-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
                             >
                                 Sign in
                             </Link>
-                            )}
                             <button
                                 className="flex h-11 w-11 items-center justify-center text-slate-900"
                                 aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}

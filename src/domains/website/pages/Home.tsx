@@ -1,10 +1,9 @@
 
 import { Link, useNavigate } from "react-router-dom";
 import {
-    CLIENT_HOME_CARE_PATH,
     PUBLIC_HOME_CARE_BOOKING_PATH,
-    PUBLIC_TELEMEDICINE_BOOKING_PATH,
-    TELEMEDICINE_BOOKING_PATH
+    telemedicineBookingPath,
+    type TelemedicineChoice
 } from "../../../shared/utils/returnPath";
 import {
     ArrowRight,
@@ -25,7 +24,6 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
-import { useAuth } from "../../../shared/hooks/useAuth";
 import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
 import { TaskTiles } from "../components/TaskTiles";
 
@@ -37,12 +35,10 @@ import nursingImage from "../../../assets/images/nursing.png";
 import therapyImage from "../../../assets/images/service-therapy.png";
 import elderlyImage from "../../../assets/images/service-elderly.png";
 import diagnosticsImage from "../../../assets/images/service-nurse.png";
-import labSampleCollectionImage from "../../../assets/images/lab-sample-collection.png";
 import telemedicineImage from "../../../assets/images/telemedicine-consultation.webp";
 import telemedicineHeroImage from "../../../assets/images/telemedicine-hero.webp";
 import labResultsReviewImage from "../../../assets/images/telemedicine/lab-results-review.webp";
 import specialistFollowUpImage from "../../../assets/images/telemedicine/generated/specialist-follow-up.webp";
-import mentalHealthImage from "../../../assets/images/telemedicine/mental-health-support.webp";
 
 const SectionHeader = ({ title, subtitle, centered = true }: { title: string; subtitle?: string; centered?: boolean }) => (
     <div className={`mb-12 ${centered ? "text-center" : "text-left"}`}>
@@ -53,25 +49,22 @@ const SectionHeader = ({ title, subtitle, centered = true }: { title: string; su
 
 export const Home = () => {
     const { data: services, isLoading } = useServices({ active: true });
-    const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
+    // The landing page always sends a visitor to the public booking pages, whether or not the browser still holds a
+    // session: a session that has expired would otherwise bounce them to the login page from a button that promised a
+    // booking. The booking page itself recognises a signed-in client and asks a visitor for details only at the end.
     const handleServiceClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        // Home care is booked where the visitor lands without an account; a signed-in client books it inside the app.
-        navigate(isAuthenticated ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH);
+        navigate(PUBLIC_HOME_CARE_BOOKING_PATH);
     };
 
-    // Remote consultations are booked in the one booking dialog, which owns the catalogue, the
-    // slot picker and payment. The landing page only introduces the service and hands the
-    // visitor over: a signed-in client lands on the booking screen in the app, and everyone else
-    // on the public booking page, where they choose a consultation, a clinic and a time before
-    // being asked for any details. Nothing about providers, availability or the catalogue is
-    // fetched or shown on this page -- the booking dialog fetches it, so there is no second
-    // booking flow here to keep in step with the real one.
-    const handleTelemedicineClick = (e: React.MouseEvent) => {
+    // Remote consultations are booked in the one booking dialog, which owns the catalogue, the slot picker and payment.
+    // The landing page only hands the visitor over, with what they already chose: a care area or one service.
+    const openTelemedicine = (choice: TelemedicineChoice = {}) => (e: React.MouseEvent) => {
         e.preventDefault();
-        navigate(isAuthenticated ? TELEMEDICINE_BOOKING_PATH : PUBLIC_TELEMEDICINE_BOOKING_PATH);
+        navigate(telemedicineBookingPath(false, choice));
     };
+    const handleTelemedicineClick = openTelemedicine();
 
     const telemedicineHighlights = [
         {
@@ -112,6 +105,7 @@ export const Home = () => {
             unit: "per call",
             image: telemedicineImage,
             alt: "Doctor speaking with a patient by video",
+            choice: { service: "first-medical-consultation" },
         },
         {
             name: "Drug & Lab Report Review",
@@ -120,6 +114,7 @@ export const Home = () => {
             unit: "per review",
             image: labResultsReviewImage,
             alt: "Laboratory report being reviewed",
+            choice: { service: "follow-up-medical-consultation" },
         },
         {
             name: "Specialist Consultation",
@@ -128,6 +123,7 @@ export const Home = () => {
             unit: "per call",
             image: specialistFollowUpImage,
             alt: "Specialist providing a remote consultation",
+            choice: { category: "specialistcare" },
         },
     ];
 
@@ -154,7 +150,7 @@ export const Home = () => {
                                 From a doctor on video to a specialist at your fingertips, and professional care delivered to your home. Tiba Ya Home connects you to doctors, specialists, nurses, therapists, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> whenever and wherever you need them.
                             </p>
 
-                            <TaskTiles isAuthenticated={isAuthenticated} />
+                            <TaskTiles isAuthenticated={false} />
 
                             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3">
                                 {[
@@ -334,46 +330,6 @@ export const Home = () => {
                 </div>
             </section>
 
-            {/* Our Services */}
-            <section className="py-24 bg-slate-50">
-                <div className="container mx-auto px-4 md:px-6">
-                    <SectionHeader title="Our Services" />
-
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:gap-8 lg:grid-cols-12">
-                        {[
-                            { name: "Online Doctor Consultation", img: telemedicineImage, onClick: handleTelemedicineClick },
-                            { name: "Mental Health Support", img: mentalHealthImage, onClick: handleTelemedicineClick },
-                            { name: "Doctor & Nurse Home Visits", img: doctorImage, onClick: handleServiceClick },
-                            { name: "Nursing & Long-Term Care", img: nursingImage, onClick: handleServiceClick },
-                            { name: "Therapy & Rehabilitation", img: therapyImage, onClick: handleServiceClick },
-                            { name: "Elderly & Assisted Living Care", img: elderlyImage, onClick: handleServiceClick },
-                            { name: "Diagnostics & Monitoring at Home", img: diagnosticsImage, onClick: handleServiceClick },
-                            { name: "Lab Sample Collection", img: labSampleCollectionImage, onClick: handleServiceClick }
-                        ].map((service, i) => (
-                            <button
-                                key={i}
-                                onClick={service.onClick}
-                                className="group col-span-1 h-full overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-all hover:shadow-xl sm:col-span-1 lg:col-span-3"
-                            >
-                                <div className="relative aspect-[3/2] overflow-hidden bg-slate-100">
-                                    <img
-                                        src={service.img}
-                                        alt={service.name}
-                                        className="h-full w-full rounded-t-2xl object-cover transition-transform duration-500"
-                                    />
-                                    <div className="absolute inset-0 bg-tiba-blue/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                                <div className="p-4 text-center">
-                                    <h3 className="text-sm md:text-base font-bold transition-colors">
-                                        {service.name}
-                                    </h3>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
             {/* Ambulance Section */}
             <section id="ambulance" className="scroll-mt-20 py-24 bg-tiba-blue relative text-white overflow-hidden">
                 {/* Background Decorative patterns */}
@@ -457,7 +413,7 @@ export const Home = () => {
                             {introductoryServices.map((service) => (
                                 <button
                                     key={service.name}
-                                    onClick={handleTelemedicineClick}
+                                    onClick={openTelemedicine(service.choice)}
                                     className="group flex min-h-36 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                                 >
                                     <img src={service.image} alt={service.alt} className="h-auto w-2/5 min-w-28 object-cover" />
