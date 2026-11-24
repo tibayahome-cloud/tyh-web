@@ -1,6 +1,7 @@
 
 import { Link, useNavigate } from "react-router-dom";
 import {
+    PUBLIC_AMBULANCE_REQUEST_PATH,
     PUBLIC_HOME_CARE_BOOKING_PATH,
     telemedicineBookingPath,
     type TelemedicineChoice
@@ -358,6 +359,13 @@ export const Home = () => {
                                     </li>
                                 ))}
                             </ul>
+
+                            <Link
+                                to={PUBLIC_AMBULANCE_REQUEST_PATH}
+                                className="mb-8 inline-flex min-h-12 items-center gap-2 rounded-lg bg-tiba-gold px-6 font-bold text-slate-900 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                            >
+                                Request an ambulance <ArrowRight className="h-5 w-5" aria-hidden="true" />
+                            </Link>
 
                             <p className="mb-4 text-lg font-semibold text-white">In an emergency, call now.</p>
                             <div className="flex flex-wrap gap-3">

@@ -20,6 +20,8 @@ export const TELEMEDICINE_BOOKING_PATH = "/app/telemedicine?book=1";
 export const PUBLIC_TELEMEDICINE_BOOKING_PATH = "/book/telemedicine";
 /** Where a visitor with no account asks for a carer to visit them at home. */
 export const PUBLIC_HOME_CARE_BOOKING_PATH = "/book/home-care";
+/** Where a visitor with no account requests an ambulance: the home care request page with the ambulance services shown. */
+export const PUBLIC_AMBULANCE_REQUEST_PATH = "/book/home-care?care=ambulance";
 /** Where a signed-in client chooses and books home care inside the app. */
 export const CLIENT_HOME_CARE_PATH = "/app/services";
 
@@ -74,3 +76,5 @@ export const telemedicineBookingPath = (inApp: boolean, choice: TelemedicineChoi
   const text = query.toString();
   return text ? `${base}?${text}` : base;
 };
+/** The same for a signed-in client, inside the app. */
+export const CLIENT_AMBULANCE_REQUEST_PATH = "/app/services?group=ambulance";

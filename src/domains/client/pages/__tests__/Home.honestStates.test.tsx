@@ -4,7 +4,7 @@
  * always read "-- bpm" because it looked up a field that is not on the record.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -79,11 +79,10 @@ describe("client Home: the ways to book", () => {
     expect(screen.getByRole("link", { name: /Home care/ }).getAttribute("href")).toMatch(/^\/app\//);
   });
 
-  it("opens the numbers to call from the ambulance tile instead of a booking list", () => {
+  it("takes the ambulance tile to the ambulance services inside the app", () => {
     renderHome();
 
-    fireEvent.click(screen.getByRole("button", { name: /Ambulance/ }));
-    expect(screen.getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
+    expect(screen.getByRole("link", { name: /Ambulance/ })).toHaveAttribute("href", "/app/services?group=ambulance");
   });
 });
 

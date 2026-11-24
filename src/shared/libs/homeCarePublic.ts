@@ -52,14 +52,16 @@ export type HomeCareRequestResult = {
 
 type Envelope<T> = { data: T };
 
-export const fetchHomeCareServices = async (): Promise<HomeCareService[]> => {
+export type CareKind = "home" | "ambulance";
+
+export const fetchHomeCareServices = async (kind: CareKind = "home"): Promise<HomeCareService[]> => {
   const response = await api.get<Envelope<HomeCareService[]>>("/services", {
     params: {
       fields: "id,key,name,description,base_price_cents,default_estimate_minutes",
       include: "category:id,name",
       "filter[active]": "true",
       "filter[has_active_offering]": "true",
-      "filter[care_type]": "home_based"
+      "filter[care_type]": kind === "ambulance" ? "ambulance" : "home_based"
     }
   });
   return response.data.data;
