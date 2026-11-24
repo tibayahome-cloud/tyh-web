@@ -149,6 +149,27 @@ describe("onboarding status", () => {
     expect(screen.getByText("Approved")).toBeInTheDocument();
   });
 
+  it("says when an administrator added a document for the provider", async () => {
+    state.status = summary({
+      status: "documents_needed",
+      items_done: 2,
+      items_total: 3,
+      items: [
+        { requirement_key: "n", label: "National ID", input_type: "file", status: "verified", reviewer_note: null, uploaded_by: { kind: "platform", name: "Admin" } },
+        { requirement_key: "l", label: "Practising licence", input_type: "file", status: "verified", reviewer_note: null, uploaded_by: { kind: "facility", name: "Care Point" } }
+      ]
+    });
+    state.application = {
+      id: "a1",
+      status: "draft",
+      items: [appItem("1", "National ID", "verified"), appItem("2", "Practising licence", "verified"), appItem("3", "KRA certificate", "missing")]
+    };
+    await renderPage();
+
+    expect(screen.getByText("Added for you by Tiba Ya Home")).toBeInTheDocument();
+    expect(screen.getByText("Added for you by your facility: Care Point")).toBeInTheDocument();
+  });
+
   it("everything uploaded: asks you to check and confirm before it sends for review", async () => {
     state.status = summary({ status: "documents_needed", items_done: 1, items_total: 1, ready_to_submit: true });
     state.application = { id: "a1", status: "draft", items: [appItem("1", "National ID", "pending")] };

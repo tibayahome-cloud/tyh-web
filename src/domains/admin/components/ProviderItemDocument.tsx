@@ -42,7 +42,7 @@ export const ProviderItemDocument = ({ applicationId, itemId, label, hasFile, ha
     onSuccess: () => {
       toast.showToast({
         title: "Document added",
-        description: `${label} is on file for this provider and waits for review.`,
+        description: `${label} is on file for this provider as verified. The provider can see that you added it.`,
         variant: "success"
       });
       onUploaded();
