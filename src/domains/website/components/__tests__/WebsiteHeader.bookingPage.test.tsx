@@ -6,10 +6,17 @@
 
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../../shared/constants/contact";
 import { WebsiteHeader } from "../WebsiteHeader";
+
+const auth = vi.hoisted(() => ({ isAuthenticated: false }));
+vi.mock("../../../../shared/hooks/useAuth", () => ({ useAuth: () => auth }));
+
+beforeEach(() => {
+  auth.isAuthenticated = false;
+});
 
 const renderAt = (path: string) =>
   render(
@@ -68,7 +75,7 @@ describe("the site header elsewhere", () => {
   it("keeps Book Now and the menu button on the landing page", () => {
     renderAt("/");
 
-    expect(screen.getByRole("link", { name: "Book Now" })).toHaveAttribute("href", "/book/home-care");
+    expect(screen.getByRole("link", { name: "Book Now" })).toHaveAttribute("href", "/book/telemedicine");
     expect(screen.getByRole("button")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: `Call ${COMPANY_PHONE_DISPLAY}` })).not.toBeInTheDocument();
   });
@@ -98,5 +105,25 @@ describe("the site header elsewhere", () => {
     renderAt("/book/telemedicine");
 
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Book Now follows the sign-in state", () => {
+  it("opens the in-app doctor booking for a signed-in client and drops the Sign in link", () => {
+    auth.isAuthenticated = true;
+    renderAt("/");
+
+    expect(screen.getByRole("link", { name: "Book Now" }).getAttribute("href")).toMatch(/^\/app\//);
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+
+  it("offers doctor and home care in the phone menu", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderAt("/");
+    await userEvent.click(screen.getByRole("button", { name: "Open menu" }));
+
+    const bookNow = screen.getAllByRole("link", { name: "Book Now" });
+    expect(bookNow.map((l) => l.getAttribute("href"))).toEqual(["/book/telemedicine", "/book/telemedicine"]);
+    expect(screen.getByRole("link", { name: "Book home care" })).toHaveAttribute("href", "/book/home-care");
   });
 });
