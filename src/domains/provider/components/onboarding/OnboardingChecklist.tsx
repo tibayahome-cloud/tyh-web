@@ -22,6 +22,8 @@ export type ChecklistItem = {
   /** A licence or cover that runs out: its end date is asked for with the upload. */
   hasExpiry: boolean;
   expiresOn: string | null;
+  /** Who added it, when an administrator did rather than the provider. */
+  addedBy?: { kind: "platform" | "facility"; name?: string | null } | null;
   /** Can still be changed after the application is sent (a CV, a renewed licence). Others are view-only once sent. */
   editableAfterSend?: boolean;
 };
@@ -227,6 +229,13 @@ const Row = ({ item, busy, onUpload, onSaveText, onView, onRemove, sentForReview
               {!item.required && <span className="ml-2 text-sm font-normal text-slate-600">Optional</span>}
               {needsAttention && <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-950">Required</span>}
             </h4>
+            {item.addedBy && (
+              <p className="text-sm text-slate-700">
+                {item.addedBy.kind === "platform"
+                  ? "Added for you by Tiba Ya Home"
+                  : `Added for you by your facility${item.addedBy.name ? `: ${item.addedBy.name}` : ""}`}
+              </p>
+            )}
             {expiry && <p className={`text-sm ${EXPIRY_TONE[expiry.tone]}`}>{expiry.text}</p>}
             {isText && item.valueText && !open && <p className="text-sm text-slate-700">{item.valueText}</p>}
           </div>

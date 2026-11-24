@@ -4,12 +4,11 @@
  * always read "-- bpm" because it looked up a field that is not on the record.
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const ambulance = vi.hoisted(() => ({ has: false }));
 const state = vi.hoisted(() => ({
   upcoming: {} as Record<string, unknown>,
   history: {} as Record<string, unknown>,
@@ -35,7 +34,6 @@ vi.mock("../../../../shared/hooks/useBookings", () => ({
 vi.mock("../../../../shared/hooks/useWallet", () => ({ useWalletAccount: () => state.wallet }));
 vi.mock("../../../../shared/hooks/useTelemedicine", () => ({ useTelemedicinePolicy: () => ({ data: { joinWindowBeforeMinutes: 10 } }) }));
 vi.mock("../../../../shared/hooks/useSelfCare", () => ({ useSelfCareCheckins: () => state.checkins }));
-vi.mock("../../hooks/useHasAmbulanceService", () => ({ useHasAmbulanceService: () => ambulance.has }));
 vi.mock("../../../../shared/hooks/useSocket", () => ({ useSocket: () => null }));
 vi.mock("../../../../shared/hooks/useLocationAccess", () => ({
   useLocationAccess: () => ({ status: "granted", error: null, requestAccess: vi.fn() })
@@ -73,20 +71,19 @@ beforeEach(() => {
 });
 
 describe("client Home: the ways to book", () => {
-  it("opens the Services page from Book home care, and shows no ambulance button when there is no ambulance service", () => {
-    ambulance.has = false;
+  it("shows the same task tiles as the public page, pointing into the app", () => {
     renderHome();
 
-    expect(screen.getByRole("button", { name: /Book home care/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /ambulance/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What can we help you with today?" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Video doctor/ }).getAttribute("href")).toMatch(/^\/app\//);
+    expect(screen.getByRole("link", { name: /Home care/ }).getAttribute("href")).toMatch(/^\/app\//);
   });
 
-  it("shows the ambulance button once the catalogue has an ambulance service", () => {
-    ambulance.has = true;
+  it("opens the numbers to call from the ambulance tile instead of a booking list", () => {
     renderHome();
 
-    expect(screen.getByRole("button", { name: /Request an ambulance/ })).toBeInTheDocument();
-    ambulance.has = false;
+    fireEvent.click(screen.getByRole("button", { name: /Ambulance/ }));
+    expect(screen.getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
   });
 });
 
@@ -167,7 +164,7 @@ describe("client Home", () => {
   it("puts the next appointments before the ways to book a new one", () => {
     renderHome();
     const upcoming = screen.getByRole("heading", { name: "Your next appointments" });
-    const launcher = screen.getByRole("heading", { name: "How would you like to receive care?" });
+    const launcher = screen.getByRole("heading", { name: "What can we help you with today?" });
     expect(upcoming.compareDocumentPosition(launcher) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

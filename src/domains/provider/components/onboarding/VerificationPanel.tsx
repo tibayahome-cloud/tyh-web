@@ -135,6 +135,7 @@ export const VerificationPanel = () => {
 
   const items: ChecklistItem[] = useMemo(() => {
     const noteByLabel = new Map((statusQuery.data?.items ?? []).map((item) => [item.label, item.reviewer_note]));
+    const addedByLabel = new Map((statusQuery.data?.items ?? []).map((item) => [item.label, item.uploaded_by ?? null]));
     return [...(application?.items ?? [])]
       .sort((a, b) => (a.requirement_type?.display_order ?? 0) - (b.requirement_type?.display_order ?? 0))
       .map((item) => ({
@@ -148,6 +149,7 @@ export const VerificationPanel = () => {
         required: Boolean(item.requirement_type?.required_for_verification),
         hasExpiry: Boolean(item.requirement_type?.has_expiry),
         expiresOn: item.expires_on ?? null,
+        addedBy: addedByLabel.get(item.requirement_type?.label ?? "") ?? null,
         editableAfterSend: Boolean(item.requirement_type?.editable_after_submission),
         reviewerNote: noteByLabel.get(item.requirement_type?.label ?? "") ?? (item.status === "rejected" ? item.comment ?? null : null)
       }));

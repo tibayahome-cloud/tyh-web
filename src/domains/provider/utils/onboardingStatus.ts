@@ -15,6 +15,8 @@ export type OnboardingItem = {
   required?: boolean;
   has_expiry?: boolean;
   expires_on?: string | null;
+  /** Set when an administrator added the document for the provider. */
+  uploaded_by?: { kind: "platform" | "facility"; name?: string | null; at?: string | null } | null;
 };
 
 export type OnboardingSummary = {

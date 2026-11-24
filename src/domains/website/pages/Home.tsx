@@ -15,20 +15,19 @@ import {
     HeartPulse,
     Phone,
     ChevronRight,
-    Siren,
     Smartphone,
     Check,
     Zap,
     Shield,
     Video,
     Stethoscope,
-    CalendarClock,
-    Search,
-    House
+    CalendarClock
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
+import { TaskTiles } from "../components/TaskTiles";
 
 // Assets
 import appMockup from "../../../assets/images/app-showcase.webp";
@@ -151,40 +150,11 @@ export const Home = () => {
                             <h1 className="mb-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
                                 Your Healthcare. One Click Away.
                             </h1>
-                            <p className="mb-6 max-w-xl text-base leading-relaxed text-slate-700">
+                            <p className="mb-6 hidden max-w-xl text-base leading-relaxed text-slate-700 sm:block">
                                 From a doctor on video to a specialist at your fingertips, and professional care delivered to your home. Tiba Ya Home connects you to doctors, specialists, nurses, therapists, diagnostics, and <span className="font-bold text-tiba-blue">ambulance services</span> whenever and wherever you need them.
                             </p>
 
-                            <div className="grid max-w-xl grid-cols-2 gap-3 [&>button]:px-3 [&>button]:text-sm [&>button>svg]:shrink-0">
-                                <button
-                                    onClick={handleTelemedicineClick}
-                                    className="btn-primary inline-flex items-center justify-center gap-2"
-                                >
-                                    <Video className="w-5 h-5" />
-                                    <span>Talk to a Doctor Online</span>
-                                </button>
-                                <button
-                                    onClick={handleServiceClick}
-                                    className="btn-secondary inline-flex items-center justify-center gap-2"
-                                >
-                                    <House className="w-5 h-5" />
-                                    Book Home Care
-                                </button>
-                                <button
-                                    onClick={handleTelemedicineClick}
-                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-tiba-blue px-5 py-3 font-semibold text-tiba-blue transition-colors hover:bg-tiba-blue/5"
-                                >
-                                    <Search className="w-5 h-5" />
-                                    Find a Specialist
-                                </button>
-                                <button
-                                    onClick={handleServiceClick}
-                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-tiba-gold px-5 py-3 font-semibold text-tiba-gold transition-colors hover:bg-tiba-gold/10"
-                                >
-                                    <Siren className="w-5 h-5" />
-                                    Get Ambulance
-                                </button>
-                            </div>
+                            <TaskTiles isAuthenticated={isAuthenticated} />
 
                             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3">
                                 {[
@@ -205,7 +175,7 @@ export const Home = () => {
                             initial={{ opacity: 0, scale: 0.9 }}
                             whileInView={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.8 }}
-                            className="relative order-first lg:order-none min-w-0 w-full flex-1"
+                            className="relative min-w-0 w-full flex-1"
                         >
                             <img
                                 src={telemedicineImage}
@@ -405,7 +375,7 @@ export const Home = () => {
             </section>
 
             {/* Ambulance Section */}
-            <section className="py-24 bg-tiba-blue relative text-white overflow-hidden">
+            <section id="ambulance" className="scroll-mt-20 py-24 bg-tiba-blue relative text-white overflow-hidden">
                 {/* Background Decorative patterns */}
                 <div className="absolute top-0 right-0 w-1/3 h-full bg-white/5 skew-x-12 translate-x-1/2" />
                 <div className="absolute bottom-0 left-0 w-1/4 h-1/2 bg-tiba-gold/10 blur-3xl rounded-full" />
@@ -433,12 +403,23 @@ export const Home = () => {
                                 ))}
                             </ul>
 
-                            <button
-                                onClick={handleServiceClick}
-                                className="btn-secondary"
-                            >
-                                Get Ambulance
-                            </button>
+                            <p className="mb-4 text-lg font-semibold text-white">In an emergency, call now.</p>
+                            <div className="flex flex-wrap gap-3">
+                                {[
+                                    { href: "tel:999", label: "Call 999" },
+                                    { href: "tel:112", label: "Call 112" },
+                                    { href: `tel:${COMPANY_PHONE}`, label: `Call ${COMPANY_PHONE_DISPLAY}` }
+                                ].map((call) => (
+                                    <a
+                                        key={call.href}
+                                        href={call.href}
+                                        className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-white px-5 font-semibold text-tiba-blue transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                    >
+                                        <Phone className="h-5 w-5" aria-hidden="true" />
+                                        {call.label}
+                                    </a>
+                                ))}
+                            </div>
                         </div>
 
                         <motion.div

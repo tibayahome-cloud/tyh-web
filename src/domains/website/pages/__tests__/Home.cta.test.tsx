@@ -9,7 +9,7 @@
  * route that does not exist lands on the fallback and fails the assertion.
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,13 +108,21 @@ describe("homepage calls to action", () => {
   });
 
   describe("when the visitor is signed in", () => {
-    it.each([
-      "Talk to a Doctor",
-      "Find a Specialist",
-      "Book Home Care",
-      "Get Ambulance",
-      "View All Services & Care Packages"
-    ])("sends %s into the client app rather than back to login", async (label) => {
+    it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results", "Scan results", "Prescriptions", "Home care"])(
+      "sends the %s tile into the client app rather than back to login",
+      async (label) => {
+        const user = userEvent.setup();
+        renderHome({ isAuthenticated: true });
+
+        await user.click(screen.getByRole("link", { name: label }));
+
+        expect(screen.getByText(CLIENT_APP_HOME)).toBeInTheDocument();
+        expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
+        expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
+      }
+    );
+
+    it.each(["View All Services & Care Packages"])("sends %s into the client app rather than back to login", async (label) => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: true });
 
@@ -148,7 +156,7 @@ describe("homepage calls to action", () => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: false });
 
-      await user.click(screen.getAllByRole("button", { name: /Book Home Care/i })[0]);
+      await user.click(screen.getByRole("link", { name: "Home care" }));
 
       expect(screen.getByText(PUBLIC_HOME_CARE_PAGE)).toBeInTheDocument();
       expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
@@ -165,13 +173,13 @@ describe("homepage calls to action", () => {
       }
     });
 
-    it.each(["Talk to a Doctor", "Find a Specialist", "Video Doctor Consultation"])(
-      "sends %s to the public booking page, so the visitor sees services and times before any sign-up",
+    it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results", "Scan results", "Prescriptions"])(
+      "sends the %s tile to the public booking page, so the visitor sees services and times before any sign-up",
       async (label) => {
         const user = userEvent.setup();
         renderHome({ isAuthenticated: false });
 
-        await user.click(screen.getAllByRole("button", { name: new RegExp(label, "i") })[0]);
+        await user.click(screen.getByRole("link", { name: label }));
 
         expect(screen.getByText(PUBLIC_BOOKING_PAGE)).toBeInTheDocument();
         expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
@@ -179,5 +187,58 @@ describe("homepage calls to action", () => {
         expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
       }
     );
+  });
+
+  describe("the task tiles", () => {
+    it("offers the eight things a visitor comes to do, under one heading", () => {
+      renderHome({ isAuthenticated: false });
+
+      const heading = screen.getByRole("heading", { name: "What can we help you with today?" });
+      const grid = heading.closest("section") as HTMLElement;
+      const labels = within(grid)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+      expect(labels).toEqual([
+        "Video doctor",
+        "Find a specialist",
+        "Mental health",
+        "Lab results",
+        "Scan results",
+        "Prescriptions",
+        "Home care",
+        "Ambulance"
+      ]);
+    });
+
+    it("opens the numbers to call under the tiles when the ambulance tile is pressed, and no booking form", async () => {
+      const user = userEvent.setup();
+      renderHome({ isAuthenticated: false });
+      const tile = screen.getByRole("button", { name: "Ambulance" });
+      expect(tile).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("region", { name: "Call for an ambulance" })).not.toBeInTheDocument();
+
+      await user.click(tile);
+
+      const panel = screen.getByRole("region", { name: "Call for an ambulance" });
+      expect(tile).toHaveAttribute("aria-expanded", "true");
+      expect(within(panel).getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
+      expect(within(panel).getByRole("link", { name: "Call 112" })).toHaveAttribute("href", "tel:112");
+      expect(within(panel).getByRole("link", { name: /^Call \+254/ })).toHaveAttribute("href", expect.stringMatching(/^tel:\+254/));
+      expect(within(panel).getByRole("link", { name: "Call 999" })).toHaveFocus();
+      expect(screen.queryByText(PUBLIC_HOME_CARE_PAGE)).not.toBeInTheDocument();
+
+      await user.click(tile);
+      expect(screen.queryByRole("region", { name: "Call for an ambulance" })).not.toBeInTheDocument();
+    });
+
+    it("puts the numbers to call in the ambulance section lower on the page and no booking button", () => {
+      renderHome({ isAuthenticated: false });
+
+      const section = document.getElementById("ambulance") as HTMLElement;
+      expect(within(section).getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
+      expect(within(section).getByRole("link", { name: "Call 112" })).toHaveAttribute("href", "tel:112");
+      expect(within(section).getByRole("link", { name: /^Call \+254/ })).toHaveAttribute("href", expect.stringMatching(/^tel:\+254/));
+      expect(within(section).queryByRole("button")).not.toBeInTheDocument();
+    });
   });
 });
