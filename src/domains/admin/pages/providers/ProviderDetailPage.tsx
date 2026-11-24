@@ -13,6 +13,7 @@ import { FormField } from "../../../../shared/components/FormField";
 import { Input } from "../../../../shared/components/Input";
 import { Loading } from "../../../../shared/components/Loading";
 import { Modal } from "../../../../shared/components/Modal";
+import { ProviderItemDocument } from "../../components/ProviderItemDocument";
 import { ActionMenu, type ActionMenuItem } from "../../../../shared/components/ActionMenu";
 import { useToast } from "../../../../shared/components/ToastProvider";
 import { useRbac } from "../../../../shared/hooks/useRbac";
@@ -128,8 +129,10 @@ type ProviderApplicationItem = {
   comment: string | null;
   valueText: string | null;
   fileUrl: string | null;
+  expiresOn: string | null;
   requirement: {
     id: string;
+    hasExpiry: boolean;
     key: string;
     label: string;
     inputType: string;
@@ -489,7 +492,9 @@ const mapProviderApplication = (resource: unknown): ProviderApplicationSummary =
           comment: coerceString(node.comment),
           valueText: coerceString(node.value_text),
           fileUrl: coerceString(node.file_url),
+          expiresOn: coerceString(node.expires_on),
           requirement: {
+            hasExpiry: requirement.has_expiry === true,
             id: normalizeId(requirement.id ?? node.requirement_type_id),
             key: coerceString(requirement.key) ?? "unknown",
             label: coerceString(requirement.label) ?? "Requirement",
@@ -1150,6 +1155,17 @@ const ProviderDetailPage = () => {
                         {renderStatusBadge(item.status)}
                       </div>
                       {item.comment && <p className="mt-2 text-xs text-slate-500">{item.comment}</p>}
+                      {item.requirement.inputType !== "text" && (
+                        <ProviderItemDocument
+                          applicationId={application.id}
+                          itemId={item.id}
+                          label={item.requirement.label}
+                          hasFile={Boolean(item.fileUrl)}
+                          hasExpiry={item.requirement.hasExpiry}
+                          expiresOn={item.expiresOn}
+                          onUploaded={invalidateProviderData}
+                        />
+                      )}
                       {canRequestResubmission(item.status) && (
                         <div className="mt-3">
                           <Button
