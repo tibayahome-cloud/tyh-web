@@ -82,14 +82,14 @@ describe("public telemedicine entry point", () => {
   });
 
   describe("routing", () => {
-    it("sends a signed-in client to the telemedicine booking screen", async () => {
+    it("sends even a signed-in browser to the public booking page, which recognises the client there", async () => {
       const user = userEvent.setup();
       renderHome({ isAuthenticated: true });
 
       await user.click(screen.getByRole("button", { name: CTA_NAME }));
 
-      expect(screen.getByText(TELEMEDICINE_PAGE)).toBeInTheDocument();
-      expect(screen.queryByText(SIGNUP_PAGE)).not.toBeInTheDocument();
+      expect(screen.getByText(PUBLIC_BOOKING_PAGE)).toBeInTheDocument();
+      expect(screen.queryByText(TELEMEDICINE_PAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(NOT_FOUND_FALLBACK)).not.toBeInTheDocument();
     });
 
