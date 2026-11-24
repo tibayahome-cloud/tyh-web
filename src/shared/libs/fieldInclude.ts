@@ -331,7 +331,7 @@ export const providerApplicationReview: FieldPreset = {
   fields: ["id", "user_id", "status", "submitted_at", "documents_due_on"],
   includes: {
     items: {
-      fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "expires_on", "verified_at", "verifier_name"],
+      fields: ["id", "status", "value_text", "file_url", "download_url", "comment", "expires_on", "verified_at", "verifier_name", "uploaded_by"],
       children: {
         requirement_type: {
           fields: ["id", "key", "label", "input_type", "display_order", "required_for_verification", "has_expiry"]

@@ -78,6 +78,8 @@ export type ReviewItem = {
   verified_at?: string | null;
   /** Who approved it, or sent it back. */
   verifier_name?: string | null;
+  /** Set when an administrator added the document for the provider. */
+  uploaded_by?: { kind: "platform" | "facility"; name?: string | null } | null;
   requirement_type?: {
     id: string;
     key?: string;

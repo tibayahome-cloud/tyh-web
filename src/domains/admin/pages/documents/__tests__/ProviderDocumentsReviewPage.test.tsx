@@ -155,6 +155,39 @@ describe("Reviewing a provider's documents", () => {
     expect(await screen.findByRole("dialog", { name: "Preview of Practising licence" })).toHaveTextContent("/items/n2/file");
   });
 
+  it("lets the reviewer add a document for the provider, and send it to that item's upload route", async () => {
+    state.application = application("draft", [
+      item("n1", "National ID", "missing"),
+      item("n2", "Practising licence", "pending", { expires_on: "2030-03-31" }, { has_expiry: true })
+    ]);
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Add National ID" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace Practising licence" })).toBeInTheDocument();
+    const file = new File(["%PDF-1.4"], "id.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByTestId("file-n1"), { target: { files: [file] } });
+
+    await waitFor(() => expect(state.post).toHaveBeenCalled());
+    expect(state.post.mock.calls[0][0]).toBe("/provider-applications/app-1/items/n1/upload");
+  });
+
+  it("says who added a document when an administrator did", async () => {
+    state.application = application("draft", [
+      item("n1", "National ID", "verified", { uploaded_by: { kind: "platform", name: "Moses Abwova" } })
+    ]);
+    renderPage();
+
+    expect(await screen.findByText("Added for the provider by Tiba Ya Home (Moses Abwova)")).toBeInTheDocument();
+  });
+
+  it("offers no upload for a typed answer", async () => {
+    state.application = application("draft", [item("n1", "KRA PIN", "pending", { value_text: "A123456789B" }, { input_type: "text" })]);
+    renderPage();
+
+    await screen.findByText("A123456789B");
+    expect(screen.queryByRole("button", { name: /^(Add|Replace) KRA PIN/ })).not.toBeInTheDocument();
+  });
+
   it("shows the expiry date and the reason a document was sent back", async () => {
     state.application = application("under_review", [
       item("n1", "National ID", "rejected", { comment: "The photo is blurry" }),
