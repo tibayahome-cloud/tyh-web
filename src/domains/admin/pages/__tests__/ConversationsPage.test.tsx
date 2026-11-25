@@ -15,6 +15,7 @@ import type { Thread } from "../../../../shared/schemas/messaging";
 import AdminConversationsPage, { filterThreadsBySearch } from "../ConversationsPage";
 
 const useThreadsMock = vi.fn();
+const markReadMock = vi.hoisted(() => vi.fn());
 const rbac = vi.hoisted(() => ({ roles: ["admin.super"] as string[] }));
 const createThreadMock = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false, mutate: vi.fn() }));
 const facilities = vi.hoisted(() => ({ fetchFacilityProviders: vi.fn(), fetchFacilities: vi.fn() }));
@@ -32,6 +33,7 @@ vi.mock("../../../../shared/hooks/useMessaging", () => ({
   useThreadMessages: () => ({ data: undefined, isLoading: false, fetchNextPage: vi.fn(), hasNextPage: false, isFetchingNextPage: false }),
   useSendMessage: () => ({ mutate: vi.fn() }),
   useCreateThread: () => createThreadMock,
+  useMarkThreadRead: () => ({ mutate: markReadMock }),
   messagingKeys: { threads: () => ["messaging", "threads"], messages: (id: string) => ["messaging", "threads", id, "messages"] }
 }));
 

@@ -12,7 +12,7 @@ import { useToast } from "../ToastProvider";
 import { useAuth } from "../../hooks/useAuth";
 import { useBookingList } from "../../hooks/useBookings";
 import { useSocket } from "../../hooks/useSocket";
-import { messagingKeys, useCreateThread, useSendMessage, useThreadMessages, useThreads } from "../../hooks/useMessaging";
+import { messagingKeys, useCreateThread, useMarkThreadRead, useSendMessage, useThreadMessages, useThreads } from "../../hooks/useMessaging";
 import { conversationOptions } from "../../utils/inboxOptions";
 import { ConversationList, type Conversation } from "./ConversationList";
 import { MessageThread, type Message } from "./MessageThread";
@@ -61,6 +61,7 @@ export const InboxPage = ({ role, basePath }: Props) => {
   const messagesQuery = useThreadMessages(threadId || null);
   const sendMutation = useSendMessage();
   const createThreadMutation = useCreateThread();
+  const markRead = useMarkThreadRead();
 
   const [query, setQuery] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
@@ -85,6 +86,12 @@ export const InboxPage = ({ role, basePath }: Props) => {
     return needle ? options.filter((option) => `${option.name} ${option.service}`.toLowerCase().includes(needle)) : options;
   }, [options, personQuery]);
 
+  // Opening a conversation reads it: the server clears its unread count and its bell item.
+  const markReadMutate = markRead.mutate;
+  useEffect(() => {
+    if (threadId) markReadMutate(threadId);
+  }, [threadId, markReadMutate]);
+
   useEffect(() => {
     if (!socket || !threadId) return;
     const room = `thread:${threadId}`;
@@ -92,6 +99,8 @@ export const InboxPage = ({ role, basePath }: Props) => {
     const onMessage = (payload: { thread_id?: string }) => {
       if (payload?.thread_id === threadId) {
         queryClient.invalidateQueries({ queryKey: messagingKeys.messages(threadId) }).catch(() => undefined);
+        // A message that arrives while the conversation is open is read as it arrives.
+        markReadMutate(threadId);
       }
       queryClient.invalidateQueries({ queryKey: messagingKeys.threads() }).catch(() => undefined);
     };
@@ -100,7 +109,7 @@ export const InboxPage = ({ role, basePath }: Props) => {
       socket.emit?.("leave_room", { room });
       socket.off("message.created", onMessage);
     };
-  }, [socket, threadId, queryClient]);
+  }, [socket, threadId, queryClient, markReadMutate]);
 
   const threads: Conversation[] = useMemo(
     () =>

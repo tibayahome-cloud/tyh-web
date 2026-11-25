@@ -169,3 +169,15 @@ export const fetchSupportContacts = async (
   const matches = normalizeMatches(data.matches ?? []);
   return { admins, matches };
 };
+
+/** How many messages from other people this person has not read, across their conversations. */
+export const fetchUnreadMessageCount = async (): Promise<number> => {
+  const response = await api.get("/messaging/unread-count");
+  const value = response.data?.data?.unread_count;
+  return typeof value === "number" ? value : 0;
+};
+
+/** Marks a conversation read for this person; the server also clears its bell item. */
+export const markThreadRead = async (threadId: string): Promise<void> => {
+  await api.post(`/messaging/threads/${threadId}/read`);
+};
