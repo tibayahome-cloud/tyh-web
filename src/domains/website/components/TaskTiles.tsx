@@ -44,9 +44,9 @@ export const taskTiles = (inApp: boolean): TaskTile[] => {
         { key: "video", label: "Video doctor", icon: Video, to: book({ category: "firstcare" }), tint: "blue" },
         { key: "specialist", label: "Find a specialist", icon: Stethoscope, to: book({ category: "specialistcare" }), tint: "blue" },
         { key: "mental-health", label: "Mental health", icon: MessageCircleHeart, to: book({ category: "mental-health" }), tint: "gold" },
-        { key: "lab-results", label: "Lab results", icon: FlaskConical, to: book({ service: "follow-up-medical-consultation" }), tint: "blue" },
-        { key: "scan-results", label: "Scan results", icon: ScanLine, to: book({ service: "diagnostic-report-review" }), tint: "blue" },
-        { key: "prescriptions", label: "Prescriptions", icon: Pill, to: book({ service: "medical-advice-referral" }), tint: "blue" },
+        { key: "lab-results", label: "Lab results review", icon: FlaskConical, to: book({ service: "follow-up-medical-consultation" }), tint: "blue" },
+        { key: "scan-results", label: "Scan results review", icon: ScanLine, to: book({ service: "diagnostic-report-review" }), tint: "blue" },
+        { key: "prescriptions", label: "Prescription review", icon: Pill, to: book({ service: "medical-advice-referral" }), tint: "blue" },
         { key: "home-care", label: "Home care", icon: House, to: homeCare, tint: "blue" },
         { key: "ambulance", label: "Ambulance", icon: Siren, to: inApp ? CLIENT_AMBULANCE_REQUEST_PATH : PUBLIC_AMBULANCE_REQUEST_PATH, tint: "blue" }
     ];

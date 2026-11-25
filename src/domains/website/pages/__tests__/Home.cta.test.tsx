@@ -121,7 +121,7 @@ describe("homepage calls to action", () => {
   describe("when the browser still holds a session", () => {
     // The site only checks that a login token is saved, not that it still works. A button that promised a booking must
     // therefore never lead into the app, where an expired session ends at the login page.
-    it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results", "Scan results", "Prescriptions", "Home care"])(
+    it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results review", "Scan results review", "Prescription review", "Home care"])(
       "sends the %s tile to the public booking pages, not into the app",
       async (label) => {
         const user = userEvent.setup();
@@ -175,7 +175,7 @@ describe("homepage calls to action", () => {
       expect(screen.queryByText(CLIENT_APP_HOME)).not.toBeInTheDocument();
     });
 
-    it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results", "Scan results", "Prescriptions"])(
+    it.each(["Video doctor", "Find a specialist", "Mental health", "Lab results review", "Scan results review", "Prescription review"])(
       "sends the %s tile to the public booking page, so the visitor sees services and times before any sign-up",
       async (label) => {
         const user = userEvent.setup();
@@ -196,9 +196,9 @@ describe("homepage calls to action", () => {
       ["Video doctor", "?category=firstcare"],
       ["Find a specialist", "?category=specialistcare"],
       ["Mental health", "?category=mental-health"],
-      ["Lab results", "?service=follow-up-medical-consultation"],
-      ["Scan results", "?service=diagnostic-report-review"],
-      ["Prescriptions", "?service=medical-advice-referral"]
+      ["Lab results review", "?service=follow-up-medical-consultation"],
+      ["Scan results review", "?service=diagnostic-report-review"],
+      ["Prescription review", "?service=medical-advice-referral"]
     ];
 
     it.each(TILE_CHOICES)("the %s tile opens the booking with %s", async (label, search) => {
@@ -244,9 +244,9 @@ describe("homepage calls to action", () => {
         "Video doctor",
         "Find a specialist",
         "Mental health",
-        "Lab results",
-        "Scan results",
-        "Prescriptions",
+        "Lab results review",
+        "Scan results review",
+        "Prescription review",
         "Home care",
         "Ambulance"
       ]);
