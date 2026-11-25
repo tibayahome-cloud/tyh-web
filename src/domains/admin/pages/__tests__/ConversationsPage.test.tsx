@@ -15,12 +15,23 @@ import type { Thread } from "../../../../shared/schemas/messaging";
 import AdminConversationsPage, { filterThreadsBySearch } from "../ConversationsPage";
 
 const useThreadsMock = vi.fn();
+const rbac = vi.hoisted(() => ({ roles: ["admin.super"] as string[] }));
+const createThreadMock = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false, mutate: vi.fn() }));
+const facilities = vi.hoisted(() => ({ fetchFacilityProviders: vi.fn(), fetchFacilities: vi.fn() }));
+
+vi.mock("../../../../shared/hooks/useRbac", () => ({
+  useRbac: () => ({ hasRole: (role: string | string[]) => [role].flat().some((r) => rbac.roles.includes(r)) })
+}));
+vi.mock("../../../../shared/libs/facilities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../shared/libs/facilities")>()),
+  ...facilities
+}));
 
 vi.mock("../../../../shared/hooks/useMessaging", () => ({
   useThreads: (...args: unknown[]) => useThreadsMock(...args),
   useThreadMessages: () => ({ data: undefined, isLoading: false, fetchNextPage: vi.fn(), hasNextPage: false, isFetchingNextPage: false }),
   useSendMessage: () => ({ mutate: vi.fn() }),
-  useCreateThread: () => ({ mutate: vi.fn() }),
+  useCreateThread: () => createThreadMock,
   messagingKeys: { threads: () => ["messaging", "threads"], messages: (id: string) => ["messaging", "threads", id, "messages"] }
 }));
 
@@ -117,6 +128,73 @@ const renderPage = () => {
 describe("ConversationsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    rbac.roles = ["admin.super"];
+  });
+
+  describe("a facility admin starting a conversation", () => {
+    const provider = (userId: string, name: string, email: string) => ({ id: `p-${userId}`, userId, user: { fullName: name, email } });
+
+    beforeEach(() => {
+      rbac.roles = ["admin.ops"];
+      useThreadsMock.mockReturnValue({ data: { pages: [{ data: [] }] }, isLoading: false, isError: false, fetchNextPage: vi.fn(), hasNextPage: false });
+      facilities.fetchFacilities.mockResolvedValue({ facilities: [{ id: "f1", name: "Ganana" }] });
+      facilities.fetchFacilityProviders.mockResolvedValue({
+        providers: [provider("u2", "Susan Kithinji", "susan@example.test"), provider("u1", "Alice Wahome", "alice@example.test")],
+        meta: {}
+      });
+      createThreadMock.mutateAsync.mockResolvedValue({ id: "new-thread" });
+    });
+
+    it("offers New message, lists the facility's providers by name, and starts the conversation with the one chosen", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole("button", { name: "New message" }));
+      expect(await screen.findByText("Alice Wahome")).toBeInTheDocument();
+      expect(facilities.fetchFacilityProviders).toHaveBeenCalledWith("f1", expect.anything());
+      const names = screen.getAllByRole("radio").map((radio) => radio.closest("label")?.textContent);
+      expect(names[0]).toContain("Alice Wahome");
+
+      const start = screen.getByRole("button", { name: "Start conversation" });
+      expect(start).toBeDisabled();
+      await user.click(screen.getByRole("radio", { name: /Susan Kithinji/ }));
+      await user.click(start);
+
+      await waitFor(() =>
+        expect(createThreadMock.mutateAsync).toHaveBeenCalledWith({ scope: "admin", participants: [{ userId: "u2", roleHint: "provider" }] })
+      );
+    });
+
+    it("says so when the facility has no providers yet", async () => {
+      facilities.fetchFacilityProviders.mockResolvedValue({ providers: [], meta: {} });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole("button", { name: "New message" }));
+
+      expect(await screen.findByText(/Your facility has no providers yet/)).toBeInTheDocument();
+    });
+
+    it("keeps Start conversation outside the scrolling list, so a long list never hides it", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole("button", { name: "New message" }));
+      await screen.findByText("Alice Wahome");
+
+      const start = screen.getByRole("button", { name: "Start conversation" });
+      const scroller = screen.getByRole("radio", { name: /Alice Wahome/ }).closest(".overflow-y-auto");
+      expect(scroller).not.toBeNull();
+      expect(scroller?.contains(start)).toBe(false);
+    });
+  });
+
+  it("does not offer a super admin a New message button: they read every conversation, they do not start them here", async () => {
+    useThreadsMock.mockReturnValue({ data: { pages: [{ data: [] }] }, isLoading: false, isError: false, fetchNextPage: vi.fn(), hasNextPage: false });
+    renderPage();
+
+    await screen.findByText("Inbox", { selector: "h2" });
+    expect(screen.queryByRole("button", { name: "New message" })).not.toBeInTheDocument();
   });
 
   it("filters the visible conversation list as the admin types", async () => {

@@ -19,13 +19,30 @@ describe("conversationOptions", () => {
     expect(`${option.name} ${option.service} ${option.when}`).not.toMatch(/9255e426/);
   });
 
-  it("lists the newest booking first", () => {
+  it("lists the person with the newest booking first", () => {
     const options = conversationOptions(
-      [booking("old", { scheduledAt: "2026-09-01T08:00:00Z" }), booking("new", { scheduledAt: "2026-10-20T08:00:00Z" })],
+      [
+        booking("old", { scheduledAt: "2026-09-01T08:00:00Z", client: { id: "c-old", fullName: "Old Client" } }),
+        booking("new", { scheduledAt: "2026-10-20T08:00:00Z", client: { id: "c-new", fullName: "New Client" } })
+      ],
       "client"
     );
 
     expect(options.map((o) => o.bookingId)).toEqual(["new", "old"]);
+  });
+
+  it("lists a person once however many bookings they share, with the latest booking and the count", () => {
+    const options = conversationOptions(
+      [
+        booking("b1", { scheduledAt: "2026-09-01T08:00:00Z", service: { name: "Review My Lab Results" } }),
+        booking("b3", { scheduledAt: "2026-10-17T08:00:00Z", service: { name: "Counselling" } }),
+        booking("b2", { scheduledAt: "2026-10-14T08:00:00Z", service: { name: "Counselling" } })
+      ],
+      "provider"
+    );
+
+    expect(options).toHaveLength(1);
+    expect(options[0]).toMatchObject({ bookingId: "b3", name: "Dr Example", service: "Counselling", when: "17 Oct", count: 3 });
   });
 
   it("skips a booking that has no one to write to", () => {
