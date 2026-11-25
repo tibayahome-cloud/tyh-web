@@ -15,6 +15,8 @@ interface ModalProps {
   fullWidth?: boolean;
   /** If true, forces desktop styling even on mobile */
   disableMobileFullScreen?: boolean;
+  /** Square off the content area so a list inside it meets the dialog edge instead of sitting in a second rounded box. */
+  flush?: boolean;
 }
 
 export const Modal = ({
@@ -25,6 +27,7 @@ export const Modal = ({
   maxWidth = "sm",
   fullWidth = true,
   disableMobileFullScreen = false,
+  flush = false,
   children
 }: PropsWithChildren<ModalProps>) => {
   const theme = useTheme();
@@ -74,7 +77,8 @@ export const Modal = ({
       <DialogContent
         dividers
         sx={{
-          borderRadius: useFullScreen ? 0 : 3,
+          borderRadius: useFullScreen || flush ? 0 : 3,
+          ...(flush ? { borderLeft: "none", borderRight: "none" } : {}),
           borderColor: "rgba(148,163,184,0.35)",
           mt: title || description ? 1 : 0,
           backgroundColor: "#fffdfc",
