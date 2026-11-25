@@ -67,6 +67,7 @@ export const InboxPage = ({ role, basePath }: Props) => {
   const [target, setTarget] = useState<"person" | "support">("person");
   const [selectedBookingId, setSelectedBookingId] = useState("");
   const [supportSubject, setSupportSubject] = useState("");
+  const [personQuery, setPersonQuery] = useState("");
 
   const bookings = useBookingList(
     role === "provider"
@@ -78,6 +79,11 @@ export const InboxPage = ({ role, basePath }: Props) => {
     () => conversationOptions((bookings.data?.bookings ?? []) as never[], otherRole),
     [bookings.data?.bookings, otherRole]
   );
+
+  const visibleOptions = useMemo(() => {
+    const needle = personQuery.trim().toLowerCase();
+    return needle ? options.filter((option) => `${option.name} ${option.service}`.toLowerCase().includes(needle)) : options;
+  }, [options, personQuery]);
 
   useEffect(() => {
     if (!socket || !threadId) return;
@@ -146,6 +152,7 @@ export const InboxPage = ({ role, basePath }: Props) => {
   const openComposer = () => {
     setTarget("person");
     setSelectedBookingId("");
+    setPersonQuery("");
     setSupportSubject("");
     setComposerOpen(true);
   };
@@ -260,8 +267,8 @@ export const InboxPage = ({ role, basePath }: Props) => {
       </div>
 
       <Modal open={composerOpen} onClose={() => setComposerOpen(false)} title="New message" description={`Choose who to write to.`}>
-        <div className="space-y-5 pt-2">
-          <div role="radiogroup" aria-label="Write to" className="flex rounded-2xl bg-slate-100 p-1">
+        <div className="flex max-h-[calc(100dvh-11rem)] flex-col gap-4 pt-2">
+          <div role="radiogroup" aria-label="Write to" className="flex shrink-0 rounded-2xl bg-slate-100 p-1">
             {(["person", "support"] as const).map((value) => (
               <button
                 key={value}
@@ -279,55 +286,78 @@ export const InboxPage = ({ role, basePath }: Props) => {
             ))}
           </div>
 
-          {target === "person" ? (
-            bookings.isLoading ? (
-              <Loading />
-            ) : options.length > 0 ? (
-              <fieldset className="space-y-2">
-                <legend className="sr-only">Choose a booking</legend>
-                {options.map((option) => (
-                  <label
-                    key={option.bookingId}
-                    className={classNames(
-                      "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-2xl border p-3",
-                      selectedBookingId === option.bookingId ? "border-tiba-blue bg-sky-50" : "border-slate-200 hover:bg-slate-50"
-                    )}
-                  >
+          {/* Only this part scrolls: the buttons below stay in view however long the list is. */}
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+            {target === "person" ? (
+              bookings.isLoading ? (
+                <Loading />
+              ) : options.length > 0 ? (
+                <>
+                  <p className="text-sm text-slate-600">People you have a booking with. Pick one to write to.</p>
+                  {options.length > 5 && (
                     <input
-                      type="radio"
-                      name="conversation-booking"
-                      checked={selectedBookingId === option.bookingId}
-                      onChange={() => setSelectedBookingId(option.bookingId)}
-                      className="h-4 w-4"
+                      type="search"
+                      value={personQuery}
+                      onChange={(event) => setPersonQuery(event.target.value)}
+                      aria-label={`Search ${copy.otherLower}`}
+                      placeholder={`Search ${copy.otherLower}`}
+                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
                     />
-                    <span>
-                      <span className="block text-sm font-semibold text-slate-900">{option.name}</span>
-                      <span className="block text-sm text-slate-600">
-                        {option.service}
-                        {option.when ? `, ${option.when}` : ""}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
+                  )}
+                  {visibleOptions.length === 0 ? (
+                    <p role="status" className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      No one matches &ldquo;{personQuery.trim()}&rdquo;.
+                    </p>
+                  ) : (
+                    <fieldset className="space-y-2">
+                      <legend className="sr-only">Choose who to write to</legend>
+                      {visibleOptions.map((option) => (
+                        <label
+                          key={option.bookingId}
+                          className={classNames(
+                            "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-2xl border p-3",
+                            selectedBookingId === option.bookingId ? "border-tiba-blue bg-sky-50" : "border-slate-200 hover:bg-slate-50"
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="conversation-person"
+                            checked={selectedBookingId === option.bookingId}
+                            onChange={() => setSelectedBookingId(option.bookingId)}
+                            className="h-4 w-4"
+                          />
+                          <span>
+                            <span className="block text-sm font-semibold text-slate-900">{option.name}</span>
+                            <span className="block text-sm text-slate-600">
+                              {option.service}
+                              {option.when ? `, ${option.when}` : ""}
+                              {option.count > 1 ? ` · ${option.count} bookings together` : ""}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
+                </>
+              ) : (
+                <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  You have no bookings with {copy.otherLower} yet. Once you do, you can message them from here.
+                </p>
+              )
             ) : (
-              <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                You have no bookings with {copy.otherLower} yet. Once you do, you can message them from here.
-              </p>
-            )
-          ) : (
-            <label className="block">
-              <span className="text-sm font-medium text-slate-800">What do you need help with?</span>
-              <input
-                value={supportSubject}
-                onChange={(event) => setSupportSubject(event.target.value)}
-                placeholder="For example, a payment question"
-                className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-              />
-            </label>
-          )}
+              <label className="block">
+                <span className="text-sm font-medium text-slate-800">What do you need help with?</span>
+                <input
+                  value={supportSubject}
+                  onChange={(event) => setSupportSubject(event.target.value)}
+                  placeholder="For example, a payment question"
+                  className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
+                />
+              </label>
+            )}
+          </div>
 
-          <div className="flex gap-3">
+          <div className="flex shrink-0 gap-3 border-t border-slate-100 pt-3">
             <Button type="button" variant="ghost" className="min-h-[44px] flex-1" onClick={() => setComposerOpen(false)}>
               Cancel
             </Button>
