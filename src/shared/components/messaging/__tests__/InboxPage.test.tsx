@@ -36,6 +36,9 @@ vi.mock("../../AppLayout", () => ({ AppLayout: ({ children }: { children: React.
 
 import { InboxPage } from "../InboxPage";
 
+/** The people in the new-message list (the two toggle buttons above it are radios too). */
+const personRadios = () => Array.from(document.querySelectorAll<HTMLInputElement>('input[name="conversation-person"]'));
+
 const thread = (id: string, name: string, body: string, unread = 0) => ({
   id,
   title: null,
@@ -160,6 +163,63 @@ describe("New message", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start conversation" }));
 
     expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ scope: "booking", bookingId: bookings[0].id }));
+  });
+
+  const booking = (id: string, clientId: string, name: string, when: string, service = "Counselling") => ({
+    id,
+    scheduledAt: when,
+    service: { name: service },
+    client: { id: clientId, fullName: name }
+  });
+
+  it("lists each person once, with their latest booking and how many they share", () => {
+    state.bookings = [
+      booking("b1", "c1", "Amina Client", "2026-09-04T08:00:00Z", "Review My Lab Results"),
+      booking("b2", "c1", "Amina Client", "2026-10-14T08:00:00Z"),
+      booking("b3", "c1", "Amina Client", "2026-10-17T08:00:00Z"),
+      booking("b4", "c2", "John Doe", "2026-10-01T08:00:00Z")
+    ];
+    renderInbox();
+    fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
+
+    expect(personRadios()).toHaveLength(2);
+    expect(screen.getByText("Counselling, 17 Oct · 3 bookings together")).toBeInTheDocument();
+    expect(screen.getByText("People you have a booking with. Pick one to write to.")).toBeInTheDocument();
+  });
+
+  it("starts the conversation on the latest booking with the person chosen", () => {
+    state.bookings = [booking("old", "c1", "Amina Client", "2026-09-04T08:00:00Z"), booking("new", "c1", "Amina Client", "2026-10-17T08:00:00Z")];
+    state.create.mockResolvedValue({ id: "new-thread" });
+    renderInbox();
+    fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
+
+    fireEvent.click(screen.getByRole("radio", { name: /Amina Client/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Start conversation" }));
+
+    expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ scope: "booking", bookingId: "new" }));
+  });
+
+  it("adds a search once there are more than five people, and finds a person by name", () => {
+    state.bookings = ["Ann", "Ben", "Cyd", "Dan", "Eve", "Fay"].map((name, i) => booking(`b${i}`, `c${i}`, `${name} Client`, `2026-10-0${i + 1}T08:00:00Z`));
+    renderInbox();
+    fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search clients" }), { target: { value: "dan" } });
+
+    expect(personRadios()).toHaveLength(1);
+    expect(screen.getByText("Dan Client")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search clients" }), { target: { value: "zzz" } });
+    expect(screen.getByText(/No one matches/)).toBeInTheDocument();
+  });
+
+  it("keeps Start conversation outside the scrolling list, so a long list never hides it", () => {
+    state.bookings = ["Ann", "Ben", "Cyd", "Dan", "Eve", "Fay"].map((name, i) => booking(`b${i}`, `c${i}`, `${name} Client`, `2026-10-0${i + 1}T08:00:00Z`));
+    renderInbox();
+    fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
+
+    const scroller = personRadios()[0].closest(".overflow-y-auto");
+    expect(scroller).not.toBeNull();
+    expect(scroller?.contains(screen.getByRole("button", { name: "Start conversation" }))).toBe(false);
   });
 
   it("explains when there is nobody to message yet", () => {

@@ -8,6 +8,9 @@ import { Loading } from "../../../shared/components/Loading";
 import ApiErrorBanner from "../../../shared/components/ApiErrorBanner";
 import { classifyApiError } from "../../../shared/utils/errors";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { useRbac } from "../../../shared/hooks/useRbac";
+import { NewProviderMessageDialog } from "../components/NewProviderMessageDialog";
+import { useAdminFacilityScope } from "./finance/paymentAccess";
 import { useSocket } from "../../../shared/hooks/useSocket";
 import {
   useThreads,
@@ -58,6 +61,13 @@ const AdminConversationsPage = () => {
   const socket = useSocket();
 
   const [search, setSearch] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
+  const { hasRole } = useRbac();
+  // A facility admin writes to the providers of their own facility, by default. (A super admin reads every conversation
+  // from this page, and does not start them here.)
+  const isFacilityAdmin = hasRole("admin.ops") && !hasRole(["admin.super", "admin"]);
+  const facilityScope = useAdminFacilityScope(isFacilityAdmin);
+  const createThread = useCreateThread();
 
   const {
     data: threadsData,
@@ -108,7 +118,8 @@ const AdminConversationsPage = () => {
       const other = t.participants.find((p: any) => p.userId !== user?.id);
       return {
         id: t.id,
-        title: t.title || (t.scope === 'booking' ? `Booking Support` : `General Support`),
+        // A two-person conversation has no title of its own: each side sees the other person's name.
+        title: t.title || other?.user?.fullName || other?.user?.email || (t.scope === 'booking' ? `Booking Support` : `General Support`),
         lastMessage: t.messages[0] ? {
           body: t.messages[0].body || "",
           created_at: t.messages[0].createdAt || t.lastMessageAt || "",
@@ -140,6 +151,22 @@ const AdminConversationsPage = () => {
 
   const selectedThread = threads.find(t => t.id === threadId);
 
+  const startWithProvider = (providerUserId: string) => {
+    createThread
+      .mutateAsync({ scope: "admin", participants: [{ userId: providerUserId, roleHint: "provider" }] })
+      .then((thread: any) => {
+        setComposerOpen(false);
+        navigate(`/admin/conversations/${thread.id}`);
+      })
+      .catch((error: unknown) => {
+        toast.showToast({
+          title: "Could not start the conversation",
+          description: error instanceof Error ? error.message : "Try again.",
+          variant: "error"
+        });
+      });
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-slate-50">
       <div className="flex-1 flex overflow-hidden lg:p-6">
@@ -154,6 +181,16 @@ const AdminConversationsPage = () => {
                 <Shield size={20} className="text-tiba-blue" />
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">Inbox</h2>
               </div>
+              {isFacilityAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setComposerOpen(true)}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-tiba-blue px-4 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  New message
+                </button>
+              )}
             </div>
             <div className="p-4 bg-slate-50/50">
               <div className="relative">
@@ -220,13 +257,22 @@ const AdminConversationsPage = () => {
                 </div>
                 <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Inbox</h3>
                 <p className="mt-2 text-slate-500 max-w-xs text-sm leading-relaxed">
-                  Select an active conversation to view messages and respond to users.
+                  {isFacilityAdmin
+                    ? "Select a conversation, or start one with a provider at your facility."
+                    : "Select an active conversation to view messages and respond to users."}
                 </p>
               </div>
             )}
           </div>
         </div>
       </div>
+      <NewProviderMessageDialog
+        open={composerOpen}
+        facilityId={facilityScope.facility?.id ?? null}
+        starting={createThread.isPending}
+        onClose={() => setComposerOpen(false)}
+        onStart={startWithProvider}
+      />
     </div>
   );
 };
