@@ -1,48 +1,33 @@
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { messagingKeys, useUnreadMessageCount } from "./useMessaging";
 import { useSocket } from "./useSocket";
-import { useConversationStore } from "../stores/useConversationStore";
 import { useAuth } from "./useAuth";
 
-const CHAT_EVENTS = [
-  "booking.chat.message",
-  "model.booking.chat.message",
-  "message.created",
-  "model.message.created"
-];
+const CHAT_EVENTS = ["message.created", "model.message.created", "booking.chat.message", "model.booking.chat.message"];
 
+/**
+ * The unread count on the Inbox entry. The number comes from the server (messages from other people not yet read), so it
+ * survives a reload and counts what arrived while the app was closed. A live message event only asks for a fresh count;
+ * it never adds one by itself, so a message seen in an open conversation, or announced twice, cannot inflate it.
+ */
 export const useConversationBadge = () => {
   const socket = useSocket();
-  const unreadCount = useConversationStore((state) => state.unreadCount);
-  const increment = useConversationStore((state) => state.increment);
-  const reset = useConversationStore((state) => state.reset);
+  const queryClient = useQueryClient();
   const { user } = useAuth();
+  const query = useUnreadMessageCount(Boolean(user?.id));
 
   useEffect(() => {
-    if (!socket) {
-      return;
-    }
-    const handleMessage = (payload: Record<string, unknown> = {}) => {
-      const senderId =
-        (typeof payload.sender_id === "string" && payload.sender_id) ||
-        (typeof payload.user_id === "string" && payload.user_id) ||
-        null;
-      if (senderId && senderId === user?.id) {
-        return;
-      }
-      increment();
+    if (!socket) return;
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: messagingKeys.unread() }).catch(() => undefined);
     };
-    CHAT_EVENTS.forEach((event) => socket.on(event, handleMessage));
+    CHAT_EVENTS.forEach((event) => socket.on(event, refresh));
     return () => {
-      CHAT_EVENTS.forEach((event) => socket.off(event, handleMessage));
+      CHAT_EVENTS.forEach((event) => socket.off(event, refresh));
     };
-  }, [increment, socket, user?.id]);
+  }, [queryClient, socket]);
 
-  useEffect(() => {
-    const handleChatOpen = () => reset();
-    window.addEventListener("chat:open", handleChatOpen);
-    return () => window.removeEventListener("chat:open", handleChatOpen);
-  }, [reset]);
-
-  return { unreadCount, reset };
+  return { unreadCount: query.data ?? 0, reset: () => void query.refetch() };
 };

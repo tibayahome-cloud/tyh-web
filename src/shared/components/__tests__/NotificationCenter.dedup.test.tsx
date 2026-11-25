@@ -26,6 +26,10 @@ vi.mock("../../hooks/useSocket", () => ({
   useSocket: () => null
 }));
 
+vi.mock("../../hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "u1" } })
+}));
+
 vi.mock("../ToastProvider", () => ({
   useToast: () => ({ showToast: vi.fn(), push: vi.fn() })
 }));

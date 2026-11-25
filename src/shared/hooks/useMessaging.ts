@@ -5,7 +5,9 @@ import {
   fetchThreadMessages,
   postThreadMessage,
   createThread,
-  fetchSupportContacts
+  fetchSupportContacts,
+  fetchUnreadMessageCount,
+  markThreadRead
 } from "../libs/messaging";
 import type { CreateThreadInput, SupportContactsResponse } from "../libs/messaging";
 
@@ -13,6 +15,7 @@ export const messagingKeys = {
   all: ["messaging"] as const,
   threads: () => ["messaging", "threads"] as const,
   messages: (threadId: string) => ["messaging", "threads", threadId, "messages"] as const,
+  unread: () => ["messaging", "unread-count"] as const,
   supportContacts: (scope: string) => ["messaging", "support", "contacts", scope] as const
 };
 
@@ -71,5 +74,29 @@ export const useSupportContacts = (scope: "client_support" | "provider_support")
     queryKey: messagingKeys.supportContacts(scope),
     queryFn: () => fetchSupportContacts(scope),
     staleTime: 5 * 60 * 1000
+  });
+};
+
+/** The number on the Inbox badge: unread messages as the server counts them, so it survives a reload and a closed tab. */
+export const useUnreadMessageCount = (enabled = true) =>
+  useQuery({
+    queryKey: messagingKeys.unread(),
+    queryFn: fetchUnreadMessageCount,
+    enabled,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000
+  });
+
+/** Opening a conversation marks it read; the list, the badge and the bell all refresh from the server. */
+export const useMarkThreadRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (threadId: string) => markThreadRead(threadId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: messagingKeys.threads() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: messagingKeys.unread() }).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }).catch(() => undefined);
+    }
   });
 };

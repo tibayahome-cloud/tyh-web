@@ -28,6 +28,8 @@ export type Thread = {
   status: string;
   title: string | null;
   lastMessageAt: string | null;
+  /** Messages from other people this person has not read; worked out by the server. */
+  unreadCount?: number;
   participants: ThreadParticipant[];
   messages: Message[];
 };
@@ -82,6 +84,7 @@ export const mapThread = (payload: unknown): Thread | null => {
     status: coerceString(raw.status) ?? "open",
     title: coerceString(raw.title),
     lastMessageAt: coerceDate(raw.last_message_at),
+    unreadCount: typeof raw.unread_count === "number" ? raw.unread_count : 0,
     participants: participantsRaw
       .map((entry) => mapParticipant(entry))
       .filter((entry): entry is ThreadParticipant => Boolean(entry)),

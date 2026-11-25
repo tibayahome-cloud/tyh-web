@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import classNames from "classnames";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { NOTIFICATION_CENTER_PAGE_SIZE, useNotifications } from "../hooks/useNotifications";
+import { NOTIFICATION_CENTER_PAGE_SIZE, useNotifications, useNotificationSocket } from "../hooks/useNotifications";
+import { areaFromPath, notificationPath } from "../utils/notificationLink";
 import type { Notification } from "../schemas/notification";
 import { Button } from "./Button";
 import { Loading } from "./Loading";
@@ -65,6 +66,9 @@ export const NotificationCenter = ({ pageSize = NOTIFICATION_CENTER_PAGE_SIZE }:
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Live: a new notification appears without a refresh. This sits in the shell header, so it is mounted once per screen.
+  useNotificationSocket();
+
   const unreadCount = useMemo(() => {
     if (meta?.unread !== undefined) {
       return meta.unread;
@@ -111,11 +115,17 @@ export const NotificationCenter = ({ pageSize = NOTIFICATION_CENTER_PAGE_SIZE }:
     markAllAsRead();
   };
 
-  const basePath = location.pathname.startsWith("/admin")
-    ? "/admin"
-    : location.pathname.startsWith("/pro")
-    ? "/pro"
-    : "/app";
+  const basePath = areaFromPath(location.pathname);
+
+  // Tapping a notification takes the person to what it is about, and counts as reading it.
+  const handleOpen = (notification: Notification) => {
+    const path = notificationPath(notification.data, basePath);
+    handleMarkRead(notification);
+    if (path) {
+      setOpen(false);
+      navigate(path);
+    }
+  };
 
   const handleViewAll = () => {
     setOpen(false);
@@ -187,6 +197,7 @@ export const NotificationCenter = ({ pageSize = NOTIFICATION_CENTER_PAGE_SIZE }:
                       key={notification.id}
                       notification={notification}
                       onMarkRead={handleMarkRead}
+                      onOpen={notificationPath(notification.data, basePath) ? () => handleOpen(notification) : undefined}
                     />
                   ))}
                 </ul>
@@ -211,9 +222,11 @@ export const NotificationCenter = ({ pageSize = NOTIFICATION_CENTER_PAGE_SIZE }:
 type NotificationItemProps = {
   notification: Notification;
   onMarkRead: (notification: Notification) => void;
+  /** Present when the notification is about something the person can open. */
+  onOpen?: () => void;
 };
 
-const NotificationItem = ({ notification, onMarkRead }: NotificationItemProps) => {
+const NotificationItem = ({ notification, onMarkRead, onOpen }: NotificationItemProps) => {
   const isUnread = !notification.readAt;
   const timestamp = notification.readAt ?? notification.deliveredAt ?? notification.createdAt;
   return (
@@ -230,7 +243,10 @@ const NotificationItem = ({ notification, onMarkRead }: NotificationItemProps) =
             "bg-slate-300": !isUnread
           })}
         />
-        <div className="flex-1">
+        <div
+          className={classNames("flex-1", { "cursor-pointer rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500": Boolean(onOpen) })}
+          {...(onOpen ? { role: "button", tabIndex: 0, onClick: onOpen, onKeyDown: (event: React.KeyboardEvent) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } }, "aria-label": `Open: ${notification.title || "Notification"}` } : {})}
+        >
           <p className="text-sm font-semibold text-slate-900">{notification.title || "Notification"}</p>
           {notification.eventName && (
             <p className="text-xs uppercase tracking-wide text-primary-500">{notification.eventName}</p>

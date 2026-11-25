@@ -17,6 +17,7 @@ import {
   useThreadMessages,
   useSendMessage,
   useCreateThread,
+  useMarkThreadRead,
   messagingKeys,
 } from "../../../shared/hooks/useMessaging";
 import { useToast } from "../../../shared/components/ToastProvider";
@@ -68,6 +69,8 @@ const AdminConversationsPage = () => {
   const isFacilityAdmin = hasRole("admin.ops") && !hasRole(["admin.super", "admin"]);
   const facilityScope = useAdminFacilityScope(isFacilityAdmin);
   const createThread = useCreateThread();
+  const markRead = useMarkThreadRead();
+  const markReadMutate = markRead.mutate;
 
   const {
     data: threadsData,
@@ -89,6 +92,11 @@ const AdminConversationsPage = () => {
 
   const sendMutation = useSendMessage();
 
+  // Opening a conversation reads it: the server clears its unread count and its bell item.
+  useEffect(() => {
+    if (threadId) markReadMutate(threadId);
+  }, [threadId, markReadMutate]);
+
   useEffect(() => {
     if (!socket || !threadId) return;
     const room = `thread:${threadId}`;
@@ -96,6 +104,7 @@ const AdminConversationsPage = () => {
     const handleMessageEvent = (payload: { thread_id?: string }) => {
       if (payload?.thread_id === threadId) {
         queryClient.invalidateQueries({ queryKey: messagingKeys.messages(threadId) }).catch(() => undefined);
+        markReadMutate(threadId);
       }
       queryClient.invalidateQueries({ queryKey: messagingKeys.threads() }).catch(() => undefined);
     };
@@ -104,7 +113,7 @@ const AdminConversationsPage = () => {
       socket.emit?.("leave_room", { room });
       socket.off("message.created", handleMessageEvent);
     };
-  }, [socket, threadId, queryClient]);
+  }, [socket, threadId, queryClient, markReadMutate]);
 
   const rawThreads: Thread[] = useMemo(
     () => (threadsData?.pages.flatMap((page: any) => page.data) ?? []) as Thread[],

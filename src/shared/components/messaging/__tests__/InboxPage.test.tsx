@@ -11,7 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   threads: [] as unknown[],
   bookings: [] as unknown[],
-  create: vi.fn()
+  create: vi.fn(),
+  markRead: vi.fn()
 }));
 
 vi.mock("../../../hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "me" } }) }));
@@ -29,7 +30,8 @@ vi.mock("../../../hooks/useMessaging", () => ({
   }),
   useThreadMessages: () => ({ data: { pages: [{ data: [] }] }, isLoading: false, hasNextPage: false, fetchNextPage: vi.fn() }),
   useSendMessage: () => ({ mutate: vi.fn() }),
-  useCreateThread: () => ({ mutateAsync: state.create, isPending: false })
+  useCreateThread: () => ({ mutateAsync: state.create, isPending: false }),
+  useMarkThreadRead: () => ({ mutate: state.markRead })
 }));
 vi.mock("../../ToastProvider", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock("../../AppLayout", () => ({ AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
@@ -62,6 +64,7 @@ beforeEach(() => {
   state.threads = [];
   state.bookings = [];
   state.create.mockReset();
+  state.markRead.mockReset();
 });
 
 describe("Inbox header", () => {
@@ -118,6 +121,22 @@ describe("Inbox list", () => {
     fireEvent.change(screen.getByLabelText("Search conversations"), { target: { value: "zzz" } });
 
     expect(screen.getByText(/No conversation matches/)).toBeInTheDocument();
+  });
+});
+
+describe("Opening a conversation", () => {
+  it("marks it read, so the server clears its unread count and its bell item", () => {
+    state.threads = [thread("t1", "Amina Client", "Hi", 2)];
+    renderInbox("/pro/inbox/t1");
+
+    expect(state.markRead).toHaveBeenCalledWith("t1");
+  });
+
+  it("does not mark anything read from the list alone", () => {
+    state.threads = [thread("t1", "Amina Client", "Hi", 2)];
+    renderInbox();
+
+    expect(state.markRead).not.toHaveBeenCalled();
   });
 });
 
