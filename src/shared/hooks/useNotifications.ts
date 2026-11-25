@@ -8,10 +8,9 @@ import {
   markNotificationsRead,
   updateNotificationPreferences
 } from "../libs/notifications";
-import type { Notification, NotificationEventPreference} from "../schemas/notification";
-import { mapNotification } from "../schemas/notification";
+import type { NotificationEventPreference } from "../schemas/notification";
 import { useSocket } from "./useSocket";
-import { useToast } from "../components/ToastProvider";
+import { useAuth } from "./useAuth";
 
 type UseNotificationsParams = {
   page?: number;
@@ -208,107 +207,31 @@ export const useNotificationPreferences = () => {
   };
 };
 
-const upsertNotification = (existing: Notification[], incoming: Notification): Notification[] => {
-  const index = existing.findIndex((item) => item.id === incoming.id);
-  if (index === -1) {
-    return [incoming, ...existing];
-  }
-  const copy = [...existing];
-  copy[index] = { ...existing[index], ...incoming };
-  return copy;
-};
-
-const updateListsWithNotification = (
-  data: NotificationListData | undefined,
-  notification: Notification
-): NotificationListData | undefined => {
-  if (!data) {
-    return data;
-  }
-
-  const notifications = upsertNotification(data.notifications, notification);
-  const unread = notifications.filter((item) => !item.readAt).length;
-
-  return {
-    notifications,
-    meta: {
-      ...data.meta,
-      unread
-    }
-  };
-};
-
 export const useNotificationSocket = () => {
   const socket = useSocket();
   const queryClient = useQueryClient();
-  const { showToast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!socket) {
       return;
     }
 
-    const handleCreated = (payload: { payload?: unknown }) => {
-      const resource = payload?.payload;
-      try {
-        const notification = fetchNotificationFromSocket(resource);
-        queryClient.setQueriesData(
-          { queryKey: notificationKeys.lists(), exact: false },
-          (data: NotificationListData | undefined) => updateListsWithNotification(data, notification)
-        );
-        showToast({
-          title: notification.title || "New notification",
-          description: notification.body ? truncateText(notification.body, 140) : undefined,
-          variant: notification.readAt ? "info" : "success"
-        });
-      } catch {
-        // ignore malformed payloads
-      }
-    };
-
-    const handleRead = (payload: { payload?: { notification_id?: string } }) => {
-      const id = payload?.payload?.notification_id;
-      if (!id) {
+    // The server sends the event with flat fields and only to the person it is for; this also ignores anything that
+    // names someone else. The list is simply fetched again, so the bell and the unread count are exactly the server's.
+    const refresh = (payload?: { user_id?: string }) => {
+      if (payload?.user_id && user?.id && payload.user_id !== user.id) {
         return;
       }
-      const readAt = nowIso();
-      queryClient.setQueriesData(
-        { queryKey: notificationKeys.lists(), exact: false },
-        (data: NotificationListData | undefined) => updateListReadState(data, new Set([id]), readAt)
-      );
+      queryClient.invalidateQueries({ queryKey: notificationKeys.lists(), exact: false }).catch(() => undefined);
     };
 
-    socket.on("notification.created", handleCreated);
-    socket.on("notification.read", handleRead);
+    socket.on("notification.created", refresh);
+    socket.on("notification.read", refresh);
 
     return () => {
-      socket.off("notification.created", handleCreated);
-      socket.off("notification.read", handleRead);
+      socket.off("notification.created", refresh);
+      socket.off("notification.read", refresh);
     };
-  }, [queryClient, showToast, socket]);
-};
-
-const fetchNotificationFromSocket = (payload: unknown): Notification => {
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Invalid notification payload");
-  }
-  const source = payload as Record<string, unknown>;
-  const normalized: Record<string, unknown> = {
-    ...source,
-    id: source.notification_id ?? source.id,
-    read_at: source.read_at ?? source.readAt,
-    delivered_at: source.delivered_at ?? source.deliveredAt,
-    created_at: source.created_at ?? source.createdAt,
-    updated_at: source.updated_at ?? source.updatedAt,
-    event_key: source.event_key ?? source.eventKey,
-    event_name: source.event_name ?? source.eventName
-  };
-  return mapNotification(normalized);
-};
-
-const truncateText = (value: string, maxLength: number) => {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, maxLength - 1)}…`;
+  }, [queryClient, socket, user?.id]);
 };
