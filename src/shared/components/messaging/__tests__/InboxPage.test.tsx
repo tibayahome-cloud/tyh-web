@@ -167,7 +167,7 @@ describe("New message", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
 
     expect(screen.getByText("Amina Client")).toBeInTheDocument();
-    expect(screen.getByText("Wound dressing, 21 Oct")).toBeInTheDocument();
+    expect(screen.getByText("Last: Wound dressing, 21 Oct")).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/9255e426|Booking: #/);
   });
 
@@ -202,8 +202,8 @@ describe("New message", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
 
     expect(personRadios()).toHaveLength(2);
-    expect(screen.getByText("Counselling, 17 Oct · 3 bookings together")).toBeInTheDocument();
-    expect(screen.getByText("People you have a booking with. Pick one to write to.")).toBeInTheDocument();
+    expect(screen.getByText("Last: Counselling, 17 Oct · 3 bookings together")).toBeInTheDocument();
+    expect(screen.getByText("People you have a booking with.")).toBeInTheDocument();
   });
 
   it("starts the conversation on the latest booking with the person chosen", () => {
@@ -229,6 +229,40 @@ describe("New message", () => {
     expect(screen.getByText("Dan Client")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search clients" }), { target: { value: "zzz" } });
     expect(screen.getByText(/No one matches/)).toBeInTheDocument();
+  });
+
+  it("puts people you already talk to first, marked, and opens that conversation instead of starting another", () => {
+    state.threads = [
+      {
+        id: "t-john",
+        title: null,
+        participants: [{ userId: "me" }, { userId: "c2", user: { fullName: "John Doe" } }],
+        messages: [{ body: "Thanks", createdAt: new Date().toISOString(), senderUserId: "c2", deliveryStatus: "delivered" }],
+        unreadCount: 0
+      }
+    ];
+    state.bookings = [booking("b1", "c1", "Amina Client", "2026-10-17T08:00:00Z"), booking("b2", "c2", "John Doe", "2026-10-01T08:00:00Z")];
+    renderInbox();
+    fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
+
+    const rows = personRadios().map((radio) => radio.closest("label")?.textContent ?? "");
+    expect(rows[0]).toContain("John Doe");
+    expect(rows[0]).toContain("Continue conversation");
+    expect(rows[1]).not.toContain("Continue conversation");
+
+    fireEvent.click(screen.getByRole("radio", { name: /John Doe/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Open conversation" }));
+
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
+  it("shows each person's initials, and says who is listed in one line", () => {
+    state.bookings = [booking("b1", "c1", "Amina Client", "2026-10-17T08:00:00Z")];
+    renderInbox();
+    fireEvent.click(screen.getAllByRole("button", { name: "New message" })[0]);
+
+    expect(screen.getByText("AC")).toBeInTheDocument();
+    expect(screen.queryByText("Choose who to write to.")).not.toBeInTheDocument();
   });
 
   it("keeps Start conversation outside the scrolling list, so a long list never hides it", () => {

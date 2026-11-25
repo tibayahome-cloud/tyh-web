@@ -8,6 +8,7 @@ import { AppLayout } from "../AppLayout";
 import { Button } from "../Button";
 import { Loading } from "../Loading";
 import { Modal } from "../Modal";
+import { PersonPicker, type PickerPerson } from "./PersonPicker";
 import { useToast } from "../ToastProvider";
 import { useAuth } from "../../hooks/useAuth";
 import { useBookingList } from "../../hooks/useBookings";
@@ -66,9 +67,8 @@ export const InboxPage = ({ role, basePath }: Props) => {
   const [query, setQuery] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
   const [target, setTarget] = useState<"person" | "support">("person");
-  const [selectedBookingId, setSelectedBookingId] = useState("");
+  const [selectedPersonId, setSelectedPersonId] = useState("");
   const [supportSubject, setSupportSubject] = useState("");
-  const [personQuery, setPersonQuery] = useState("");
 
   const bookings = useBookingList(
     role === "provider"
@@ -80,11 +80,6 @@ export const InboxPage = ({ role, basePath }: Props) => {
     () => conversationOptions((bookings.data?.bookings ?? []) as never[], otherRole),
     [bookings.data?.bookings, otherRole]
   );
-
-  const visibleOptions = useMemo(() => {
-    const needle = personQuery.trim().toLowerCase();
-    return needle ? options.filter((option) => `${option.name} ${option.service}`.toLowerCase().includes(needle)) : options;
-  }, [options, personQuery]);
 
   // Opening a conversation reads it: the server clears its unread count and its bell item.
   const markReadMutate = markRead.mutate;
@@ -134,6 +129,30 @@ export const InboxPage = ({ role, basePath }: Props) => {
     [threadsQuery.data, user?.id]
   );
 
+  // The newest conversation with each person, so someone already talked to opens that conversation.
+  const threadByPerson = useMemo(() => {
+    const map = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const page of threadsQuery.data?.pages ?? []) for (const t of (page as any).data ?? []) {
+      for (const participant of t.participants ?? []) {
+        if (participant.userId && participant.userId !== user?.id && !map.has(participant.userId)) map.set(participant.userId, t.id);
+      }
+    }
+    return map;
+  }, [threadsQuery.data, user?.id]);
+
+  const people: PickerPerson[] = useMemo(() => {
+    const rows = options.map((option) => ({
+      id: option.personId,
+      name: option.name,
+      detail: `Last: ${option.service}${option.when ? `, ${option.when}` : ""}${option.count > 1 ? ` · ${option.count} bookings together` : ""}`,
+      note: threadByPerson.has(option.personId) ? "Continue conversation" : undefined
+    }));
+    // People already talked to first, then the rest, each group newest first.
+    return [...rows.filter((row) => row.note), ...rows.filter((row) => !row.note)];
+  }, [options, threadByPerson]);
+  const continuing = target === "person" && threadByPerson.has(selectedPersonId);
+
   const visibleThreads = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return threads;
@@ -160,13 +179,20 @@ export const InboxPage = ({ role, basePath }: Props) => {
 
   const openComposer = () => {
     setTarget("person");
-    setSelectedBookingId("");
-    setPersonQuery("");
+    setSelectedPersonId("");
     setSupportSubject("");
     setComposerOpen(true);
   };
 
   const startConversation = () => {
+    const existing = target === "person" ? threadByPerson.get(selectedPersonId) : undefined;
+    if (existing) {
+      // Already talking: carry on in that conversation instead of starting another.
+      setComposerOpen(false);
+      navigate(`${basePath}/${existing}`);
+      return;
+    }
+    const selectedBookingId = options.find((option) => option.personId === selectedPersonId)?.bookingId ?? "";
     const scope = target === "person" ? "booking" : copy.supportScope;
     createThreadMutation
       .mutateAsync({
@@ -275,8 +301,8 @@ export const InboxPage = ({ role, basePath }: Props) => {
         </div>
       </div>
 
-      <Modal open={composerOpen} onClose={() => setComposerOpen(false)} title="New message" description={`Choose who to write to.`}>
-        <div className="flex max-h-[calc(100dvh-11rem)] flex-col gap-4 pt-2">
+      <Modal open={composerOpen} onClose={() => setComposerOpen(false)} title="New message" flush>
+        <div className="flex max-h-[calc(100dvh-8rem)] sm:max-h-[calc(100dvh-14rem)] flex-col gap-4 pt-1">
           <div role="radiogroup" aria-label="Write to" className="flex shrink-0 rounded-2xl bg-slate-100 p-1">
             {(["person", "support"] as const).map((value) => (
               <button
@@ -287,7 +313,7 @@ export const InboxPage = ({ role, basePath }: Props) => {
                 onClick={() => setTarget(value)}
                 className={classNames(
                   "min-h-[44px] flex-1 rounded-xl text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue",
-                  target === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
+                  target === value ? "bg-white text-tiba-blue shadow-sm ring-1 ring-tiba-blue/30" : "text-slate-700"
                 )}
               >
                 {value === "person" ? (role === "provider" ? "A client" : "A provider") : copy.support}
@@ -295,76 +321,34 @@ export const InboxPage = ({ role, basePath }: Props) => {
             ))}
           </div>
 
-          {/* Only this part scrolls: the buttons below stay in view however long the list is. */}
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-            {target === "person" ? (
-              bookings.isLoading ? (
-                <Loading />
-              ) : options.length > 0 ? (
-                <>
-                  <p className="text-sm text-slate-600">People you have a booking with. Pick one to write to.</p>
-                  {options.length > 5 && (
-                    <input
-                      type="search"
-                      value={personQuery}
-                      onChange={(event) => setPersonQuery(event.target.value)}
-                      aria-label={`Search ${copy.otherLower}`}
-                      placeholder={`Search ${copy.otherLower}`}
-                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-                    />
-                  )}
-                  {visibleOptions.length === 0 ? (
-                    <p role="status" className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                      No one matches &ldquo;{personQuery.trim()}&rdquo;.
-                    </p>
-                  ) : (
-                    <fieldset className="space-y-2">
-                      <legend className="sr-only">Choose who to write to</legend>
-                      {visibleOptions.map((option) => (
-                        <label
-                          key={option.bookingId}
-                          className={classNames(
-                            "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-2xl border p-3",
-                            selectedBookingId === option.bookingId ? "border-tiba-blue bg-sky-50" : "border-slate-200 hover:bg-slate-50"
-                          )}
-                        >
-                          <input
-                            type="radio"
-                            name="conversation-person"
-                            checked={selectedBookingId === option.bookingId}
-                            onChange={() => setSelectedBookingId(option.bookingId)}
-                            className="h-4 w-4"
-                          />
-                          <span>
-                            <span className="block text-sm font-semibold text-slate-900">{option.name}</span>
-                            <span className="block text-sm text-slate-600">
-                              {option.service}
-                              {option.when ? `, ${option.when}` : ""}
-                              {option.count > 1 ? ` · ${option.count} bookings together` : ""}
-                            </span>
-                          </span>
-                        </label>
-                      ))}
-                    </fieldset>
-                  )}
-                </>
-              ) : (
-                <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                  You have no bookings with {copy.otherLower} yet. Once you do, you can message them from here.
-                </p>
-              )
+          {target === "person" ? (
+            bookings.isLoading ? (
+              <Loading />
+            ) : people.length > 0 ? (
+              <PersonPicker
+                people={people}
+                selectedId={selectedPersonId}
+                onSelect={setSelectedPersonId}
+                helper="People you have a booking with."
+                noun={copy.otherLower}
+                groupName="conversation-person"
+              />
             ) : (
-              <label className="block">
-                <span className="text-sm font-medium text-slate-800">What do you need help with?</span>
-                <input
-                  value={supportSubject}
-                  onChange={(event) => setSupportSubject(event.target.value)}
-                  placeholder="For example, a payment question"
-                  className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
-                />
-              </label>
-            )}
-          </div>
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                You have no bookings with {copy.otherLower} yet. Once you do, you can message them from here.
+              </p>
+            )
+          ) : (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-800">What do you need help with?</span>
+              <input
+                value={supportSubject}
+                onChange={(event) => setSupportSubject(event.target.value)}
+                placeholder="For example, a payment question"
+                className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-tiba-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tiba-blue/40"
+              />
+            </label>
+          )}
 
           <div className="flex shrink-0 gap-3 border-t border-slate-100 pt-3">
             <Button type="button" variant="ghost" className="min-h-[44px] flex-1" onClick={() => setComposerOpen(false)}>
@@ -372,12 +356,12 @@ export const InboxPage = ({ role, basePath }: Props) => {
             </Button>
             <Button
               type="button"
-              className="min-h-[44px] flex-1"
+              className="min-h-[44px] flex-1 disabled:bg-slate-200 disabled:text-slate-600"
               loading={createThreadMutation.isPending}
-              disabled={target === "person" && !selectedBookingId}
+              disabled={target === "person" && !selectedPersonId}
               onClick={startConversation}
             >
-              Start conversation
+              {continuing ? "Open conversation" : "Start conversation"}
             </Button>
           </div>
         </div>

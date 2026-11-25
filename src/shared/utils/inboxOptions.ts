@@ -1,4 +1,6 @@
 export type ConversationOption = {
+  /** The other person's user id. */
+  personId: string;
   bookingId: string;
   /** The other person, by name. */
   name: string;
@@ -54,6 +56,7 @@ export const conversationOptions = (
       continue;
     }
     people.set(String(party.id), {
+      personId: String(party.id),
       bookingId: String(booking.id),
       name: party.fullName || party.email || (other === "client" ? "Client" : "Provider"),
       service: booking.service?.name || "Appointment",
