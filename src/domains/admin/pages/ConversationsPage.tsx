@@ -160,6 +160,17 @@ const AdminConversationsPage = () => {
 
   const selectedThread = threads.find(t => t.id === threadId);
 
+  // The providers this admin already has a conversation with, so the picker can say "Continue conversation".
+  const continueIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const thread of rawThreads) {
+      for (const participant of thread.participants) {
+        if (participant.userId && participant.userId !== user?.id) ids.add(participant.userId);
+      }
+    }
+    return ids;
+  }, [rawThreads, user?.id]);
+
   const startWithProvider = (providerUserId: string) => {
     createThread
       .mutateAsync({ scope: "admin", participants: [{ userId: providerUserId, roleHint: "provider" }] })
@@ -278,6 +289,8 @@ const AdminConversationsPage = () => {
       <NewProviderMessageDialog
         open={composerOpen}
         facilityId={facilityScope.facility?.id ?? null}
+        facilityName={facilityScope.facility?.name ?? null}
+        continueIds={continueIds}
         starting={createThread.isPending}
         onClose={() => setComposerOpen(false)}
         onStart={startWithProvider}

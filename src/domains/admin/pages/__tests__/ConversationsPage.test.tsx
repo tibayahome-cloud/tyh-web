@@ -167,6 +167,41 @@ describe("ConversationsPage", () => {
       );
     });
 
+    it("says in words who is free to answer and who you already talk to, and names the facility", async () => {
+      facilities.fetchFacilities.mockResolvedValue({ facilities: [{ id: "f1", name: "Ganana Hospital" }] });
+      facilities.fetchFacilityProviders.mockResolvedValue({
+        providers: [
+          { ...provider("u1", "Alice Wahome", "alice@example.test"), isAvailable: true },
+          { ...provider("u2", "Susan Kithinji", "susan@example.test"), isAvailable: false }
+        ],
+        meta: {}
+      });
+      useThreadsMock.mockReturnValue({
+        data: {
+          pages: [{ data: [thread({ id: "t-susan", participants: [{ id: "p1", userId: "admin-1", roleHint: "admin", muted: false }, { id: "p2", userId: "u2", roleHint: "provider", muted: false }] as never })] }]
+        },
+        isLoading: false,
+        isError: false,
+        fetchNextPage: vi.fn(),
+        hasNextPage: false
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole("button", { name: "New message" }));
+      await screen.findByText("Alice Wahome");
+
+      expect(screen.getByText("Providers at Ganana Hospital.")).toBeInTheDocument();
+      const rows = screen.getAllByRole("radio").map((radio) => radio.closest("label")?.textContent ?? "");
+      expect(rows[0]).toContain("Susan Kithinji");
+      expect(rows[0]).toContain("Continue conversation");
+      expect(rows[1]).toContain("Alice Wahome");
+      expect(rows[1]).toContain("Available now");
+
+      await user.click(screen.getByRole("radio", { name: /Susan Kithinji/ }));
+      expect(screen.getByRole("button", { name: "Open conversation" })).toBeEnabled();
+    });
+
     it("says so when the facility has no providers yet", async () => {
       facilities.fetchFacilityProviders.mockResolvedValue({ providers: [], meta: {} });
       const user = userEvent.setup();
