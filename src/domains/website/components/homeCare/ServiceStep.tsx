@@ -75,7 +75,7 @@ export const ServiceStep = ({ onChoose, kind = "home" }: { onChoose: (service: H
 
       {query.data && query.data.length === 0 && (
         <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-          {ambulance ? "No ambulance service is open for online requests right now. Call 999 or 112, or us on" : "No home care services are open for booking online right now. Call us on"}{" "}
+          {ambulance ? "No ambulance service is open for online requests right now. Call us on" : "No home care services are open for booking online right now. Call us on"}{" "}
           <a className="font-semibold underline underline-offset-2" href={`tel:${COMPANY_PHONE}`}>
             {COMPANY_PHONE_DISPLAY}
           </a>

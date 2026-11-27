@@ -329,7 +329,7 @@ describe("requesting an ambulance (the same page with ?care=ambulance)", () => {
     base_price_cents: 500000, default_estimate_minutes: 30, category: { id: "c-amb", name: "Ambulance" }
   };
 
-  it("asks the API for ambulance services, with the numbers to call at the top", async () => {
+  it("asks the API for ambulance services, with our number to call at the top", async () => {
     api.fetchHomeCareServices.mockResolvedValue([AMBULANCE, { ...AMBULANCE, id: "svc-amb2", name: "Ambulance with oxygen" }]);
     renderPage("/book/home-care?care=ambulance");
 
@@ -337,8 +337,10 @@ describe("requesting an ambulance (the same page with ?care=ambulance)", () => {
     expect(await screen.findByRole("button", { name: /Ambulance transport/ })).toBeInTheDocument();
     expect(api.fetchHomeCareServices).toHaveBeenCalledWith("ambulance");
     const note = screen.getByRole("note");
-    expect(within(note).getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
-    expect(within(note).getByRole("link", { name: "Call 112" })).toHaveAttribute("href", "tel:112");
+    expect(within(note).getByText(/Need an ambulance\? Book now below, or call 0712 444 422/)).toBeInTheDocument();
+    expect(within(note).getByText("(non-emergency)")).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Call 0712 444 422" })).toHaveAttribute("href", "tel:+254712444422");
+    expect(within(note).queryByRole("link", { name: /999|112/ })).not.toBeInTheDocument();
   });
 
   it("goes straight to the place when only one ambulance service is on offer, and has no time step", async () => {
