@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 
 import { type HomeCareRequestResult } from "../../../../shared/libs/homeCarePublic";
 import { bookingReference } from "../../../../shared/utils/bookingReference";
-import { paidAfterLine } from "./format";
+import { COMPANY_PHONE_LOCAL } from "../../../../shared/constants/contact";
+import { priceLine } from "./format";
 
 export const DoneStep = ({
   result,
@@ -26,10 +27,10 @@ export const DoneStep = ({
         <span className="font-semibold text-slate-900">{result.facility.name}</span> has your request for {serviceName}
         {result.scheduled_at ? ` on ${new Date(result.scheduled_at).toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })}` : ", as soon as possible"}.
       </p>
-      <p className="mt-2">They will call {phone} to confirm. {paidAfterLine(result.price_cents, result.currency)}</p>
+      <p className="mt-2">They will call {phone} to confirm. {priceLine(ambulance, result.price_cents, result.currency)}</p>
       {ambulance && (
         <p className="mt-2 font-semibold text-slate-900">
-          If it is getting worse, do not wait for the call: dial 999 or 112.
+          If it is getting worse, do not wait for the call: call us on {COMPANY_PHONE_LOCAL}.
         </p>
       )}
       <p className="mt-2">

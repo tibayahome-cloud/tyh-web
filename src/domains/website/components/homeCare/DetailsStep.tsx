@@ -22,11 +22,12 @@ type DetailsStepProps = {
   place: { lat: number; lng: number; address: string; landmark: string };
   scheduledAt: string | null;
   onDone: (result: HomeCareRequestResult, phone: string) => void;
+  ambulance?: boolean;
 };
 
 type Problem = { message: string; callUs?: boolean; signIn?: boolean };
 
-export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone }: DetailsStepProps) => {
+export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone, ambulance = false }: DetailsStepProps) => {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [agreed, setAgreed] = useState(false);
@@ -118,7 +119,7 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
 
   return (
     <div className="space-y-4">
-      <StepHeading hint="We text you a code to check this number is yours. No password to make.">Who is the visit for?</StepHeading>
+      <StepHeading hint="We text you a code to check this number is yours. No password to make.">{ambulance ? "Who is the ambulance for?" : "Who is the visit for?"}</StepHeading>
 
       <Input
         label="Full name"
@@ -136,7 +137,7 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
         autoComplete="tel"
         value={phone}
         placeholder={PHONE_PLACEHOLDER}
-        hint="The clinic calls this number about your visit."
+        hint={ambulance ? "The facility calls this number about the ambulance." : "The clinic calls this number about your visit."}
         onChange={(event) => setPhone(event.target.value)}
         disabled={codeSent}
       />
@@ -213,7 +214,7 @@ export const DetailsStep = ({ serviceId, facilityId, place, scheduledAt, onDone 
             onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
           />
           <Button type="button" size="lg" fullWidth disabled={code.length !== 6} loading={busy === "request"} onClick={() => void sendRequest()}>
-            Request my visit
+            {ambulance ? "Request the ambulance" : "Request my visit"}
           </Button>
           <Button
             type="button"

@@ -352,10 +352,22 @@ describe("requesting an ambulance (the same page with ?care=ambulance)", () => {
     await screen.findByText("We can reach you.");
     expect(screen.queryByRole("button", { name: /Ambulance transport/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Time")).not.toBeInTheDocument();
+    // An ambulance is paid for before it is sent; only home care is paid after the visit.
+    expect(screen.getByText(/Kilimani Clinic is 3\.8 km away/)).toHaveTextContent(/will send the ambulance\. .*paid before the ambulance is sent\./);
+    expect(document.body.textContent).not.toMatch(/pay after|paid after|will visit/);
 
     await user.click(screen.getByRole("button", { name: "Yes, come here" }));
 
     expect(await screen.findByRole("region", { name: "Your details" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Who is the ambulance for?" })).toBeInTheDocument();
+    expect(screen.getByText("The facility calls this number about the ambulance.")).toBeInTheDocument();
+  });
+
+  it("tells the visitor on the service step that an ambulance is paid for before it is sent", async () => {
+    api.fetchHomeCareServices.mockResolvedValue([AMBULANCE, { ...AMBULANCE, id: "svc-amb2", name: "Ambulance with oxygen" }]);
+    renderPage("/book/home-care?care=ambulance");
+
+    expect(await screen.findByText("An ambulance comes to you. You pay before it is sent.")).toBeInTheDocument();
   });
 
   it("keeps the ordinary home care page unchanged", async () => {

@@ -20,7 +20,7 @@ const REGION_LABELS = ["Choose the care you need", "Confirm where we should come
 /**
  * Where a visitor who is not signed in asks for a carer to visit them at home. It is a page, not a popup, and it asks as little
  * as it can: the place is read from the device, the nearest clinic that reaches it is picked for them, and a text code takes
- * the place of a password. Payment is after the visit, so there is no payment step.
+ * the place of a password. Home care is paid after the visit and an ambulance before it is sent; neither has an online payment step yet.
  */
 export const BookHomeCare = () => {
   // The same flow serves an ambulance (?care=ambulance): the services shown are ambulance services, there is no time to
@@ -106,6 +106,7 @@ export const BookHomeCare = () => {
               service={service}
               value={place}
               onChange={setPlace}
+              ambulance={ambulance}
               onContinue={(reaching) => {
                 setClinics(reaching);
                 setStep(ambulance ? 3 : 2);
@@ -121,6 +122,7 @@ export const BookHomeCare = () => {
               facilityId={clinics[0].id}
               place={{ ...place.place.coords, address: place.place.name, landmark: place.landmark }}
               scheduledAt={time.mode === "later" ? new Date(time.at).toISOString() : null}
+              ambulance={ambulance}
               onDone={(created, phone) => {
                 setResult(created);
                 setPhoneUsed(phone);

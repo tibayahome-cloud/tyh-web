@@ -21,6 +21,8 @@ type PinPickerProps = {
   onChange: (place: Place) => void;
   /** Where the device says it is, and how far off that may be in metres. Drawn as a circle under the pin. */
   device: { coords: Coords | null; accuracyM: number | null; locating: boolean; ask: () => void };
+  /** Who is coming: "The carer" for home care, "The ambulance" for an ambulance. */
+  comer?: string;
 };
 
 /**
@@ -29,7 +31,7 @@ type PinPickerProps = {
  * the ward) with its plus code, and the circle shows how sure the device was. A map that cannot draw gives way to the
  * address search and the "use my location" button.
  */
-export const PinPicker = ({ value, onChange, device }: PinPickerProps) => {
+export const PinPicker = ({ value, onChange, device, comer = "The carer" }: PinPickerProps) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: apiKey ?? "", libraries: MAP_LIBRARIES, id: "shared-map", version: "weekly" });
   const failed = useMapFailed(Boolean(apiKey));
@@ -144,7 +146,7 @@ export const PinPicker = ({ value, onChange, device }: PinPickerProps) => {
       </Button>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4" role="status" aria-live="polite">
-        <p className="text-sm text-slate-600">The carer will come to</p>
+        <p className="text-sm text-slate-600">{comer} will come to</p>
         <p className="mt-0.5 text-base font-semibold text-slate-900">
           {finding ? "Finding the address…" : value && value.name !== UNNAMED_PLACE ? value.name : "Move the map until the pin is on your gate"}
         </p>
