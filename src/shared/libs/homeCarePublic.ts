@@ -48,6 +48,19 @@ export type HomeCareRequestResult = {
   price_cents: number;
   currency: string;
   account_created: boolean;
+  /** An ambulance is paid for before it is sent: where its M-Pesa payment stands. Null for home care (paid after). */
+  payment?: AmbulancePayment | null;
+};
+
+/** The M-Pesa payment for an ambulance request, as the request page follows it. */
+export type AmbulancePayment = {
+  state: "none" | "sending" | "waiting" | "failed" | "exhausted" | "paid" | "expired";
+  amount_cents: number;
+  currency: string;
+  payer_phone_masked: string | null;
+  can_resend_at: string | null;
+  pay_by: string;
+  sent_to_facility: boolean;
 };
 
 type Envelope<T> = { data: T };
@@ -117,4 +130,15 @@ export const homeCareErrorCode = (error: unknown): string | null => {
 export const homeCareRetryAfter = (error: unknown): number | null => {
   const details = (error as AxiosError<{ error?: { details?: { retry_after?: unknown } } }>)?.response?.data?.error?.details;
   return typeof details?.retry_after === "number" ? details.retry_after : null;
+};
+
+export const fetchAmbulancePayment = async (bookingId: string): Promise<AmbulancePayment> => {
+  const response = await api.get<Envelope<AmbulancePayment>>(`/public/home-care/requests/${bookingId}/payment`);
+  return response.data.data;
+};
+
+/** Sends the M-Pesa prompt again, to the phone the request was made with (the API checks it is the same number). */
+export const resendAmbulancePayment = async (bookingId: string, phone: string): Promise<AmbulancePayment> => {
+  const response = await api.post<Envelope<AmbulancePayment>>(`/public/home-care/requests/${bookingId}/payment/resend`, { phone });
+  return response.data.data;
 };
