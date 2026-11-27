@@ -10,7 +10,7 @@ export const About = () => {
             <div className="bg-slate-900 py-20 text-center text-white">
                 <div className="container mx-auto px-4">
                     <h1 className="text-4xl md:text-6xl font-bold mb-4 font-display">About Tiba Ya Home</h1>
-                    <p className="text-xl text-blue-300 font-medium">Divine Care @ Home</p>
+                    <p className="text-xl text-blue-300 font-medium">Healthcare that comes to you</p>
                 </div>
             </div>
 
