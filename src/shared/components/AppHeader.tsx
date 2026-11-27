@@ -162,7 +162,7 @@ export const AppHeader = ({
             </div>
           </div>
         ) : (
-          <div className="type-overline text-tiba-gold">Divine Care</div>
+          <div className="type-overline text-tiba-gold">Healthcare that comes to you</div>
         )}
       </div>
     </header>

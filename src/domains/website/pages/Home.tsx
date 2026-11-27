@@ -142,7 +142,7 @@ export const Home = () => {
                         >
                             <span className="mb-5 hidden lg:inline-flex items-center gap-2 rounded-full border border-tiba-gold/40 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-tiba-gold">
                                 <HeartPulse className="h-4 w-4" />
-                                Divine care @ home
+                                Healthcare that comes to you
                             </span>
                             <h1 className="mb-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
                                 Your Healthcare. One Click Away.
@@ -484,7 +484,7 @@ export const Home = () => {
             <div className="py-12 bg-white text-center border-t border-slate-50">
                 <div className="container mx-auto px-4">
                     <p className="text-tiba-blue font-bold text-xl mb-2">Tiba Ya Home</p>
-                    <p className="text-tiba-gold font-medium italic">Divine Care @ Home</p>
+                    <p className="text-tiba-gold font-medium italic">Healthcare that comes to you</p>
                 </div>
             </div>
         </div>
