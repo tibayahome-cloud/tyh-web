@@ -142,3 +142,19 @@ export const resendAmbulancePayment = async (bookingId: string, phone: string): 
   const response = await api.post<Envelope<AmbulancePayment>>(`/public/home-care/requests/${bookingId}/payment/resend`, { phone });
   return response.data.data;
 };
+
+/** What a service costs before the place is chosen: the lowest price any facility charges, and, once the visitor's
+ * location is known, what the nearest facility that reaches them charges (what they will pay). */
+export type CarePrice = {
+  service_id: string;
+  from_cents: number | null;
+  currency: string | null;
+  nearest: { facility_id: string; facility_name: string; distance_km: number; price_cents: number; currency: string } | null;
+};
+
+export const fetchHomeCarePrices = async (kind: CareKind, coords?: { lat: number; lng: number } | null): Promise<CarePrice[]> => {
+  const response = await api.get<Envelope<CarePrice[]>>("/public/home-care/prices", {
+    params: { kind, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) }
+  });
+  return response.data.data;
+};
