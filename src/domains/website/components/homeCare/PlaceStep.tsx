@@ -10,7 +10,7 @@ import { useDeviceLocation } from "../../../../shared/hooks/useDeviceLocation";
 import { fetchHomeCareCoverage, type HomeCareClinic, type HomeCareService } from "../../../../shared/libs/homeCarePublic";
 import { classifyApiError } from "../../../../shared/utils/errors";
 import { CURRENT_PLACE, describePlace, UNNAMED_PLACE, type Place } from "../../../../shared/utils/geocoding";
-import { formatKm, paidAfterLine } from "./format";
+import { formatKm, priceLine } from "./format";
 import { PinPicker } from "./PinPicker";
 import { StepHeading } from "./ServiceStep";
 
@@ -21,12 +21,13 @@ type PlaceStepProps = {
   value: VisitPlace;
   onChange: (value: VisitPlace) => void;
   onContinue: (clinics: HomeCareClinic[]) => void;
+  ambulance?: boolean;
 };
 
 /** A place with no real name ("Pinned location") cannot guide a carer on its own: a landmark is then needed. */
 const isUnnamed = (place: Place | null) => !place || place.name === UNNAMED_PLACE || place.name === CURRENT_PLACE;
 
-export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepProps) => {
+export const PlaceStep = ({ service, value, onChange, onContinue, ambulance = false }: PlaceStepProps) => {
   const device = useDeviceLocation(value.place === null);
   const latest = useRef(value);
   latest.current = value;
@@ -84,6 +85,7 @@ export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepPro
         value={value.place}
         onChange={(place) => onChange({ ...latest.current, place })}
         device={{ coords: device.coords, accuracyM: device.accuracyM, locating: device.status === "asking", ask: device.ask }}
+        comer={ambulance ? "The ambulance" : "The carer"}
       />
 
       {value.place && (
@@ -93,7 +95,7 @@ export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepPro
           value={value.landmark}
           maxLength={200}
           placeholder="Blue gate, second floor, near the school"
-          error={needsLandmark ? "Tell us the street or a landmark so the carer can find you." : undefined}
+          error={needsLandmark ? `Tell us the street or a landmark so the ${ambulance ? "ambulance" : "carer"} can find you.` : undefined}
           onChange={(event) => onChange({ ...value, landmark: event.target.value })}
         />
       )}
@@ -113,7 +115,8 @@ export const PlaceStep = ({ service, value, onChange, onContinue }: PlaceStepPro
         <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           <p className="font-semibold">We can reach you.</p>
           <p className="mt-1">
-            {nearest.name} is {formatKm(nearest.distance_km)} away and will visit. {paidAfterLine(nearest.price_cents, nearest.currency)}
+            {nearest.name} is {formatKm(nearest.distance_km)} away and {ambulance ? "will send the ambulance" : "will visit"}.{" "}
+            {priceLine(ambulance, nearest.price_cents, nearest.currency)}
           </p>
           {clinics.length > 1 && <p className="mt-1">{clinics.length - 1} more nearby also reach you. Your request goes to the nearest.</p>}
         </div>

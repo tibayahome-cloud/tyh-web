@@ -53,7 +53,7 @@ export const ServiceStep = ({ onChoose, kind = "home" }: { onChoose: (service: H
 
   return (
     <div className="space-y-4">
-      <StepHeading hint={ambulance ? "An ambulance is sent to you. You pay after." : "A carer comes to you. You pay after the visit."}>
+      <StepHeading hint={ambulance ? "An ambulance comes to you. You pay before it is sent." : "A carer comes to you. You pay after the visit."}>
         {ambulance ? "Which ambulance service do you need?" : "What care do you need at home?"}
       </StepHeading>
 
