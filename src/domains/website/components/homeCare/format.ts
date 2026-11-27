@@ -12,3 +12,12 @@ export const localInputValue = (date: Date): string => {
 /** What the visitor reads about cost. A clinic that has set no price yet is not shown as "KES 0". */
 export const paidAfterLine = (cents: number, currency = "KES"): string =>
   cents > 0 ? `It costs ${formatMoney(cents, currency)}, paid after the visit.` : "The clinic confirms the price. You pay after the visit.";
+
+/** An ambulance is paid for before it is sent; home care is paid after the visit. */
+export const paidBeforeAmbulanceLine = (cents: number, currency = "KES"): string =>
+  cents > 0
+    ? `It costs ${formatMoney(cents, currency)}, paid before the ambulance is sent.`
+    : "The facility confirms the price. You pay before the ambulance is sent.";
+
+export const priceLine = (ambulance: boolean, cents: number, currency = "KES"): string =>
+  ambulance ? paidBeforeAmbulanceLine(cents, currency) : paidAfterLine(cents, currency);
