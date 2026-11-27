@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
@@ -8,6 +8,7 @@ import { careServiceImage } from "../../../shared/utils/careServiceImage";
 import type { HomeCareClinic, HomeCareRequestResult, HomeCareService } from "../../../shared/libs/homeCarePublic";
 import { DetailsStep } from "../components/homeCare/DetailsStep";
 import { DoneStep } from "../components/homeCare/DoneStep";
+import { PayStep } from "../components/homeCare/PayStep";
 import { PlaceStep, type VisitPlace } from "../components/homeCare/PlaceStep";
 import { ServiceStep } from "../components/homeCare/ServiceStep";
 import { TimeStep, type VisitTime } from "../components/homeCare/TimeStep";
@@ -20,7 +21,8 @@ const REGION_LABELS = ["Choose the care you need", "Confirm where we should come
 /**
  * Where a visitor who is not signed in asks for a carer to visit them at home. It is a page, not a popup, and it asks as little
  * as it can: the place is read from the device, the nearest clinic that reaches it is picked for them, and a text code takes
- * the place of a password. Home care is paid after the visit and an ambulance before it is sent; neither has an online payment step yet.
+ * the place of a password. Home care is paid after the visit. An ambulance is paid
+ * for before it is sent: after the request, PayStep follows the M-Pesa prompt until it is paid.
  */
 export const BookHomeCare = () => {
   // The same flow serves an ambulance (?care=ambulance): the services shown are ambulance services, there is no time to
@@ -35,6 +37,9 @@ export const BookHomeCare = () => {
   const [time, setTime] = useState<VisitTime>({ mode: "asap" });
   const [result, setResult] = useState<HomeCareRequestResult | null>(null);
   const [phoneUsed, setPhoneUsed] = useState("");
+  // An ambulance is paid for before it is sent: after the request, the page waits for the M-Pesa payment.
+  const [paid, setPaid] = useState(false);
+  const markPaid = useCallback(() => setPaid(true), []);
   const region = useRef<HTMLDivElement>(null);
   const first = useRef(true);
 
@@ -88,7 +93,12 @@ export const BookHomeCare = () => {
         )}
 
         <div ref={region} role="region" aria-label={REGION_LABELS[done ? 4 : step]} tabIndex={-1} className="outline-none">
-          {done && result && service && <DoneStep result={result} serviceName={service.name} phone={phoneUsed} ambulance={ambulance} />}
+          {done && result && service && ambulance && result.payment && !paid && (
+            <PayStep result={result} phone={phoneUsed} onPaid={markPaid} />
+          )}
+          {done && result && service && (!ambulance || !result.payment || paid) && (
+            <DoneStep result={result} serviceName={service.name} phone={phoneUsed} ambulance={ambulance} />
+          )}
 
           {!done && step === 0 && (
             <ServiceStep
