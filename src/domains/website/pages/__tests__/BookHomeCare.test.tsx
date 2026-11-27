@@ -16,7 +16,8 @@ const api = vi.hoisted(() => ({
   fetchHomeCareServices: vi.fn(),
   fetchHomeCareCoverage: vi.fn(),
   sendHomeCareCode: vi.fn(),
-  createHomeCareRequest: vi.fn()
+  createHomeCareRequest: vi.fn(),
+  fetchHomeCarePrices: vi.fn()
 }));
 
 vi.mock("../../../../shared/libs/homeCarePublic", async (importOriginal) => ({
@@ -80,6 +81,7 @@ beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset());
   api.fetchHomeCareServices.mockResolvedValue(SERVICES);
   api.fetchHomeCareCoverage.mockResolvedValue({ covered: true, service_id: "svc-wound", facilities: [CLINIC] });
+  api.fetchHomeCarePrices.mockResolvedValue([]);
   allowLocation();
   window.scrollTo = vi.fn();
 });
@@ -376,5 +378,65 @@ describe("requesting an ambulance (the same page with ?care=ambulance)", () => {
     expect(await screen.findByRole("button", { name: /Wound dressing/ })).toBeInTheDocument();
     expect(api.fetchHomeCareServices).toHaveBeenCalledWith("home");
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("prices on the service cards", () => {
+  const AMB = [
+    { id: "svc-bls", key: "bls", name: "BLS with oxygen", description: "Basic life support", base_price_cents: 500000, default_estimate_minutes: 120, category: { id: "c-amb", name: "Ambulance" } },
+    { id: "svc-als", key: "als", name: "Advanced life support", description: "Paramedic on board", base_price_cents: 900000, default_estimate_minutes: 60, category: { id: "c-amb", name: "Ambulance" } }
+  ];
+  const grantLocation = (state: PermissionState) =>
+    Object.defineProperty(navigator, "permissions", {
+      configurable: true,
+      value: { query: vi.fn(async () => ({ state })) }
+    });
+
+  afterEach(() => Object.defineProperty(navigator, "permissions", { configurable: true, value: undefined }));
+
+  it("shows the lowest price each service costs anywhere, and offers exact prices for the visitor's location", async () => {
+    grantLocation("prompt");
+    api.fetchHomeCareServices.mockResolvedValue(AMB);
+    api.fetchHomeCarePrices.mockResolvedValue([
+      { service_id: "svc-bls", from_cents: 805000, currency: "KES", nearest: null },
+      { service_id: "svc-als", from_cents: null, currency: null, nearest: null }
+    ]);
+    renderPage("/book/home-care?care=ambulance");
+
+    const card = await screen.findByRole("button", { name: /BLS with oxygen/ });
+    await waitFor(() => expect(card).toHaveTextContent(/From Ksh\s?8,050/));
+    expect(screen.getByRole("button", { name: /Advanced life support/ })).not.toHaveTextContent(/Ksh/);
+    expect(api.fetchHomeCarePrices).toHaveBeenCalledWith("ambulance", null);
+    expect(screen.getByRole("button", { name: "Use my location for exact prices" })).toBeInTheDocument();
+  });
+
+  it("uses a location the visitor already allowed, with no prompt, and shows what they will pay", async () => {
+    grantLocation("granted");
+    api.fetchHomeCareServices.mockResolvedValue(AMB);
+    api.fetchHomeCarePrices.mockImplementation(async (_kind: string, coords: unknown) =>
+      coords
+        ? [{ service_id: "svc-bls", from_cents: 805000, currency: "KES", nearest: { facility_id: "f1", facility_name: "OCOA Ambulance", distance_km: 7.9, price_cents: 1725000, currency: "KES" } }]
+        : []
+    );
+    renderPage("/book/home-care?care=ambulance");
+
+    const card = await screen.findByRole("button", { name: /BLS with oxygen/ });
+    await waitFor(() => expect(card).toHaveTextContent(/Ksh\s?17,250 · OCOA Ambulance, 7\.9 km/));
+    expect(api.fetchHomeCarePrices).toHaveBeenCalledWith("ambulance", { lat: -1.292, lng: 36.822 });
+    expect(screen.getByText("Prices are for where you are now.")).toBeInTheDocument();
+  });
+
+  it("asks for the location only when the visitor taps the button", async () => {
+    grantLocation("prompt");
+    const ask = vi.spyOn(navigator.geolocation, "getCurrentPosition");
+    api.fetchHomeCareServices.mockResolvedValue(AMB);
+    const user = userEvent.setup();
+    renderPage("/book/home-care?care=ambulance");
+
+    await screen.findByRole("button", { name: /BLS with oxygen/ });
+    expect(ask).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Use my location for exact prices" }));
+    expect(ask).toHaveBeenCalled();
   });
 });
