@@ -41,7 +41,7 @@ export const taskTiles = (inApp: boolean): TaskTile[] => {
     const homeCare = inApp ? CLIENT_HOME_CARE_PATH : PUBLIC_HOME_CARE_BOOKING_PATH;
     const book = (choice: TelemedicineChoice) => telemedicineBookingPath(inApp, choice);
     return [
-        { key: "video", label: "Video doctor", icon: Video, to: book({ category: "firstcare" }), tint: "blue" },
+        { key: "video", label: "Video doctor consultation", icon: Video, to: book({ category: "firstcare" }), tint: "blue" },
         { key: "specialist", label: "Find a specialist", icon: Stethoscope, to: book({ category: "specialistcare" }), tint: "blue" },
         { key: "mental-health", label: "Mental health", icon: MessageCircleHeart, to: book({ category: "mental-health" }), tint: "gold" },
         { key: "lab-results", label: "Lab results review", icon: FlaskConical, to: book({ service: "follow-up-medical-consultation" }), tint: "blue" },
