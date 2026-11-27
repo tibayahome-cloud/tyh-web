@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useServices } from "../../../shared/hooks/useServices";
-import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
+import { COMPANY_PHONE, COMPANY_PHONE_LOCAL } from "../../../shared/constants/contact";
 import { TaskTiles } from "../components/TaskTiles";
 
 // Assets
@@ -367,23 +367,16 @@ export const Home = () => {
                                 Request an ambulance <ArrowRight className="h-5 w-5" aria-hidden="true" />
                             </Link>
 
-                            <p className="mb-4 text-lg font-semibold text-white">In an emergency, call now.</p>
-                            <div className="flex flex-wrap gap-3">
-                                {[
-                                    { href: "tel:999", label: "Call 999" },
-                                    { href: "tel:112", label: "Call 112" },
-                                    { href: `tel:${COMPANY_PHONE}`, label: `Call ${COMPANY_PHONE_DISPLAY}` }
-                                ].map((call) => (
-                                    <a
-                                        key={call.href}
-                                        href={call.href}
-                                        className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-white px-5 font-semibold text-tiba-blue transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                                    >
-                                        <Phone className="h-5 w-5" aria-hidden="true" />
-                                        {call.label}
-                                    </a>
-                                ))}
-                            </div>
+                            <p className="mb-4 text-lg font-semibold text-white">
+                                Need an ambulance? Book now, or call {COMPANY_PHONE_LOCAL} <span className="font-normal text-blue-100">(non-emergency)</span>
+                            </p>
+                            <a
+                                href={`tel:${COMPANY_PHONE}`}
+                                className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-white px-5 font-semibold text-tiba-blue transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                            >
+                                <Phone className="h-5 w-5" aria-hidden="true" />
+                                Call {COMPANY_PHONE_LOCAL}
+                            </a>
                         </div>
 
                         <motion.div

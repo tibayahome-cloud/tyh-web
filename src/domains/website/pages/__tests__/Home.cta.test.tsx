@@ -258,13 +258,14 @@ describe("homepage calls to action", () => {
       expect(screen.getByRole("link", { name: "Ambulance" })).toHaveAttribute("href", "/book/home-care?care=ambulance");
     });
 
-    it("puts the numbers to call and a request button in the ambulance section lower on the page", () => {
+    it("puts our number (non-emergency) and a request button in the ambulance section, and no public emergency numbers", () => {
       renderHome({ isAuthenticated: false });
 
       const section = document.getElementById("ambulance") as HTMLElement;
-      expect(within(section).getByRole("link", { name: "Call 999" })).toHaveAttribute("href", "tel:999");
-      expect(within(section).getByRole("link", { name: "Call 112" })).toHaveAttribute("href", "tel:112");
-      expect(within(section).getByRole("link", { name: /^Call \+254/ })).toHaveAttribute("href", expect.stringMatching(/^tel:\+254/));
+      expect(within(section).getByText(/Need an ambulance\? Book now, or call 0712 444 422/)).toBeInTheDocument();
+      expect(within(section).getByText("(non-emergency)")).toBeInTheDocument();
+      expect(within(section).getByRole("link", { name: "Call 0712 444 422" })).toHaveAttribute("href", "tel:+254712444422");
+      expect(within(section).queryByRole("link", { name: /999|112/ })).not.toBeInTheDocument();
       expect(within(section).getByRole("link", { name: /Request an ambulance/ })).toHaveAttribute("href", "/book/home-care?care=ambulance");
     });
   });

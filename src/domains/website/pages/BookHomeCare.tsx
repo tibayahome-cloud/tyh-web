@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { COMPANY_PHONE, COMPANY_PHONE_DISPLAY } from "../../../shared/constants/contact";
+import { COMPANY_PHONE, COMPANY_PHONE_LOCAL } from "../../../shared/constants/contact";
 import { Stepper } from "../../../shared/components/Stepper";
 import { careServiceImage } from "../../../shared/utils/careServiceImage";
 import type { HomeCareClinic, HomeCareRequestResult, HomeCareService } from "../../../shared/libs/homeCarePublic";
@@ -58,23 +58,16 @@ export const BookHomeCare = () => {
 
         {ambulance && !done && (
           <div className="mb-5 rounded-2xl border-2 border-tiba-blue bg-white p-4" role="note">
-            <p className="mb-3 font-semibold text-slate-900">In danger now? Call, do not wait for this form.</p>
-            <div className="flex flex-wrap gap-3">
-              {[
-                { href: "tel:999", label: "Call 999" },
-                { href: "tel:112", label: "Call 112" },
-                { href: `tel:${COMPANY_PHONE}`, label: `Call ${COMPANY_PHONE_DISPLAY}` }
-              ].map((call) => (
-                <a
-                  key={call.href}
-                  href={call.href}
-                  className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-tiba-blue px-4 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
-                >
-                  <Phone className="h-4 w-4" aria-hidden="true" />
-                  {call.label}
-                </a>
-              ))}
-            </div>
+            <p className="mb-3 font-semibold text-slate-900">
+              Need an ambulance? Book now below, or call {COMPANY_PHONE_LOCAL} <span className="font-normal text-slate-600">(non-emergency)</span>
+            </p>
+            <a
+              href={`tel:${COMPANY_PHONE}`}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-tiba-blue px-4 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tiba-blue"
+            >
+              <Phone className="h-4 w-4" aria-hidden="true" />
+              Call {COMPANY_PHONE_LOCAL}
+            </a>
           </div>
         )}
 
